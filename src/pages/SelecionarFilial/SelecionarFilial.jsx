@@ -1,10 +1,15 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './SelecionarFilial.css';
 import { Building2, MapPin, ChevronRight } from 'lucide-react';
 
 export default function SelecionarFilial() {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Pega o destino que foi enviado pela Central de Operações. 
+  // Se por acaso alguém entrar aqui direto, manda pro '/' por segurança.
+  const rotaDestino = location.state?.destinoFinal || '/';
   
   const dadosFiliais = [
     { id: 'BR02', nome: 'BR02 — Santo André', cidade: 'Santo André, SP', cor: 'azul' },
@@ -29,19 +34,17 @@ export default function SelecionarFilial() {
           <div 
             key={filial.id} 
             className="cartao-filial"
-            /* 👇 A MUDANÇA ESTÁ AQUI: Agora vai direto para Consulta de Estoque */
-            onClick={() => navigate('/consulta-estoque')}
+            // Ao clicar, navega para a rota que trouxemos na memória!
+            onClick={() => navigate(rotaDestino)}
           >
             <div className={`bloco-icone ${filial.cor === 'azul' ? 'bloco-azul' : 'bloco-roxo'}`}>
               <MapPin size={20} strokeWidth={2.5} />
               <span className="texto-sigla">{filial.id}</span>
             </div>
-
             <div className="info-filial">
               <h2 className="nome-filial">{filial.nome}</h2>
               <p className="local-filial">{filial.cidade}</p>
             </div>
-
             <div className="acao-filial">
               <div className={`ponto-status ${filial.cor === 'azul' ? 'ponto-azul' : 'ponto-roxo'}`}></div>
               <ChevronRight className="icone-seta" size={20} />
