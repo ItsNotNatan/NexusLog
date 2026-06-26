@@ -1,0 +1,142 @@
+/* Ficheiro: SelecionarFilial.css */
+
+/* Contentor principal do ecrã */
+.selecionar-filial-container {
+  min-height: 100vh;
+  background-color: #f4f5f7; /* Fundo cinza bem claro, conforme a imagem */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4rem 1.5rem;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Cabeçalho centralizado */
+.cabecalho-filial {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.icone-topo-container {
+  background-color: #e0e7ff; /* Fundo azul claro */
+  color: #3b82f6; /* Azul forte */
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem auto;
+}
+
+.titulo-filial {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.subtitulo-filial {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+/* Lista vertical de cartões */
+.lista-filiais {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 42rem; /* Limita a largura para não ficar muito esticado num ecrã grande */
+}
+
+/* O cartão da filial em si */
+.cartao-filial {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.cartao-filial:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Bloco do ícone à esquerda do cartão */
+.bloco-icone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid;
+}
+
+/* Variações de cor para o bloco do ícone */
+.bloco-azul {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+  color: #3b82f6;
+}
+
+.bloco-roxo {
+  background-color: #faf5ff;
+  border-color: #e9d5ff;
+  color: #a855f7;
+}
+
+.texto-sigla {
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-top: 0.1rem;
+}
+
+/* Informações de texto no centro do cartão */
+.info-filial {
+  flex-grow: 1; /* Ocupa o espaço livre do meio */
+  margin-left: 1.5rem;
+}
+
+.nome-filial {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.local-filial {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-top: 0.2rem;
+}
+
+/* Parte direita do cartão (Status e Seta) */
+.acao-filial {
+  display: flex;
+  align-items: center;
+}
+
+.ponto-status {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  margin-right: 1rem;
+}
+
+.ponto-azul {
+  background-color: #3b82f6;
+}
+
+.ponto-roxo {
+  background-color: #a855f7;
+}
+
+.icone-seta {
+  color: #9ca3af;
+}

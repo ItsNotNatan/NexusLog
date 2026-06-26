@@ -1,9 +1,13 @@
 import React from 'react';
-// IMPORTANTE: Importamos o nosso ficheiro CSS aqui!
-import './CentralDeOperacoes.css';
+// Importamos o hook de navegação do react-router-dom
+import { useNavigate } from 'react-router-dom'; 
+import './CentralOperacoes.css';
 import { Box, LayoutGrid, ClipboardList, ShieldCheck, Activity, ArrowRight } from 'lucide-react';
 
 export default function CentralDeOperacoes() {
+  // Inicializamos a função navigate
+  const navigate = useNavigate();
+
   return (
     <div className="painel-container">
       
@@ -35,7 +39,11 @@ export default function CentralDeOperacoes() {
                 <span className="tag">Solicitações</span>
                 <span className="tag">Rastreabilidade</span>
             </div>
-            <button className="botao-acao">
+            {/* Adicionado o evento onClick aqui! */}
+            <button 
+                className="botao-acao" 
+                onClick={() => navigate('/selecionar-filial')}
+            >
                 Selecionar Filial <ArrowRight size={18} className="icone-seta" />
             </button>
         </div>
@@ -54,7 +62,11 @@ export default function CentralDeOperacoes() {
                 <span className="tag">Aprovação de BS</span>
                 <span className="tag">Painel Geral</span>
             </div>
-            <button className="botao-acao">
+            {/* Adicionado o evento onClick aqui! */}
+            <button 
+                className="botao-acao"
+                onClick={() => navigate('/selecionar-filial')}
+            >
                 Acessar Logística <ArrowRight size={18} className="icone-seta" />
             </button>
         </div>
