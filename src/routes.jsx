@@ -6,7 +6,7 @@ import AppLayout from './components/Layout/AppLayout';
 
 // Importação das tuas Páginas
 import CentralDeOperacoes from './pages/CentralOperacoes/CentralOperacoes';
-import SelecionarFilial from './pages/SelecionarFilial/SelecionarFilial'; // <-- Importamos a nova tela
+import SelecionarFilial from './pages/SelecionarFilial/SelecionarFilial';
 import PainelGeral from './pages/PainelGeral/PainelGeral';
 import Dashboard from './pages/Dashboard/Dashboard';
 import EntradaEstoque from './pages/EntradaEstoque/EntradaEstoque';
@@ -17,17 +17,17 @@ import Configuracoes from './pages/Configuracoes/Configuracoes';
 
 export const router = createBrowserRouter([
   {
-    // Tela Inicial
+    // 1. PRIMEIRA TELA: Central de Operações
     path: "/",
     element: <CentralDeOperacoes />
   },
   {
-    // Tela de Selecionar Filial (Sem barra lateral)
+    // 2. SEGUNDA TELA: Selecionar Filial (Chegamos aqui clicando na Central)
     path: "/selecionar-filial",
     element: <SelecionarFilial />
   },
   {
-    // Layout com Barra Lateral
+    // 3. O SISTEMA EM SI: Layout com Barra Lateral
     element: <AppLayout />, 
     children: [
       { path: "/painel", element: <PainelGeral /> },
