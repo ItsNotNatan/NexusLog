@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 export default function Sidebar({ modulo }) {
-  // 1. Menu EXCLUSIVO do Cliente
+  // 1. Menu EXCLUSIVO do Cliente (Apenas as 3 opções que pediste!)
   const menuCliente = [
     { path: '/cliente/consulta-estoque', label: 'Consulta de Estoque', icon: <Boxes size={20} /> },
     { path: '/cliente/fazer-solicitacao', label: 'Fazer Solicitação', icon: <ClipboardEdit size={20} /> },
@@ -25,7 +25,7 @@ export default function Sidebar({ modulo }) {
     { path: '/logistica/configuracoes', label: 'Configurações', icon: <Settings size={20} /> },
   ];
 
-  // A mágica: escolhemos a lista certa e o título certo
+  // Aqui a tua lógica escolhe qual menu desenhar com base na palavra que veio do AppLayout
   const menuItems = modulo === 'cliente' ? menuCliente : menuLogistica;
   const tituloSidebar = modulo === 'cliente' ? 'Portal do Cliente' : 'NexusLog';
 
