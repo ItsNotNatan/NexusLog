@@ -38,9 +38,6 @@ export default function FazerSolicitacao() {
       <header className="solicitacao-cabecalho">
         <div className="cabecalho-topo">
           {/* O navigate(-1) diz ao navegador para voltar à página anterior */}
-          <button className="btn-voltar" onClick={() => navigate(-1)} title="Voltar">
-            <ArrowLeft size={20} />
-          </button>
           <div>
             <h1>Fazer Solicitação</h1>
             <p>Escolha o tipo de solicitação que deseja realizar</p>
