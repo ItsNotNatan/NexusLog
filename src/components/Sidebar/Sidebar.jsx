@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
-import { 
+import {
   LayoutDashboard, ListTodo, PackagePlus, Archive, Download, FileSpreadsheet, Settings, Hexagon,
   ClipboardEdit, Boxes, FileClock, ArrowLeft
 } from 'lucide-react';
@@ -22,7 +22,7 @@ export default function Sidebar({ modulo }) {
   const menuLogistica = [
     { path: '/logistica/painel', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} /> },
-        { path: '/logistica/PainelAprovacao', label: 'Painel de Aprovação', icon: <ListTodo size={20} /> },
+    { path: '/logistica/PainelAprovacao', label: 'Painel de Aprovação', icon: <ListTodo size={20} /> },
     { path: '/logistica/traceabilly', label: 'Rastreabilidade', icon: <Archive size={20} /> },
     { path: '/logistica/exportar', label: 'Exportar Dados', icon: <Download size={20} /> },
     { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} /> },
@@ -45,8 +45,8 @@ export default function Sidebar({ modulo }) {
         <ul>
           {menuItems.map((item) => (
             <li key={item.path}>
-              <NavLink 
-                to={item.path} 
+              <NavLink
+                to={item.path}
                 className={({ isActive }) => isActive ? "nav-item ativo" : "nav-item"}
               >
                 <span className="nav-icone">{item.icon}</span>
@@ -59,7 +59,7 @@ export default function Sidebar({ modulo }) {
 
       {/* NOVO: Secção inferior com o botão de voltar */}
       <div className="sidebar-footer">
-        <button 
+        <button
           className="btn-voltar-sidebar"
           // Vai para os galpões, e guarda a página atual na memória para voltar para cá depois!
           onClick={() => navigate('/selecionar-filial', { state: { destinoFinal: location.pathname } })}
