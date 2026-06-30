@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './Configuracoes.css';
-import { Target, Info } from 'lucide-react';
+// 👇 A CORREÇÃO ESTÁ AQUI: Adicionamos o RotateCcw e o Save na importação
+import { Target, Info, RotateCcw, Save } from 'lucide-react';
 
 export default function Configuracoes() {
   // Estado para armazenar o valor do input (começa com 3)
@@ -64,23 +65,23 @@ export default function Configuracoes() {
         </div>
 
         {/* ========================================= */}
-{/* BARRA DE AÇÕES (RODAPÉ)                   */}
-{/* ========================================= */}
-<div className="config-rodape-acoes">
-  <span className="rodape-texto">
-    Configurações salvas localmente neste navegador.
-  </span>
-  
-  <div className="rodape-botoes">
-    <button className="btn-padrao">
-      <RotateCcw size={16} /> Padrão
-    </button>
-    
-    <button className="btn-salvar">
-      <Save size={16} /> Salvar
-    </button>
-  </div>
-</div>
+        {/* BARRA DE AÇÕES (RODAPÉ)                   */}
+        {/* ========================================= */}
+        <div className="config-rodape-acoes">
+          <span className="rodape-texto">
+            Configurações salvas localmente neste navegador.
+          </span>
+          
+          <div className="rodape-botoes">
+            <button className="btn-padrao">
+              <RotateCcw size={16} /> Padrão
+            </button>
+            
+            <button className="btn-salvar">
+              <Save size={16} /> Salvar
+            </button>
+          </div>
+        </div>
 
       </div>
     </div>
