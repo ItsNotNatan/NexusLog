@@ -20,7 +20,7 @@ export default function Sidebar({ modulo }) {
 
   // 2. Menu EXCLUSIVO da Logística
   const menuLogistica = [
-    { path: '/logistica/painel', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+    { path: '/logistica/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} /> },
     { path: '/logistica/PainelAprovacao', label: 'Painel de Aprovação', icon: <ListTodo size={20} /> },
     { path: '/logistica/traceabilly', label: 'Rastreabilidade', icon: <Archive size={20} /> },
