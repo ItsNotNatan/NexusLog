@@ -6,7 +6,7 @@ import CentralDeOperacoes from './pages/CentralOperacoes/CentralOperacoes';
 import SelecionarFilial from './pages/SelecionarFilial/SelecionarFilial';
 
 import PainelGeral from './pages/PainelGeral/PainelGeral';
-import Dashboard from './pages/Dashboard/Dashboard';
+import PainelAprovacao from './pages/PainelAprovacao/PainelAprovacao';
 import EntradaEstoque from './pages/EntradaEstoque/EntradaEstoque';
 import Traceabilly from './pages/Traceabilly/Traceabilly';
 import ExportarDados from './pages/ExportarDados/ExportarDados';
@@ -38,7 +38,7 @@ export const router = createBrowserRouter([
     element: <AppLayout modulo="logistica" />, 
     children: [
       { path: "painel", element: <PainelGeral /> },
-      { path: "dashboard", element: <Dashboard /> },
+      { path: "PainelAprovacao", element: <PainelAprovacao /> },
       { path: "entrada-estoque", element: <EntradaEstoque /> },
       { path: "traceabilly", element: <Traceabilly /> },
       { path: "exportar", element: <ExportarDados /> },

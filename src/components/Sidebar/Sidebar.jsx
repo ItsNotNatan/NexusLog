@@ -20,10 +20,10 @@ export default function Sidebar({ modulo }) {
 
   // 2. Menu EXCLUSIVO da Logística
   const menuLogistica = [
-    { path: '/logistica/painel', label: 'Painel Geral', icon: <LayoutDashboard size={20} /> },
-    { path: '/logistica/dashboard', label: 'Dashboard BS/PS', icon: <ListTodo size={20} /> },
+    { path: '/logistica/painel', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} /> },
-    { path: '/logistica/traceabilly', label: 'Traceabilly', icon: <Archive size={20} /> },
+        { path: '/logistica/PainelAprovacao', label: 'Painel de Aprovação', icon: <ListTodo size={20} /> },
+    { path: '/logistica/traceabilly', label: 'Rastreabilidade', icon: <Archive size={20} /> },
     { path: '/logistica/exportar', label: 'Exportar Dados', icon: <Download size={20} /> },
     { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} /> },
     { path: '/logistica/configuracoes', label: 'Configurações', icon: <Settings size={20} /> },
