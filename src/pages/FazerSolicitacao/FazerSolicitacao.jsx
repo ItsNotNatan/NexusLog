@@ -5,8 +5,8 @@ import {
   Truck, RefreshCcw, XCircle 
 } from 'lucide-react';
 
-// IMPORTAÇÃO DOS TEUS COMPONENTES (Ajusta os caminhos se necessário)
-import MaterialEstoque from './MaterialEstoque'; // Vamos criar este abaixo!
+// IMPORTAÇÃO DOS COMPONENTES FILHOS (Certifica-te que estes ficheiros existem!)
+import MaterialEstoque from './MaterialEstoque'; 
 import TransferenciaWBS from '../TransferenciaWBS/TransferenciaWBS';
 import SolicitarNotaFiscal from '../SolicitarNotaFiscal/SolicitarNotaFiscal';
 import EntradaMaterial from '../EntradaMaterial/EntradaMaterial';
@@ -15,8 +15,11 @@ import ReintegracaoItens from '../ReintegracaoItens/ReintegracaoItens';
 import CancelarBS from '../CancelarBS/CancelarBS';
 
 export default function FazerSolicitacao() {
+  // Estado inicial
   const [tipoAtivo, setTipoAtivo] = useState('material');
 
+  // O array com as tuas 7 opções, onde cada uma tem a sua "cor" mapeada.
+  // Nota: Omitimos a cor nas duas primeiras para usarem o Azul por defeito.
   const tiposSolicitacao = [
     { id: 'material', titulo: 'Material de Estoque', desc: 'Retirada de itens do almoxarifado', icone: <Boxes size={20} /> },
     { id: 'transferencia', titulo: 'Transferência de WBS', desc: 'Mover material para outro projeto', icone: <ArrowLeftRight size={20} /> },
@@ -36,10 +39,12 @@ export default function FazerSolicitacao() {
         <p>Escolha o tipo de solicitação que deseja realizar</p>
       </header>
 
-      {/* MENU DE BOTÕES */}
+      {/* MENU DE BOTÕES COM CORES DINÂMICAS */}
       <div className="tipos-container">
         {tiposSolicitacao.map((tipo) => {
           let classeCartao = 'tipo-cartao';
+          
+          // Se este for o botão clicado, adicionamos a classe CSS correspondente à cor
           if (tipoAtivo === tipo.id) {
             classeCartao += tipo.cor ? ` ativo-${tipo.cor}` : ' ativo';
           }
@@ -59,7 +64,7 @@ export default function FazerSolicitacao() {
       </div>
 
       {/* ========================================================= */}
-      {/* RENDERIZAÇÃO DOS COMPONENTES                              */}
+      {/* RENDERIZAÇÃO CONDICIONAL DOS MÓDULOS                      */}
       {/* ========================================================= */}
       <div className="conteudo-dinamico">
         {tipoAtivo === 'material' && <MaterialEstoque />}
