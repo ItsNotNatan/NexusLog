@@ -1,14 +1,14 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './SelecionarFilial.css';
-import { Building2, MapPin, ChevronRight } from 'lucide-react';
+import { Building2, MapPin, ChevronRight, ArrowLeft } from 'lucide-react';
 
 export default function SelecionarFilial() {
   const navigate = useNavigate();
   const location = useLocation();
   
   // Pega o destino que foi enviado pela Central de Operações. 
-  // Se por acaso alguém entrar aqui direto, manda pro '/' por segurança.
+  // Se não houver, assume que o utilizador vai para a raiz '/' por segurança.
   const rotaDestino = location.state?.destinoFinal || '/';
   
   const dadosFiliais = [
@@ -19,6 +19,18 @@ export default function SelecionarFilial() {
 
   return (
     <div className="selecionar-filial-container">
+      
+      {/* NOVO: Envolvendo o botão com o max-width para manter o alinhamento */}
+      <div style={{ width: '100%', maxWidth: '42rem' }}>
+        <button 
+          className="btn-voltar-areas" 
+          onClick={() => navigate('/')}
+        >
+          <ArrowLeft size={18} />
+          Voltar para Áreas
+        </button>
+      </div>
+
       <header className="cabecalho-filial">
         <div className="icone-topo-container">
           <Building2 size={28} />

@@ -364,3 +364,32 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   .nf-grid-superior { grid-template-columns: 1fr; }
   textarea.input-campo { height: 100px; }
 }
+
+/* --- BOTÃO VOLTAR E CABEÇALHO --- */
+.cabecalho-topo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.btn-voltar {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0; /* Impede o botão de encolher */
+}
+
+.btn-voltar:hover {
+  background-color: #f8fafc;
+  color: #1e293b;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}

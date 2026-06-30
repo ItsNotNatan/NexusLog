@@ -1,13 +1,17 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 import { 
   LayoutDashboard, ListTodo, PackagePlus, Archive, Download, FileSpreadsheet, Settings, Hexagon,
-  ClipboardEdit, Boxes, FileClock 
+  ClipboardEdit, Boxes, FileClock, ArrowLeft
 } from 'lucide-react';
 
 export default function Sidebar({ modulo }) {
-  // 1. Menu EXCLUSIVO do Cliente (Apenas as 3 opções que pediste!)
+  // Ferramentas de navegação para o botão de voltar
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // 1. Menu EXCLUSIVO do Cliente
   const menuCliente = [
     { path: '/cliente/consulta-estoque', label: 'Consulta de Estoque', icon: <Boxes size={20} /> },
     { path: '/cliente/fazer-solicitacao', label: 'Fazer Solicitação', icon: <ClipboardEdit size={20} /> },
@@ -25,7 +29,6 @@ export default function Sidebar({ modulo }) {
     { path: '/logistica/configuracoes', label: 'Configurações', icon: <Settings size={20} /> },
   ];
 
-  // Aqui a tua lógica escolhe qual menu desenhar com base na palavra que veio do AppLayout
   const menuItems = modulo === 'cliente' ? menuCliente : menuLogistica;
   const tituloSidebar = modulo === 'cliente' ? 'Portal do Cliente' : 'NexusLog';
 
@@ -53,6 +56,19 @@ export default function Sidebar({ modulo }) {
           ))}
         </ul>
       </nav>
+
+      {/* NOVO: Secção inferior com o botão de voltar */}
+      <div className="sidebar-footer">
+        <button 
+          className="btn-voltar-sidebar"
+          // Vai para os galpões, e guarda a página atual na memória para voltar para cá depois!
+          onClick={() => navigate('/selecionar-filial', { state: { destinoFinal: location.pathname } })}
+        >
+          <ArrowLeft size={18} />
+          Voltar a Galpões
+        </button>
+      </div>
+
     </aside>
   );
 }

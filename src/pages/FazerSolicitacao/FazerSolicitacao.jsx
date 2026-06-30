@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // 1. Importamos o hook de navegação
 import './FazerSolicitacao.css';
 import { 
   Boxes, ArrowLeftRight, FileText, PackagePlus, 
-  Truck, RefreshCcw, XCircle 
-} from 'lucide-react';
+  Truck, RefreshCcw, XCircle, ArrowLeft 
+} from 'lucide-react'; // 2. Importamos a setinha (ArrowLeft)
 
-// IMPORTAÇÃO DOS COMPONENTES FILHOS (Certifica-te que estes ficheiros existem!)
+// IMPORTAÇÃO DOS COMPONENTES FILHOS
 import MaterialEstoque from './MaterialEstoque'; 
 import TransferenciaWBS from '../TransferenciaWBS/TransferenciaWBS';
 import SolicitarNotaFiscal from '../SolicitarNotaFiscal/SolicitarNotaFiscal';
@@ -15,11 +16,11 @@ import ReintegracaoItens from '../ReintegracaoItens/ReintegracaoItens';
 import CancelarBS from '../CancelarBS/CancelarBS';
 
 export default function FazerSolicitacao() {
-  // Estado inicial
   const [tipoAtivo, setTipoAtivo] = useState('material');
+  
+  // 3. Inicializamos o useNavigate
+  const navigate = useNavigate();
 
-  // O array com as tuas 7 opções, onde cada uma tem a sua "cor" mapeada.
-  // Nota: Omitimos a cor nas duas primeiras para usarem o Azul por defeito.
   const tiposSolicitacao = [
     { id: 'material', titulo: 'Material de Estoque', desc: 'Retirada de itens do almoxarifado', icone: <Boxes size={20} /> },
     { id: 'transferencia', titulo: 'Transferência de WBS', desc: 'Mover material para outro projeto', icone: <ArrowLeftRight size={20} /> },
@@ -33,10 +34,18 @@ export default function FazerSolicitacao() {
   return (
     <div className="solicitacao-wrapper">
       
-      {/* CABEÇALHO */}
+      {/* CABEÇALHO COM BOTÃO VOLTAR */}
       <header className="solicitacao-cabecalho">
-        <h1>Fazer Solicitação</h1>
-        <p>Escolha o tipo de solicitação que deseja realizar</p>
+        <div className="cabecalho-topo">
+          {/* O navigate(-1) diz ao navegador para voltar à página anterior */}
+          <button className="btn-voltar" onClick={() => navigate(-1)} title="Voltar">
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1>Fazer Solicitação</h1>
+            <p>Escolha o tipo de solicitação que deseja realizar</p>
+          </div>
+        </div>
       </header>
 
       {/* MENU DE BOTÕES COM CORES DINÂMICAS */}
@@ -44,7 +53,6 @@ export default function FazerSolicitacao() {
         {tiposSolicitacao.map((tipo) => {
           let classeCartao = 'tipo-cartao';
           
-          // Se este for o botão clicado, adicionamos a classe CSS correspondente à cor
           if (tipoAtivo === tipo.id) {
             classeCartao += tipo.cor ? ` ativo-${tipo.cor}` : ' ativo';
           }
