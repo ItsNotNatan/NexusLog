@@ -70,6 +70,43 @@ export default function Dashboard() {
       </div>
 
       {/* ============================================================ */}
+      {/* SECÇÃO: EFICIÊNCIA DE ATENDIMENTO                            */}
+      {/* ============================================================ */}
+      <div className="efficiency-section">
+        <div className="efficiency-header">
+          <div className="efficiency-icon">
+            <Target size={20} />
+          </div>
+          <div className="efficiency-textos">
+            <h2>Eficiência de Atendimento</h2>
+            <p>Lead time: Data Criação &rarr; Data de Finalização &middot; Target: 3 dia(s)</p>
+          </div>
+        </div>
+
+        <div className="efficiency-grid">
+          <div className="eff-card green">
+            <CheckCircle2 size={24} strokeWidth={1.5} />
+            <span>Dentro do Target</span>
+            <strong>0</strong>
+          </div>
+          <div className="eff-card red">
+            <XCircle size={24} strokeWidth={1.5} />
+            <span>Fora do Target</span>
+            <strong>0</strong>
+          </div>
+          <div className="eff-card gray">
+            <BarChart3 size={24} strokeWidth={1.5} />
+            <span>Total Avaliado</span>
+            <strong>0</strong>
+          </div>
+        </div>
+
+        <p className="efficiency-footer">
+          Nenhum BS concluído ainda para cálculo de eficiência.
+        </p>
+      </div>
+
+      {/* ============================================================ */}
       {/* LINHA 1 DE GRÁFICOS (2 Colunas)                              */}
       {/* ============================================================ */}
       <div className="graficos-grid-2col">
@@ -170,6 +207,8 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      
 
       {/* ============================================================ */}
       {/* LINHA 2 DE GRÁFICOS (1 Coluna Completa)                      */}
