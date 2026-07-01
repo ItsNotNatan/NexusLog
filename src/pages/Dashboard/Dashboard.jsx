@@ -1,99 +1,72 @@
 import React from 'react';
-import './Dashboard.css'; // <-- Importando o arquivo CSS
+import './Dashboard.css';
 import { 
-  Settings, 
-  ClipboardList, 
-  FileCheck2, 
-  Clock, 
-  Activity, 
-  Target,
-  CheckCircle2,
-  XCircle,
-  BarChart3,
-  TrendingUp,
-  FileText,
-  Download
+  Settings, ClipboardList, FileCheck2, Clock, Activity, 
+  Target, CheckCircle2, XCircle, BarChart3, TrendingUp, 
+  FileText, Download, Users, AlertTriangle 
 } from 'lucide-react';
 
-const Dashboard = () => {
+export default function Dashboard() {
   return (
-    <div className="painel-container">
+    <div className="dashboard-container">
       
-      {/* Cabeçalho */}
-      <header className="painel-header">
+      {/* --- CABEÇALHO --- */}
+      <header className="dashboard-header">
         <div>
-          <h1 className="header-title">
-            Painel Geral
-          </h1>
-          <p className="header-subtitle">
-            Atualizado em 23 de junho, 13:38
-          </p>
+          <h1>Dashboard de Operações</h1>
+          <p>Métricas de desempenho e visão geral da logística</p>
         </div>
         
         <div className="header-actions">
           <div className="target-badge">
             <Settings size={16} />
-            <span>Target: 3d</span>
+            <span>Target Atual: <strong>3 Dias</strong></span>
           </div>
           <select className="period-select">
+            <option>Todo Período</option>
             <option>Este Mês</option>
-            <option>Mês Passado</option>
-            <option>Este Ano</option>
+            <option>Semana Passada</option>
           </select>
         </div>
       </header>
 
-      {/* Cards Superiores */}
+      {/* --- CARDS SUPERIORES (KPIs) --- */}
       <div className="cards-grid">
-        
-        {/* Card 1 */}
         <div className="stat-card">
           <div className="card-header">
-            <h3 className="card-title">SOLICITAÇÕES</h3>
-            <div className="icon-wrapper icon-blue">
-              <ClipboardList size={20} />
-            </div>
+            <h3 className="card-title">Solicitações Recebidas</h3>
+            <div className="icon-wrapper icon-blue"><ClipboardList size={20} /></div>
           </div>
           <p className="card-value value-blue">14</p>
-          <p className="card-description">26 itens no período</p>
+          <p className="card-description">Total de PS no período</p>
         </div>
 
-        {/* Card 2 */}
         <div className="stat-card">
           <div className="card-header">
-            <h3 className="card-title">BS EMITIDOS</h3>
-            <div className="icon-wrapper icon-blue">
-              <FileCheck2 size={20} />
-            </div>
+            <h3 className="card-title">BS Emitidos</h3>
+            <div className="icon-wrapper icon-blue"><FileCheck2 size={20} /></div>
           </div>
           <p className="card-value value-blue">12</p>
-          <p className="card-description">24 linhas de BS</p>
+          <p className="card-description">Boletins criados</p>
         </div>
 
-        {/* Card 3 */}
         <div className="stat-card">
           <div className="card-header">
-            <h3 className="card-title">AGUARDANDO</h3>
-            <div className="icon-wrapper icon-orange">
-              <Clock size={20} />
-            </div>
+            <h3 className="card-title">Aguardando Aprovação</h3>
+            <div className="icon-wrapper icon-orange"><Clock size={20} /></div>
           </div>
           <p className="card-value value-orange">0</p>
-          <p className="card-description">Pendentes de aprovação</p>
+          <p className="card-description">Pendentes na fila</p>
         </div>
 
-        {/* Card 4 */}
         <div className="stat-card">
           <div className="card-header">
-            <h3 className="card-title">EM SEPARAÇÃO</h3>
-            <div className="icon-wrapper icon-blue">
-              <Activity size={20} />
-            </div>
+            <h3 className="card-title">Em Separação</h3>
+            <div className="icon-wrapper icon-blue"><Activity size={20} /></div>
           </div>
           <p className="card-value value-blue">1</p>
-          <p className="card-description">Em andamento agora</p>
+          <p className="card-description">Sendo processados agora</p>
         </div>
-
       </div>
 
       {/* ============================================================ */}
@@ -174,7 +147,7 @@ const Dashboard = () => {
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
             
-            {/* Barras do Gráfico construídas com divs */}
+            {/* Barras do Gráfico construídas com divs e porcentagens */}
             <div className="grafico-barras">
               <div className="barra-container">
                 <span className="barra-label-topo" style={{opacity: 0}}>0</span>
@@ -182,12 +155,10 @@ const Dashboard = () => {
               </div>
               <div className="barra-container">
                 <span className="barra-label-topo">1</span>
-                {/* 1 num máximo de 12 = ~8.3% */}
                 <div className="barra-preenchimento vermelha" style={{height: '8.3%'}}></div>
               </div>
               <div className="barra-container">
                 <span className="barra-label-topo">11</span>
-                {/* 11 num máximo de 12 = ~91.6% */}
                 <div className="barra-preenchimento azul" style={{height: '91.6%'}}></div>
               </div>
             </div>
@@ -259,8 +230,100 @@ const Dashboard = () => {
 
       </div>
 
+      
+      {/* ============================================================ */}
+        {/* GRÁFICO 4: Volume Diário — Últimos 7 Dias                    */}
+        {/* ============================================================ */}
+        <div className="grafico-card">
+          <div className="grafico-header">
+            <div className="grafico-titulo-grupo">
+              <div className="grafico-icone"><TrendingUp size={18} /></div>
+              <div className="grafico-textos">
+                <h3>Volume Diário — Últimos 7 Dias</h3>
+              </div>
+            </div>
+            <button className="btn-csv"><Download size={14}/> CSV</button>
+          </div>
+
+          <div className="grafico-area" style={{height: '250px'}}>
+            <div className="grafico-eixo-y">
+              <span>4</span><span>3</span><span>2</span><span>1</span><span>0</span>
+            </div>
+            <div className="grafico-linhas">
+              <div className="linha-horizontal"></div><div className="linha-horizontal"></div>
+              <div className="linha-horizontal"></div><div className="linha-horizontal"></div>
+              <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
+            </div>
+
+            {/* GRÁFICO DE LINHA (SVG Puro) - Valores Zerados */}
+            <div className="grafico-svg-layer">
+              <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{overflow: 'visible'}}>
+                {/* Linha Azul (Solicitações) ao nível do zero (y=100) */}
+                <polyline points="0,100 16.6,100 33.3,100 50,100 66.6,100 83.3,100 100,100" fill="none" stroke="#2563eb" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                <circle cx="0" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
+                <circle cx="16.6" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
+                <circle cx="33.3" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
+                <circle cx="50" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
+                <circle cx="66.6" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
+                <circle cx="83.3" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
+                <circle cx="100" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
+
+                {/* Linha Verde (BS Emitidos) ao nível do zero (y=100) sobreposta */}
+                <polyline points="0,100 16.6,100 33.3,100 50,100 66.6,100 83.3,100 100,100" fill="none" stroke="#10b981" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                <circle cx="0" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
+                <circle cx="16.6" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
+                <circle cx="33.3" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
+                <circle cx="50" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
+                <circle cx="66.6" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
+                <circle cx="83.3" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
+                <circle cx="100" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
+              </svg>
+            </div>
+
+            <div className="grafico-eixo-x">
+              <span>25/06</span><span>26/06</span><span>27/06</span><span>28/06</span><span>29/06</span><span>30/06</span><span>01/07</span>
+            </div>
+          </div>
+          
+          <div className="grafico-legenda">
+            <div className="legenda-item"><div className="legenda-cor azul-claro"></div> Solicitações</div>
+            <div className="legenda-item"><div className="legenda-ponto-verde"></div> BS Emitidos</div>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* CARTÃO 5: Top Solicitantes e Em Separação Agora              */}
+        {/* ============================================================ */}
+        <div className="grafico-card cartao-sem-padding">
+          <div className="top-solicitantes-header">
+            <div className="grafico-titulo-grupo">
+              <Users size={20} color="#2563eb" />
+              <h3>Top Solicitantes</h3>
+            </div>
+            <select className="select-simples">
+              <option>Este Mês</option>
+            </select>
+          </div>
+          
+          <div className="top-solicitantes-body">
+            Nenhum solicitante no período
+          </div>
+          
+          <div className="em-separacao-container">
+            <div className="em-separacao-titulo">
+              <div className="ponto-azul-pequeno"></div>
+              EM SEPARAÇÃO AGORA
+            </div>
+            <div className="em-separacao-linha">
+              <span className="ps-destaque">PS: 2306261114</span>
+              <span className="alerta-texto">
+                <AlertTriangle size={16} /> 185h 45min
+              </span>
+            </div>
+          </div>
+        </div>
+
+
     </div>
   );
-};
-
-export default Dashboard;
+}
