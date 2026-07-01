@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './FormatacaoSAP.css';
 import { FileSpreadsheet, Search } from 'lucide-react';
 
-// 1. DADOS SIMULADOS (MOCK DATA)
+// DADOS MOCKADOS (Atualizados para corresponder à tua imagem)
 const dadosLista = [
   {
     id: '10976',
@@ -37,14 +37,18 @@ const dadosLista = [
     solicitante: 'JEFERSON GARANDY',
     itens: 3,
     data: '10/06/26',
-    destino: '' // Este item simula um sem destino visível
+    destino: 'MANUFACTURING'
+  },
+  {
+    id: '10971',
+    solicitante: 'DOUGLAS FELIPE',
+    itens: 1,
+    data: '10/06/26',
+    destino: '...'
   }
 ];
 
-// 2. COMPONENTE PRINCIPAL
 export default function FormatacaoSAP() {
-  // Estado para controlar qual aba está selecionada ('bs' ou 'ps')
-  // Por padrão, começa com 'bs' (Boletins de Saída)
   const [abaAtiva, setAbaAtiva] = useState('bs');
 
   return (
@@ -59,65 +63,67 @@ export default function FormatacaoSAP() {
         </div>
       </header>
 
-      {/* --- CARTÃO PRINCIPAL --- */}
-      <div className="formatacao-cartao">
+      {/* --- LAYOUT DIVIDIDO EM DUAS COLUNAS --- */}
+      <div className="formatacao-grid">
         
-        {/* Alternador de Abas (Toggle) */}
-        <div className="toggle-container">
-          <button 
-            className={`toggle-btn ${abaAtiva === 'bs' ? 'ativo' : ''}`}
-            onClick={() => setAbaAtiva('bs')}
-          >
-            Boletins de Saída (BS)
-          </button>
-          <button 
-            className={`toggle-btn ${abaAtiva === 'ps' ? 'ativo' : ''}`}
-            onClick={() => setAbaAtiva('ps')}
-          >
-            Solicitações (PS)
-          </button>
-        </div>
-
-        {/* Barra de Pesquisa */}
-        <div className="pesquisa-container">
-          <div className="pesquisa-input-wrapper">
-            <Search className="pesquisa-icone" size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar por nº BS, WBS..." 
-              className="pesquisa-input"
-            />
+        {/* COLUNA ESQUERDA: LISTA DE BUSCA */}
+        <div className="cartao-lista">
+          
+          <div className="toggle-container">
+            <button 
+              className={`toggle-btn ${abaAtiva === 'bs' ? 'ativo' : ''}`}
+              onClick={() => setAbaAtiva('bs')}
+            >
+              Boletins de Saída (BS)
+            </button>
+            <button 
+              className={`toggle-btn ${abaAtiva === 'ps' ? 'ativo' : ''}`}
+              onClick={() => setAbaAtiva('ps')}
+            >
+              Solicitações (PS)
+            </button>
           </div>
+
+          <div className="pesquisa-container">
+            <div className="pesquisa-input-wrapper">
+              <Search className="pesquisa-icone" size={18} />
+              <input 
+                type="text" 
+                placeholder="Buscar por nº BS, WBS..." 
+                className="pesquisa-input"
+              />
+            </div>
+          </div>
+
+          <div className="lista-scroll-container">
+            {dadosLista.map((item) => (
+              <div key={item.id} className="lista-item">
+                <div className="item-titulo">
+                  <strong>BS</strong> #{item.id}
+                </div>
+                <div className="item-meta">
+                  {item.solicitante} &middot; {item.itens} {item.itens === 1 ? 'item' : 'itens'} &middot; {item.data}
+                </div>
+                {item.destino && (
+                  <div className="item-destino">
+                    &rarr; {item.destino}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          
         </div>
 
-        {/* --- LISTA COM SCROLL --- */}
-        <div className="lista-scroll-container">
-          {/* Mapeamento dos dados para gerar as linhas */}
-          {dadosLista.map((item, index) => (
-            <div key={item.id} className="lista-item">
-              
-              {/* Título do Item */}
-              <div className="item-titulo">
-                <strong>BS</strong> #{item.id}
-              </div>
-              
-              {/* Informações Secundárias (Metadados) */}
-              <div className="item-meta">
-                {item.solicitante} &middot; {item.itens} {item.itens === 1 ? 'item' : 'itens'} &middot; {item.data}
-              </div>
-              
-              {/* Link de Destino (Renderiza apenas se existir) */}
-              {item.destino && (
-                <div className="item-destino">
-                  &rarr; {item.destino}
-                </div>
-              )}
-              
-            </div>
-          ))}
+        {/* COLUNA DIREITA: ESTADO VAZIO (PREVIEW) */}
+        <div className="cartao-preview">
+          <FileSpreadsheet size={56} className="icone-preview" strokeWidth={1.5} />
+          <h3>Selecione um BS ou PS à esquerda</h3>
+          <p>Os dados serão formatados no padrão SAP</p>
         </div>
 
       </div>
+
     </div>
   );
 }
