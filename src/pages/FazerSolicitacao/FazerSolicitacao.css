@@ -27,9 +27,10 @@
 }
 
 /* LISTA DE TIPOS DE SOLICITAÇÃO (Cartões Horizontais) */
+/* LISTA DE TIPOS DE SOLICITAÇÃO (Cartões Horizontais) */
 .tipos-container {
   display: flex;
-  gap: 16px;
+  gap: 12px; /* Reduzimos um pouco o espaço entre eles (era 16px) */
   margin-bottom: 24px;
   overflow-x: auto;
   padding-bottom: 8px;
@@ -47,12 +48,13 @@
 }
 
 .tipo-cartao {
-  flex: 0 0 auto;
-  width: 180px;
+  flex: 1; /* MUDANÇA PRINCIPAL: Faz os cartões dividirem o espaço igualmente */
+  min-width: 120px; /* Limite mínimo para o texto não ficar completamente esmagado em telas pequenas */
+  /* Removemos a largura fixa de 180px */
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px; /* Reduzimos o padding (era 16px) para ganhar mais espaço interno */
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
