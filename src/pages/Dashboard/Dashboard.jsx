@@ -147,7 +147,7 @@ export default function Dashboard() {
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
             
-            {/* Barras do Gráfico construídas com divs e porcentagens */}
+            {/* Barras do Gráfico */}
             <div className="grafico-barras">
               <div className="barra-container">
                 <span className="barra-label-topo" style={{opacity: 0}}>0</span>
@@ -197,24 +197,24 @@ export default function Dashboard() {
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
 
-            {/* GRÁFICO DE LINHA (SVG Puro) */}
+            {/* GRÁFICO DE LINHA - Correção para manter bolinhas redondas */}
             <div className="grafico-svg-layer">
               <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{overflow: 'visible'}}>
-                {/* Fundo Verde Claro (Área) */}
+                {/* Linhas SVG */}
                 <polygon points="0,100 80,100 100,25 100,100" fill="rgba(16, 185, 129, 0.1)" />
-                
-                {/* Linha Verde (BS Emitidos) -> Vai de 0 a 12 (75% da altura) */}
                 <polyline points="0,100 20,100 40,100 60,100 80,100 100,25" fill="none" stroke="#10b981" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                <circle cx="0" cy="100" r="4" fill="#10b981" vectorEffect="non-scaling-stroke" />
-                <circle cx="40" cy="100" r="4" fill="#10b981" vectorEffect="non-scaling-stroke" />
-                <circle cx="80" cy="100" r="4" fill="#10b981" vectorEffect="non-scaling-stroke" />
-                <circle cx="100" cy="25" r="4" fill="#10b981" vectorEffect="non-scaling-stroke" />
-
-                {/* Linha Azul (Solicitações) -> Vai de 0 a 14 (87.5% da altura) */}
                 <polyline points="0,100 20,100 40,100 60,100 80,100 100,12.5" fill="none" stroke="#2563eb" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                <circle cx="100" cy="12.5" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
-                <circle cx="100" cy="12.5" r="2" fill="#ffffff" vectorEffect="non-scaling-stroke" />
               </svg>
+              
+              {/* Pontos HTML sobrepostos para não esticarem */}
+              {[0, 20, 40, 60, 80].map(pos => (
+                <React.Fragment key={`hist-${pos}`}>
+                  <div className="ponto-grafico verde" style={{ left: `${pos}%`, bottom: '0%' }}></div>
+                  <div className="ponto-grafico azul" style={{ left: `${pos}%`, bottom: '0%' }}></div>
+                </React.Fragment>
+              ))}
+              <div className="ponto-grafico verde" style={{ left: '100%', bottom: '75%' }}></div>
+              <div className="ponto-grafico azul-branco" style={{ left: '100%', bottom: '87.5%' }}></div>
             </div>
 
             <div className="grafico-eixo-x">
@@ -228,10 +228,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-      </div>
-
-      
-      {/* ============================================================ */}
+        {/* ============================================================ */}
         {/* GRÁFICO 4: Volume Diário — Últimos 7 Dias                    */}
         {/* ============================================================ */}
         <div className="grafico-card">
@@ -255,29 +252,20 @@ export default function Dashboard() {
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
 
-            {/* GRÁFICO DE LINHA (SVG Puro) - Valores Zerados */}
+            {/* GRÁFICO DE LINHA - Correção das bolinhas */}
             <div className="grafico-svg-layer">
               <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{overflow: 'visible'}}>
-                {/* Linha Azul (Solicitações) ao nível do zero (y=100) */}
                 <polyline points="0,100 16.6,100 33.3,100 50,100 66.6,100 83.3,100 100,100" fill="none" stroke="#2563eb" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                <circle cx="0" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
-                <circle cx="16.6" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
-                <circle cx="33.3" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
-                <circle cx="50" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
-                <circle cx="66.6" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
-                <circle cx="83.3" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
-                <circle cx="100" cy="100" r="4" fill="#2563eb" vectorEffect="non-scaling-stroke" />
-
-                {/* Linha Verde (BS Emitidos) ao nível do zero (y=100) sobreposta */}
                 <polyline points="0,100 16.6,100 33.3,100 50,100 66.6,100 83.3,100 100,100" fill="none" stroke="#10b981" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                <circle cx="0" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
-                <circle cx="16.6" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
-                <circle cx="33.3" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
-                <circle cx="50" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
-                <circle cx="66.6" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
-                <circle cx="83.3" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
-                <circle cx="100" cy="100" r="3" fill="#10b981" vectorEffect="non-scaling-stroke" />
               </svg>
+              
+              {/* Pontos HTML */}
+              {[0, 16.6, 33.3, 50, 66.6, 83.3, 100].map(pos => (
+                <React.Fragment key={`vol-${pos}`}>
+                  <div className="ponto-grafico azul" style={{ left: `${pos}%`, bottom: '0%' }}></div>
+                  <div className="ponto-grafico verde pequeno" style={{ left: `${pos}%`, bottom: '0%' }}></div>
+                </React.Fragment>
+              ))}
             </div>
 
             <div className="grafico-eixo-x">
@@ -323,6 +311,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+      </div>
 
     </div>
   );
