@@ -395,3 +395,190 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   border-color: #cbd5e1;
   box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
+
+/* ========================================================================== */
+/* SECÇÃO DE SELEÇÃO DE ITENS (Material de Estoque)                           */
+/* ========================================================================== */
+
+.selecao-itens-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.painel-lista {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 600px;
+  overflow: hidden;
+}
+
+.painel-lista-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.painel-lista-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.titulo-com-icone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.titulo-com-icone svg {
+  color: #2563eb;
+}
+
+.badge-contagem {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  background-color: #f8fafc;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.badge-contagem.bg-branco {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+/* Pesquisa do Estoque */
+.pesquisa-estoque {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  position: relative;
+}
+
+.icone-pesquisa-estoque {
+  position: absolute;
+  left: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+}
+
+.pesquisa-estoque input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.pesquisa-estoque input:focus {
+  border-color: #93c5fd;
+  background-color: #ffffff;
+}
+
+/* Lista Rolável */
+.lista-rolavel {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.lista-rolavel::-webkit-scrollbar {
+  width: 8px;
+}
+.lista-rolavel::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+}
+
+.item-estoque-card {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.item-estoque-card:hover {
+  background-color: #f8fafc;
+}
+
+.item-pn {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.item-desc {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0 0 8px 0;
+}
+
+.item-rodape {
+  display: flex;
+  gap: 16px;
+  font-size: 0.75rem;
+}
+
+.item-saldo { color: #10b981; }
+.item-saldo strong { font-weight: 600; }
+.item-alocacao { color: #2563eb; font-weight: 500; font-family: monospace, sans-serif; }
+
+/* Estado Vazio (Lado Direito) */
+.estado-vazio-selecao {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+  gap: 16px;
+}
+
+.estado-vazio-selecao p {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* Botão de Enviar (Azul Padrão) */
+.btn-enviar-azul {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-enviar-azul:hover {
+  background-color: #1d4ed8;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .selecao-itens-grid {
+    grid-template-columns: 1fr;
+  }
+}
