@@ -376,3 +376,36 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   -webkit-appearance: none; 
   margin: 0; 
 }
+
+/* ========================================================================== */
+/* EDIÇÃO INLINE DA TABELA (Quantidade e Texto Geral)                         */
+/* ========================================================================== */
+
+/* ... (mantém o CSS do input-inline-tabela que já lá está) ... */
+
+/* NOVO: Para campos de texto gerais da tabela */
+.input-editavel-tabela {
+  width: 100%;
+  min-width: 80px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background-color: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.input-editavel-tabela:hover {
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
+  cursor: text;
+}
+
+.input-editavel-tabela:focus {
+  background-color: #ffffff;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
