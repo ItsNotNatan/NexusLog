@@ -6,80 +6,57 @@ import {
   CheckCircle2,
   XCircle,
   Search,
-  FileText
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
 
-// 1. DADOS SIMULADOS (MOCK) BASEADOS NA IMAGEM
-const dadosTabela = [
-  {
-    id: 1,
-    desenhoSAP: 'TLXXX-0000023499',
-    partNumber: '1534534',
-    descricao: 'SENSOR DE INDUÇÃO',
-    fornecedor: 'BALLUF',
-    nfEntrada: '1497',
-    qtdNF: '20',
-    qtdNFUnd: 'Unid',
-    qtdCor: 'azul',
-    saldo: '0',
-    saldoUnd: 'Unid',
-    saldoCor: 'vermelho',
-    valorUnit: 'R$ 250,00',
-    valorTotal: 'R$ 0,00',
-    alocacao: '200-A-003',
-    wbs: 'BRBCBBB20',
-    status: 'Zerado'
-  },
-  {
-    id: 2,
-    desenhoSAP: '-',
-    partNumber: 'PN-TUB-7890',
-    descricao: 'Tubo Aço Inox 316L 6" Sch...',
-    fornecedor: 'Aperam South America',
-    nfEntrada: 'NF-45830',
-    qtdNF: '-',
-    qtdNFUnd: '',
-    qtdCor: 'cinza',
-    saldo: '4',
-    saldoUnd: 'Metro',
-    saldoCor: 'verde',
-    valorUnit: 'R$ 890,00',
-    valorTotal: 'R$ 3.560,00',
-    alocacao: '400-A-003',
-    wbs: 'WBS-PRJ-2024-001',
-    status: 'Disponível'
-  },
-  {
-    id: 3,
-    desenhoSAP: '-',
-    partNumber: 'PN-FLG-1580',
-    descricao: 'Flange Cego 4" ANSI 150',
-    fornecedor: 'Conforminas',
-    nfEntrada: 'NF-45822',
-    qtdNF: '-',
-    qtdNFUnd: '',
-    qtdCor: 'cinza',
-    saldo: '17',
-    saldoUnd: 'Unid',
-    saldoCor: 'verde',
-    valorUnit: 'R$ 380,50',
-    valorTotal: 'R$ 6.468,50',
-    alocacao: '300-C-012',
-    wbs: 'WBS-PRJ-2024-001',
-    status: 'Disponível'
-  }
-];
+// Importamos a nossa ferramenta e o componente de botão
+import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
+import { lerRelatorioSAP } from '../../utils/excelUtils';
+
+// Mantemos o mock inicial apenas para quando a página carrega vazia
+const dadosIniciais = [];
 
 export default function ConsultaEstoque() {
   const [periodoAtivo, setPeriodoAtivo] = useState('Total');
+  const [dadosTabela, setDadosTabela] = useState(dadosIniciais); // Estado que guarda os itens
+  const [carregando, setCarregando] = useState(false);
+
+  // Calcula os valores dinâmicos dos KPIs baseado no Excel importado
+  const totalItens = dadosTabela.length;
+  const disponiveis = dadosTabela.filter(item => item.status === 'Disponível').length;
+  const zerados = dadosTabela.filter(item => item.status === 'Zerado').length;
+
+  const handleImportarSAP = async (arquivo) => {
+    setCarregando(true);
+    try {
+      const novosDados = await lerRelatorioSAP(arquivo);
+      setDadosTabela(novosDados);
+    } catch (erro) {
+      alert(erro);
+    } finally {
+      setCarregando(false);
+    }
+  };
 
   return (
     <div className="consulta-wrapper">
 
       {/* --- CABEÇALHO --- */}
-      <header className="consulta-cabecalho">
-        <h1>Consulta de Estoque</h1>
-        <p>Visão completa dos materiais disponíveis em todos os projetos</p>
+      <header className="consulta-cabecalho" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1>Consulta de Estoque</h1>
+          <p>Visão completa dos materiais disponíveis em todos os projetos</p>
+        </div>
+        
+        {/* NOSSO BOTÃO DE UPLOAD AQUI! */}
+        <CarregarArquivo 
+          variante="botao"
+          accept=".xlsx, .xls, .csv"
+          label={carregando ? "Carregando..." : "Importar Relatório SAP"}
+          icone={<FileSpreadsheet size={16} color="#10b981" />}
+          onFileSelect={handleImportarSAP}
+        />
       </header>
 
       {/* --- DESTAQUE: VALOR TOTAL --- */}
@@ -90,13 +67,13 @@ export default function ConsultaEstoque() {
           </div>
           <div className="valor-textos">
             <label>VALOR TOTAL DO ESTOQUE</label>
-            <h2>R$ 56.704,75</h2>
+            <h2>R$ --,--</h2> {/* Na vida real, farias um .reduce() para somar os valores da tabela */}
           </div>
         </div>
 
         <div className="itens-ativos-badge">
           <span>Itens Ativos</span>
-          <strong>9</strong>
+          <strong>{disponiveis}</strong>
         </div>
       </div>
 
@@ -114,15 +91,15 @@ export default function ConsultaEstoque() {
         ))}
       </div>
 
-      {/* --- CARTÕES KPI (Total, Disponíveis, Zerados) --- */}
+      {/* --- CARTÕES KPI (Dinâmicos agora!) --- */}
       <div className="kpis-estoque">
         <div className="kpi-card selecionado">
           <div className="kpi-icone">
             <Package size={20} />
           </div>
           <div className="kpi-textos">
-            <label>Total de Itens</label>
-            <strong>11</strong>
+            <label>Total de Linhas (SAP)</label>
+            <strong>{totalItens}</strong>
           </div>
         </div>
 
@@ -131,8 +108,8 @@ export default function ConsultaEstoque() {
             <CheckCircle2 size={20} />
           </div>
           <div className="kpi-textos">
-            <label>Disponíveis</label>
-            <strong>9</strong>
+            <label>Com Saldo</label>
+            <strong>{disponiveis}</strong>
           </div>
         </div>
 
@@ -142,15 +119,13 @@ export default function ConsultaEstoque() {
           </div>
           <div className="kpi-textos">
             <label>Zerados</label>
-            <strong>2</strong>
+            <strong>{zerados}</strong>
           </div>
         </div>
       </div>
 
       {/* --- ÁREA DA TABELA --- */}
       <div className="tabela-area">
-
-        {/* Pesquisas */}
         <div className="tabela-pesquisas">
           <div className="pesquisa-grupo principal">
             <Search className="icone-busca" size={18} />
@@ -162,110 +137,91 @@ export default function ConsultaEstoque() {
           </div>
         </div>
 
-        {/* Info Resultados */}
         <div className="resultados-info">
-          11 resultados
+          {totalItens} resultados encontrados
         </div>
 
-        {/* Tabela com Scroll */}
         <div className="scroll-tabela">
           <table className="tabela-dados">
             <thead>
               <tr>
-                <th>DESCRIÇÃO DO MAT.</th>
-                <th>N° PRÇA</th>
-                <th>DESCRIÇÃO</th>
+                <th>DESENHO SAP</th>
+                <th>MATERIAL DESCRIPTION</th>
+                <th>Nº PEÇA FABRICANTE</th>
                 <th>FORNECEDOR</th>
-                <th>QTD</th>
+                <th>QTD. FORNECIDA</th>
                 <th>REFERÊNCIA</th>
-                <th>UNI. DE MED.</th>
-                <th>VENDOR DESCR.</th>
+                <th>UNIDADE</th>
+                <th>VENDOR DESCRIPTION</th>
                 <th>WBS</th>
-                <th>EMISSÃO NF.</th>
-                <th>RECIBO NF.</th>
+                <th>EMISSÃO NF</th>
+                <th>RECEB. NF</th>
                 <th>DOC. DE COMPRAS</th>
-                <th>PO. NET PRICE</th>
+                <th>PO NET PRICE</th>
                 <th>CENTRO</th>
                 <th>DEPÓSITO</th>
                 <th>ALOCAÇÃO</th>
+                <th>STATUS</th>
               </tr>
             </thead>
             <tbody>
-              {dadosTabela.map((item) => (
-                <tr key={item.id}>
-
-                  {/* Desenho SAP */}
-                  <td>
-                    {item.desenhoSAP !== '-' ? (
-                      <span className="texto-cinza-claro" style={{ display: 'block', maxWidth: '80px', wordWrap: 'break-word' }}>
-                        {item.desenhoSAP}
-                      </span>
-                    ) : (
-                      <span className="texto-cinza-claro">-</span>
-                    )}
+              {dadosTabela.length === 0 ? (
+                <tr>
+                  <td colSpan="17" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                    <FileSpreadsheet size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                    <br />
+                    Importe o relatório SAP no botão acima para visualizar o estoque.
                   </td>
-
-                  {/* Part Number */}
-                  <td>
-                    <span className="badge-partnumber">{item.partNumber}</span>
-                  </td>
-
-                  {/* Descrição e Fornecedor */}
-                  <td className="texto-preto">{item.descricao}</td>
-                  <td className="texto-cinza-escuro">{item.fornecedor}</td>
-
-                  {/* NF Entrada */}
-                  <td>
-                    <span className="badge-nf">
-                      <FileText size={14} /> {item.nfEntrada}
-                    </span>
-                  </td>
-
-                  {/* QTD NF */}
-                  <td>
-                    <div className={`qtd-celula ${item.qtdCor}`}>
-                      {item.qtdNF}
-                      {item.qtdNFUnd && <span>{item.qtdNFUnd}</span>}
-                    </div>
-                  </td>
-
-                  {/* SALDO */}
-                  <td>
-                    <div className={`qtd-celula ${item.saldoCor}`}>
-                      {item.saldo}
-                      {item.saldoUnd && <span>{item.saldoUnd}</span>}
-                    </div>
-                  </td>
-
-                  {/* Valores */}
-                  <td className="texto-cinza-escuro">{item.valorUnit}</td>
-                  <td className="texto-preto">{item.valorTotal}</td>
-
-                  {/* Links (Alocação e WBS) */}
-                  <td><a href="#" className="link-azul">{item.alocacao}</a></td>
-                  <td><a href="#" className="link-azul">{item.wbs}</a></td>
-
-                  {/* Situação (Badge Status) */}
-                  <td>
-                    {item.status === 'Zerado' ? (
-                      <span className="badge-status-tabela status-zerado">
-                        <XCircle size={14} /> {item.status}
-                      </span>
-                    ) : (
-                      <span className="badge-status-tabela status-disponivel">
-                        <CheckCircle2 size={14} /> {item.status}
-                      </span>
-                    )}
-                  </td>
-
                 </tr>
-              ))}
+              ) : (
+                dadosTabela.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      {item.desenhoSAP !== '-' ? (
+                        <span className="texto-cinza-claro" style={{ display: 'block', maxWidth: '100px', wordWrap: 'break-word' }}>
+                          {item.desenhoSAP}
+                        </span>
+                      ) : (
+                        <span className="texto-cinza-claro">-</span>
+                      )}
+                    </td>
+                    <td className="texto-preto" style={{ minWidth: '200px' }}>{item.materialDescription}</td>
+                    <td><span className="badge-partnumber">{item.numPecaFabricante}</span></td>
+                    <td className="texto-cinza-escuro">{item.fornecedor}</td>
+                    <td>
+                      <div className={`qtd-celula ${item.qtdFornecida === '0' ? 'vermelho' : 'verde'}`}>
+                        {item.qtdFornecida}
+                      </div>
+                    </td>
+                    <td className="texto-cinza-escuro">{item.referencia}</td>
+                    <td className="texto-cinza">{item.unidadeMedida}</td>
+                    <td className="texto-cinza-claro" style={{ minWidth: '180px' }}>{item.vendorDescription}</td>
+                    <td><a href="#" className="link-azul">{item.wbs}</a></td>
+                    <td className="texto-cinza">{item.emissaoNF}</td>
+                    <td className="texto-cinza">{item.recebNF}</td>
+                    <td className="texto-cinza-escuro">{item.docCompras}</td>
+                    <td className="texto-preto">{item.poNetPrice}</td>
+                    <td className="texto-cinza">{item.centro}</td>
+                    <td className="texto-cinza">{item.deposito}</td>
+                    <td><a href="#" className="link-azul">{item.alocacao}</a></td>
+                    <td>
+                      {item.status === 'Zerado' ? (
+                        <span className="badge-status-tabela status-zerado">
+                          <XCircle size={14} /> {item.status}
+                        </span>
+                      ) : (
+                        <span className="badge-status-tabela status-disponivel">
+                          <CheckCircle2 size={14} /> {item.status}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-
       </div>
-
     </div>
   );
 }

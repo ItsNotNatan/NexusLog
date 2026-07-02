@@ -348,3 +348,10 @@
   color: #10b981;
   border: 1px solid #a7f3d0;
 }
+
+.tabela-dados {
+  width: 100%;
+  min-width: 1800px; /* <--- Aumenta este valor para dar respiro às colunas novas */
+  border-collapse: collapse;
+  text-align: left;
+}
