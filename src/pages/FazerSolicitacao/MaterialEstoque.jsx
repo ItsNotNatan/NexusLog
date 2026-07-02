@@ -1,5 +1,9 @@
-import React from 'react';
-import { User, MapPin, Calendar, Zap, Search, Package, Send } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, MapPin, Calendar, Zap, Search, Package, Send, FileSpreadsheet, Trash2 } from 'lucide-react';
+
+// IMPORTAÇÕES PARA O EXCEL FUNCIONAR
+import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
+import { lerExcelParaItens } from '../../utils/excelUtils';
 
 // DADOS SIMULADOS BASEADOS NA IMAGEM
 const estoqueDisponivel = [
@@ -15,9 +19,19 @@ const estoqueDisponivel = [
 ];
 
 export default function MaterialEstoque() {
+  // 1. ESTADO: Guarda os itens que o utilizador escolheu (manualmente ou por Excel)
+  const [itensSelecionados, setItensSelecionados] = useState([]);
+
+  // 2. FUNÇÃO: Remove um item da lista da direita
+  const removerItem = (idParaRemover) => {
+    setItensSelecionados(prev => prev.filter(item => item.id !== idParaRemover));
+  };
+
   return (
     <>
-      {/* 1. FORMULÁRIO DO SOLICITANTE (O que já tínhamos) */}
+      {/* ======================================================= */}
+      {/* 1. FORMULÁRIO DO SOLICITANTE                            */}
+      {/* ======================================================= */}
       <div className="form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
@@ -76,7 +90,7 @@ export default function MaterialEstoque() {
       </div>
 
       {/* ======================================================= */}
-      {/* 2. NOVA SECÇÃO: SELEÇÃO DE ITENS                          */}
+      {/* 2. SECÇÃO: SELEÇÃO DE ITENS E UPLOAD EXCEL                */}
       {/* ======================================================= */}
       <div className="selecao-itens-grid">
         
@@ -92,7 +106,12 @@ export default function MaterialEstoque() {
           </div>
           <div className="lista-rolavel">
             {estoqueDisponivel.map((item, index) => (
-              <div key={index} className="item-estoque-card">
+              <div 
+                key={index} 
+                className="item-estoque-card"
+                // Adiciona o item à lista da direita ao clicar
+                onClick={() => setItensSelecionados(prev => [...prev, { ...item, id: `manual-${Date.now()}-${index}`, qtdSelecionada: 1 }])}
+              >
                 <strong className="item-pn">{item.pn}</strong>
                 <p className="item-desc">{item.desc}</p>
                 <div className="item-rodape">
@@ -110,12 +129,58 @@ export default function MaterialEstoque() {
             <div className="titulo-com-icone">
               <Package size={18} /> Itens Selecionados
             </div>
-            <span className="badge-contagem bg-branco">0/25</span>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              
+              {/* O NOSSO COMPONENTE DE UPLOAD */}
+              <CarregarArquivo 
+                variante="botao"
+                accept=".xlsx, .xls"
+                label="Importar Excel"
+                icone={<FileSpreadsheet size={16} color="#10b981" />}
+                onFileSelect={(arquivo) => {
+                  lerExcelParaItens(arquivo)
+                    .then(novosItens => setItensSelecionados(prev => [...prev, ...novosItens]))
+                    .catch(erro => alert(erro));
+                }}
+              />
+
+              <span className="badge-contagem bg-branco">{itensSelecionados.length}/25</span>
+            </div>
           </div>
-          <div className="estado-vazio-selecao">
-            <Package size={48} strokeWidth={1} />
-            <p>Clique nos itens à esquerda para adicioná-los</p>
-          </div>
+
+          {/* Renderização Condicional: Vazio ou Lista */}
+          {itensSelecionados.length === 0 ? (
+            <div className="estado-vazio-selecao">
+              <Package size={48} strokeWidth={1} />
+              <p>Clique nos itens à esquerda ou importe um Excel</p>
+            </div>
+          ) : (
+            <div className="lista-rolavel">
+              {itensSelecionados.map((item) => (
+                <div key={item.id} className="item-estoque-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <strong className="item-pn">{item.pn}</strong>
+                    <p className="item-desc" style={{ marginBottom: '4px' }}>{item.desc}</p>
+                    <div className="item-rodape">
+                      <span className="item-saldo" style={{ color: '#64748b' }}>
+                        Qtd pedida: <strong style={{ color: '#2563eb' }}>{item.qtdSelecionada}</strong>
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Botão de Remover (Lixeira) */}
+                  <button 
+                    onClick={() => removerItem(item.id)}
+                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '8px' }}
+                    title="Remover item"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>

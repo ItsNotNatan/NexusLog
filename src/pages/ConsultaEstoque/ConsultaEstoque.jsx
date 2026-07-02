@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import './ConsultaEstoque.css';
-import { 
-  DollarSign, 
-  Package, 
-  CheckCircle2, 
-  XCircle, 
-  Search, 
-  FileText 
+import {
+  DollarSign,
+  Package,
+  CheckCircle2,
+  XCircle,
+  Search,
+  FileText
 } from 'lucide-react';
 
 // 1. DADOS SIMULADOS (MOCK) BASEADOS NA IMAGEM
@@ -75,7 +75,7 @@ export default function ConsultaEstoque() {
 
   return (
     <div className="consulta-wrapper">
-      
+
       {/* --- CABEÇALHO --- */}
       <header className="consulta-cabecalho">
         <h1>Consulta de Estoque</h1>
@@ -93,7 +93,7 @@ export default function ConsultaEstoque() {
             <h2>R$ 56.704,75</h2>
           </div>
         </div>
-        
+
         <div className="itens-ativos-badge">
           <span>Itens Ativos</span>
           <strong>9</strong>
@@ -104,7 +104,7 @@ export default function ConsultaEstoque() {
       <div className="filtros-periodo">
         <span>PERÍODO:</span>
         {['Total', 'Hoje', 'Semana', 'Mês'].map(periodo => (
-          <button 
+          <button
             key={periodo}
             className={`btn-periodo ${periodoAtivo === periodo ? 'ativo' : ''}`}
             onClick={() => setPeriodoAtivo(periodo)}
@@ -149,7 +149,7 @@ export default function ConsultaEstoque() {
 
       {/* --- ÁREA DA TABELA --- */}
       <div className="tabela-area">
-        
+
         {/* Pesquisas */}
         <div className="tabela-pesquisas">
           <div className="pesquisa-grupo principal">
@@ -161,7 +161,7 @@ export default function ConsultaEstoque() {
             <input type="text" placeholder="Buscar por Nota Fiscal..." />
           </div>
         </div>
-        
+
         {/* Info Resultados */}
         <div className="resultados-info">
           11 resultados
@@ -172,24 +172,28 @@ export default function ConsultaEstoque() {
           <table className="tabela-dados">
             <thead>
               <tr>
-                <th>DESENHO SAP</th>
-                <th>PART NUMBER</th>
+                <th>DESCRIÇÃO DO MAT.</th>
+                <th>N° PRÇA</th>
                 <th>DESCRIÇÃO</th>
                 <th>FORNECEDOR</th>
-                <th>NF ENTRADA</th>
-                <th>QTD. NF</th>
-                <th>SALDO</th>
-                <th>VALOR UNIT.</th>
-                <th>VALOR TOTAL</th>
-                <th>ALOCAÇÃO</th>
+                <th>QTD</th>
+                <th>REFERÊNCIA</th>
+                <th>UNI. DE MED.</th>
+                <th>VENDOR DESCR.</th>
                 <th>WBS</th>
-                <th>SITUAÇÃO</th>
+                <th>EMISSÃO NF.</th>
+                <th>RECIBO NF.</th>
+                <th>DOC. DE COMPRAS</th>
+                <th>PO. NET PRICE</th>
+                <th>CENTRO</th>
+                <th>DEPÓSITO</th>
+                <th>ALOCAÇÃO</th>
               </tr>
             </thead>
             <tbody>
               {dadosTabela.map((item) => (
                 <tr key={item.id}>
-                  
+
                   {/* Desenho SAP */}
                   <td>
                     {item.desenhoSAP !== '-' ? (
@@ -200,23 +204,23 @@ export default function ConsultaEstoque() {
                       <span className="texto-cinza-claro">-</span>
                     )}
                   </td>
-                  
+
                   {/* Part Number */}
                   <td>
                     <span className="badge-partnumber">{item.partNumber}</span>
                   </td>
-                  
+
                   {/* Descrição e Fornecedor */}
                   <td className="texto-preto">{item.descricao}</td>
                   <td className="texto-cinza-escuro">{item.fornecedor}</td>
-                  
+
                   {/* NF Entrada */}
                   <td>
                     <span className="badge-nf">
                       <FileText size={14} /> {item.nfEntrada}
                     </span>
                   </td>
-                  
+
                   {/* QTD NF */}
                   <td>
                     <div className={`qtd-celula ${item.qtdCor}`}>
@@ -224,7 +228,7 @@ export default function ConsultaEstoque() {
                       {item.qtdNFUnd && <span>{item.qtdNFUnd}</span>}
                     </div>
                   </td>
-                  
+
                   {/* SALDO */}
                   <td>
                     <div className={`qtd-celula ${item.saldoCor}`}>
@@ -232,15 +236,15 @@ export default function ConsultaEstoque() {
                       {item.saldoUnd && <span>{item.saldoUnd}</span>}
                     </div>
                   </td>
-                  
+
                   {/* Valores */}
                   <td className="texto-cinza-escuro">{item.valorUnit}</td>
                   <td className="texto-preto">{item.valorTotal}</td>
-                  
+
                   {/* Links (Alocação e WBS) */}
                   <td><a href="#" className="link-azul">{item.alocacao}</a></td>
                   <td><a href="#" className="link-azul">{item.wbs}</a></td>
-                  
+
                   {/* Situação (Badge Status) */}
                   <td>
                     {item.status === 'Zerado' ? (
