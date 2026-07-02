@@ -1,37 +1,47 @@
 import React, { useState } from 'react';
 import { User, MapPin, Calendar, Zap, Search, Package, Send, FileSpreadsheet, Trash2 } from 'lucide-react';
-
-// IMPORTAÇÕES PARA O EXCEL FUNCIONAR
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
 import { lerExcelParaItens } from '../../utils/excelUtils';
 
-// DADOS SIMULADOS BASEADOS NA IMAGEM
+// DADOS DO ESTOQUE ATUALIZADOS PARA O PADRÃO COMPLETO
 const estoqueDisponivel = [
-  { pn: 'PN-PAR-4450', desc: 'Parafuso Estojo 3/4" x 4" B7', saldo: '199 Unid', alocacao: '200-E-005' },
-  { pn: 'PN-TUB-7890', desc: 'Tubo Aço Inox 316L 6" Sch40', saldo: '4 Metro', alocacao: '400-A-003' },
-  { pn: 'PN-FLG-1580', desc: 'Flange Cego 4" ANSI 150', saldo: '17 Unid', alocacao: '300-C-012' },
-  { pn: 'PN-ELB-9012', desc: 'Cotovelo 90º 3" Aço Carbono', saldo: '1 Unid', alocacao: '300-A-009' },
-  { pn: 'PN-INS-3345', desc: 'Isolamento Térmico Lã de Rocha 2"', saldo: '120 Metro', alocacao: '500-A-001' },
-  { pn: 'PN-JTA-2210', desc: 'Junta Spiral Wound 4" CS', saldo: '78 Unid', alocacao: '200-D-018' },
-  { pn: 'PN-MAN-1125', desc: 'Manômetro 0-10 kgf/cm² Inox', saldo: '12 Unid', alocacao: '200-F-020' },
-  { pn: 'PN-VLV-3420', desc: 'Válvula Esfera 2" ANSI 300', saldo: '3 Unid', alocacao: '300-B-006' },
-  { pn: 'PN-CHP-7780', desc: 'Chapa Aço Inox 304 #12 4x8', saldo: '5 Unid', alocacao: '600-A-002' },
+  { desenhoSAP: 'TEXXX-0000022629', materialDescription: 'REPARTIDORES LÓGICOS 4 X M12 FÊMEA', numPecaFabricante: 'PROLOGANT4RP', fornecedor: 'SENSTRONIC', qtdFornecida: '199', referencia: '9095', unidadeMedida: 'NR', vendorDescription: 'SENSTRONIC DO BRASIL', wbs: 'BRBCBBB29-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34026', poNetPrice: 'R$ 1.697,39', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
+  { desenhoSAP: 'TAL-S378006', materialDescription: 'CONECTOR IE FC 180 4X2', numPecaFabricante: '6GK1901-1BB11-2AA0', fornecedor: 'SIEMENS', qtdFornecida: '4', referencia: 'AR-366866', unidadeMedida: 'NR', vendorDescription: 'SIEMENS INFRAESTRUTURA', wbs: 'BRBRRCY21-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34246', poNetPrice: 'R$ 161,77', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
+  { desenhoSAP: 'TCXXX9999902639', materialDescription: 'CILINDRO COMPACTO DE DUPLA ACAO D50', numPecaFabricante: 'ADVU-50-25-P-A', fornecedor: 'FESTO', qtdFornecida: '17', referencia: '2762733', unidadeMedida: 'NR', vendorDescription: 'FESTO BRASIL LTDA', wbs: 'BRBCBBB41-...', emissaoNF: '26/06/2026', recebNF: '30/06/2026', docCompras: '34258', poNetPrice: 'R$ 1.454,26', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
 ];
 
 export default function MaterialEstoque() {
-  // 1. ESTADO: Guarda os itens que o utilizador escolheu (manualmente ou por Excel)
   const [itensSelecionados, setItensSelecionados] = useState([]);
 
-  // 2. FUNÇÃO: Remove um item da lista da direita
   const removerItem = (idParaRemover) => {
     setItensSelecionados(prev => prev.filter(item => item.id !== idParaRemover));
   };
 
+  const adicionarManualmente = (item, index) => {
+    setItensSelecionados(prev => [...prev, {
+      id: `manual-${Date.now()}-${index}`,
+      desenhoSAP: item.desenhoSAP,
+      materialDescription: item.materialDescription,
+      numPecaFabricante: item.numPecaFabricante,
+      fornecedor: item.fornecedor,
+      qtdSelecionada: 1,
+      referencia: item.referencia,
+      unidadeMedida: item.unidadeMedida,
+      vendorDescription: item.vendorDescription,
+      wbs: item.wbs,
+      emissaoNF: item.emissaoNF,
+      recebNF: item.recebNF,
+      docCompras: item.docCompras,
+      poNetPrice: item.poNetPrice,
+      centro: item.centro,
+      deposito: item.deposito,
+      alocacao: item.alocacao
+    }]);
+  };
+
   return (
     <>
-      {/* ======================================================= */}
-      {/* 1. FORMULÁRIO DO SOLICITANTE                            */}
-      {/* ======================================================= */}
+      {/* --- FORMULÁRIO DO SOLICITANTE --- */}
       <div className="form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
@@ -49,7 +59,6 @@ export default function MaterialEstoque() {
             <label>WBS / CENTRO DE CUSTO *</label>
             <input type="text" className="input-campo" placeholder="Ex: WBS-PRJ-2024-001" />
           </div>
-          
           <div className="input-grupo">
             <label><MapPin size={14} /> FILIAL DE ORIGEM</label>
             <div className="input-wrapper-fixo">
@@ -58,40 +67,22 @@ export default function MaterialEstoque() {
               <span className="badge-fixo">Fixo</span>
             </div>
           </div>
-
           <div className="input-grupo row-span-2">
             <label><MapPin size={14} /> DESTINO *</label>
             <textarea className="input-campo" placeholder="Local de destino do material"></textarea>
           </div>
-
           <div className="input-grupo">
             <label><Calendar size={14} /> DATA DE NECESSIDADE *</label>
             <input type="date" className="input-campo" />
-            <span className="texto-ajuda">Informe até quando o material é necessário</span>
           </div>
-
           <div className="input-grupo span-2">
             <label>OBSERVAÇÕES</label>
-            <textarea className="input-campo" placeholder="Informações adicionais para a equipe de logística" rows="2"></textarea>
-          </div>
-        </div>
-
-        <div className="caixa-urgente">
-          <input type="checkbox" className="checkbox-custom" id="urgente-check" />
-          <div className="urgente-info">
-            <label htmlFor="urgente-check" className="urgente-titulo" style={{cursor: 'pointer'}}>
-              <Zap size={16} color="#fbbf24" fill="#fbbf24" /> Entrega Urgente
-            </label>
-            <span className="urgente-desc">
-              Marque apenas se a solicitação for crítica e necessitar de aprovação imediata do Administrador.
-            </span>
+            <textarea className="input-campo" placeholder="Informações adicionais..." rows="2"></textarea>
           </div>
         </div>
       </div>
 
-      {/* ======================================================= */}
-      {/* 2. SECÇÃO: SELEÇÃO DE ITENS E UPLOAD EXCEL                */}
-      {/* ======================================================= */}
+      {/* --- GRIDS DE SELEÇÃO EM FORMATO PLANILHA --- */}
       <div className="selecao-itens-grid">
         
         {/* COLUNA ESQUERDA: Estoque Disponível */}
@@ -106,16 +97,11 @@ export default function MaterialEstoque() {
           </div>
           <div className="lista-rolavel">
             {estoqueDisponivel.map((item, index) => (
-              <div 
-                key={index} 
-                className="item-estoque-card"
-                // Adiciona o item à lista da direita ao clicar
-                onClick={() => setItensSelecionados(prev => [...prev, { ...item, id: `manual-${Date.now()}-${index}`, qtdSelecionada: 1 }])}
-              >
-                <strong className="item-pn">{item.pn}</strong>
-                <p className="item-desc">{item.desc}</p>
+              <div key={index} className="item-estoque-card" onClick={() => adicionarManualmente(item, index)}>
+                <strong className="item-pn">{item.numPecaFabricante}</strong>
+                <p className="item-desc">{item.materialDescription}</p>
                 <div className="item-rodape">
-                  <span className="item-saldo">Saldo: <strong>{item.saldo}</strong></span>
+                  <span className="item-saldo">Saldo: <strong>{item.qtdFornecida} {item.unidadeMedida}</strong></span>
                   <span className="item-alocacao">{item.alocacao}</span>
                 </div>
               </div>
@@ -123,7 +109,7 @@ export default function MaterialEstoque() {
           </div>
         </div>
 
-        {/* COLUNA DIREITA: Itens Selecionados */}
+        {/* COLUNA DIREITA: NOVA TABELA ESTILO PLANILHA REAL */}
         <div className="painel-lista">
           <div className="painel-lista-header">
             <div className="titulo-com-icone">
@@ -131,8 +117,6 @@ export default function MaterialEstoque() {
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              
-              {/* O NOSSO COMPONENTE DE UPLOAD */}
               <CarregarArquivo 
                 variante="botao"
                 accept=".xlsx, .xls"
@@ -144,41 +128,67 @@ export default function MaterialEstoque() {
                     .catch(erro => alert(erro));
                 }}
               />
-
               <span className="badge-contagem bg-branco">{itensSelecionados.length}/25</span>
             </div>
           </div>
 
-          {/* Renderização Condicional: Vazio ou Lista */}
           {itensSelecionados.length === 0 ? (
             <div className="estado-vazio-selecao">
               <Package size={48} strokeWidth={1} />
-              <p>Clique nos itens à esquerda ou importe um Excel</p>
+              <p>Clique nos itens à esquerda ou importe um Excel do SAP</p>
             </div>
           ) : (
-            <div className="lista-rolavel">
-              {itensSelecionados.map((item) => (
-                <div key={item.id} className="item-estoque-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong className="item-pn">{item.pn}</strong>
-                    <p className="item-desc" style={{ marginBottom: '4px' }}>{item.desc}</p>
-                    <div className="item-rodape">
-                      <span className="item-saldo" style={{ color: '#64748b' }}>
-                        Qtd pedida: <strong style={{ color: '#2563eb' }}>{item.qtdSelecionada}</strong>
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Botão de Remover (Lixeira) */}
-                  <button 
-                    onClick={() => removerItem(item.id)}
-                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '8px' }}
-                    title="Remover item"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              ))}
+            <div className="scroll-tabela-solicitacao">
+              <table className="tabela-solicitacao-dados">
+                <thead>
+                  <tr>
+                    <th>AÇÕES</th>
+                    <th>MATERIAL DESCRIPTION</th>
+                    <th>Nº PEÇA FABRICANTE</th>
+                    <th>QTD. SOLICITADA</th>
+                    <th>DESENHO SAP</th>
+                    <th>FORNECEDOR</th>
+                    <th>REFERÊNCIA</th>
+                    <th>UNIDADE DE MEDIDA</th>
+                    <th>VENDOR DESCRIPTION</th>
+                    <th>WBS</th>
+                    <th>EMISSÃO NF</th>
+                    <th>RECEB. NF</th>
+                    <th>DOCUMENTO DE COMPRAS</th>
+                    <th>PO NET PRICE</th>
+                    <th>CENTRO</th>
+                    <th>DEPÓSITO</th>
+                    <th>ALOCAÇÃO</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itensSelecionados.map((item) => (
+                    <tr key={item.id}>
+                      <td style={{ textAlign: 'center' }}>
+                        <button onClick={() => removerItem(item.id)} className="btn-deletar-linha">
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                      <td className="texto-preto" style={{ minWidth: '220px' }}>{item.materialDescription}</td>
+                      <td><span className="badge-partnumber">{item.numPecaFabricante}</span></td>
+                      <td className="qtd-solicitada-destaque">{item.qtdSelecionada}</td>
+                      <td className="texto-cinza-claro">{item.desenhoSAP}</td>
+                      <td className="texto-cinza-escuro">{item.fornecedor}</td>
+                      <td className="texto-cinza">{item.referencia}</td>
+                      <td className="texto-cinza">{item.unidadeMedida}</td>
+                      <td className="texto-cinza-claro" style={{ minWidth: '180px' }}>{item.vendorDescription}</td>
+                      <td><span className="link-azul-fake">{item.wbs}</span></td>
+                      <td className="texto-cinza">{item.emissaoNF}</td>
+                      <td className="texto-cinza">{item.recebNF}</td>
+                      <td className="texto-cinza-escuro">{item.docCompras}</td>
+                      <td className="texto-preto">{item.poNetPrice}</td>
+                      <td className="texto-cinza">{item.centro}</td>
+                      <td className="texto-cinza">{item.deposito}</td>
+                      <td><span className="link-azul-fake">{item.alocacao}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

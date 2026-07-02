@@ -582,3 +582,75 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
     grid-template-columns: 1fr;
   }
 }
+
+/* CONTAINER E ESTILOS DA PLANILHA DE ITENS SELECIONADOS */
+.scroll-tabela-solicitacao {
+  width: 100%;
+  overflow-x: auto;
+  flex: 1;
+  background-color: #ffffff;
+}
+
+.scroll-tabela-solicitacao::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.scroll-tabela-solicitacao::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+}
+
+.tabela-solicitacao-dados {
+  width: 100%;
+  min-width: 1900px; /* Força o respiro horizontal para as 16 colunas */
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.tabela-solicitacao-dados th {
+  padding: 12px 16px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  position: sticky;
+  top: 0;
+}
+
+.tabela-solicitacao-dados td {
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.qtd-solicitada-destaque {
+  font-weight: 700;
+  color: #2563eb;
+  text-align: center;
+  background-color: #eff6ff;
+  border-radius: 4px;
+}
+
+.link-azul-fake {
+  color: #2563eb;
+  font-family: monospace, sans-serif;
+}
+
+.btn-deletar-linha {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.btn-deletar-linha:hover {
+  color: #ef4444;
+  background-color: #fef2f2;
+}
