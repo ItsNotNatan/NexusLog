@@ -1,4 +1,7 @@
-/* CONTAINER GERAL */
+/* ========================================================================== */
+/* 1. ESTRUTURA GERAL E CABEÇALHO                                             */
+/* ========================================================================== */
+
 .solicitacao-wrapper {
   padding: 32px;
   background-color: #f4f5f7;
@@ -8,9 +11,14 @@
   box-sizing: border-box;
 }
 
-/* CABEÇALHO */
 .solicitacao-cabecalho {
   margin-bottom: 24px;
+}
+
+.cabecalho-topo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .solicitacao-cabecalho h1 {
@@ -26,35 +34,29 @@
   margin: 0;
 }
 
-/* LISTA DE TIPOS DE SOLICITAÇÃO (Cartões Horizontais) */
-/* LISTA DE TIPOS DE SOLICITAÇÃO (Cartões Horizontais) */
+/* ========================================================================== */
+/* 2. MENU SUPERIOR (Cartões de Tipos de Solicitação)                         */
+/* ========================================================================== */
+
 .tipos-container {
   display: flex;
-  gap: 12px; /* Reduzimos um pouco o espaço entre eles (era 16px) */
+  gap: 12px;
   margin-bottom: 24px;
   overflow-x: auto;
   padding-bottom: 8px;
 }
 
-.tipos-container::-webkit-scrollbar {
-  height: 6px;
-}
-.tipos-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-.tipos-container::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 4px;
-}
+.tipos-container::-webkit-scrollbar { height: 6px; }
+.tipos-container::-webkit-scrollbar-track { background: transparent; }
+.tipos-container::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
 
 .tipo-cartao {
-  flex: 1; /* MUDANÇA PRINCIPAL: Faz os cartões dividirem o espaço igualmente */
-  min-width: 120px; /* Limite mínimo para o texto não ficar completamente esmagado em telas pequenas */
-  /* Removemos a largura fixa de 180px */
+  flex: 1; /* Divide o espaço igualmente por todos os cartões */
+  min-width: 120px; /* Evita que o texto esmague em telas pequenas */
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 12px; /* Reduzimos o padding (era 16px) para ganhar mais espaço interno */
+  padding: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -93,55 +95,45 @@
   line-height: 1.3;
 }
 
-/* ========================================================================== */
-/* TEMAS DOS CARTÕES ATIVOS (A mágica das cores acontece aqui!)               */
-/* ========================================================================== */
-
-/* AZUL (Padrão para Material de Estoque e Transferência WBS) */
+/* --- Temas dos Cartões Ativos (Cores) --- */
 .tipo-cartao.ativo { background-color: #eff6ff; border-color: #bfdbfe; }
 .tipo-cartao.ativo .tipo-icone { background-color: transparent; color: #2563eb; }
 .tipo-cartao.ativo .tipo-titulo { color: #2563eb; }
 .tipo-cartao.ativo .tipo-desc { color: #3b82f6; }
 
-/* ROXO (Solicitar Nota Fiscal) */
 .tipo-cartao.ativo-roxo { background-color: #faf5ff; border-color: #e9d5ff; }
 .tipo-cartao.ativo-roxo .tipo-icone { background-color: transparent; color: #a855f7; }
 .tipo-cartao.ativo-roxo .tipo-titulo { color: #9333ea; }
 .tipo-cartao.ativo-roxo .tipo-desc { color: #a855f7; }
 
-/* VERDE (Entrada de Material) */
 .tipo-cartao.ativo-verde { background-color: #ecfdf5; border-color: #a7f3d0; }
 .tipo-cartao.ativo-verde .tipo-icone { background-color: transparent; color: #10b981; }
 .tipo-cartao.ativo-verde .tipo-titulo { color: #059669; }
 .tipo-cartao.ativo-verde .tipo-desc { color: #10b981; }
 
-/* CIANO / AZUL CLARO (Crossdocking) */
 .tipo-cartao.ativo-ciano { background-color: #e0f2fe; border-color: #bae6fd; }
 .tipo-cartao.ativo-ciano .tipo-icone { background-color: transparent; color: #0284c7; }
 .tipo-cartao.ativo-ciano .tipo-titulo { color: #0284c7; }
 .tipo-cartao.ativo-ciano .tipo-desc { color: #0ea5e9; }
 
-/* LARANJA (Reintegração de Itens) */
 .tipo-cartao.ativo-laranja { background-color: #fff7ed; border-color: #fed7aa; }
 .tipo-cartao.ativo-laranja .tipo-icone { background-color: transparent; color: #f97316; }
 .tipo-cartao.ativo-laranja .tipo-titulo { color: #ea580c; }
 .tipo-cartao.ativo-laranja .tipo-desc { color: #f97316; }
 
-/* VERMELHO (Cancelar BS) */
 .tipo-cartao.ativo-vermelho { background-color: #fef2f2; border-color: #fecaca; }
 .tipo-cartao.ativo-vermelho .tipo-icone { background-color: transparent; color: #ef4444; }
 .tipo-cartao.ativo-vermelho .tipo-titulo { color: #dc2626; }
 .tipo-cartao.ativo-vermelho .tipo-desc { color: #ef4444; }
 
-/* Área onde os componentes filhos vão ser renderizados */
+
+/* ========================================================================== */
+/* 3. FORMULÁRIOS GENÉRICOS (Reutilizados em várias abas)                     */
+/* ========================================================================== */
+
 .conteudo-dinamico {
   margin-top: 24px;
 }
-
-
-/* ========================================================================== */
-/* FORMULÁRIOS GENÉRICOS DOS SUB-COMPONENTES                                  */
-/* ========================================================================== */
 
 .form-cartao {
   background-color: #ffffff;
@@ -155,7 +147,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   margin-bottom: 24px;
 }
 
@@ -176,16 +167,6 @@
   justify-content: center;
 }
 
-/* Variações de Ícones de Cabeçalho */
-.form-header-icone.redondo { border-radius: 50%; }
-.form-header-icone.roxo-claro { background-color: #faf5ff; color: #a855f7; border-radius: 50%; }
-.form-header-icone.cinza { background-color: #f1f5f9; color: #64748b; border-radius: 50%; }
-.form-header-icone.verde-claro { background-color: #ecfdf5; color: #10b981; border-radius: 50%; }
-.form-header-icone.verde-quadrado { background-color: #ecfdf5; color: #10b981; border-radius: 8px; }
-.form-header-icone.ciano { background-color: #e0f2fe; color: #0284c7; border-radius: 8px; }
-.form-header-icone.laranja { background-color: #fff7ed; color: #f97316; border-radius: 50%; }
-.form-header-icone.vermelho { background-color: #fef2f2; color: #ef4444; border-radius: 50%; }
-
 .form-header h2 {
   font-size: 1.125rem;
   font-weight: 600;
@@ -193,7 +174,6 @@
   margin: 0;
 }
 
-/* Inputs e Grids */
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -232,34 +212,15 @@
 textarea.input-campo { resize: vertical; min-height: 42px; }
 .input-campo:focus { border-color: #93c5fd; background-color: #ffffff; }
 
-/* Foco Específico por Tema */
-.foco-roxo:focus { border-color: #d8b4fe; }
-.foco-verde:focus { border-color: #a7f3d0; }
-.foco-laranja:focus { border-color: #fdba74; }
-.foco-vermelho:focus { border-color: #fca5a5; }
-.foco-ciano:focus { border-color: #7dd3fc; }
-
-.texto-ajuda { font-size: 0.75rem; color: #64748b; margin-top: 6px; }
-.texto-vermelho { color: #ef4444; }
-
-/* Helpers de Layout */
-.flex-coluna { display: flex; flex-direction: column; }
-.flex-1 { flex: 1; }
-.mt-4 { margin-top: 16px; }
-.limitador-largura { max-width: 800px; display: flex; flex-direction: column; gap: 24px; }
-
-
 /* ========================================================================== */
-/* COMPONENTES ESPECÍFICOS                                                    */
+/* 4. MÓDULO: MATERIAL DE ESTOQUE (Aba 1)                                     */
 /* ========================================================================== */
 
-/* Campos Fixos (Material de Estoque) */
 .input-wrapper-fixo { position: relative; display: flex; align-items: center; }
 .icone-dentro-input { position: absolute; left: 12px; color: #3b82f6; }
 .input-wrapper-fixo .input-campo { padding-left: 36px; padding-right: 50px; background-color: #ffffff; font-weight: 500; }
 .badge-fixo { position: absolute; right: 12px; background-color: #e2e8f0; color: #64748b; font-size: 0.65rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
 
-/* Caixa Urgente */
 .caixa-urgente { margin-top: 24px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; display: flex; align-items: flex-start; gap: 16px; cursor: pointer; transition: background-color 0.2s; }
 .caixa-urgente:hover { background-color: #f8fafc; }
 .checkbox-custom { width: 20px; height: 20px; border: 2px solid #cbd5e1; border-radius: 4px; margin-top: 2px; cursor: pointer; }
@@ -267,142 +228,10 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
 .urgente-titulo { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #1e293b; font-size: 0.875rem; }
 .urgente-desc { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
 
-/* Banners de Aviso */
-.banner-aviso { display: flex; align-items: center; gap: 12px; border-radius: 12px; padding: 16px 24px; margin-bottom: 24px; }
-.banner-aviso strong { font-weight: 600; font-size: 1rem; }
-.banner-aviso p { margin: 0; font-size: 0.875rem; }
-
-.banner-verde { background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #059669; }
-.banner-ciano { background-color: #f0f9ff; border: 1px solid #bae6fd; color: #0284c7; }
-.banner-vermelho { background-color: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
-.banner-vermelho p { color: #64748b; }
-
-/* Colunas (Transferência de WBS) */
-.transferencia-grid-inferior { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; }
-.coluna-cartao { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; min-height: 400px; }
-.coluna-esquerda-header { padding: 16px; border-bottom: 1px solid #f1f5f9; }
-.coluna-esquerda-header h3 { font-size: 0.875rem; font-weight: 600; color: #1e293b; margin: 0 0 12px 0; }
-.pesquisa-itens-wrapper { position: relative; }
-.pesquisa-itens-wrapper input { width: 100%; padding: 10px 10px 10px 36px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; box-sizing: border-box; outline: none; }
-.pesquisa-itens-wrapper input:focus { border-color: #93c5fd; background-color: #ffffff; }
-.icone-busca-itens { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
-.lista-itens-scroll { overflow-y: auto; flex: 1; }
-.lista-itens-scroll::-webkit-scrollbar { width: 8px; }
-.lista-itens-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
-.item-lista { padding: 16px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background-color 0.2s; }
-.item-lista:hover { background-color: #f8fafc; }
-.item-lista-pn { font-weight: 600; color: #1e293b; font-size: 0.875rem; margin-bottom: 4px; }
-.item-lista-desc { font-size: 0.75rem; color: #64748b; margin-bottom: 6px; }
-.item-lista-wbs { font-size: 0.75rem; color: #2563eb; font-weight: 500; }
-.item-lista-qtd { font-size: 0.75rem; color: #1e293b; font-weight: 600; margin-left: 6px; }
-.coluna-direita-header { display: flex; align-items: center; gap: 8px; padding: 16px; border-bottom: 1px solid #f1f5f9; font-size: 1rem; font-weight: 600; color: #0f172a; }
-.icone-header-direita { color: #2563eb; }
-.estado-vazio-itens { flex: 1; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 0.875rem; }
-
-/* Dropzones e Anexos (Nota Fiscal & Crossdocking) */
-.nf-grid-superior { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
-.dropzone { border: 1px dashed #cbd5e1; border-radius: 8px; padding: 24px; text-align: center; color: #64748b; font-size: 0.875rem; cursor: pointer; transition: all 0.2s; }
-.dropzone.branca { background-color: #ffffff; }
-.dropzone.cinza { background-color: #f8fafc; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.dropzone:hover { background-color: #f1f5f9; border-color: #94a3b8; }
-.anexos-grupo { display: flex; align-items: center; gap: 12px; margin-top: 24px; }
-.anexos-grupo span { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
-.btn-anexo { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; color: #475569; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
-.btn-anexo:hover { background-color: #f1f5f9; color: #1e293b; }
-.btn-anexo-simples { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background-color: #ffffff; border: 1px dashed #cbd5e1; border-radius: 8px; color: #475569; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
-.btn-anexo-simples:hover { background-color: #f8fafc; border-color: #94a3b8; }
-
-/* Tabela Flexível (Entrada de Material) */
-.btn-adicionar-item { display: flex; align-items: center; gap: 6px; background-color: #ffffff; color: #10b981; border: 1px solid #a7f3d0; border-radius: 8px; padding: 8px 16px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-.btn-adicionar-item:hover { background-color: #ecfdf5; }
-.itens-scroll-wrapper { width: 100%; overflow-x: auto; }
-.itens-grid-container { min-width: 900px; }
-.itens-grid-header { display: grid; grid-template-columns: 1fr 1.5fr 2fr 80px 100px 1.5fr 1fr; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; margin-bottom: 16px; }
-.itens-grid-header span { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
-.itens-grid-row { display: grid; grid-template-columns: 1fr 1.5fr 2fr 80px 100px 1.5fr 1fr; gap: 16px; margin-bottom: 12px; }
-
-/* Botões Toggle (Crossdocking) */
-.botoes-toggle-container { display: flex; gap: 16px; }
-.btn-toggle { flex: 1; padding: 12px; text-align: center; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.2s; }
-.btn-toggle:hover { background-color: #f1f5f9; }
-.btn-toggle.selecionado { background-color: #f0f9ff; border-color: #7dd3fc; color: #0284c7; font-weight: 600; }
-
-/* Pesquisa e Lista de BS (Reintegração e Cancelar) */
-.lista-bs-container { max-height: 280px; overflow-y: auto; padding-right: 8px; }
-.lista-bs-container::-webkit-scrollbar { width: 8px; }
-.lista-bs-container::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
-.item-bs { display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }
-.item-bs:hover { background-color: #f8fafc; border-color: #cbd5e1; }
-.item-bs:last-child { margin-bottom: 0; }
-.item-bs-info { display: flex; flex-direction: column; gap: 4px; }
-.item-bs-titulo { font-weight: 600; color: #1e293b; font-size: 0.875rem; }
-.item-bs-detalhes { font-size: 0.75rem; color: #64748b; }
-.badge-separacao { background-color: #e0f2fe; color: #3b82f6; padding: 4px 12px; border-radius: 999px; font-size: 0.75rem; font-weight: 500; border: 1px solid #bae6fd; }
-
-/* ========================================================================== */
-/* BOTÕES DE ENVIO FINAIS                                                     */
-/* ========================================================================== */
-
-.form-acoes-final { display: flex; justify-content: flex-end; margin-top: 8px; }
-.btn-enviar { display: flex; align-items: center; gap: 8px; color: #ffffff; border: none; border-radius: 8px; padding: 12px 24px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
-
-.btn-enviar.roxo { background-color: #9333ea; }
-.btn-enviar.roxo:hover { background-color: #7e22ce; }
-
-.btn-enviar.verde { background-color: #059669; }
-.btn-enviar.verde:hover { background-color: #047857; }
-
-.btn-enviar.ciano { background-color: #0284c7; }
-.btn-enviar.ciano:hover { background-color: #0369a1; }
-
-.btn-enviar.laranja { background-color: #fca5a5; }
-.btn-enviar.laranja:hover { background-color: #f87171; }
-
-/* RESPONSIVIDADE GERAL */
-@media (max-width: 768px) {
-  .form-grid { grid-template-columns: 1fr; }
-  .input-grupo.span-2, .input-grupo.row-span-2 { grid-column: span 1; grid-row: auto; }
-  .transferencia-grid-inferior { grid-template-columns: 1fr; }
-  .nf-grid-superior { grid-template-columns: 1fr; }
-  textarea.input-campo { height: 100px; }
-}
-
-/* --- BOTÃO VOLTAR E CABEÇALHO --- */
-.cabecalho-topo {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.btn-voltar {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0; /* Impede o botão de encolher */
-}
-
-.btn-voltar:hover {
-  background-color: #f8fafc;
-  color: #1e293b;
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-}
-
-/* ========================================================================== */
-/* SECÇÃO DE SELEÇÃO DE ITENS (Material de Estoque)                           */
-/* ========================================================================== */
-
+/* Grid de Seleção (Estoque / Planilha) - EMPILHADA */
 .selecao-itens-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column; /* Uma debaixo da outra */
   gap: 24px;
   margin-bottom: 24px;
 }
@@ -413,7 +242,8 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   border-radius: 12px;
   display: flex;
   flex-direction: column;
-  height: 600px;
+  min-height: 350px;
+  max-height: 600px;
   overflow: hidden;
 }
 
@@ -425,138 +255,57 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   border-bottom: 1px solid #f1f5f9;
 }
 
-.painel-lista-header h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0;
-}
+.painel-lista-header h3 { font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0; }
+.titulo-com-icone { display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 600; color: #0f172a; }
+.titulo-com-icone svg { color: #2563eb; }
 
-.titulo-com-icone {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #0f172a;
-}
+.badge-contagem { font-size: 0.75rem; font-weight: 500; color: #64748b; background-color: #f8fafc; padding: 4px 10px; border-radius: 999px; }
+.badge-contagem.bg-branco { background-color: #ffffff; border: 1px solid #e2e8f0; }
 
-.titulo-com-icone svg {
-  color: #2563eb;
-}
+.pesquisa-estoque { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; position: relative; }
+.icone-pesquisa-estoque { position: absolute; left: 32px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+.pesquisa-estoque input { width: 100%; padding: 10px 12px 10px 36px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; outline: none; }
 
-.badge-contagem {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #64748b;
-  background-color: #f8fafc;
-  padding: 4px 10px;
-  border-radius: 999px;
-}
+.lista-rolavel { overflow-y: auto; flex: 1; }
+.lista-rolavel::-webkit-scrollbar { width: 8px; }
+.lista-rolavel::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
 
-.badge-contagem.bg-branco {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-}
-
-/* Pesquisa do Estoque */
-.pesquisa-estoque {
-  padding: 16px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  position: relative;
-}
-
-.icone-pesquisa-estoque {
-  position: absolute;
-  left: 32px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #94a3b8;
-}
-
-.pesquisa-estoque input {
-  width: 100%;
-  padding: 10px 12px 10px 36px;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  outline: none;
-  box-sizing: border-box;
-}
-
-.pesquisa-estoque input:focus {
-  border-color: #93c5fd;
-  background-color: #ffffff;
-}
-
-/* Lista Rolável */
-.lista-rolavel {
-  overflow-y: auto;
-  flex: 1;
-}
-
-.lista-rolavel::-webkit-scrollbar {
-  width: 8px;
-}
-.lista-rolavel::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 4px;
-}
-
-.item-estoque-card {
-  padding: 16px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.item-estoque-card:hover {
-  background-color: #f8fafc;
-}
-
-.item-pn {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin-bottom: 4px;
-}
-
-.item-desc {
-  font-size: 0.75rem;
-  color: #64748b;
-  margin: 0 0 8px 0;
-}
-
-.item-rodape {
-  display: flex;
-  gap: 16px;
-  font-size: 0.75rem;
-}
-
+.item-estoque-card { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background-color 0.2s; }
+.item-estoque-card:hover { background-color: #f8fafc; }
+.item-pn { display: block; font-size: 0.875rem; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+.item-desc { font-size: 0.75rem; color: #64748b; margin: 0 0 8px 0; }
+.item-rodape { display: flex; gap: 16px; font-size: 0.75rem; }
 .item-saldo { color: #10b981; }
 .item-saldo strong { font-weight: 600; }
 .item-alocacao { color: #2563eb; font-weight: 500; font-family: monospace, sans-serif; }
 
-/* Estado Vazio (Lado Direito) */
-.estado-vazio-selecao {
-  flex: 1;
+.estado-vazio-selecao { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #cbd5e1; gap: 16px; }
+.estado-vazio-selecao p { color: #64748b; font-size: 0.875rem; margin: 0; }
+
+/* Tabela de Excel no Lado Direito */
+.scroll-tabela-solicitacao { width: 100%; overflow-x: auto; flex: 1; background-color: #ffffff; }
+.scroll-tabela-solicitacao::-webkit-scrollbar { height: 8px; width: 8px; }
+.scroll-tabela-solicitacao::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+
+.tabela-solicitacao-dados { width: 100%; min-width: 1900px; border-collapse: collapse; text-align: left; }
+.tabela-solicitacao-dados th { padding: 12px 16px; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; background-color: #f8fafc; position: sticky; top: 0; }
+.tabela-solicitacao-dados td { padding: 12px 16px; font-size: 0.85rem; color: #334155; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+
+.qtd-solicitada-destaque { font-weight: 700; color: #2563eb; text-align: center; background-color: #eff6ff; border-radius: 4px; }
+.link-azul-fake { color: #2563eb; font-family: monospace, sans-serif; }
+.btn-deletar-linha { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 6px; border-radius: 6px; transition: all 0.2s; }
+.btn-deletar-linha:hover { color: #ef4444; background-color: #fef2f2; }
+
+/* ========================================================================== */
+/* 5. BOTÕES GERAIS E FINAIS                                                  */
+/* ========================================================================== */
+
+.form-acoes-final {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #cbd5e1;
-  gap: 16px;
+  justify-content: flex-end;
+  margin-top: 8px;
 }
 
-.estado-vazio-selecao p {
-  color: #64748b;
-  font-size: 0.875rem;
-  margin: 0;
-}
-
-/* Botão de Enviar (Azul Padrão) */
 .btn-enviar-azul {
   display: flex;
   align-items: center;
@@ -576,81 +325,8 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   background-color: #1d4ed8;
 }
 
-/* Responsividade */
+/* Responsividade Geral */
 @media (max-width: 768px) {
-  .selecao-itens-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* CONTAINER E ESTILOS DA PLANILHA DE ITENS SELECIONADOS */
-.scroll-tabela-solicitacao {
-  width: 100%;
-  overflow-x: auto;
-  flex: 1;
-  background-color: #ffffff;
-}
-
-.scroll-tabela-solicitacao::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
-}
-.scroll-tabela-solicitacao::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 4px;
-}
-
-.tabela-solicitacao-dados {
-  width: 100%;
-  min-width: 1900px; /* Força o respiro horizontal para as 16 colunas */
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.tabela-solicitacao-dados th {
-  padding: 12px 16px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  border-bottom: 1px solid #e2e8f0;
-  background-color: #f8fafc;
-  position: sticky;
-  top: 0;
-}
-
-.tabela-solicitacao-dados td {
-  padding: 12px 16px;
-  font-size: 0.85rem;
-  color: #334155;
-  border-bottom: 1px solid #f1f5f9;
-  vertical-align: middle;
-}
-
-.qtd-solicitada-destaque {
-  font-weight: 700;
-  color: #2563eb;
-  text-align: center;
-  background-color: #eff6ff;
-  border-radius: 4px;
-}
-
-.link-azul-fake {
-  color: #2563eb;
-  font-family: monospace, sans-serif;
-}
-
-.btn-deletar-linha {
-  background: none;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.btn-deletar-linha:hover {
-  color: #ef4444;
-  background-color: #fef2f2;
+  .form-grid { grid-template-columns: 1fr; }
+  .input-grupo.span-2, .input-grupo.row-span-2 { grid-column: span 1; grid-row: auto; }
 }
