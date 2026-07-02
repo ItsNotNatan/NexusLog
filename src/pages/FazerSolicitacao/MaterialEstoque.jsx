@@ -3,7 +3,6 @@ import { User, MapPin, Calendar, Zap, Search, Package, Send, FileSpreadsheet, Tr
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
 import { lerExcelParaItens } from '../../utils/excelUtils';
 
-// DADOS DO ESTOQUE ATUALIZADOS PARA O PADRÃO COMPLETO
 const estoqueDisponivel = [
   { desenhoSAP: 'TEXXX-0000022629', materialDescription: 'REPARTIDORES LÓGICOS 4 X M12 FÊMEA', numPecaFabricante: 'PROLOGANT4RP', fornecedor: 'SENSTRONIC', qtdFornecida: '199', referencia: '9095', unidadeMedida: 'NR', vendorDescription: 'SENSTRONIC DO BRASIL', wbs: 'BRBCBBB29-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34026', poNetPrice: 'R$ 1.697,39', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
   { desenhoSAP: 'TAL-S378006', materialDescription: 'CONECTOR IE FC 180 4X2', numPecaFabricante: '6GK1901-1BB11-2AA0', fornecedor: 'SIEMENS', qtdFornecida: '4', referencia: 'AR-366866', unidadeMedida: 'NR', vendorDescription: 'SIEMENS INFRAESTRUTURA', wbs: 'BRBRRCY21-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34246', poNetPrice: 'R$ 161,77', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
@@ -13,10 +12,21 @@ const estoqueDisponivel = [
 export default function MaterialEstoque() {
   const [itensSelecionados, setItensSelecionados] = useState([]);
 
+  // Função para Deletar um item da lista
   const removerItem = (idParaRemover) => {
     setItensSelecionados(prev => prev.filter(item => item.id !== idParaRemover));
   };
 
+  // Função para Atualizar a Quantidade (Inline Editing)
+  const atualizarQuantidade = (id, novaQtd) => {
+    setItensSelecionados(prev => 
+      prev.map(item => 
+        item.id === id ? { ...item, qtdSelecionada: novaQtd } : item
+      )
+    );
+  };
+
+  // Adicionar manualmente clicando na lista da esquerda
   const adicionarManualmente = (item, index) => {
     setItensSelecionados(prev => [...prev, {
       id: `manual-${Date.now()}-${index}`,
@@ -24,7 +34,7 @@ export default function MaterialEstoque() {
       materialDescription: item.materialDescription,
       numPecaFabricante: item.numPecaFabricante,
       fornecedor: item.fornecedor,
-      qtdSelecionada: 1,
+      qtdSelecionada: 1, // Começa sempre com 1
       referencia: item.referencia,
       unidadeMedida: item.unidadeMedida,
       vendorDescription: item.vendorDescription,
@@ -109,7 +119,7 @@ export default function MaterialEstoque() {
           </div>
         </div>
 
-        {/* COLUNA DIREITA: NOVA TABELA ESTILO PLANILHA REAL */}
+        {/* COLUNA DIREITA: NOVA TABELA COM EDIÇÃO INLINE */}
         <div className="painel-lista">
           <div className="painel-lista-header">
             <div className="titulo-com-icone">
@@ -164,14 +174,29 @@ export default function MaterialEstoque() {
                 <tbody>
                   {itensSelecionados.map((item) => (
                     <tr key={item.id}>
+                      
+                      {/* LIXEIRA (Remover) */}
                       <td style={{ textAlign: 'center' }}>
-                        <button onClick={() => removerItem(item.id)} className="btn-deletar-linha">
+                        <button onClick={() => removerItem(item.id)} className="btn-deletar-linha" title="Remover item">
                           <Trash2 size={16} />
                         </button>
                       </td>
+                      
                       <td className="texto-preto" style={{ minWidth: '220px' }}>{item.materialDescription}</td>
                       <td><span className="badge-partnumber">{item.numPecaFabricante}</span></td>
-                      <td className="qtd-solicitada-destaque">{item.qtdSelecionada}</td>
+                      
+                      {/* CAMPO EDITÁVEL DA QUANTIDADE (Inline Editing) */}
+                      <td className="qtd-solicitada-destaque">
+                        <input 
+                          type="number" 
+                          className="input-inline-tabela"
+                          value={item.qtdSelecionada}
+                          onChange={(e) => atualizarQuantidade(item.id, e.target.value)}
+                          min="1"
+                          title="Clique para alterar a quantidade"
+                        />
+                      </td>
+
                       <td className="texto-cinza-claro">{item.desenhoSAP}</td>
                       <td className="texto-cinza-escuro">{item.fornecedor}</td>
                       <td className="texto-cinza">{item.referencia}</td>

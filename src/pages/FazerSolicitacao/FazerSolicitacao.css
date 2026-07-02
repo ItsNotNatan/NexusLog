@@ -330,3 +330,49 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   .form-grid { grid-template-columns: 1fr; }
   .input-grupo.span-2, .input-grupo.row-span-2 { grid-column: span 1; grid-row: auto; }
 }
+
+/* ========================================================================== */
+/* EDIÇÃO INLINE DA TABELA (Quantidade)                                       */
+/* ========================================================================== */
+
+.qtd-solicitada-destaque {
+  text-align: center;
+  background-color: #eff6ff;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.input-inline-tabela {
+  width: 60px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background-color: transparent;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #2563eb;
+  text-align: center;
+  outline: none;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+/* Quando passa o rato por cima, avisa que é clicável */
+.input-inline-tabela:hover {
+  background-color: #dbeafe;
+}
+
+/* Quando clica para editar, vira um campo de texto normal */
+.input-inline-tabela:focus {
+  background-color: #ffffff;
+  border-color: #93c5fd;
+  cursor: text;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Remove as setinhas feias de aumentar/diminuir do campo number */
+.input-inline-tabela::-webkit-inner-spin-button, 
+.input-inline-tabela::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
