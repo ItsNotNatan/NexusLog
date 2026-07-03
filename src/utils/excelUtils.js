@@ -32,7 +32,6 @@ export const processarExcelComProgresso = (file, onProgress) => {
         // Função recursiva para processar em lotes (evita travar a UI)
         const processarLote = () => {
           const limite = Math.min(linhaAtual + tamanhoLote, totalLinhas);
-          
           for (let i = linhaAtual; i < limite; i++) {
             const linha = json[i];
             
@@ -76,7 +75,7 @@ export const processarExcelComProgresso = (file, onProgress) => {
             fase: `Processando linha ${linhaAtual} de ${totalLinhas}...`, 
             progresso: progressoCalculado 
           });
-
+          
           if (linhaAtual < totalLinhas) {
             // Agenda o próximo lote deixando o navegador respirar (renderizar a barra)
             setTimeout(processarLote, 10);
@@ -96,7 +95,6 @@ export const processarExcelComProgresso = (file, onProgress) => {
 
         // Inicia o processamento em lotes
         setTimeout(processarLote, 50);
-
       } catch (error) {
         reject('Erro fatal ao processar o ficheiro Excel.');
       }
@@ -105,4 +103,14 @@ export const processarExcelComProgresso = (file, onProgress) => {
     reader.onerror = () => reject('Erro de leitura do ficheiro.');
     reader.readAsBinaryString(file);
   });
+};
+
+/**
+ * Função simplificada para ler o SAP diretamente, retornando apenas o array de itens.
+ * Utilizada na página de Consulta de Estoque.
+ */
+export const lerRelatorioSAP = async (file) => {
+  // Chamamos a função principal passando uma função vazia para o onProgress
+  const resultado = await processarExcelComProgresso(file, () => {});
+  return resultado.itens;
 };
