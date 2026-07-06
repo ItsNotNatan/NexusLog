@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react';
+import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet, Zap } from 'lucide-react';
 
 // NOSSOS COMPONENTES E HOOKS
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
@@ -12,7 +12,8 @@ export default function EntradaMaterial() {
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
-    observacoes: ''
+    observacoes: '',
+    entregaUrgente: false // <-- NOVO CAMPO ADICIONADO AQUI
   });
 
   // Função auxiliar para gerar uma linha vazia com todos os novos campos do SAP
@@ -142,7 +143,7 @@ export default function EntradaMaterial() {
 
       if (resposta.ok) {
         alert(`Sucesso! Solicitação de Entrada enviada. ID: ${dados.ps_id}`);
-        setFormDados({ nome: '', wbs: '', observacoes: '' });
+        setFormDados({ nome: '', wbs: '', observacoes: '', entregaUrgente: false });
         setItens([gerarLinhaVazia()]);
         setAnexos([]);
       } else {
@@ -215,6 +216,39 @@ export default function EntradaMaterial() {
             ></textarea>
           </div>
         </div>
+
+        {/* --- NOVO COMPONENTE: ENTREGA URGENTE --- */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '12px',
+          padding: '16px',
+          border: '1px solid #cbd5e1',
+          borderRadius: '8px',
+          backgroundColor: '#f8fafc',
+          marginTop: '20px'
+        }}>
+          <input 
+            type="checkbox" 
+            id="checkbox-urgente"
+            checked={formDados.entregaUrgente}
+            onChange={(e) => setFormDados({...formDados, entregaUrgente: e.target.checked})}
+            style={{ marginTop: '4px', cursor: 'pointer', width: '16px', height: '16px' }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={16} color="#475569" />
+              <label htmlFor="checkbox-urgente" style={{ fontWeight: '600', color: '#0f172a', margin: 0, cursor: 'pointer' }}>
+                Entrega Urgente
+              </label>
+            </div>
+            <span style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
+              Marcando esta opção, a solicitação entrará em fila de aprovação exclusiva do Administrador.
+            </span>
+          </div>
+        </div>
+        {/* --- FIM DO NOVO COMPONENTE --- */}
+
       </div>
 
       {/* --- BLOCO 2: ITENS PARA ENTRADA --- */}
