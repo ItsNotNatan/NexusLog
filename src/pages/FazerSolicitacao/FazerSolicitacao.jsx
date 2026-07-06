@@ -1,10 +1,25 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // 1. Importamos o hook de navegação
+import { useNavigate } from 'react-router-dom';
 import './FazerSolicitacao.css';
+
+// 1. Importamos TODOS os ícones de uma vez só (sem repetições!)
 import { 
-  Boxes, ArrowLeftRight, FileText, PackagePlus, 
-  Truck, RefreshCcw, XCircle, ArrowLeft 
-} from 'lucide-react'; // 2. Importamos a setinha (ArrowLeft)
+  Boxes, 
+  ArrowLeftRight, 
+  FileText, 
+  PackagePlus, 
+  Truck, 
+  RefreshCcw, 
+  XCircle, 
+  ArrowLeft,
+  Send, 
+  Package, 
+  AlertTriangle, 
+  Search 
+} from 'lucide-react';
+
+// 2. Importação do Botão Global
+import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 // IMPORTAÇÃO DOS COMPONENTES FILHOS
 import MaterialEstoque from './MaterialEstoque'; 

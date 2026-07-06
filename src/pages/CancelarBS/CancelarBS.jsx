@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertTriangle, XCircle, Search } from 'lucide-react';
+import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
+import { Send, FileText, Package, ArrowLeftRight, RefreshCcw, AlertTriangle, XCircle, Search } from 'lucide-react';
 
 const listaDeBs = [
   { id: '10976', solicitante: 'TESTE', wbs: 'WBS-PRJ-2024-001', itens: 4, status: 'Em Separação' },
