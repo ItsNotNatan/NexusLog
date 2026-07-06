@@ -49,16 +49,11 @@ export default function EntradaMaterial() {
   // FUNÇÃO PRINCIPAL: UPLOAD E MAPEAMENTO DO EXCEL
   // ==========================================
   const handleImportarExcel = async (arquivo) => {
-    // 1. O hook lê o arquivo e transforma em um Array de objetos JSON
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
     
-    // 2. Verifica se deu tudo certo e se realmente temos dados
     if (itensProcessados && Array.isArray(itensProcessados)) {
-      
-      // 3. Mapeia os dados do Excel para os nomes exatos do nosso Estado (State)
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        // Fazemos fallback (||) para cobrir variações de nomes nas colunas do SAP
         desenhoSAP: item.desenhoSAP || item['Material'] || item['DESENHO SAP'] || '',
         materialDescription: item.materialDescription || item['Material Description'] || item['MATERIAL DESCRIPTION'] || '',
         numPecaFabricante: item.numPecaFabricante || item['Nº peça fabricante'] || item['Nº PEÇA FABRICANTE'] || '',
@@ -77,11 +72,8 @@ export default function EntradaMaterial() {
         alocacao: item.alocacao || item['Alocação'] || item['ALOCAÇÃO'] || ''
       }));
 
-      // 4. Atualiza a tabela na tela
       setItens(prev => {
-        // Limpa a linha inicial vazia se o usuário não tiver digitado nada nela
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '' || i.materialDescription !== '');
-        // Junta o que já estava na tabela com os novos itens do Excel
         return [...listaLimpa, ...novosItensFormatados];
       });
     }
@@ -113,7 +105,6 @@ export default function EntradaMaterial() {
 
   // --- ENVIO PARA O BACKEND (NODE.JS) ---
   const handleEnviar = async () => {
-    // Validação básica
     if (!formDados.nome || !formDados.wbs) {
       alert("Preencha o Nome e o WBS do solicitante.");
       return;
@@ -125,10 +116,13 @@ export default function EntradaMaterial() {
       return;
     }
 
-    // Prepara o pacote de dados para enviar ao Node.js
+    // AQUI ESTÁ O CONSERTO: Mapeamos o "qtdFornecida" para "qtd" antes de enviar para o Node.js
     const payload = {
       solicitante: formDados,
-      itens: itens
+      itens: itens.map(item => ({
+        ...item,
+        qtd: item.qtdFornecida // O backend procura por 'qtd', então enviamos com este nome!
+      }))
     };
 
     try {

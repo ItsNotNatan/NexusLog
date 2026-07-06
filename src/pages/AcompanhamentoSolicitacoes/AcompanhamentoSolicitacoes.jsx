@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './AcompanhamentoSolicitacoes.css';
 import { 
   Search, 
@@ -7,80 +7,18 @@ import {
   FileText, 
   RefreshCw, 
   CheckCircle2, 
-  XCircle 
+  XCircle,
+  Zap
 } from 'lucide-react';
-
-// DADOS MOCKADOS BASEADOS NA IMAGEM
-const dadosTabela = [
-  {
-    id: '2306261114',
-    tipo: 'Material',
-    solicitante: 'TESTE',
-    wbs: 'WBS-PRJ-...',
-    bs: 'BS #PE-BS 10976',
-    dataSolicitacao: '23/06 14:14',
-    dataEntrega: null,
-    status: 'Em Separação'
-  },
-  {
-    id: '1106261734',
-    tipo: 'Material',
-    solicitante: 'RASDAS',
-    wbs: 'WBS-PRJ-...',
-    bs: 'BS #SP-BS 10975',
-    dataSolicitacao: '11/06 20:34',
-    dataEntrega: '15/06 10:59',
-    status: 'Concluído'
-  },
-  {
-    id: '1106261648',
-    tipo: 'Material',
-    solicitante: 'DOUGLAS',
-    wbs: 'WBS-PRJ-...',
-    bs: 'BS #SP-BS 10974',
-    dataSolicitacao: '11/06 19:48',
-    dataEntrega: '11/06 19:51',
-    status: 'Concluído'
-  },
-  {
-    id: '1006261107',
-    tipo: 'Material',
-    solicitante: 'SADFSDAS',
-    wbs: 'WBS-PRJ-...',
-    bs: null,
-    dataSolicitacao: '10/06 14:07',
-    dataEntrega: null,
-    status: 'Cancelado'
-  },
-  {
-    id: '1006261102',
-    tipo: 'Material',
-    solicitante: 'MARCIO',
-    wbs: 'WBS-PRJ-...',
-    bs: 'BS #SP-BS 10973',
-    dataSolicitacao: '10/06 14:02',
-    dataEntrega: null,
-    status: 'Cancelado'
-  },
-  {
-    id: '1006261056',
-    tipo: 'Material',
-    solicitante: 'JEFERSON GARANDY',
-    wbs: 'WBS-PRJ-...',
-    bs: 'BS #SP-BS 10972',
-    dataSolicitacao: '10/06 13:56',
-    dataEntrega: '10/06 18:00',
-    status: 'Concluído'
-  }
-];
 
 // FUNÇÃO PARA RENDERIZAR O BADGE DE STATUS CORRETO
 const renderBadgeStatus = (status) => {
   switch (status) {
+    case 'Pendente':
     case 'Em Separação':
       return (
         <span className="badge-status status-separacao">
-          <RefreshCw size={14} /> Em Separação
+          <RefreshCw size={14} className="animate-spin" /> {status}
         </span>
       );
     case 'Concluído':
@@ -90,18 +28,69 @@ const renderBadgeStatus = (status) => {
         </span>
       );
     case 'Cancelado':
+    case 'Recusado':
       return (
         <span className="badge-status status-cancelado">
-          <XCircle size={14} /> Cancelado
+          <XCircle size={14} /> {status}
         </span>
       );
     default:
-      return <span>{status}</span>;
+      return <span className="badge-status">{status}</span>;
   }
 };
 
 export default function AcompanhamentoSolicitacoes() {
+  const [dadosTabela, setDadosTabela] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState('Todos');
+  const [termoPesquisa, setTermoPesquisa] = useState('');
+  const [carregando, setCarregando] = useState(true);
+
+  // 1. CARREGAR DADOS DO BACKEND VIA API
+  useEffect(() => {
+    const buscarSolicitacoes = async () => {
+      try {
+        const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
+        const resultado = await resposta.json();
+        
+        if (resposta.ok && resultado.sucesso) {
+          setDadosTabela(resultado.dados);
+        } else {
+          console.error("Erro retornado do servidor:", resultado.erro);
+        }
+      } catch (error) {
+        console.error("Falha ao conectar à API:", error);
+      } finally {
+        setCarregando(false);
+      }
+    };
+
+    buscarSolicitacoes();
+  }, []);
+
+  // 2. CÁLCULO DINÂMICO DOS CARD DE RESUMO (KPIs)
+  const kpiTotal = dadosTabela.length;
+  const kpiPendentes = dadosTabela.filter(item => item.status === 'Pendente').length;
+  const kpiAndamento = dadosTabela.filter(item => item.status === 'Em Separação').length;
+  const kpiConcluidos = dadosTabela.filter(item => item.status === 'Concluído').length;
+
+  // 3. FILTRAGEM COMBINADA (Abas de Categoria + Barra de Pesquisa)
+  const dadosFiltrados = dadosTabela.filter((linha) => {
+    // Tratamento do filtro por tipo da aba
+    let passaFiltroAba = true;
+    if (filtroAtivo === 'Material') passaFiltroAba = linha.tipo === 'Material';
+    if (filtroAtivo === 'Transfer. WBS') passaFiltroAba = linha.tipo === 'Transferencia WBS';
+    if (filtroAtivo === 'Nota Fiscal') passaFiltroAba = linha.tipo === 'Nota Fiscal';
+
+    // Tratamento da caixa de texto de pesquisa
+    const termoLower = termoPesquisa.toLowerCase();
+    const passaPesquisa = 
+      linha.id.toString().toLowerCase().includes(termoLower) ||
+      linha.solicitante.toLowerCase().includes(termoLower) ||
+      linha.wbs.toLowerCase().includes(termoLower) ||
+      (linha.bs && linha.bs.toLowerCase().includes(termoLower));
+
+    return passaFiltroAba && passaPesquisa;
+  });
 
   return (
     <div className="acompanhamento-wrapper">
@@ -112,23 +101,23 @@ export default function AcompanhamentoSolicitacoes() {
         <p>Visualize todas as solicitações abertas — materiais, transferências de WBS e notas fiscais</p>
       </header>
 
-      {/* 2. CARTÕES DE RESUMO (KPIs) */}
+      {/* 2. CARTÕES DE RESUMO (KPIs DINÂMICOS) */}
       <div className="kpis-linha">
         <div className="kpi-card-resumo kpi-total">
           <span>Total</span>
-          <strong>14</strong>
+          <strong>{kpiTotal}</strong>
         </div>
         <div className="kpi-card-resumo kpi-pendentes">
           <span>Pendentes</span>
-          <strong>0</strong>
+          <strong>{kpiPendentes}</strong>
         </div>
         <div className="kpi-card-resumo kpi-andamento">
-          <span>Em Andamento</span>
-          <strong>1</strong>
+          <span>Em Separação</span>
+          <strong>{kpiAndamento}</strong>
         </div>
         <div className="kpi-card-resumo kpi-concluidos">
           <span>Concluídos</span>
-          <strong>10</strong>
+          <strong>{kpiConcluidos}</strong>
         </div>
       </div>
 
@@ -150,84 +139,102 @@ export default function AcompanhamentoSolicitacoes() {
           </div>
           <div className="pesquisa-wrapper-direita">
             <Search className="icone-pesquisa-dir" size={18} />
-            <input type="text" placeholder="Buscar por ID, solicitante, item..." />
+            <input 
+              type="text" 
+              placeholder="Buscar por ID, solicitante, WBS..." 
+              value={termoPesquisa}
+              onChange={(e) => setTermoPesquisa(e.target.value)}
+            />
           </div>
         </div>
 
         {/* Tabela de Dados */}
         <div className="tabela-scroll-horizontal">
-          <table className="tabela-solicitacoes">
-            <thead>
-              <tr>
-                <th className="col-chevron"></th>
-                <th>TIPO / ID</th>
-                <th>SOLICITANTE</th>
-                <th>WBS</th>
-                <th>Nº DO BS</th>
-                <th>DATA SOLICITAÇÃO</th>
-                <th>DATA ENTREGA</th>
-                <th>STATUS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dadosTabela.map((linha, index) => (
-                <tr key={index}>
-                  
-                  {/* Chevron para expandir */}
-                  <td className="col-chevron">
-                    <ChevronRight size={18} />
-                  </td>
-
-                  {/* Coluna Tipo e ID da PS */}
-                  <td>
-                    <div className="bloco-tipo-id">
-                      <span className="badge-tipo">
-                        <GitBranch size={14} /> {linha.tipo}
-                      </span>
-                      <span className="texto-ps-id">PS : {linha.id}</span>
-                    </div>
-                  </td>
-
-                  {/* Solicitante */}
-                  <td className="nome-solicitante">{linha.solicitante}</td>
-
-                  {/* WBS */}
-                  <td>
-                    <span className="badge-wbs">{linha.wbs}</span>
-                  </td>
-
-                  {/* Nº do BS */}
-                  <td>
-                    {linha.bs ? (
-                      <span className="badge-bs">
-                        <FileText size={14} /> {linha.bs}
-                      </span>
-                    ) : (
-                      <span className="traco-vazio">—</span>
-                    )}
-                  </td>
-
-                  {/* Data Solicitação */}
-                  <td className="texto-data">{linha.dataSolicitacao}</td>
-
-                  {/* Data Entrega */}
-                  <td>
-                    {linha.dataEntrega ? (
-                      <span className="texto-data-verde">{linha.dataEntrega}</span>
-                    ) : (
-                      <span className="traco-vazio">—</span>
-                    )}
-                  </td>
-
-                  {/* Status */}
-                  <td>
-                    {renderBadgeStatus(linha.status)}
-                  </td>
-
+          {carregando ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: '500' }}>
+              Carregando solicitações do sistema...
+            </div>
+          ) : dadosFiltrados.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+              Nenhuma solicitação encontrada para os filtros aplicados.
+            </div>
+          ) : (
+            <table className="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th className="col-chevron"></th>
+                  <th>TIPO / ID</th>
+                  <th>SOLICITANTE</th>
+                  <th>WBS (ORIGEM ➔ DESTINO)</th>
+                  <th>Nº DO BS</th>
+                  <th>DATA SOLICITAÇÃO</th>
+                  <th>DATA ENTREGA</th>
+                  <th>STATUS</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {dadosFiltrados.map((linha, index) => (
+                  <tr key={linha.id || index}>
+                    
+                    {/* Chevron para expandir */}
+                    <td className="col-chevron">
+                      <ChevronRight size={18} style={{ color: '#94a3b8' }} />
+                    </td>
+
+                    {/* Coluna Tipo e ID da PS */}
+                    <td>
+                      <div className="bloco-tipo-id">
+                        <span className={`badge-tipo ${linha.entregaUrgente ? 'badge-urgente-critico' : ''}`}>
+                          {linha.entregaUrgente ? <Zap size={13} color="#ef4444" fill="#ef4444" /> : <GitBranch size={13} />} 
+                          {linha.tipo}
+                        </span>
+                        <span className="texto-ps-id" style={{ fontWeight: linha.entregaUrgente ? '700' : 'normal' }}>
+                          PS : {linha.id}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Solicitante */}
+                    <td className="nome-solicitante">{linha.solicitante}</td>
+
+                    {/* WBS */}
+                    <td>
+                      <span className="badge-wbs">{linha.wbs}</span>
+                    </td>
+
+                    {/* Nº do BS */}
+                    <td>
+                      {linha.bs ? (
+                        <span className="badge-bs">
+                          <FileText size={14} /> {linha.bs}
+                        </span>
+                      ) : (
+                        <span className="traco-vazio">—</span>
+                      )}
+                    </td>
+
+                    {/* Data Solicitação */}
+                    <td className="texto-data">{linha.dataSolicitacao}</td>
+
+                    {/* Data Entrega */}
+                    <td>
+                      {linha.dataEntrega ? (
+                        <span className="texto-data-verde">{linha.dataEntrega}</span>
+                      ) : (
+                        <span className="traco-vazio">—</span>
+                      )}
+                    </td>
+
+                    {/* Status */}
+                    <td>
+                      {renderBadgeStatus(linha.status)}
+                    </td>
+
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
       </div>
