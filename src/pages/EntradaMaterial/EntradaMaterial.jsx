@@ -45,15 +45,44 @@ export default function EntradaMaterial() {
   // INICIA O MAESTRO (Hook de Processamento do Excel)
   const processador = useProcessadorExcel();
 
-  // --- FUNÇÕES DE MANIPULAÇÃO DA TABELA ---
-
+  // ==========================================
+  // FUNÇÃO PRINCIPAL: UPLOAD E MAPEAMENTO DO EXCEL
+  // ==========================================
   const handleImportarExcel = async (arquivo) => {
-    const novosItens = await processador.iniciarProcessamento(arquivo);
-    if (novosItens && Array.isArray(novosItens)) {
+    // 1. O hook lê o arquivo e transforma em um Array de objetos JSON
+    const itensProcessados = await processador.iniciarProcessamento(arquivo);
+    
+    // 2. Verifica se deu tudo certo e se realmente temos dados
+    if (itensProcessados && Array.isArray(itensProcessados)) {
+      
+      // 3. Mapeia os dados do Excel para os nomes exatos do nosso Estado (State)
+      const novosItensFormatados = itensProcessados.map((item, index) => ({
+        id: `excel-${Date.now()}-${index}`,
+        // Fazemos fallback (||) para cobrir variações de nomes nas colunas do SAP
+        desenhoSAP: item.desenhoSAP || item['Material'] || item['DESENHO SAP'] || '',
+        materialDescription: item.materialDescription || item['Material Description'] || item['MATERIAL DESCRIPTION'] || '',
+        numPecaFabricante: item.numPecaFabricante || item['Nº peça fabricante'] || item['Nº PEÇA FABRICANTE'] || '',
+        fornecedor: item.fornecedor || item['Fornecedor'] || item['FORNECEDOR'] || '',
+        qtdFornecida: item.qtdFornecida || item['Qtd.fornecida'] || item['Qtd.'] || 1,
+        referencia: item.referencia || item['Referência'] || item['REFERÊNCIA'] || '',
+        unidadeMedida: item.unidadeMedida || item['Unidade de medida'] || 'Unid',
+        vendorDescription: item.vendorDescription || item['Vendor Description'] || '',
+        wbs: item.wbs || item['WBS'] || item['Elemento PEP'] || '',
+        emissaoNF: item.emissaoNF || item['EMISSÃO NF'] || item['Emissão NF'] || '',
+        recebNF: item.recebNF || item['RECEB. NF'] || item['Receb. NF'] || '',
+        docCompras: item.docCompras || item['Documento de compras'] || item['Doc. Compras'] || '',
+        poNetPrice: item.poNetPrice || item['PO Net Price'] || '',
+        centro: item.centro || item['Centro'] || item['CENTRO'] || '',
+        deposito: item.deposito || item['Depósito'] || item['DEPÓSITO'] || '',
+        alocacao: item.alocacao || item['Alocação'] || item['ALOCAÇÃO'] || ''
+      }));
+
+      // 4. Atualiza a tabela na tela
       setItens(prev => {
-        // Remove a linha vazia inicial se o usuário estiver importando um Excel
+        // Limpa a linha inicial vazia se o usuário não tiver digitado nada nela
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '' || i.materialDescription !== '');
-        return [...listaLimpa, ...novosItens];
+        // Junta o que já estava na tabela com os novos itens do Excel
+        return [...listaLimpa, ...novosItensFormatados];
       });
     }
   };
@@ -206,6 +235,7 @@ export default function EntradaMaterial() {
               <Plus size={16} /> Nova Linha
             </button>
 
+            {/* BOTÃO IMPORTAR EXCEL CONECTADO À FUNÇÃO */}
             <CarregarArquivo 
               variante="botao"
               accept=".xlsx, .xls"
@@ -222,7 +252,6 @@ export default function EntradaMaterial() {
         
         {/* Corpo da Tabela */}
         <div className="scroll-tabela-solicitacao">
-          {/* Note o minWidth bem grande (2500px) para acomodar as 16 colunas sem esmagar */}
           <table className="tabela-solicitacao-dados" style={{ minWidth: '2500px' }}>
             <thead>
               <tr>
