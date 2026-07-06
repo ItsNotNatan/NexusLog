@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { User, MapPin, Calendar, Zap, Search, Package, Send, FileSpreadsheet, Trash2 } from 'lucide-react';
+// Adicionamos o ícone 'Plus' na importação
+import { User, MapPin, Calendar, Search, Package, Send, FileSpreadsheet, Trash2, Plus } from 'lucide-react';
 
 // NOSSOS COMPONENTES E HOOKS
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
@@ -18,12 +19,13 @@ export default function MaterialEstoque() {
   // INICIA O MAESTRO (Hook de Processamento)
   const processador = useProcessadorExcel();
 
-  // FUNÇÃO CORRIGIDA DE IMPORTAÇÃO
+  // FUNÇÃO DE IMPORTAÇÃO (Já preserva os itens existentes graças ao ...prev)
   const handleImportarExcel = async (arquivo) => {
     const novosItens = await processador.iniciarProcessamento(arquivo);
     
     // Trava de segurança: Só adiciona se for realmente um Array válido
     if (novosItens && Array.isArray(novosItens)) {
+      // O 'prev' aqui garante que o que foi digitado manualmente não se apague!
       setItensSelecionados(prev => [...prev, ...novosItens]);
     }
   };
@@ -40,12 +42,32 @@ export default function MaterialEstoque() {
     );
   };
 
+  // Adiciona itens clicando na lista da esquerda
   const adicionarManualmente = (item, index) => {
     setItensSelecionados(prev => [...prev, {
       id: `manual-${Date.now()}-${index}`,
       ...item,
       qtdSelecionada: 1 
     }]);
+  };
+
+  // NOVA FUNÇÃO: Adiciona uma linha totalmente em branco na tabela
+  const adicionarLinhaEmBranco = () => {
+    setItensSelecionados(prev => [
+      ...prev,
+      {
+        id: `linha-vazia-${Date.now()}`,
+        desenhoSAP: '',
+        materialDescription: '',
+        numPecaFabricante: '',
+        fornecedor: '',
+        qtdSelecionada: 1,
+        referencia: '',
+        unidadeMedida: 'Unid',
+        wbs: '',
+        alocacao: ''
+      }
+    ]);
   };
 
   // Garante que é sempre um array antes de renderizar (evita ecrã branco)
@@ -130,8 +152,22 @@ export default function MaterialEstoque() {
         <div className="painel-lista">
           <div className="painel-lista-header">
             <div className="titulo-com-icone"><Package size={18} /> Itens Selecionados</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               
+              {/* BOTÃO PARA ADICIONAR LINHA MANUALMENTE */}
+              <button 
+                onClick={adicionarLinhaEmBranco} 
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: '6px', 
+                  padding: '6px 12px', backgroundColor: '#ffffff', 
+                  border: '1px solid #cbd5e1', borderRadius: '8px', 
+                  fontSize: '0.75rem', fontWeight: '600', color: '#475569', 
+                  cursor: 'pointer' 
+                }}
+              >
+                <Plus size={16} /> Nova Linha
+              </button>
+
               <CarregarArquivo 
                 variante="botao"
                 accept=".xlsx, .xls"
@@ -147,7 +183,7 @@ export default function MaterialEstoque() {
           {listaSegura.length === 0 ? (
             <div className="estado-vazio-selecao">
               <Package size={48} strokeWidth={1} />
-              <p>Clique nos itens à esquerda ou importe um Excel do SAP</p>
+              <p>Clique nos itens à esquerda, adicione uma linha manual ou importe um Excel do SAP</p>
             </div>
           ) : (
             <div className="scroll-tabela-solicitacao">
@@ -175,31 +211,31 @@ export default function MaterialEstoque() {
                         </button>
                       </td>
                       <td style={{ minWidth: '220px' }}>
-                        <input className="input-editavel-tabela texto-preto" value={item.materialDescription || ''} onChange={(e) => atualizarCampo(item.id, 'materialDescription', e.target.value)} />
+                        <input className="input-editavel-tabela texto-preto" value={item.materialDescription || ''} onChange={(e) => atualizarCampo(item.id, 'materialDescription', e.target.value)} placeholder="Descrição do item" />
                       </td>
                       <td>
-                        <input className="input-editavel-tabela badge-partnumber" value={item.numPecaFabricante || ''} onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} />
+                        <input className="input-editavel-tabela badge-partnumber" value={item.numPecaFabricante || ''} onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
                       </td>
                       <td className="qtd-solicitada-destaque">
                         <input type="number" className="input-inline-tabela" value={item.qtdSelecionada || 1} onChange={(e) => atualizarCampo(item.id, 'qtdSelecionada', e.target.value)} />
                       </td>
                       <td>
-                        <input className="input-editavel-tabela texto-cinza-claro" value={item.desenhoSAP || ''} onChange={(e) => atualizarCampo(item.id, 'desenhoSAP', e.target.value)} />
+                        <input className="input-editavel-tabela texto-cinza-claro" value={item.desenhoSAP || ''} onChange={(e) => atualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP" />
                       </td>
                       <td>
-                        <input className="input-editavel-tabela texto-cinza-escuro" value={item.fornecedor || ''} onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} />
+                        <input className="input-editavel-tabela texto-cinza-escuro" value={item.fornecedor || ''} onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                       </td>
                       <td>
-                        <input className="input-editavel-tabela texto-cinza" value={item.referencia || ''} onChange={(e) => atualizarCampo(item.id, 'referencia', e.target.value)} />
+                        <input className="input-editavel-tabela texto-cinza" value={item.referencia || ''} onChange={(e) => atualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Ref" />
                       </td>
                       <td>
-                        <input className="input-editavel-tabela texto-cinza" style={{ width: '60px' }} value={item.unidadeMedida || ''} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)} />
+                        <input className="input-editavel-tabela texto-cinza" style={{ width: '60px' }} value={item.unidadeMedida || ''} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)} placeholder="Unid" />
                       </td>
                       <td>
-                        <input className="input-editavel-tabela link-azul-fake" value={item.wbs || ''} onChange={(e) => atualizarCampo(item.id, 'wbs', e.target.value)} />
+                        <input className="input-editavel-tabela link-azul-fake" value={item.wbs || ''} onChange={(e) => atualizarCampo(item.id, 'wbs', e.target.value)} placeholder="WBS" />
                       </td>
                       <td>
-                        <input className="input-editavel-tabela link-azul-fake" value={item.alocacao || ''} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} />
+                        <input className="input-editavel-tabela link-azul-fake" value={item.alocacao || ''} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
                       </td>
                     </tr>
                   ))}
