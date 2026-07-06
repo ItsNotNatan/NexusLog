@@ -5,7 +5,7 @@ import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet } from
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../hooks/useProcessadorExcel';
-import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal'; // <-- Importação do Botão Global!
+import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 export default function EntradaMaterial() {
   // 1. ESTADO: Dados gerais do formulário
@@ -15,21 +15,29 @@ export default function EntradaMaterial() {
     observacoes: ''
   });
 
-  // 2. ESTADO: Tabela dinâmica de itens (começa com 1 linha vazia)
-  const [itens, setItens] = useState([
-    { 
-      id: `linha-vazia-${Date.now()}`, 
-      desenhoSAP: '', 
-      partNumber: '', 
-      descricao: '', 
-      qtdSelecionada: 1, 
-      unidadeMedida: 'Unid', 
-      fornecedor: '', 
-      referencia: '',
-      wbs: '',
-      alocacao: ''
-    }
-  ]);
+  // Função auxiliar para gerar uma linha vazia com todos os novos campos do SAP
+  const gerarLinhaVazia = () => ({
+    id: `linha-vazia-${Date.now()}-${Math.random()}`, 
+    desenhoSAP: '', 
+    materialDescription: '', 
+    numPecaFabricante: '', 
+    fornecedor: '', 
+    qtdFornecida: 1, 
+    referencia: '',
+    unidadeMedida: 'Unid', 
+    vendorDescription: '',
+    wbs: '',
+    emissaoNF: '',
+    recebNF: '',
+    docCompras: '',
+    poNetPrice: '',
+    centro: '',
+    deposito: '',
+    alocacao: ''
+  });
+
+  // 2. ESTADO: Tabela dinâmica de itens
+  const [itens, setItens] = useState([gerarLinhaVazia()]);
 
   // 3. ESTADO: Ficheiros anexados
   const [anexos, setAnexos] = useState([]);
@@ -44,28 +52,14 @@ export default function EntradaMaterial() {
     if (novosItens && Array.isArray(novosItens)) {
       setItens(prev => {
         // Remove a linha vazia inicial se o usuário estiver importando um Excel
-        const listaLimpa = prev.filter(i => i.partNumber !== '' || i.descricao !== '');
+        const listaLimpa = prev.filter(i => i.numPecaFabricante !== '' || i.materialDescription !== '');
         return [...listaLimpa, ...novosItens];
       });
     }
   };
 
   const adicionarLinhaEmBranco = () => {
-    setItens([
-      ...itens,
-      { 
-        id: `linha-vazia-${Date.now()}`, 
-        desenhoSAP: '', 
-        partNumber: '', 
-        descricao: '', 
-        qtdSelecionada: 1, 
-        unidadeMedida: 'Unid', 
-        fornecedor: '', 
-        referencia: '',
-        wbs: '',
-        alocacao: '' 
-      }
-    ]);
+    setItens([...itens, gerarLinhaVazia()]);
   };
 
   const removerItem = (idParaRemover) => {
@@ -96,9 +90,9 @@ export default function EntradaMaterial() {
       return;
     }
 
-    const itensIncompletos = itens.some(i => !i.numPecaFabricante && !i.partNumber || (!i.materialDescription && !i.descricao) || !i.qtdSelecionada);
+    const itensIncompletos = itens.some(i => !i.numPecaFabricante || !i.materialDescription || !i.qtdFornecida);
     if (itensIncompletos) {
-      alert("Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas.");
+      alert("Preencha os campos obrigatórios (Nº Peça, Descrição e Qtd) em todas as linhas.");
       return;
     }
 
@@ -109,12 +103,9 @@ export default function EntradaMaterial() {
     };
 
     try {
-      // Faz a requisição POST para o seu servidor backend
       const resposta = await fetch('http://localhost:3001/api/solicitacoes/nova', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
@@ -122,9 +113,8 @@ export default function EntradaMaterial() {
 
       if (resposta.ok) {
         alert(`Sucesso! Solicitação de Entrada enviada. ID: ${dados.ps_id}`);
-        // Limpa o formulário
         setFormDados({ nome: '', wbs: '', observacoes: '' });
-        setItens([{ id: `linha-vazia-${Date.now()}`, desenhoSAP: '', partNumber: '', descricao: '', qtdSelecionada: 1, unidadeMedida: 'Unid', fornecedor: '', referencia: '', wbs: '', alocacao: '' }]);
+        setItens([gerarLinhaVazia()]);
         setAnexos([]);
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
@@ -198,7 +188,7 @@ export default function EntradaMaterial() {
         </div>
       </div>
 
-      {/* --- BLOCO 2: ITENS PARA ENTRADA (ESTILO "ITENS SELECIONADOS") --- */}
+      {/* --- BLOCO 2: ITENS PARA ENTRADA --- */}
       <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
         
         {/* Cabeçalho da Tabela */}
@@ -209,21 +199,13 @@ export default function EntradaMaterial() {
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* BOTÃO NOVA LINHA */}
             <button 
               onClick={adicionarLinhaEmBranco} 
-              style={{ 
-                display: 'flex', alignItems: 'center', gap: '6px', 
-                padding: '6px 12px', backgroundColor: '#ffffff', 
-                border: '1px solid #cbd5e1', borderRadius: '8px', 
-                fontSize: '0.75rem', fontWeight: '600', color: '#475569', 
-                cursor: 'pointer' 
-              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
             >
               <Plus size={16} /> Nova Linha
             </button>
 
-            {/* BOTÃO IMPORTAR EXCEL */}
             <CarregarArquivo 
               variante="botao"
               accept=".xlsx, .xls"
@@ -232,7 +214,6 @@ export default function EntradaMaterial() {
               onFileSelect={handleImportarExcel}
             />
 
-            {/* CONTADOR */}
             <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 10px', borderRadius: '999px' }}>
               {itens.length} itens
             </span>
@@ -241,18 +222,26 @@ export default function EntradaMaterial() {
         
         {/* Corpo da Tabela */}
         <div className="scroll-tabela-solicitacao">
-          <table className="tabela-solicitacao-dados">
+          {/* Note o minWidth bem grande (2500px) para acomodar as 16 colunas sem esmagar */}
+          <table className="tabela-solicitacao-dados" style={{ minWidth: '2500px' }}>
             <thead>
               <tr>
                 <th>AÇÕES</th>
+                <th>DESENHO SAP</th>
                 <th>MATERIAL DESCRIPTION</th>
                 <th>Nº PEÇA FABRICANTE</th>
-                <th>QTD. SOLICITADA</th>
-                <th>DESENHO SAP</th>
                 <th>FORNECEDOR</th>
+                <th>QTD. FORNECIDA</th>
                 <th>REFERÊNCIA</th>
-                <th>UNIDADE</th>
+                <th>UNIDADE DE MEDIDA</th>
+                <th>VENDOR DESCRIPTION</th>
                 <th>WBS</th>
+                <th>EMISSÃO NF</th>
+                <th>RECEB. NF</th>
+                <th>DOCUMENTO DE COMPRAS</th>
+                <th>PO NET PRICE</th>
+                <th>CENTRO</th>
+                <th>DEPÓSITO</th>
                 <th>ALOCAÇÃO</th>
               </tr>
             </thead>
@@ -264,38 +253,60 @@ export default function EntradaMaterial() {
                       <Trash2 size={16} />
                     </button>
                   </td>
+                  <td>
+                    <input className="input-editavel-tabela texto-cinza-claro" value={item.desenhoSAP} onChange={(e) => atualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP" />
+                  </td>
                   <td style={{ minWidth: '220px' }}>
-                    <input className="input-editavel-tabela texto-preto" value={item.descricao || item.materialDescription || ''} onChange={(e) => atualizarCampo(item.id, 'materialDescription', e.target.value)} placeholder="Descrição do item" />
+                    <input className="input-editavel-tabela texto-preto" value={item.materialDescription} onChange={(e) => atualizarCampo(item.id, 'materialDescription', e.target.value)} placeholder="Descrição do item" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela badge-partnumber" value={item.partNumber || item.numPecaFabricante || ''} onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
+                    <input className="input-editavel-tabela badge-partnumber" value={item.numPecaFabricante} onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
+                  </td>
+                  <td>
+                    <input className="input-editavel-tabela texto-cinza-escuro" value={item.fornecedor} onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                   </td>
                   <td className="qtd-solicitada-destaque">
-                    <input type="number" className="input-inline-tabela" value={item.qtdSelecionada || 1} onChange={(e) => atualizarCampo(item.id, 'qtdSelecionada', e.target.value)} placeholder="0" min="1" />
+                    <input type="number" className="input-inline-tabela" value={item.qtdFornecida} onChange={(e) => atualizarCampo(item.id, 'qtdFornecida', e.target.value)} placeholder="0" min="1" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela texto-cinza-claro" value={item.desenhoSAP || ''} onChange={(e) => atualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP" />
+                    <input className="input-editavel-tabela texto-cinza" value={item.referencia} onChange={(e) => atualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Ref" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela texto-cinza-escuro" value={item.fornecedor || ''} onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela texto-cinza" value={item.referencia || ''} onChange={(e) => atualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Ref" />
-                  </td>
-                  <td>
-                    <select className="input-editavel-tabela texto-cinza" style={{ width: '80px', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida || 'Unid'} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
+                    <select className="input-editavel-tabela texto-cinza" style={{ width: '80px', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
                       <option value="Unid">Unid</option>
                       <option value="Kg">Kg</option>
                       <option value="Metro">Metro</option>
                       <option value="Caixa">Caixa</option>
                       <option value="Litro">Litro</option>
+                      <option value="NR">NR</option>
                     </select>
                   </td>
-                  <td>
-                    <input className="input-editavel-tabela link-azul-fake" value={item.wbs || ''} onChange={(e) => atualizarCampo(item.id, 'wbs', e.target.value)} placeholder="WBS" />
+                  <td style={{ minWidth: '180px' }}>
+                    <input className="input-editavel-tabela texto-cinza" value={item.vendorDescription} onChange={(e) => atualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição do fornecedor" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela link-azul-fake" value={item.alocacao || ''} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
+                    <input className="input-editavel-tabela link-azul-fake" value={item.wbs} onChange={(e) => atualizarCampo(item.id, 'wbs', e.target.value)} placeholder="WBS" />
+                  </td>
+                  <td>
+                    <input type="text" className="input-editavel-tabela texto-cinza" value={item.emissaoNF} onChange={(e) => atualizarCampo(item.id, 'emissaoNF', e.target.value)} placeholder="DD/MM/AAAA" />
+                  </td>
+                  <td>
+                    <input type="text" className="input-editavel-tabela texto-cinza" value={item.recebNF} onChange={(e) => atualizarCampo(item.id, 'recebNF', e.target.value)} placeholder="DD/MM/AAAA" />
+                  </td>
+                  <td>
+                    <input className="input-editavel-tabela texto-cinza" value={item.docCompras} onChange={(e) => atualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
+                  </td>
+                  <td>
+                    <input className="input-editavel-tabela texto-preto" value={item.poNetPrice} onChange={(e) => atualizarCampo(item.id, 'poNetPrice', e.target.value)} placeholder="R$ 0,00" />
+                  </td>
+                  <td>
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '60px' }} value={item.centro} onChange={(e) => atualizarCampo(item.id, 'centro', e.target.value)} placeholder="Centro" />
+                  </td>
+                  <td>
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '70px' }} value={item.deposito} onChange={(e) => atualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
+                  </td>
+                  <td>
+                    <input className="input-editavel-tabela link-azul-fake" value={item.alocacao} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
                   </td>
                 </tr>
               ))}
@@ -319,7 +330,6 @@ export default function EntradaMaterial() {
             />
           </div>
 
-          {/* LISTA DE ARQUIVOS ANEXADOS */}
           {anexos.length > 0 && (
             <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {anexos.map((arquivo, index) => (
@@ -332,11 +342,10 @@ export default function EntradaMaterial() {
               ))}
             </div>
           )}
-
         </div>
       </div>
 
-      {/* --- BLOCO 4: AÇÃO FINAL (Usando BotaoAcaoGlobal) --- */}
+      {/* --- BLOCO 4: AÇÃO FINAL --- */}
       <BotaoAcaoGlobal 
         texto="Solicitar Entrada de Material" 
         icone={<Send size={16} />} 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { User, RefreshCcw, Search, Send } from 'lucide-react';
+import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 const listaDeBs = [
   { id: '10976', solicitante: 'TESTE', wbs: 'WBS-PRJ-2024-001', itens: 4, status: 'Em Separação' },
@@ -9,6 +10,12 @@ const listaDeBs = [
 ];
 
 export default function ReintegracaoItens() {
+
+  // Função provisória para o clique do botão (pronta para plugar no Node.js depois)
+  const handleEnviar = () => {
+    alert('Enviando Solicitação de Reintegração...');
+  };
+
   return (
     <div className="limitador-largura">
       <div className="form-cartao">
@@ -48,11 +55,14 @@ export default function ReintegracaoItens() {
         </div>
       </div>
 
-      <div className="form-acoes-final">
-        <button className="btn-enviar laranja">
-          <Send size={16} /> Solicitar Reintegração
-        </button>
-      </div>
+      {/* --- BOTÃO GLOBAL AQUI --- */}
+      <BotaoAcaoGlobal 
+        texto="Solicitar Reintegração" 
+        icone={<Send size={16} />} 
+        cor="laranja" 
+        onClick={handleEnviar} 
+      />
+      
     </div>
   );
 }

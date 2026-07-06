@@ -173,7 +173,7 @@
   transition: all 0.2s;
 }
 
-.input-campo:focus {
+.input-campo.foco-laranja:focus {
   border-color: #fdba74;
   background-color: #ffffff;
 }
@@ -268,29 +268,4 @@
   font-size: 0.75rem;
   font-weight: 500;
   border: 1px solid #bae6fd;
-}
-
-/* BOTÃO ENVIAR */
-.form-acoes-final {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn-enviar-laranja {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background-color: #fca5a5; /* Um pêssego/salmão similar à imagem */
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  padding: 12px 24px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-enviar-laranja:hover {
-  background-color: #f87171;
 }

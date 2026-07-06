@@ -1,6 +1,6 @@
 import React from 'react';
+import { AlertTriangle, XCircle, Search } from 'lucide-react';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-import { Send, FileText, Package, ArrowLeftRight, RefreshCcw, AlertTriangle, XCircle, Search } from 'lucide-react';
 
 const listaDeBs = [
   { id: '10976', solicitante: 'TESTE', wbs: 'WBS-PRJ-2024-001', itens: 4, status: 'Em Separação' },
@@ -10,8 +10,16 @@ const listaDeBs = [
 ];
 
 export default function CancelarBS() {
+
+  // Função para testar o envio
+  const handleEnviar = () => {
+    alert('Enviando solicitação de Cancelamento...');
+  };
+
   return (
     <div className="limitador-largura">
+      
+      {/* AVISO SUPERIOR */}
       <div className="banner-aviso banner-vermelho">
         <AlertTriangle size={24} />
         <div>
@@ -20,6 +28,7 @@ export default function CancelarBS() {
         </div>
       </div>
 
+      {/* CARTÃO DE PESQUISA */}
       <div className="form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
@@ -31,6 +40,8 @@ export default function CancelarBS() {
           <Search size={18} className="icone-pesquisa" />
           <input type="text" className="input-campo foco-vermelho" placeholder="Buscar por nº BS, ID ou solicitante..." style={{ paddingLeft: '40px' }} />
         </div>
+        
+        {/* LISTA */}
         <div className="lista-bs-container">
           {listaDeBs.map((bs) => (
             <div key={bs.id} className="item-bs">
@@ -43,6 +54,15 @@ export default function CancelarBS() {
           ))}
         </div>
       </div>
+
+      {/* --- BOTÃO GLOBAL AQUI --- */}
+      <BotaoAcaoGlobal 
+        texto="Confirmar Cancelamento" 
+        icone={<AlertTriangle size={16} />} 
+        cor="vermelho" 
+        onClick={handleEnviar} 
+      />
+
     </div>
   );
 }
