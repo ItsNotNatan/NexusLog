@@ -1,142 +1,38 @@
-/* CONTAINER GERAL */
-.crossdocking-wrapper {
-  padding: 32px;
-  background-color: #f4f5f7;
-  font-family: system-ui, -apple-system, sans-serif;
-  color: #334155;
-  min-height: 100vh;
-  box-sizing: border-box;
-}
-
-/* CABEÇALHO */
-.crossdocking-cabecalho {
-  margin-bottom: 24px;
-}
-
-.crossdocking-cabecalho h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 8px 0;
-}
-
-.crossdocking-cabecalho p {
-  font-size: 1rem;
-  color: #64748b;
-  margin: 0;
-}
-
-/* LISTA DE TIPOS DE SOLICITAÇÃO */
-.tipos-container {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-.tipos-container::-webkit-scrollbar {
-  height: 6px;
-}
-.tipos-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-.tipos-container::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 4px;
-}
-
-.tipo-cartao {
-  flex: 0 0 auto;
-  width: 180px;
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 16px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-}
-
-.tipo-cartao:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.tipo-icone {
-  width: 36px;
-  height: 36px;
-  background-color: #f8fafc;
-  color: #64748b;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
-  transition: all 0.2s ease;
-}
-
-.tipo-titulo {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 4px;
-  line-height: 1.2;
-}
-
-.tipo-desc {
-  font-size: 0.75rem;
-  color: #64748b;
-  line-height: 1.3;
-}
-
-/* --- ESTILOS ATIVOS Padrão --- */
-.tipo-cartao.ativo {
-  background-color: #eff6ff;
-  border-color: #bfdbfe;
-}
-.tipo-cartao.ativo .tipo-icone { background-color: transparent; color: #2563eb; }
-.tipo-cartao.ativo .tipo-titulo { color: #2563eb; }
-.tipo-cartao.ativo .tipo-desc { color: #3b82f6; }
-
-/* --- ESTILOS ATIVOS (Ciano - Específico para Crossdocking) --- */
-.tipo-cartao.ativo-ciano {
-  background-color: #e0f2fe; /* Azul claro ciano */
-  border-color: #bae6fd;
-}
-.tipo-cartao.ativo-ciano .tipo-icone { background-color: transparent; color: #0284c7; }
-.tipo-cartao.ativo-ciano .tipo-titulo { color: #0284c7; }
-.tipo-cartao.ativo-ciano .tipo-desc { color: #0ea5e9; }
-
-/* --- CONTEÚDO DO FORMULÁRIO (LIMITADO À ESQUERDA) --- */
-.crossdocking-conteudo {
-  max-width: 800px; /* Limita a largura como na imagem */
+/* CONTAINER GERAL / LIMITADOR */
+.limitador-largura {
+  max-width: 800px; /* Garante o visual limpo e centralizado igual ao das outras telas */
+  margin: 0 auto;
+  padding: 32px 16px;
   display: flex;
   flex-direction: column;
   gap: 24px;
+  font-family: system-ui, -apple-system, sans-serif;
+  box-sizing: border-box;
 }
 
-/* --- BANNER DE AVISO --- */
-.banner-aviso-ciano {
+/* --- BANNER DE AVISO (CIANO) --- */
+.banner-aviso.banner-ciano {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background-color: #f0f9ff;
-  border: 1px solid #bae6fd;
+  gap: 16px;
+  background-color: #ecfeff; /* Fundo ciano suave */
+  border: 1px solid #a5f3fc;
   border-radius: 12px;
   padding: 16px 24px;
-  color: #0284c7;
+  color: #0891b2; /* Texto ciano escuro */
 }
 
-.banner-aviso-ciano strong {
-  font-weight: 600;
+.banner-aviso.banner-ciano strong {
+  font-weight: 700;
   font-size: 1rem;
+  display: block;
+  margin-bottom: 2px;
 }
 
-.banner-aviso-ciano p {
+.banner-aviso.banner-ciano p {
   margin: 0;
   font-size: 0.875rem;
+  color: #0e7490;
 }
 
 /* CARTÕES DE FORMULÁRIO */
@@ -145,16 +41,25 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
+/* HEADER DO FORMULÁRIO */
 .form-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
   margin-bottom: 24px;
 }
 
-.form-header-icone {
+.form-header-esquerda {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ÍCONES DO HEADER */
+.form-header-icone.ciano {
   background-color: #e0f2fe;
   color: #0284c7;
   width: 32px;
@@ -165,8 +70,11 @@
   justify-content: center;
 }
 
-.form-header-icone.redondo {
+/* Modificador de ícone redondo */
+.form-header-icone.ciano.redondo {
   border-radius: 50%;
+  background-color: #ecfeff;
+  color: #0891b2;
 }
 
 .form-header h2 {
@@ -187,6 +95,7 @@
   grid-template-columns: 1fr;
 }
 
+/* GRUPOS DE INPUT */
 .input-grupo {
   display: flex;
   flex-direction: column;
@@ -213,26 +122,29 @@
   color: #334155;
   box-sizing: border-box;
   outline: none;
-  transition: all 0.2s;
+  transition: all 0.2s ease-in-out;
 }
 
 textarea.input-campo {
   resize: vertical;
-  min-height: 80px;
+  min-height: 90px;
 }
 
-.input-campo:focus {
-  border-color: #7dd3fc;
+/* Foco específico para o tema Ciano */
+.input-campo.foco-ciano:focus {
+  border-color: #22d3ee;
   background-color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.1);
 }
 
 .texto-vermelho {
   color: #ef4444;
+  font-weight: bold;
 }
 
-/* ÁREA DE UPLOAD DA NOTA FISCAL */
-.dropzone-nf {
-  border: 1px dashed #cbd5e1;
+/* ÁREA DE DROPZONE (COMPONENTE ANEXAR NOTA) */
+.dropzone.cinza {
+  border: 2px dashed #cbd5e1;
   border-radius: 8px;
   padding: 24px;
   text-align: center;
@@ -243,16 +155,17 @@ textarea.input-campo {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  transition: all 0.2s;
+  gap: 10px;
+  transition: all 0.2s ease;
 }
 
-.dropzone-nf:hover {
+.dropzone.cinza:hover {
   background-color: #f1f5f9;
-  border-color: #94a3b8;
+  border-color: #0891b2;
+  color: #0891b2;
 }
 
-/* BOTÕES TOGGLE (TIPO DE SAÍDA) */
+/* BOTÕES DE SWITCH/TOGGLE (TIPO DE SAÍDA) */
 .botoes-toggle-container {
   display: flex;
   gap: 16px;
@@ -269,49 +182,34 @@ textarea.input-campo {
   font-weight: 500;
   color: #475569;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .btn-toggle:hover {
   background-color: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .btn-toggle.selecionado {
-  background-color: #f0f9ff;
-  border-color: #7dd3fc;
-  color: #0284c7;
+  background-color: #ecfeff;
+  border-color: #22d3ee;
+  color: #0891b2;
   font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-/* BOTÃO ENVIAR */
-.form-acoes-final {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-
-.btn-enviar-ciano {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background-color: #0284c7; /* Ciano/Azul forte da imagem */
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  padding: 12px 24px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-enviar-ciano:hover {
-  background-color: #0369a1;
-}
-
-/* RESPONSIVIDADE */
+/* RESPONSIVIDADE PARA DISPOSITIVOS MÓVEIS */
 @media (max-width: 768px) {
+  .limitador-largura {
+    padding: 16px 12px;
+  }
+  
   .form-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .botoes-toggle-container {
+    flex-direction: column;
+    gap: 10px;
   }
 }
