@@ -5,6 +5,7 @@ import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet } from
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../hooks/useProcessadorExcel';
+import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal'; // <-- Importação do Botão Global!
 
 export default function EntradaMaterial() {
   // 1. ESTADO: Dados gerais do formulário
@@ -95,7 +96,7 @@ export default function EntradaMaterial() {
       return;
     }
 
-    const itensIncompletos = itens.some(i => !i.partNumber || !i.descricao || !i.qtdSelecionada);
+    const itensIncompletos = itens.some(i => !i.numPecaFabricante && !i.partNumber || (!i.materialDescription && !i.descricao) || !i.qtdSelecionada);
     if (itensIncompletos) {
       alert("Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas.");
       return;
@@ -246,7 +247,7 @@ export default function EntradaMaterial() {
                 <th>AÇÕES</th>
                 <th>MATERIAL DESCRIPTION</th>
                 <th>Nº PEÇA FABRICANTE</th>
-                <th>QTD.</th>
+                <th>QTD. SOLICITADA</th>
                 <th>DESENHO SAP</th>
                 <th>FORNECEDOR</th>
                 <th>REFERÊNCIA</th>
@@ -335,12 +336,13 @@ export default function EntradaMaterial() {
         </div>
       </div>
 
-      {/* --- BLOCO 4: AÇÃO FINAL --- */}
-      <div className="form-acoes-final mt-4">
-        <button className="btn-enviar-azul" style={{ backgroundColor: '#10b981' }} onClick={handleEnviar}>
-          <Send size={16} /> Solicitar Entrada de Material
-        </button>
-      </div>
+      {/* --- BLOCO 4: AÇÃO FINAL (Usando BotaoAcaoGlobal) --- */}
+      <BotaoAcaoGlobal 
+        texto="Solicitar Entrada de Material" 
+        icone={<Send size={16} />} 
+        cor="verde" 
+        onClick={handleEnviar} 
+      />
       
     </div>
   );
