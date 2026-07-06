@@ -2,18 +2,42 @@ import React from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 
 import AppLayout from './components/Layout/AppLayout';
-import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute'; // <-- Importe o segurança
+import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import CentralDeOperacoes from './pages/CentralOperacoes/CentralOperacoes';
 import SelecionarFilial from './pages/SelecionarFilial/SelecionarFilial';
-import LoginLogistica from './pages/LoginLogistica/LoginLogistica'; // <-- Certifique-se de importar o login
+import LoginLogistica from './pages/LoginLogistica/LoginLogistica';
 
-// ... (importe as outras páginas normalmente) ...
+// --- PÁGINAS DA LOGÍSTICA ---
+import Dashboard from './pages/Dashboard/Dashboard';
+import PainelGeralSolicitacoes from './pages/PainelGeralSolicitacoes/PainelGeralSolicitacoes';
+import PainelAprovacao from './pages/PainelAprovacao/PainelAprovacao';
+import EntradaEstoque from './pages/EntradaEstoque/EntradaEstoque';
+import Traceabilly from './pages/Traceabilly/Traceabilly';
+import ExportarDados from './pages/ExportarDados/ExportarDados';
+import FormatacaoSAP from './pages/FormatacaoSAP/FormatacaoSAP';
+import Configuracoes from './pages/Configuracoes/Configuracoes';
+
+// --- PÁGINAS DO CLIENTE ---
+import FazerSolicitacao from './pages/FazerSolicitacao/FazerSolicitacao';
+import ConsultaEstoque from './pages/ConsultaEstoque/ConsultaEstoque';
+import AcompanhamentoSolicitacoes from './pages/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes';
 
 export const router = createBrowserRouter([
   { path: "/", element: <CentralDeOperacoes /> },
   { path: "/selecionar-filial", element: <SelecionarFilial /> },
-  { path: "/login", element: <LoginLogistica /> }, // <-- Rota de login pública
+  { path: "/login", element: <LoginLogistica /> },
   
+  // ÁREA DO CLIENTE
+  {
+    path: "/cliente",
+    element: <AppLayout modulo="cliente" />, 
+    children: [
+      { path: "consulta-estoque", element: <ConsultaEstoque /> },
+      { path: "fazer-solicitacao", element: <FazerSolicitacao /> },
+      { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes /> }
+    ]
+  },
+
   // ÁREA DA LOGÍSTICA (PROTEGIDA!)
   {
     path: "/logistica",
@@ -26,7 +50,10 @@ export const router = createBrowserRouter([
           { path: "painel", element: <PainelGeralSolicitacoes /> },
           { path: "dashboard", element: <Dashboard /> },
           { path: "PainelAprovacao", element: <PainelAprovacao /> },
-          // ... outras rotas normais ...
+          { path: "entrada-estoque", element: <EntradaEstoque /> },
+          { path: "traceabilly", element: <Traceabilly /> },
+          { path: "exportar", element: <ExportarDados /> },
+          { path: "formatacao-sap", element: <FormatacaoSAP /> },
           
           // Exemplo de rota ultra-restrita: Só ADM pode acessar as configurações
           { 
@@ -39,5 +66,4 @@ export const router = createBrowserRouter([
       }
     ]
   }
-  // ... rotas de cliente (se houver) ...
 ]);

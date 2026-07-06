@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-// Adicionamos o ícone 'Plus' na importação
 import { User, MapPin, Calendar, Search, Package, Send, FileSpreadsheet, Trash2, Plus } from 'lucide-react';
 
 // NOSSOS COMPONENTES E HOOKS
@@ -14,18 +13,23 @@ const estoqueDisponivel = [
 ];
 
 export default function MaterialEstoque() {
+  // 1. ESTADOS DO FORMULÁRIO
+  const [formDados, setFormDados] = useState({
+    nome: '',
+    wbs: '',
+    destino: '',
+    dataNecessidade: '',
+    observacoes: ''
+  });
   const [itensSelecionados, setItensSelecionados] = useState([]);
   
-  // INICIA O MAESTRO (Hook de Processamento)
+  // INICIA O MAESTRO (Hook de Processamento do Excel)
   const processador = useProcessadorExcel();
 
-  // FUNÇÃO DE IMPORTAÇÃO (Já preserva os itens existentes graças ao ...prev)
+  // 2. FUNÇÕES DE MANIPULAÇÃO DA TABELA E IMPORTAÇÃO
   const handleImportarExcel = async (arquivo) => {
     const novosItens = await processador.iniciarProcessamento(arquivo);
-    
-    // Trava de segurança: Só adiciona se for realmente um Array válido
     if (novosItens && Array.isArray(novosItens)) {
-      // O 'prev' aqui garante que o que foi digitado manualmente não se apague!
       setItensSelecionados(prev => [...prev, ...novosItens]);
     }
   };
@@ -36,13 +40,10 @@ export default function MaterialEstoque() {
 
   const atualizarCampo = (id, campo, novoValor) => {
     setItensSelecionados(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, [campo]: novoValor } : item
-      )
+      prev.map(item => item.id === id ? { ...item, [campo]: novoValor } : item)
     );
   };
 
-  // Adiciona itens clicando na lista da esquerda
   const adicionarManualmente = (item, index) => {
     setItensSelecionados(prev => [...prev, {
       id: `manual-${Date.now()}-${index}`,
@@ -51,7 +52,6 @@ export default function MaterialEstoque() {
     }]);
   };
 
-  // NOVA FUNÇÃO: Adiciona uma linha totalmente em branco na tabela
   const adicionarLinhaEmBranco = () => {
     setItensSelecionados(prev => [
       ...prev,
@@ -70,12 +70,61 @@ export default function MaterialEstoque() {
     ]);
   };
 
-  // Garante que é sempre um array antes de renderizar (evita ecrã branco)
+  // 3. FUNÇÃO DE ENVIO PARA O BACKEND (NODE.JS)
+  const handleEnviar = async () => {
+    // Validação
+    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.dataNecessidade) {
+      alert("Por favor, preencha todos os campos obrigatórios do solicitante (*).");
+      return;
+    }
+
+    if (itensSelecionados.length === 0) {
+      alert("Adicione pelo menos um item à solicitação.");
+      return;
+    }
+
+    const itensIncompletos = itensSelecionados.some(i => !i.numPecaFabricante || !i.materialDescription || !i.qtdSelecionada);
+    if (itensIncompletos) {
+      alert("Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela.");
+      return;
+    }
+
+    // Prepara o pacote (payload)
+    const payload = {
+      solicitante: formDados,
+      itens: itensSelecionados
+    };
+
+    try {
+      // Dispara a requisição HTTP POST para o servidor local
+      const resposta = await fetch('http://localhost:3001/api/solicitacoes/nova', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const dados = await resposta.json();
+
+      if (resposta.ok) {
+        alert(`Sucesso! Solicitação criada com o ID: ${dados.ps_id}`);
+        // Limpa o formulário após o sucesso
+        setFormDados({ nome: '', wbs: '', destino: '', dataNecessidade: '', observacoes: '' });
+        setItensSelecionados([]);
+      } else {
+        alert(`Erro do servidor: ${dados.erro}`);
+      }
+    } catch (error) {
+      console.error("Erro na requisição:", error);
+      alert("Falha ao conectar com o servidor. Verifique se o backend (Node.js) está rodando na porta 3001.");
+    }
+  };
+
   const listaSegura = Array.isArray(itensSelecionados) ? itensSelecionados : [];
 
   return (
     <>
-      {/* TELA DE CARREGAMENTO (MODAL) */}
       <ModalProcessamento 
         estaProcessando={processador.estaProcessando}
         concluido={processador.concluido}
@@ -96,11 +145,23 @@ export default function MaterialEstoque() {
         <div className="form-grid">
           <div className="input-grupo">
             <label>NOME DO SOLICITANTE *</label>
-            <input type="text" className="input-campo" placeholder="Seu nome completo" />
+            <input 
+              type="text" 
+              className="input-campo" 
+              placeholder="Seu nome completo"
+              value={formDados.nome}
+              onChange={(e) => setFormDados({...formDados, nome: e.target.value})}
+            />
           </div>
           <div className="input-grupo">
             <label>WBS / CENTRO DE CUSTO *</label>
-            <input type="text" className="input-campo" placeholder="Ex: WBS-PRJ-2024-001" />
+            <input 
+              type="text" 
+              className="input-campo" 
+              placeholder="Ex: WBS-PRJ-2024-001"
+              value={formDados.wbs}
+              onChange={(e) => setFormDados({...formDados, wbs: e.target.value})}
+            />
           </div>
           <div className="input-grupo">
             <label><MapPin size={14} /> FILIAL DE ORIGEM</label>
@@ -112,15 +173,31 @@ export default function MaterialEstoque() {
           </div>
           <div className="input-grupo row-span-2">
             <label><MapPin size={14} /> DESTINO *</label>
-            <textarea className="input-campo" placeholder="Local de destino do material"></textarea>
+            <textarea 
+              className="input-campo" 
+              placeholder="Local de destino do material"
+              value={formDados.destino}
+              onChange={(e) => setFormDados({...formDados, destino: e.target.value})}
+            ></textarea>
           </div>
           <div className="input-grupo">
             <label><Calendar size={14} /> DATA DE NECESSIDADE *</label>
-            <input type="date" className="input-campo" />
+            <input 
+              type="date" 
+              className="input-campo"
+              value={formDados.dataNecessidade}
+              onChange={(e) => setFormDados({...formDados, dataNecessidade: e.target.value})}
+            />
           </div>
           <div className="input-grupo span-2">
             <label>OBSERVAÇÕES</label>
-            <textarea className="input-campo" placeholder="Informações adicionais..." rows="2"></textarea>
+            <textarea 
+              className="input-campo" 
+              placeholder="Informações adicionais..." 
+              rows="2"
+              value={formDados.observacoes}
+              onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})}
+            ></textarea>
           </div>
         </div>
       </div>
@@ -154,7 +231,6 @@ export default function MaterialEstoque() {
             <div className="titulo-com-icone"><Package size={18} /> Itens Selecionados</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               
-              {/* BOTÃO PARA ADICIONAR LINHA MANUALMENTE */}
               <button 
                 onClick={adicionarLinhaEmBranco} 
                 style={{ 
@@ -247,7 +323,8 @@ export default function MaterialEstoque() {
       </div>
       
       <div className="form-acoes-final mt-4">
-        <button className="btn-enviar-azul">
+        {/* Atrelamos a função handleEnviar ao evento onClick */}
+        <button className="btn-enviar-azul" onClick={handleEnviar}>
           <Send size={16} /> Enviar Solicitação
         </button>
       </div>
