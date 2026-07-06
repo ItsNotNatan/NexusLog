@@ -1,7 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User, FileText, Paperclip, Send } from 'lucide-react';
+import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 export default function SolicitarNotaFiscal() {
+  
+  // Função provisória para o clique do botão
+  const handleEnviar = () => {
+    alert('Enviando Solicitação de Nota Fiscal...');
+  };
+
   return (
     <div className="nf-container">
       <div className="nf-grid-superior">
@@ -63,11 +70,14 @@ export default function SolicitarNotaFiscal() {
         </div>
       </div>
 
-      <div className="form-acoes-final">
-        <button className="btn-enviar roxo">
-          <Send size={16} /> Enviar Solicitação de NF
-        </button>
-      </div>
+      {/* --- BOTÃO GLOBAL AQUI --- */}
+      <BotaoAcaoGlobal 
+        texto="Enviar Solicitação de NF" 
+        icone={<Send size={16} />} 
+        cor="roxo" 
+        onClick={handleEnviar} 
+      />
+      
     </div>
   );
 }
