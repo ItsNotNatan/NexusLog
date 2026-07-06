@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
-import { Package, User, Plus, Send, Trash2, Paperclip, X } from 'lucide-react';
+import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react';
+
+// NOSSOS COMPONENTES E HOOKS
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
+import ModalProcessamento from '../../components/ModalProcessamento/ModalProcessamento';
+import { useProcessadorExcel } from '../../hooks/useProcessadorExcel';
 
 export default function EntradaMaterial() {
   // 1. ESTADO: Dados gerais do formulário
@@ -11,15 +15,14 @@ export default function EntradaMaterial() {
   });
 
   // 2. ESTADO: Tabela dinâmica de itens (começa com 1 linha vazia)
-  // Adicionei os campos extras para bater com o cabeçalho da sua tabela
   const [itens, setItens] = useState([
     { 
-      id: Date.now(), 
+      id: `linha-vazia-${Date.now()}`, 
       desenhoSAP: '', 
       partNumber: '', 
       descricao: '', 
-      qtd: '', 
-      unid: 'Unid', 
+      qtdSelecionada: 1, 
+      unidadeMedida: 'Unid', 
       fornecedor: '', 
       referencia: '',
       wbs: '',
@@ -30,18 +33,32 @@ export default function EntradaMaterial() {
   // 3. ESTADO: Ficheiros anexados
   const [anexos, setAnexos] = useState([]);
 
-  // --- FUNÇÕES DE MANIPULAÇÃO ---
+  // INICIA O MAESTRO (Hook de Processamento do Excel)
+  const processador = useProcessadorExcel();
 
-  const adicionarItem = () => {
+  // --- FUNÇÕES DE MANIPULAÇÃO DA TABELA ---
+
+  const handleImportarExcel = async (arquivo) => {
+    const novosItens = await processador.iniciarProcessamento(arquivo);
+    if (novosItens && Array.isArray(novosItens)) {
+      setItens(prev => {
+        // Remove a linha vazia inicial se o usuário estiver importando um Excel
+        const listaLimpa = prev.filter(i => i.partNumber !== '' || i.descricao !== '');
+        return [...listaLimpa, ...novosItens];
+      });
+    }
+  };
+
+  const adicionarLinhaEmBranco = () => {
     setItens([
       ...itens,
       { 
-        id: Date.now(), 
+        id: `linha-vazia-${Date.now()}`, 
         desenhoSAP: '', 
         partNumber: '', 
         descricao: '', 
-        qtd: '', 
-        unid: 'Unid', 
+        qtdSelecionada: 1, 
+        unidadeMedida: 'Unid', 
         fornecedor: '', 
         referencia: '',
         wbs: '',
@@ -50,16 +67,16 @@ export default function EntradaMaterial() {
     ]);
   };
 
-  const removerItem = (id) => {
+  const removerItem = (idParaRemover) => {
     if (itens.length > 1) {
-      setItens(itens.filter(item => item.id !== id));
+      setItens(itens.filter(item => item.id !== idParaRemover));
     } else {
       alert("A solicitação precisa ter pelo menos um item.");
     }
   };
 
-  const atualizarItem = (id, campo, valor) => {
-    setItens(itens.map(item => item.id === id ? { ...item, [campo]: valor } : item));
+  const atualizarCampo = (id, campo, novoValor) => {
+    setItens(itens.map(item => item.id === id ? { ...item, [campo]: novoValor } : item));
   };
 
   const handleAnexar = (arquivo) => {
@@ -70,7 +87,7 @@ export default function EntradaMaterial() {
     setAnexos(anexos.filter((_, index) => index !== indexRemover));
   };
 
-  // --- ENVIO PARA O BACKEND ---
+  // --- ENVIO PARA O BACKEND (NODE.JS) ---
   const handleEnviar = async () => {
     // Validação básica
     if (!formDados.nome || !formDados.wbs) {
@@ -78,7 +95,7 @@ export default function EntradaMaterial() {
       return;
     }
 
-    const itensIncompletos = itens.some(i => !i.partNumber || !i.descricao || !i.qtd);
+    const itensIncompletos = itens.some(i => !i.partNumber || !i.descricao || !i.qtdSelecionada);
     if (itensIncompletos) {
       alert("Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas.");
       return;
@@ -87,10 +104,7 @@ export default function EntradaMaterial() {
     // Prepara o pacote de dados para enviar ao Node.js
     const payload = {
       solicitante: formDados,
-      itens: itens.map(i => ({
-        ...i,
-        qtdSelecionada: i.qtd // Padronizando o nome da variável pro backend entender
-      }))
+      itens: itens
     };
 
     try {
@@ -109,7 +123,7 @@ export default function EntradaMaterial() {
         alert(`Sucesso! Solicitação de Entrada enviada. ID: ${dados.ps_id}`);
         // Limpa o formulário
         setFormDados({ nome: '', wbs: '', observacoes: '' });
-        setItens([{ id: Date.now(), desenhoSAP: '', partNumber: '', descricao: '', qtd: '', unid: 'Unid', fornecedor: '', referencia: '', wbs: '', alocacao: '' }]);
+        setItens([{ id: `linha-vazia-${Date.now()}`, desenhoSAP: '', partNumber: '', descricao: '', qtdSelecionada: 1, unidadeMedida: 'Unid', fornecedor: '', referencia: '', wbs: '', alocacao: '' }]);
         setAnexos([]);
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
@@ -123,6 +137,16 @@ export default function EntradaMaterial() {
   return (
     <div className="entrada-container">
       
+      {/* TELA DE CARREGAMENTO DO EXCEL (MODAL) */}
+      <ModalProcessamento 
+        estaProcessando={processador.estaProcessando}
+        concluido={processador.concluido}
+        estadoProgresso={processador.estadoProgresso}
+        resultado={processador.resultado}
+        erroFatal={processador.erroFatal}
+        onClose={processador.resetarProcessador}
+      />
+
       {/* --- AVISO SUPERIOR --- */}
       <div className="banner-aviso banner-verde">
         <Package size={24} />
@@ -173,18 +197,48 @@ export default function EntradaMaterial() {
         </div>
       </div>
 
-      {/* --- BLOCO 2: ITENS DINÂMICOS (AGORA USANDO TABLE) --- */}
-      <div className="form-cartao">
-        <div className="form-header">
+      {/* --- BLOCO 2: ITENS PARA ENTRADA (ESTILO "ITENS SELECIONADOS") --- */}
+      <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
+        
+        {/* Cabeçalho da Tabela */}
+        <div className="form-header" style={{ padding: '20px 24px', margin: 0, borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
           <div className="form-header-esquerda">
-            <div className="form-header-icone verde-quadrado"><Package size={18} /></div>
-            <h2>Itens para Entrada</h2>
+            <div className="form-header-icone verde-quadrado" style={{ width: '28px', height: '28px' }}><Package size={16} /></div>
+            <h2 style={{ fontSize: '1rem' }}>Itens para Entrada</h2>
           </div>
-          <button className="btn-adicionar-item" onClick={adicionarItem}>
-            <Plus size={16} /> Adicionar Item
-          </button>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* BOTÃO NOVA LINHA */}
+            <button 
+              onClick={adicionarLinhaEmBranco} 
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: '6px', 
+                padding: '6px 12px', backgroundColor: '#ffffff', 
+                border: '1px solid #cbd5e1', borderRadius: '8px', 
+                fontSize: '0.75rem', fontWeight: '600', color: '#475569', 
+                cursor: 'pointer' 
+              }}
+            >
+              <Plus size={16} /> Nova Linha
+            </button>
+
+            {/* BOTÃO IMPORTAR EXCEL */}
+            <CarregarArquivo 
+              variante="botao"
+              accept=".xlsx, .xls"
+              label="Importar Excel"
+              icone={<FileSpreadsheet size={16} color="#10b981" />}
+              onFileSelect={handleImportarExcel}
+            />
+
+            {/* CONTADOR */}
+            <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 10px', borderRadius: '999px' }}>
+              {itens.length} itens
+            </span>
+          </div>
         </div>
         
+        {/* Corpo da Tabela */}
         <div className="scroll-tabela-solicitacao">
           <table className="tabela-solicitacao-dados">
             <thead>
@@ -192,7 +246,7 @@ export default function EntradaMaterial() {
                 <th>AÇÕES</th>
                 <th>MATERIAL DESCRIPTION</th>
                 <th>Nº PEÇA FABRICANTE</th>
-                <th>QTD. SOLICITADA</th>
+                <th>QTD.</th>
                 <th>DESENHO SAP</th>
                 <th>FORNECEDOR</th>
                 <th>REFERÊNCIA</th>
@@ -210,25 +264,25 @@ export default function EntradaMaterial() {
                     </button>
                   </td>
                   <td style={{ minWidth: '220px' }}>
-                    <input className="input-editavel-tabela texto-preto" value={item.descricao} onChange={(e) => atualizarItem(item.id, 'descricao', e.target.value)} placeholder="Descrição do item" />
+                    <input className="input-editavel-tabela texto-preto" value={item.descricao || item.materialDescription || ''} onChange={(e) => atualizarCampo(item.id, 'materialDescription', e.target.value)} placeholder="Descrição do item" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela badge-partnumber" value={item.partNumber} onChange={(e) => atualizarItem(item.id, 'partNumber', e.target.value)} placeholder="PN" />
+                    <input className="input-editavel-tabela badge-partnumber" value={item.partNumber || item.numPecaFabricante || ''} onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
                   </td>
                   <td className="qtd-solicitada-destaque">
-                    <input type="number" className="input-inline-tabela" value={item.qtd} onChange={(e) => atualizarItem(item.id, 'qtd', e.target.value)} placeholder="0" min="1" />
+                    <input type="number" className="input-inline-tabela" value={item.qtdSelecionada || 1} onChange={(e) => atualizarCampo(item.id, 'qtdSelecionada', e.target.value)} placeholder="0" min="1" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela texto-cinza-claro" value={item.desenhoSAP} onChange={(e) => atualizarItem(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP" />
+                    <input className="input-editavel-tabela texto-cinza-claro" value={item.desenhoSAP || ''} onChange={(e) => atualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela texto-cinza-escuro" value={item.fornecedor} onChange={(e) => atualizarItem(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
+                    <input className="input-editavel-tabela texto-cinza-escuro" value={item.fornecedor || ''} onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela texto-cinza" value={item.referencia} onChange={(e) => atualizarItem(item.id, 'referencia', e.target.value)} placeholder="Ref" />
+                    <input className="input-editavel-tabela texto-cinza" value={item.referencia || ''} onChange={(e) => atualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Ref" />
                   </td>
                   <td>
-                    <select className="input-editavel-tabela texto-cinza" style={{ width: '80px', appearance: 'auto', padding: '4px' }} value={item.unid} onChange={(e) => atualizarItem(item.id, 'unid', e.target.value)}>
+                    <select className="input-editavel-tabela texto-cinza" style={{ width: '80px', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida || 'Unid'} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
                       <option value="Unid">Unid</option>
                       <option value="Kg">Kg</option>
                       <option value="Metro">Metro</option>
@@ -237,10 +291,10 @@ export default function EntradaMaterial() {
                     </select>
                   </td>
                   <td>
-                    <input className="input-editavel-tabela link-azul-fake" value={item.wbs} onChange={(e) => atualizarItem(item.id, 'wbs', e.target.value)} placeholder="WBS" />
+                    <input className="input-editavel-tabela link-azul-fake" value={item.wbs || ''} onChange={(e) => atualizarCampo(item.id, 'wbs', e.target.value)} placeholder="WBS" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela link-azul-fake" value={item.alocacao} onChange={(e) => atualizarItem(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
+                    <input className="input-editavel-tabela link-azul-fake" value={item.alocacao || ''} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
                   </td>
                 </tr>
               ))}
@@ -283,7 +337,6 @@ export default function EntradaMaterial() {
 
       {/* --- BLOCO 4: AÇÃO FINAL --- */}
       <div className="form-acoes-final mt-4">
-        {/* Adicionei o onClick chamando o handleEnviar */}
         <button className="btn-enviar-azul" style={{ backgroundColor: '#10b981' }} onClick={handleEnviar}>
           <Send size={16} /> Solicitar Entrada de Material
         </button>
