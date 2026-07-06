@@ -1,5 +1,6 @@
 import React from 'react';
-import { ArrowLeftRight, Search, Plus } from 'lucide-react';
+import './TransferenciaWBS.css'; // <-- 1. IMPORTAÇÃO DO CSS ADICIONADA AQUI!
+import { ArrowLeftRight, Search, Plus, Send } from 'lucide-react'; // Adicionei o ícone Send
 
 const itensDisponiveis = [
   { id: 1, pn: '1534534', desc: 'SENSOR DE INDUÇÃO', wbs: 'BRBCBBB20', qtd: '0 Unid' },
@@ -70,6 +71,13 @@ export default function TransferenciaWBS() {
             Selecione os itens à esquerda para transferir de WBS
           </div>
         </div>
+      </div>
+
+      {/* 2. BOTÃO DE ENVIO ADICIONADO AQUI! */}
+      <div className="form-acoes-final mt-4">
+        <button className="btn-enviar-azul">
+          <Send size={16} /> Confirmar Transferência
+        </button>
       </div>
     </>
   );
