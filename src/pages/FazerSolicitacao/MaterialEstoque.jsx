@@ -227,34 +227,6 @@ export default function MaterialEstoque() {
         </div>
 
         <div className="painel-lista">
-          <div className="painel-lista-header">
-            <div className="titulo-com-icone"><Package size={18} /> Itens Selecionados</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              
-              <button 
-                onClick={adicionarLinhaEmBranco} 
-                style={{ 
-                  display: 'flex', alignItems: 'center', gap: '6px', 
-                  padding: '6px 12px', backgroundColor: '#ffffff', 
-                  border: '1px solid #cbd5e1', borderRadius: '8px', 
-                  fontSize: '0.75rem', fontWeight: '600', color: '#475569', 
-                  cursor: 'pointer' 
-                }}
-              >
-                <Plus size={16} /> Nova Linha
-              </button>
-
-              <CarregarArquivo 
-                variante="botao"
-                accept=".xlsx, .xls"
-                label="Importar Excel"
-                icone={<FileSpreadsheet size={16} color="#10b981" />}
-                onFileSelect={handleImportarExcel}
-              />
-
-              <span className="badge-contagem bg-branco">{listaSegura.length}/25</span>
-            </div>
-          </div>
 
           {listaSegura.length === 0 ? (
             <div className="estado-vazio-selecao">
