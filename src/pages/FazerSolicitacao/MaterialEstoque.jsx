@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, MapPin, Calendar, Search, Package, Send, FileSpreadsheet, Trash2, Plus } from 'lucide-react';
+import { User, MapPin, Calendar, Search, Package, Send, FileSpreadsheet, Trash2, Plus, Zap } from 'lucide-react';
 
 // NOSSOS COMPONENTES E HOOKS
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
@@ -19,7 +19,8 @@ export default function MaterialEstoque() {
     wbs: '',
     destino: '',
     dataNecessidade: '',
-    observacoes: ''
+    observacoes: '',
+    entregaUrgente: false // <-- NOVO CAMPO ADICIONADO AQUI
   });
   const [itensSelecionados, setItensSelecionados] = useState([]);
   
@@ -110,7 +111,7 @@ export default function MaterialEstoque() {
       if (resposta.ok) {
         alert(`Sucesso! Solicitação criada com o ID: ${dados.ps_id}`);
         // Limpa o formulário após o sucesso
-        setFormDados({ nome: '', wbs: '', destino: '', dataNecessidade: '', observacoes: '' });
+        setFormDados({ nome: '', wbs: '', destino: '', dataNecessidade: '', observacoes: '', entregaUrgente: false });
         setItensSelecionados([]);
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
@@ -200,6 +201,39 @@ export default function MaterialEstoque() {
             ></textarea>
           </div>
         </div>
+
+        {/* --- NOVO COMPONENTE: ENTREGA URGENTE --- */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '12px',
+          padding: '16px',
+          border: '1px solid #cbd5e1',
+          borderRadius: '8px',
+          backgroundColor: '#f8fafc',
+          marginTop: '20px'
+        }}>
+          <input 
+            type="checkbox" 
+            id="checkbox-urgente"
+            checked={formDados.entregaUrgente}
+            onChange={(e) => setFormDados({...formDados, entregaUrgente: e.target.checked})}
+            style={{ marginTop: '4px', cursor: 'pointer', width: '16px', height: '16px' }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={16} color="#475569" />
+              <label htmlFor="checkbox-urgente" style={{ fontWeight: '600', color: '#0f172a', margin: 0, cursor: 'pointer' }}>
+                Entrega Urgente
+              </label>
+            </div>
+            <span style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
+              Marcando esta opção, a solicitação entrará em fila de aprovação exclusiva do Administrador.
+            </span>
+          </div>
+        </div>
+        {/* --- FIM DO NOVO COMPONENTE --- */}
+
       </div>
 
       <div className="selecao-itens-grid">
