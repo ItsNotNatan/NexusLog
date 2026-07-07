@@ -39,11 +39,44 @@ const renderBadgeStatus = (status) => {
   }
 };
 
+// FUNÇÃO PARA DEFINIR A COR DA TAG BASEADA NO TIPO
+const obterClasseBadgeTipo = (tipo) => {
+  switch (tipo) {
+    case 'Transferencia WBS':
+      return 'badge-tipo-amarelo';
+    case 'Nota Fiscal':
+      return 'badge-tipo-roxo';
+    case 'Entrada':
+      return 'badge-tipo-verde';
+    case 'Crossdocking':
+      return 'badge-tipo-ciano';
+    case 'Reintegracao':
+      return 'badge-tipo-laranja';
+    case 'Cancelado':
+    case 'Cancelar BS':
+      return 'badge-tipo-vermelho';
+    case 'Material':
+    default:
+      return 'badge-tipo-azul';
+  }
+};
+
 export default function AcompanhamentoSolicitacoes() {
   const [dadosTabela, setDadosTabela] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState('Todos');
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [carregando, setCarregando] = useState(true);
+
+  // 👇 NOVA LISTA COMPLETA DE FILTROS
+  const listaFiltros = [
+    'Todos', 
+    'Material', 
+    'Transfer. WBS', 
+    'Nota Fiscal', 
+    'Entrada', 
+    'Crossdocking', 
+    'Reintegração'
+  ];
 
   // 1. CARREGAR DADOS DO BACKEND VIA API
   useEffect(() => {
@@ -73,20 +106,27 @@ export default function AcompanhamentoSolicitacoes() {
   const kpiAndamento = dadosTabela.filter(item => item.status === 'Em Separação').length;
   const kpiConcluidos = dadosTabela.filter(item => item.status === 'Concluído').length;
 
-  // 3. FILTRAGEM COMBINADA (Abas de Categoria + Barra de Pesquisa)
+  // 3. FILTRAGEM COMBINADA (Abas + Pesquisa)
   const dadosFiltrados = dadosTabela.filter((linha) => {
-    // Tratamento do filtro por tipo da aba
+    
+    // 👇 NOVA LÓGICA DE FILTRO DINÂMICA
     let passaFiltroAba = true;
-    if (filtroAtivo === 'Material') passaFiltroAba = linha.tipo === 'Material';
-    if (filtroAtivo === 'Transfer. WBS') passaFiltroAba = linha.tipo === 'Transferencia WBS';
-    if (filtroAtivo === 'Nota Fiscal') passaFiltroAba = linha.tipo === 'Nota Fiscal';
+    if (filtroAtivo !== 'Todos') {
+      // Traduz nomes visuais bonitos para os nomes exatos do banco de dados
+      const tipoMapeado = 
+        filtroAtivo === 'Transfer. WBS' ? 'Transferencia WBS' :
+        filtroAtivo === 'Reintegração' ? 'Reintegracao' : 
+        filtroAtivo;
 
-    // Tratamento da caixa de texto de pesquisa
+      passaFiltroAba = linha.tipo === tipoMapeado;
+    }
+
+    // Lógica da caixa de pesquisa em texto
     const termoLower = termoPesquisa.toLowerCase();
     const passaPesquisa = 
       linha.id.toString().toLowerCase().includes(termoLower) ||
-      linha.solicitante.toLowerCase().includes(termoLower) ||
-      linha.wbs.toLowerCase().includes(termoLower) ||
+      (linha.solicitante && linha.solicitante.toLowerCase().includes(termoLower)) ||
+      (linha.wbs && linha.wbs.toLowerCase().includes(termoLower)) ||
       (linha.bs && linha.bs.toLowerCase().includes(termoLower));
 
     return passaFiltroAba && passaPesquisa;
@@ -94,14 +134,14 @@ export default function AcompanhamentoSolicitacoes() {
 
   return (
     <div className="acompanhamento-wrapper">
-      
+
       {/* 1. CABEÇALHO */}
       <header className="acompanhamento-cabecalho">
         <h1>Acompanhamento de Solicitações</h1>
-        <p>Visualize todas as solicitações abertas — materiais, transferências de WBS e notas fiscais</p>
+        <p>Visualize todas as solicitações abertas do sistema</p>
       </header>
 
-      {/* 2. CARTÕES DE RESUMO (KPIs DINÂMICOS) */}
+      {/* 2. CARTÕES DE RESUMO */}
       <div className="kpis-linha">
         <div className="kpi-card-resumo kpi-total">
           <span>Total</span>
@@ -123,11 +163,12 @@ export default function AcompanhamentoSolicitacoes() {
 
       {/* 3. ÁREA PRINCIPAL DA TABELA */}
       <div className="tabela-cartao-container">
-        
-        {/* Controles de Topo (Abas e Pesquisa) */}
+
+        {/* Controles de Topo */}
         <div className="tabela-controlos-topo">
           <div className="filtros-botoes">
-            {['Todos', 'Material', 'Transfer. WBS', 'Nota Fiscal'].map((filtro) => (
+            {/* 👇 RENDERIZANDO A NOVA LISTA DINAMICAMENTE */}
+            {listaFiltros.map((filtro) => (
               <button 
                 key={filtro}
                 className={`btn-aba ${filtroAtivo === filtro ? 'ativo' : ''}`}
@@ -175,7 +216,7 @@ export default function AcompanhamentoSolicitacoes() {
               <tbody>
                 {dadosFiltrados.map((linha, index) => (
                   <tr key={linha.id || index}>
-                    
+
                     {/* Chevron para expandir */}
                     <td className="col-chevron">
                       <ChevronRight size={18} style={{ color: '#94a3b8' }} />
@@ -184,7 +225,7 @@ export default function AcompanhamentoSolicitacoes() {
                     {/* Coluna Tipo e ID da PS */}
                     <td>
                       <div className="bloco-tipo-id">
-                        <span className={`badge-tipo ${linha.entregaUrgente ? 'badge-urgente-critico' : ''}`}>
+                        <span className={`badge-tipo ${obterClasseBadgeTipo(linha.tipo)} ${linha.entregaUrgente ? 'badge-urgente-critico' : ''}`}>
                           {linha.entregaUrgente ? <Zap size={13} color="#ef4444" fill="#ef4444" /> : <GitBranch size={13} />} 
                           {linha.tipo}
                         </span>
@@ -193,7 +234,7 @@ export default function AcompanhamentoSolicitacoes() {
                         </span>
                       </div>
                     </td>
-
+                    
                     {/* Solicitante */}
                     <td className="nome-solicitante">{linha.solicitante}</td>
 
