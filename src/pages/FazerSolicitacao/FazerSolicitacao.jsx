@@ -36,9 +36,10 @@ export default function FazerSolicitacao() {
   // 3. Inicializamos o useNavigate
   const navigate = useNavigate();
 
-  const tiposSolicitacao = [
+const tiposSolicitacao = [
+    // Deixamos o Material sem cor para usar o Azul padrão
     { id: 'material', titulo: 'Material de Estoque', desc: 'Retirada de itens do almoxarifado', icone: <Boxes size={20} /> },
-    { id: 'transferencia', titulo: 'Transferência de WBS', desc: 'Mover material para outro projeto', icone: <ArrowLeftRight size={20} /> },
+    { id: 'transferencia', titulo: 'Transferência de WBS', desc: 'Mover material para outro projeto', icone: <ArrowLeftRight size={20} />, cor: 'amarelo' },
     { id: 'nf', titulo: 'Solicitar Nota Fiscal', desc: 'Emissão de nota fiscal', icone: <FileText size={20} />, cor: 'roxo' },
     { id: 'entrada', titulo: 'Entrada de Material', desc: 'Solicitar entrada no estoque', icone: <PackagePlus size={20} />, cor: 'verde' },
     { id: 'crossdocking', titulo: 'Crossdocking', desc: 'Saída via nota fiscal', icone: <Truck size={20} />, cor: 'ciano' },

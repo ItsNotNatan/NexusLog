@@ -409,3 +409,19 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   border-color: #93c5fd;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
+
+/* --- ESTILOS ATIVOS (Amarelo - Específico para Transferência) --- */
+.tipo-cartao.ativo-amarelo { 
+  background-color: #fefce8; 
+  border-color: #fef08a; 
+}
+.tipo-cartao.ativo-amarelo .tipo-icone { 
+  background-color: transparent; 
+  color: #eab308; 
+}
+.tipo-cartao.ativo-amarelo .tipo-titulo { 
+  color: #ca8a04; 
+}
+.tipo-cartao.ativo-amarelo .tipo-desc { 
+  color: #eab308; 
+}

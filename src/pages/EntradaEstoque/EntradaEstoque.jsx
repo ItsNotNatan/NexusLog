@@ -13,6 +13,7 @@ import {
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../hooks/useProcessadorExcel';
+import ExemploExcel from '../../components/ExemploExcel/ExemploExcel';
 
 // DADOS SIMULADOS INICIAIS
 const dadosEstoque = [
@@ -184,6 +185,7 @@ export default function EntradaEstoque() {
             <Filter size={18} className="icone-controlo" />
             <input type="text" placeholder="Filtrar por Nota Fiscal..." />
           </div>
+          <ExemploExcel />
 
           {/* AQUI ENTRA O COMPONENTE DE IMPORTAR EXCEL */}
           <CarregarArquivo 
