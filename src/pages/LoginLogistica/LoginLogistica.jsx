@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './LoginLogistica.css';
 import { Hexagon, Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
-import { supabase } from '../../supabaseClient'; // Ajusta o caminho do teu cliente supabase se necessário
+import { supabase } from '../../supabaseClient'; // Usa a sua conexão centralizada
+import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 export default function LoginLogistica() {
   const [email, setEmail] = useState('');
@@ -27,7 +28,7 @@ export default function LoginLogistica() {
 
       const user = authData.user;
 
-      // 2. BUSCA O PERFIL DO USUÁRIO NA TABELA PARA VALIDAR O CARGO ("logística apenas")
+      // 2. BUSCA O PERFIL DO USUÁRIO NA TABELA PARA VALIDAR O CARGO
       const { data: perfil, error: perfilError } = await supabase
         .from('usuarios')
         .select('cargo')
@@ -39,15 +40,15 @@ export default function LoginLogistica() {
         throw new Error('Erro ao validar perfil de acesso.');
       }
 
-      // Validação crucial: Se não for da logística, barra imediatamente!
-      if (perfil.cargo !== 'LOGISTICA') {
-        await supabase.auth.signOut(); // Desloga o penetra
+      // Validação crucial: Verifica se é ADM ou OPERADOR (os cargos definidos no seu routes.jsx)
+      if (perfil.cargo !== 'ADM' && perfil.cargo !== 'OPERADOR') {
+        await supabase.auth.signOut(); // Desloga o penetra (ex: um 'CLIENTE')
         throw new Error('Acesso negado. Esta área é exclusiva para a equipe de Logística.');
       }
 
-      // 3. Se passou em tudo, guarda o cargo no localStorage e entra
-      localStorage.setItem('user_role', 'LOGISTICA');
-      navigate('/logistica/dashboard');
+      // 3. Se passou em tudo, o seu AuthContext (que está no main.jsx) vai detectar a mudança de sessão sozinho!
+      // Só precisamos redirecionar para o painel.
+      navigate('/logistica/painel');
 
     } catch (error) {
       setErro(error.message);
@@ -78,7 +79,9 @@ export default function LoginLogistica() {
         <form className="login-form" onSubmit={handleLogin}>
           
           <div className="input-grupo">
-            <label>EMAIL CORPORATIVO</label>
+            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px', display: 'block' }}>
+              EMAIL CORPORATIVO
+            </label>
             <div className="input-login-wrapper">
               <Mail className="input-login-icone" size={18} />
               <input 
@@ -93,7 +96,9 @@ export default function LoginLogistica() {
           </div>
 
           <div className="input-grupo">
-            <label>SENHA DE ACESSO</label>
+            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px', display: 'block' }}>
+              SENHA DE ACESSO
+            </label>
             <div className="input-login-wrapper">
               <Lock className="input-login-icone" size={18} />
               <input 
@@ -107,14 +112,15 @@ export default function LoginLogistica() {
             </div>
           </div>
 
-          <button 
-            type="submit" 
-            className="btn-entrar-logistica" 
-            disabled={carregando}
-          >
-            {carregando ? 'Validando Credenciais...' : 'Acessar Logística'}
-            {!carregando && <ArrowRight size={18} />}
-          </button>
+          <div style={{ marginTop: '8px' }}>
+            <BotaoAcaoGlobal 
+              texto="Acessar Logística" 
+              icone={<ArrowRight size={18} />} 
+              cor="azul" 
+              onClick={handleLogin}
+              carregando={carregando}
+            />
+          </div>
 
         </form>
 
