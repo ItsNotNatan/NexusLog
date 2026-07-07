@@ -66,8 +66,10 @@ export default function AcompanhamentoSolicitacoes() {
   const [filtroAtivo, setFiltroAtivo] = useState('Todos');
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [carregando, setCarregando] = useState(true);
+  
+  // 👇 NOVO ESTADO: Controla qual cartão KPI está selecionado
+  const [filtroStatus, setFiltroStatus] = useState('Todos');
 
-  // 👇 NOVA LISTA COMPLETA DE FILTROS
   const listaFiltros = [
     'Todos', 
     'Material', 
@@ -106,13 +108,12 @@ export default function AcompanhamentoSolicitacoes() {
   const kpiAndamento = dadosTabela.filter(item => item.status === 'Em Separação').length;
   const kpiConcluidos = dadosTabela.filter(item => item.status === 'Concluído').length;
 
-  // 3. FILTRAGEM COMBINADA (Abas + Pesquisa)
+  // 3. FILTRAGEM COMBINADA (Abas + Pesquisa + Status do Cartão KPI)
   const dadosFiltrados = dadosTabela.filter((linha) => {
     
-    // 👇 NOVA LÓGICA DE FILTRO DINÂMICA
+    // Filtro por Aba de Tipo
     let passaFiltroAba = true;
     if (filtroAtivo !== 'Todos') {
-      // Traduz nomes visuais bonitos para os nomes exatos do banco de dados
       const tipoMapeado = 
         filtroAtivo === 'Transfer. WBS' ? 'Transferencia WBS' :
         filtroAtivo === 'Reintegração' ? 'Reintegracao' : 
@@ -121,7 +122,13 @@ export default function AcompanhamentoSolicitacoes() {
       passaFiltroAba = linha.tipo === tipoMapeado;
     }
 
-    // Lógica da caixa de pesquisa em texto
+    // 👇 NOVA LÓGICA: Filtro pelo Cartão KPI de Status clicado
+    let passaFiltroStatus = true;
+    if (filtroStatus !== 'Todos') {
+      passaFiltroStatus = linha.status === filtroStatus;
+    }
+
+    // Filtro por Pesquisa de Texto
     const termoLower = termoPesquisa.toLowerCase();
     const passaPesquisa = 
       linha.id.toString().toLowerCase().includes(termoLower) ||
@@ -129,33 +136,45 @@ export default function AcompanhamentoSolicitacoes() {
       (linha.wbs && linha.wbs.toLowerCase().includes(termoLower)) ||
       (linha.bs && linha.bs.toLowerCase().includes(termoLower));
 
-    return passaFiltroAba && passaPesquisa;
+    // A linha só aparece se passar nos três filtros!
+    return passaFiltroAba && passaFiltroStatus && passaPesquisa;
   });
 
   return (
     <div className="acompanhamento-wrapper">
 
-      {/* 1. CABEÇALHO */}
       <header className="acompanhamento-cabecalho">
         <h1>Acompanhamento de Solicitações</h1>
         <p>Visualize todas as solicitações abertas do sistema</p>
       </header>
 
-      {/* 2. CARTÕES DE RESUMO */}
+      {/* 2. CARTÕES DE RESUMO (AGORA CLICÁVEIS) */}
       <div className="kpis-linha">
-        <div className="kpi-card-resumo kpi-total">
+        <div 
+          className={`kpi-card-resumo kpi-total ${filtroStatus === 'Todos' ? 'ativo' : ''}`}
+          onClick={() => setFiltroStatus('Todos')}
+        >
           <span>Total</span>
           <strong>{kpiTotal}</strong>
         </div>
-        <div className="kpi-card-resumo kpi-pendentes">
+        <div 
+          className={`kpi-card-resumo kpi-pendentes ${filtroStatus === 'Pendente' ? 'ativo' : ''}`}
+          onClick={() => setFiltroStatus('Pendente')}
+        >
           <span>Pendentes</span>
           <strong>{kpiPendentes}</strong>
         </div>
-        <div className="kpi-card-resumo kpi-andamento">
+        <div 
+          className={`kpi-card-resumo kpi-andamento ${filtroStatus === 'Em Separação' ? 'ativo' : ''}`}
+          onClick={() => setFiltroStatus('Em Separação')}
+        >
           <span>Em Separação</span>
           <strong>{kpiAndamento}</strong>
         </div>
-        <div className="kpi-card-resumo kpi-concluidos">
+        <div 
+          className={`kpi-card-resumo kpi-concluidos ${filtroStatus === 'Concluído' ? 'ativo' : ''}`}
+          onClick={() => setFiltroStatus('Concluído')}
+        >
           <span>Concluídos</span>
           <strong>{kpiConcluidos}</strong>
         </div>
@@ -164,10 +183,8 @@ export default function AcompanhamentoSolicitacoes() {
       {/* 3. ÁREA PRINCIPAL DA TABELA */}
       <div className="tabela-cartao-container">
 
-        {/* Controles de Topo */}
         <div className="tabela-controlos-topo">
           <div className="filtros-botoes">
-            {/* 👇 RENDERIZANDO A NOVA LISTA DINAMICAMENTE */}
             {listaFiltros.map((filtro) => (
               <button 
                 key={filtro}
@@ -189,7 +206,6 @@ export default function AcompanhamentoSolicitacoes() {
           </div>
         </div>
 
-        {/* Tabela de Dados */}
         <div className="tabela-scroll-horizontal">
           {carregando ? (
             <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: '500' }}>
@@ -216,13 +232,9 @@ export default function AcompanhamentoSolicitacoes() {
               <tbody>
                 {dadosFiltrados.map((linha, index) => (
                   <tr key={linha.id || index}>
-
-                    {/* Chevron para expandir */}
                     <td className="col-chevron">
                       <ChevronRight size={18} style={{ color: '#94a3b8' }} />
                     </td>
-
-                    {/* Coluna Tipo e ID da PS */}
                     <td>
                       <div className="bloco-tipo-id">
                         <span className={`badge-tipo ${obterClasseBadgeTipo(linha.tipo)} ${linha.entregaUrgente ? 'badge-urgente-critico' : ''}`}>
@@ -234,16 +246,10 @@ export default function AcompanhamentoSolicitacoes() {
                         </span>
                       </div>
                     </td>
-                    
-                    {/* Solicitante */}
                     <td className="nome-solicitante">{linha.solicitante}</td>
-
-                    {/* WBS */}
                     <td>
                       <span className="badge-wbs">{linha.wbs}</span>
                     </td>
-
-                    {/* Nº do BS */}
                     <td>
                       {linha.bs ? (
                         <span className="badge-bs">
@@ -253,11 +259,7 @@ export default function AcompanhamentoSolicitacoes() {
                         <span className="traco-vazio">—</span>
                       )}
                     </td>
-
-                    {/* Data Solicitação */}
                     <td className="texto-data">{linha.dataSolicitacao}</td>
-
-                    {/* Data Entrega */}
                     <td>
                       {linha.dataEntrega ? (
                         <span className="texto-data-verde">{linha.dataEntrega}</span>
@@ -265,12 +267,9 @@ export default function AcompanhamentoSolicitacoes() {
                         <span className="traco-vazio">—</span>
                       )}
                     </td>
-
-                    {/* Status */}
                     <td>
                       {renderBadgeStatus(linha.status)}
                     </td>
-
                   </tr>
                 ))}
               </tbody>
@@ -279,7 +278,6 @@ export default function AcompanhamentoSolicitacoes() {
         </div>
 
       </div>
-
     </div>
   );
 }

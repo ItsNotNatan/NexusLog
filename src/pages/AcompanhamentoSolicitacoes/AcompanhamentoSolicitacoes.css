@@ -275,3 +275,59 @@
 .traco-vazio {
   color: #cbd5e1;
 }
+
+/* CARTÕES DE RESUMO (KPIs) */
+.kpis-linha {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpi-card-resumo {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  border: 1px solid;
+  cursor: pointer; /* Adicionado para mostrar que é clicável */
+  transition: all 0.2s ease; /* Animação suave */
+}
+
+/* Efeito ao passar o rato */
+.kpi-card-resumo:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.kpi-card-resumo span {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 8px;
+  transition: color 0.2s;
+}
+
+.kpi-card-resumo strong {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Variações de cor dos KPIs e Estados Ativos (Clicados) */
+.kpi-total { border-color: #e2e8f0; }
+.kpi-total strong { color: #1e293b; }
+.kpi-total.ativo { box-shadow: 0 0 0 2px #e2e8f0; background-color: #f8fafc; }
+
+.kpi-pendentes { border-color: #fde047; }
+.kpi-pendentes strong { color: #eab308; }
+.kpi-pendentes.ativo { box-shadow: 0 0 0 2px #fde047; background-color: #fefce8; }
+
+.kpi-andamento { border-color: #bfdbfe; }
+.kpi-andamento strong { color: #3b82f6; }
+.kpi-andamento.ativo { box-shadow: 0 0 0 2px #bfdbfe; background-color: #eff6ff; }
+
+.kpi-concluidos { border-color: #a7f3d0; }
+.kpi-concluidos strong { color: #22c55e; }
+.kpi-concluidos.ativo { box-shadow: 0 0 0 2px #a7f3d0; background-color: #ecfdf5; }
