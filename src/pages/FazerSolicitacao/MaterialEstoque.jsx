@@ -5,6 +5,7 @@ import { User, MapPin, Calendar, Search, Package, Send, FileSpreadsheet, Trash2,
 import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../hooks/useProcessadorExcel';
+import ExemploExcel from '../../components/ExemploExcel/ExemploExcel';
 
 // DADOS MOCK (Estoque da esquerda)
 const estoqueDisponivel = [
@@ -20,7 +21,7 @@ export default function MaterialEstoque() {
     destino: '',
     dataNecessidade: '',
     observacoes: '',
-    entregaUrgente: false // <-- NOVO CAMPO ADICIONADO AQUI
+    entregaUrgente: false 
   });
   const [itensSelecionados, setItensSelecionados] = useState([]);
   
@@ -202,7 +203,7 @@ export default function MaterialEstoque() {
           </div>
         </div>
 
-        {/* --- NOVO COMPONENTE: ENTREGA URGENTE --- */}
+        {/* --- COMPONENTE: ENTREGA URGENTE --- */}
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -232,7 +233,6 @@ export default function MaterialEstoque() {
             </span>
           </div>
         </div>
-        {/* --- FIM DO NOVO COMPONENTE --- */}
 
       </div>
 
@@ -261,6 +261,23 @@ export default function MaterialEstoque() {
         </div>
 
         <div className="painel-lista">
+          {/* CABEÇALHO COM OS BOTÕES DE EXCEL ADICIONADOS AQUI */}
+          <div className="painel-lista-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: '#1e293b' }}>
+              <Package size={18} color="#2563eb" /> Itens da Solicitação
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <ExemploExcel />
+              <CarregarArquivo 
+                variante="botao"
+                accept=".xlsx, .xls, .csv"
+                label="Importar SAP"
+                icone={<FileSpreadsheet size={16} color="#10b981" />}
+                onFileSelect={handleImportarExcel}
+              />
+            </div>
+          </div>
 
           {listaSegura.length === 0 ? (
             <div className="estado-vazio-selecao">
@@ -329,7 +346,6 @@ export default function MaterialEstoque() {
       </div>
       
       <div className="form-acoes-final mt-4">
-        {/* Atrelamos a função handleEnviar ao evento onClick */}
         <button className="btn-enviar-azul" onClick={handleEnviar}>
           <Send size={16} /> Enviar Solicitação
         </button>

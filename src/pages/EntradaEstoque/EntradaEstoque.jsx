@@ -1,14 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './EntradaEstoque.css';
 import { 
   PackagePlus, 
   Search, 
   Filter, 
   Trash2,
-  Package
+  Package,
+  FileSpreadsheet
 } from 'lucide-react';
 
-// 1. DADOS SIMULADOS PARA A TABELA (MOCK DATA)
+// IMPORTAÇÕES PARA O EXCEL FUNCIONAR
+import CarregarArquivo from '../../components/CarregarArquivo/CarregarArquivo';
+import ModalProcessamento from '../../components/ModalProcessamento/ModalProcessamento';
+import { useProcessadorExcel } from '../../hooks/useProcessadorExcel';
+
+// DADOS SIMULADOS INICIAIS
 const dadosEstoque = [
   {
     id: 1,
@@ -23,74 +29,62 @@ const dadosEstoque = [
     alocacao: '400-A-003',
     valorUnit: 'R$ 890.00',
     wbs: 'WBS-PRJ-2024-001',
-    status: 'disponível'
-  },
-  {
-    id: 2,
-    desenho: '-',
-    pn: 'PN-FLG-1580',
-    descricao: 'Flange Cego 4" ANSI 150',
-    fornecedor: 'Conforminas',
-    nf: 'NF-45822',
-    qtdEntrada: '-',
-    saldoQtd: '17',
-    saldoUnd: 'Unid',
-    alocacao: '300-C-012',
-    valorUnit: 'R$ 380.50',
-    wbs: 'WBS-PRJ-2024-001',
-    status: 'disponível'
-  },
-  {
-    id: 3,
-    desenho: '-',
-    pn: 'PN-JTA-2210',
-    descricao: 'Junta Spiral Wound 4" CS',
-    fornecedor: 'Teadit',
-    nf: 'NF-45835',
-    qtdEntrada: '-',
-    saldoQtd: '78',
-    saldoUnd: 'Unid',
-    alocacao: '200-D-018',
-    valorUnit: 'R$ 125.00',
-    wbs: 'WBS-PRJ-2024-002',
-    status: 'disponível'
-  },
-  {
-    id: 4,
-    desenho: '-',
-    pn: 'PN-VLV-3420',
-    descricao: 'Válvula Esfera 2" ANSI 3...',
-    fornecedor: 'Flowserve Brasil',
-    nf: 'NF-45821',
-    qtdEntrada: '-',
-    saldoQtd: '3',
-    saldoUnd: 'Unid',
-    alocacao: '300-B-006',
-    valorUnit: 'R$ 1250.00',
-    wbs: 'WBS-PRJ-2024-001',
-    status: 'disponível'
-  },
-  {
-    id: 5,
-    desenho: '-',
-    pn: 'PN-CHP-7780',
-    descricao: 'Chapa Aço Inox 304 #12...',
-    fornecedor: 'Usiminas',
-    nf: 'NF-45860',
-    qtdEntrada: '-',
-    saldoQtd: '5',
-    saldoUnd: 'Unid',
-    alocacao: '600-A-002',
-    valorUnit: 'R$ 3200.00',
-    wbs: 'WBS-PRJ-2024-005',
-    status: 'disponível'
+    status: 'Disponível'
   }
 ];
 
 export default function EntradaEstoque() {
+  // 1. CRIAR ESTADO PARA A TABELA (Começa com o Mock Data, mas pode começar vazio: useState([]))
+  const [itensEstoque, setItensEstoque] = useState(dadosEstoque);
+  
+  // 2. INICIAR O PROCESSADOR DE EXCEL
+  const processador = useProcessadorExcel();
+
+  // 3. FUNÇÃO PARA LER E FORMATAR O EXCEL
+  const handleImportarExcel = async (arquivo) => {
+    const novosItens = await processador.iniciarProcessamento(arquivo);
+    
+    if (novosItens && Array.isArray(novosItens)) {
+      // Formatamos os dados que vêm do Utils para combinar com as colunas desta tabela
+      const itensFormatados = novosItens.map((item, index) => ({
+        id: `excel-${Date.now()}-${index}`,
+        desenho: item.desenhoSAP || '-',
+        pn: item.numPecaFabricante || '-',
+        descricao: item.materialDescription || 'Sem descrição',
+        fornecedor: item.fornecedor || '-',
+        nf: item.docCompras || item.recebNF || '-', 
+        qtdEntrada: item.qtdSelecionada || '-',
+        saldoQtd: item.qtdSelecionada || '0',
+        saldoUnd: item.unidadeMedida || 'Unid',
+        alocacao: item.alocacao || '-',
+        valorUnit: item.poNetPrice || 'R$ 0,00',
+        wbs: item.wbs || '-',
+        status: 'Disponível'
+      }));
+
+      // Adicionamos os novos itens à lista que já existe na tela
+      setItensEstoque(prev => [...prev, ...itensFormatados]);
+    }
+  };
+
+  // 4. FUNÇÃO PARA APAGAR ITEM DA TABELA
+  const removerItem = (idParaRemover) => {
+    setItensEstoque(prev => prev.filter(item => item.id !== idParaRemover));
+  };
+
   return (
     <div className="estoque-wrapper">
       
+      {/* TELA DE CARREGAMENTO DO EXCEL (MODAL) */}
+      <ModalProcessamento 
+        estaProcessando={processador.estaProcessando}
+        concluido={processador.concluido}
+        estadoProgresso={processador.estadoProgresso}
+        resultado={processador.resultado}
+        erroFatal={processador.erroFatal}
+        onClose={processador.resetarProcessador}
+      />
+
       {/* --- CABEÇALHO DA PÁGINA --- */}
       <header className="estoque-cabecalho">
         <h1>Entrada de Estoque</h1>
@@ -105,12 +99,11 @@ export default function EntradaEstoque() {
           <div className="icone-fundo-azul">
             <PackagePlus size={20} className="icone-azul" />
           </div>
-          <h2>Cadastro de Item</h2>
+          <h2>Cadastro de Item Manual</h2>
         </div>
 
         {/* Grelha do Formulário (CSS Grid) */}
         <div className="form-grid">
-          
           {/* Linha 1 */}
           <div className="input-grupo">
             <label>Desenho SAP</label>
@@ -153,7 +146,7 @@ export default function EntradaEstoque() {
             <input type="text" placeholder="WBS-2024-001" className="input-campo" />
           </div>
 
-          {/* Linha 4 (Apenas 2 campos e espaço vazio para alinhar) */}
+          {/* Linha 4 */}
           <div className="input-grupo">
             <label>Saldo Atual <span className="obrigatorio">*</span></label>
             <input type="number" placeholder="0" className="input-campo" />
@@ -166,7 +159,6 @@ export default function EntradaEstoque() {
               <option>Kg</option>
             </select>
           </div>
-          
         </div>
 
         {/* Botão de Submissão alinhado à direita */}
@@ -181,7 +173,7 @@ export default function EntradaEstoque() {
       {/* --- SECÇÃO 2: LISTAGEM E TABELA --- */}
       <div className="tabela-seccao">
         
-        {/* Controlos de Pesquisa e Filtro */}
+        {/* Controlos de Pesquisa, Filtro e BOTÃO DE IMPORTAR EXCEL */}
         <div className="tabela-controlos">
           <div className="pesquisa-caixa">
             <Search size={18} className="icone-controlo" />
@@ -192,6 +184,15 @@ export default function EntradaEstoque() {
             <Filter size={18} className="icone-controlo" />
             <input type="text" placeholder="Filtrar por Nota Fiscal..." />
           </div>
+
+          {/* AQUI ENTRA O COMPONENTE DE IMPORTAR EXCEL */}
+          <CarregarArquivo 
+            variante="botao"
+            accept=".xlsx, .xls"
+            label="Importar Excel SAP"
+            icone={<FileSpreadsheet size={18} color="#10b981" />}
+            onFileSelect={handleImportarExcel}
+          />
         </div>
 
         {/* Tabela de Dados */}
@@ -210,51 +211,56 @@ export default function EntradaEstoque() {
                 <th>VALOR UNIT.</th>
                 <th>WBS</th>
                 <th>STATUS</th>
-                <th></th> {/* Coluna para a lixeira */}
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {dadosEstoque.map((item) => (
-                <tr key={item.id}>
-                  <td className="texto-cinza">{item.desenho}</td>
-                  <td className="fonte-negrito">{item.pn}</td>
-                  <td>{item.descricao}</td>
-                  <td className="texto-cinza">{item.fornecedor}</td>
-                  <td className="texto-cinza">{item.nf}</td>
-                  <td className="texto-azul-claro font-bold">{item.qtdEntrada}</td>
-                  
-                  {/* Célula de Saldo (Número em negrito, unidade abaixo ou ao lado) */}
-                  <td>
-                    <div className="saldo-celula">
-                      <strong>{item.saldoQtd}</strong>
-                      <span>{item.saldoUnd}</span>
-                    </div>
-                  </td>
-                  
-                  <td><a href="#" className="link-azul">{item.alocacao}</a></td>
-                  <td>{item.valorUnit}</td>
-                  
-                  {/* WBS com quebra de linha natural pelo espaço reduzido */}
-                  <td className="wbs-celula">
-                    <a href="#" className="link-azul">{item.wbs}</a>
-                  </td>
-                  
-                  {/* Badge de Status */}
-                  <td>
-                    <span className="badge-disponivel">
-                      <Package size={12} className="mr-1" />
-                      {item.status}
-                    </span>
-                  </td>
-                  
-                  {/* Ação: Lixeira */}
-                  <td className="acao-celula">
-                    <button className="btn-icone">
-                      <Trash2 size={18} />
-                    </button>
+              {itensEstoque.length === 0 ? (
+                <tr>
+                  <td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                    Nenhum item na entrada de estoque. Importe um Excel ou cadastre manualmente.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                itensEstoque.map((item) => (
+                  <tr key={item.id}>
+                    <td className="texto-cinza">{item.desenho}</td>
+                    <td className="fonte-negrito">{item.pn}</td>
+                    <td>{item.descricao}</td>
+                    <td className="texto-cinza">{item.fornecedor}</td>
+                    <td className="texto-cinza">{item.nf}</td>
+                    <td className="texto-azul-claro font-bold">{item.qtdEntrada}</td>
+                    
+                    <td>
+                      <div className="saldo-celula">
+                        <strong>{item.saldoQtd}</strong>
+                        <span>{item.saldoUnd}</span>
+                      </div>
+                    </td>
+                    
+                    <td><a href="#" className="link-azul">{item.alocacao}</a></td>
+                    <td>{item.valorUnit}</td>
+                    
+                    <td className="wbs-celula">
+                      <a href="#" className="link-azul">{item.wbs}</a>
+                    </td>
+                    
+                    <td>
+                      <span className="badge-disponivel">
+                        <Package size={12} className="mr-1" />
+                        {item.status}
+                      </span>
+                    </td>
+                    
+                    {/* Ação: Lixeira ATIVADA */}
+                    <td className="acao-celula">
+                      <button className="btn-icone" onClick={() => removerItem(item.id)}>
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
