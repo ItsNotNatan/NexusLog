@@ -1,6 +1,4 @@
-// src/contexts/AuthContext.jsx
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext({});
 
@@ -10,45 +8,32 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Busca a sessão atual
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) buscarPerfil(session.user.id);
-      else setLoading(false);
-    });
-
-    // Fica escutando se o usuário faz login ou logout
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) buscarPerfil(session.user.id);
-      else {
-        setRole(null);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    // Quando a página carrega, verifica se o usuário já tinha logado antes
+    const userSalvo = localStorage.getItem('nexus_user');
+    if (userSalvo) {
+      const parsed = JSON.parse(userSalvo);
+      setUser(parsed);
+      setRole(parsed.cargo);
+    }
+    setLoading(false);
   }, []);
 
-  // Vai na tabela "usuarios" e descobre o cargo
-  const buscarPerfil = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('cargo')
-        .eq('id', userId)
-        .single();
-        
-      if (!error && data) setRole(data.cargo);
-    } catch (error) {
-      console.error('Erro ao buscar perfil:', error);
-    } finally {
-      setLoading(false);
-    }
+  // Função para fazer o login manual
+  const loginManual = (dadosUsuario) => {
+    localStorage.setItem('nexus_user', JSON.stringify(dadosUsuario));
+    setUser(dadosUsuario);
+    setRole(dadosUsuario.cargo);
+  };
+
+  // Função para sair
+  const logoutManual = () => {
+    localStorage.removeItem('nexus_user');
+    setUser(null);
+    setRole(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, loading }}>
+    <AuthContext.Provider value={{ user, role, loading, loginManual, logoutManual }}>
       {children}
     </AuthContext.Provider>
   );
