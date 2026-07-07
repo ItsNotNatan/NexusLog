@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { User, FileText, Paperclip, Send } from 'lucide-react';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
-// IMPORTANTE: Ajusta o caminho se guardaste o formatarDinheiro noutro lugar
-import { formatarDinheiro } from '../../utils/formatadores'; 
+// IMPORTAÇÃO DA NOVA FUNÇÃO
+import { formatarDinheiroTempoReal } from '../../utils/formatadores';
 
 export default function SolicitarNotaFiscal() {
   
@@ -16,7 +16,7 @@ export default function SolicitarNotaFiscal() {
     observacoes: ''
   });
 
-  // Função para lidar com a submissão
+  // Função provisória para o clique do botão
   const handleEnviar = () => {
     // Validação simples
     if (!formDados.nome || !formDados.wbs || !formDados.descricao) {
@@ -24,7 +24,6 @@ export default function SolicitarNotaFiscal() {
       return;
     }
     
-    // Aqui no futuro enviarás o formDados para o Backend
     alert(`Enviando Solicitação de Nota Fiscal...\nValor: ${formDados.valorEstimado}`);
   };
 
@@ -62,18 +61,18 @@ export default function SolicitarNotaFiscal() {
               />
             </div>
             
-            {/* CAMPO DE VALOR ESTIMADO (COM FORMATAÇÃO) */}
+            {/* CAMPO DE VALOR ESTIMADO (COM FORMATAÇÃO EM TEMPO REAL) */}
             <div className="input-grupo">
               <label>VALOR ESTIMADO (R$)</label>
               <input 
-                type="text" // Alterado para text para suportar o R$
+                type="text" 
                 className="input-campo foco-roxo" 
                 placeholder="R$ 0,00" 
                 value={formDados.valorEstimado}
-                onChange={(e) => setFormDados({ ...formDados, valorEstimado: e.target.value })}
-                onBlur={(e) => {
-                  // Quando o utilizador clica fora do campo, a função formata o que foi digitado!
-                  const valorFormatado = formatarDinheiro(e.target.value);
+                onChange={(e) => {
+                  // A mágica acontece aqui: formata o texto a cada tecla pressionada
+                  const valorDigitado = e.target.value;
+                  const valorFormatado = formatarDinheiroTempoReal(valorDigitado);
                   setFormDados({ ...formDados, valorEstimado: valorFormatado });
                 }}
               />
