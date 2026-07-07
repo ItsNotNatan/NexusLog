@@ -145,35 +145,6 @@ export default function TransferenciaWBS() {
         </div>
 
         {/* --- CHECKBOX: ENTREGA URGENTE --- */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '12px',
-          padding: '16px',
-          border: '1px solid #cbd5e1',
-          borderRadius: '8px',
-          backgroundColor: '#f8fafc',
-          marginTop: '20px'
-        }}>
-          <input 
-            type="checkbox" 
-            id="checkbox-urgente"
-            checked={formDados.entregaUrgente}
-            onChange={(e) => setFormDados({...formDados, entregaUrgente: e.target.checked})}
-            style={{ marginTop: '4px', cursor: 'pointer', width: '16px', height: '16px' }}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Zap size={16} color="#475569" />
-              <label htmlFor="checkbox-urgente" style={{ fontWeight: '600', color: '#0f172a', margin: 0, cursor: 'pointer' }}>
-                Processamento Urgente
-              </label>
-            </div>
-            <span style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
-              Marque esta opção se a transferência de custo e material for crítica e imediata.
-            </span>
-          </div>
-        </div>
 
         <div className="anexos-grupo mt-4">
           <span>ANEXOS (OPCIONAL)</span>
