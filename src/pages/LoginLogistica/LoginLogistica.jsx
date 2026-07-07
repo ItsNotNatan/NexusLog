@@ -4,45 +4,56 @@ import './LoginLogistica.css';
 import { Hexagon, Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-import { useAuth } from '../../contexts/AuthContext'; // Importamos o novo hook!
+import { useAuth } from '../../contexts/AuthContext'; // [cite: 1021]
 
 export default function LoginLogistica() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  const [carregando, setCarregando] = useState(false);
+  const [carregando, setCarregando] = useState(false); // [cite: 1023]
   const [erro, setErro] = useState('');
   
   const navigate = useNavigate();
-  const { loginManual } = useAuth(); // Puxa a função de login
+  const { loginManual } = useAuth(); // [cite: 1024]
 
-  const handleLogin = async (e) => {
+const handleLogin = async (e) => {
     e.preventDefault();
     setCarregando(true);
     setErro('');
 
     try {
-      // 1. Busca direto na sua tabela 'usuarios'
+      // 1. Faz a busca na tabela 'usuarios' cruzando e-mail e senha exatamente como estão no BD
       const { data, error } = await supabase
         .from('usuarios')
         .select('*')
         .eq('email', email)
         .eq('senha', senha)
-        .single();
+        .maybeSingle(); // Não gera erro PGRST116 se retornar 0 linhas
 
-      if (error || !data) {
-        throw new Error('Email ou senha incorretos.');
+      // Se houver um erro técnico real de infraestrutura
+      if (error) {
+        alert(`[Erro Técnico do Banco]: ${error.message}`);
+        throw new Error('Falha na comunicação com o servidor.');
       }
 
-      // 2. Verifica se o cargo é da Logística
+      // Se data for null, significa que o e-mail ou a senha digitados não existem no BD
+      if (!data) {
+        throw new Error('E-mail corporativo ou senha incorretos.');
+      }
+
+      // 2. Valida o cargo com base no CHECK constraint do teu BD ('ADM', 'OPERADOR')
       if (data.cargo !== 'ADM' && data.cargo !== 'OPERADOR') {
-        throw new Error('Acesso negado. Área exclusiva para Logística.');
+        throw new Error('Acesso negado. Este portal é exclusivo para a equipe de Logística.');
       }
 
-      // 3. Salva no nosso contexto novo e entra no sistema!
+      // 3. Sucesso! Guarda os dados no localStorage/Contexto e saúda o utilizador pelo nome correto
+      alert(`Bem-vindo ao NexusLog, ${data.nome_completo}!`);
+      
       loginManual(data);
       navigate('/logistica/painel');
 
     } catch (error) {
+      // Dispara o alert com o erro amigável (ex: "E-mail corporativo ou senha incorretos.")
+      alert(error.message);
       setErro(error.message);
     } finally {
       setCarregando(false);
