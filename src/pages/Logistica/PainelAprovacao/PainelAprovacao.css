@@ -381,3 +381,134 @@
   background-color: #f1f5f9;
   color: #0f172a;
 }
+
+/* =========================================
+   ÁREA EXPANDIDA (DETALHES DA SOLICITAÇÃO)
+========================================= */
+
+.item-card-completo {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.item-historico {
+  /* Removemos a borda daqui porque agora está no container pai (item-card-completo) */
+  border-bottom: none !important; 
+}
+
+.area-expandida {
+  background-color: #f8fafc;
+  border-top: 1px dashed #cbd5e1;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeInDown 0.2s ease-out forwards;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.info-detalhe-grid {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.info-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.info-bloco label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.info-bloco span, .info-bloco p {
+  font-size: 0.875rem;
+  color: #1e293b;
+  font-weight: 500;
+  margin: 0;
+}
+
+.tabela-detalhes-itens {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tabela-detalhes-itens th {
+  background-color: #f1f5f9;
+  padding: 10px 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: left;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tabela-detalhes-itens td {
+  padding: 12px 16px;
+  font-size: 0.875rem;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tabela-detalhes-itens tr:last-child td {
+  border-bottom: none;
+}
+
+.acoes-aprovacao {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.btn-aprovar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #10b981;
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-aprovar:hover { background-color: #059669; }
+
+.btn-recusar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #ffffff;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-recusar:hover {
+  background-color: #fef2f2;
+  border-color: #ef4444;
+}

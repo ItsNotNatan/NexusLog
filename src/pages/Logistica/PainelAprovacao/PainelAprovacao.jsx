@@ -8,10 +8,11 @@ import {
   RefreshCw,
   Filter,
   History,
-  ListTodo
+  ListTodo,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
-// Função para definir a estilização visual baseado no status
 const obterEstiloStatus = (status) => {
   switch (status) {
     case 'Pendente':
@@ -33,10 +34,13 @@ export default function PainelAprovacao() {
   const [carregando, setCarregando] = useState(true);
 
   // --- CONTROLO DA ABA E FILTROS ---
-  const [abaAtiva, setAbaAtiva] = useState('pendentes'); // 'pendentes' ou 'historico'
+  const [abaAtiva, setAbaAtiva] = useState('pendentes'); 
   const [filtroTipo, setFiltroTipo] = useState('Todos');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
+
+  // 👇 ESTADO: Guarda o ID da solicitação que o utilizador quer expandir
+  const [solicitacaoExpandida, setSolicitacaoExpandida] = useState(null);
 
   useEffect(() => {
     const buscarDadosDoBanco = async () => {
@@ -59,7 +63,6 @@ export default function PainelAprovacao() {
     buscarDadosDoBanco();
   }, []);
 
-  // --- CONVERSOR DE DATAS ---
   const converterDataBR = (dataStr) => {
     if (!dataStr) return null;
     const partes = dataStr.split(' ')[0].split('/'); 
@@ -67,12 +70,9 @@ export default function PainelAprovacao() {
     return new Date(`${partes[2]}-${partes[1]}-${partes[0]}T00:00:00`);
   };
 
-  // --- 1. APLICAR FILTROS (TIPO E DATA) ---
   const dadosFiltrados = solicitacoes.filter(item => {
-    // Filtro por Tipo
     let passaTipo = filtroTipo === 'Todos' || item.tipo === filtroTipo;
     
-    // Filtro por Data
     let passaData = true;
     if (dataInicio || dataFim) {
       const dataItemObj = converterDataBR(item.dataSolicitacao);
@@ -87,16 +87,81 @@ export default function PainelAprovacao() {
         }
       }
     }
-    
     return passaTipo && passaData;
   });
 
-  // --- 2. DIVIDIR EM DUAS LISTAS BASEADAS NO STATUS ---
   const listaPendentes = dadosFiltrados.filter(item => item.status === 'Pendente');
   const listaHistorico = dadosFiltrados.filter(item => item.status !== 'Pendente');
-
-  // Tipos únicos para o dropdown
   const tiposUnicos = ['Todos', ...new Set(solicitacoes.map(i => i.tipo))];
+
+  // Alterna o acordeão (abre e fecha a gaveta de detalhes)
+  const toggleExpandir = (id) => {
+    setSolicitacaoExpandida(solicitacaoExpandida === id ? null : id);
+  };
+
+  // =========================================================
+  // MÓDULO VISUAL: RENDERIZA OS DETALHES BASEADO NO TIPO
+  // =========================================================
+  const renderDetalhes = (item) => {
+    // ⚠️ MOCK: Como o teu backend ainda não traz os itens na rota '/listar', 
+    // coloquei aqui dados fictícios só para veres o layout a funcionar.
+    const itensMockados = [
+      { pn: '1534534', descricao: 'SENSOR DE INDUÇÃO', qtd: 2 },
+      { pn: 'PN-TUB-7890', descricao: 'Tubo Aço Inox 316L', qtd: 4 }
+    ];
+
+    if (item.tipo === 'Transferencia WBS') {
+      return (
+        <div className="area-expandida">
+          <div className="info-detalhe-grid">
+            <div className="info-bloco">
+              <label>Rota da Transferência</label>
+              <span style={{ color: '#2563eb', fontWeight: '600' }}>{item.wbs}</span>
+            </div>
+            <div className="info-bloco">
+              <label>Justificativa do Solicitante</label>
+              <p>O material será realocado porque a manutenção na linha B foi antecipada.</p>
+            </div>
+          </div>
+
+          <table className="tabela-detalhes-itens">
+            <thead>
+              <tr>
+                <th>PART NUMBER</th>
+                <th>DESCRIÇÃO DO MATERIAL</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>QTD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itensMockados.map((it, idx) => (
+                <tr key={idx}>
+                  <td style={{ fontFamily: 'monospace', fontWeight: '600' }}>{it.pn}</td>
+                  <td>{it.descricao}</td>
+                  <td style={{ textAlign: 'center', fontWeight: '700', color: '#2563eb' }}>{it.qtd}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {item.status === 'Pendente' && (
+            <div className="acoes-aprovacao">
+              <button className="btn-recusar"><XCircle size={16} /> Recusar Pedido</button>
+              <button className="btn-aprovar"><CheckCircle2 size={16} /> Aprovar Transferência</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Se for outro tipo e ainda não tivermos desenhado, mostra isto
+    return (
+      <div className="area-expandida">
+        <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
+          O painel detalhado para <strong>{item.tipo}</strong> será construído em breve.
+        </p>
+      </div>
+    );
+  };
 
   if (carregando) {
     return (
@@ -110,9 +175,6 @@ export default function PainelAprovacao() {
   return (
     <div className="dashboard-container">
 
-      {/* ==========================================================
-          ABAS DE NAVEGAÇÃO
-          ========================================================== */}
       <div className="abas-aprovacao">
         <button 
           className={`btn-aba-aprovacao ${abaAtiva === 'pendentes' ? 'ativo' : ''}`}
@@ -130,17 +192,10 @@ export default function PainelAprovacao() {
         </button>
       </div>
 
-      {/* ==========================================================
-          FILTROS (TIPO E DATAS)
-          ========================================================== */}
       <div className="filtros-topo-aprovacao">
         <div className="filtro-item">
           <label><Filter size={14} style={{ display: 'inline', marginBottom: '-2px' }}/> Tipo de Solicitação</label>
-          <select 
-            className="filtro-input" 
-            value={filtroTipo} 
-            onChange={(e) => setFiltroTipo(e.target.value)}
-          >
+          <select className="filtro-input" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
             {tiposUnicos.map(tipo => (
               <option key={tipo} value={tipo}>{tipo}</option>
             ))}
@@ -149,22 +204,12 @@ export default function PainelAprovacao() {
         
         <div className="filtro-item">
           <label>Data (Específica ou Início)</label>
-          <input 
-            type="date" 
-            className="filtro-input" 
-            value={dataInicio}
-            onChange={(e) => setDataInicio(e.target.value)}
-          />
+          <input type="date" className="filtro-input" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
         </div>
 
         <div className="filtro-item">
           <label>Data (Fim do Intervalo)</label>
-          <input 
-            type="date" 
-            className="filtro-input" 
-            value={dataFim}
-            onChange={(e) => setDataFim(e.target.value)}
-          />
+          <input type="date" className="filtro-input" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
         </div>
 
         <div className="filtro-item" style={{ marginLeft: 'auto' }}>
@@ -178,7 +223,7 @@ export default function PainelAprovacao() {
       </div>
 
       {/* ==========================================================
-          CARTÃO: SOLICITAÇÕES PENDENTES
+          CARTÃO 1: SOLICITAÇÕES PENDENTES
           ========================================================== */}
       {abaAtiva === 'pendentes' && (
         <div className="cartao">
@@ -200,27 +245,41 @@ export default function PainelAprovacao() {
             <div className="lista-historico">
               {listaPendentes.map((item) => {
                 const estiloStatus = obterEstiloStatus(item.status);
+                const isExpandido = solicitacaoExpandida === item.id;
+
                 return (
-                  <div key={item.id} className="item-historico">
-                    <div className="item-info">
-                      <div className="item-linha-principal">
-                        <span className="item-id" style={{ color: item.entregaUrgente ? '#ef4444' : 'inherit' }}>
-                          {item.id} {item.entregaUrgente ? '🔥' : ''}
-                        </span>
-                        <span className={`badge-status ${estiloStatus.classeCss}`}>
-                          {estiloStatus.icone} {item.tipo}
+                  <div key={item.id} className="item-card-completo">
+                    
+                    <div className="item-historico">
+                      <div className="item-info">
+                        <div className="item-linha-principal">
+                          <span className="item-id" style={{ color: item.entregaUrgente ? '#ef4444' : 'inherit' }}>
+                            {item.id} {item.entregaUrgente ? '🔥' : ''}
+                          </span>
+                          <span className={`badge-status ${estiloStatus.classeCss}`}>
+                            {estiloStatus.icone} {item.tipo}
+                          </span>
+                        </div>
+                        <span className="item-detalhes">
+                          Solicitante: <strong>{item.solicitante}</strong> &middot; Data: {item.dataSolicitacao}
                         </span>
                       </div>
-                      <span className="item-detalhes">
-                        Solicitante: <strong>{item.solicitante}</strong> &middot; Data: {item.dataSolicitacao}
-                      </span>
+
+                      <div className="item-acoes">
+                        <button 
+                          className="btn-contornado" 
+                          style={{ borderColor: isExpandido ? '#2563eb' : '#cbd5e1', color: isExpandido ? '#2563eb' : '#475569' }}
+                          onClick={() => toggleExpandir(item.id)}
+                        >
+                          {isExpandido ? 'Fechar' : 'Analisar Solicitação'}
+                          {isExpandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="item-acoes">
-                      <button className="btn-contornado" style={{ borderColor: '#cbd5e1', color: '#475569' }}>
-                        Analisar Solicitação
-                      </button>
-                    </div>
+                    {/* RENDERIZA OS DETALHES SE ESTIVER EXPANDIDO */}
+                    {isExpandido && renderDetalhes(item)}
+
                   </div>
                 );
               })}
@@ -230,7 +289,7 @@ export default function PainelAprovacao() {
       )}
 
       {/* ==========================================================
-          CARTÃO: HISTÓRICO DE APROVAÇÕES (PROCESSADOS)
+          CARTÃO 2: HISTÓRICO
           ========================================================== */}
       {abaAtiva === 'historico' && (
         <div className="cartao">
@@ -249,29 +308,38 @@ export default function PainelAprovacao() {
             ) : (
               listaHistorico.map((item) => {
                 const estiloStatus = obterEstiloStatus(item.status);
+                const isExpandido = solicitacaoExpandida === item.id;
+
                 return (
-                  <div key={item.id} className="item-historico">
-                    <div className="item-info">
-                      <div className="item-linha-principal">
-                        <span className="item-id">{item.id}</span>
-                        <span className={`badge-status ${estiloStatus.classeCss}`}>
-                          {estiloStatus.icone} {item.status}
+                  <div key={item.id} className="item-card-completo">
+                    
+                    <div className="item-historico">
+                      <div className="item-info">
+                        <div className="item-linha-principal">
+                          <span className="item-id">{item.id}</span>
+                          <span className={`badge-status ${estiloStatus.classeCss}`}>
+                            {estiloStatus.icone} {item.status}
+                          </span>
+                          {item.bs && <span className="badge-tag">{item.bs}</span>}
+                        </div>
+                        <span className="item-detalhes">
+                          Tipo: {item.tipo} &middot; Solicitante: {item.solicitante}
                         </span>
-                        {item.bs && <span className="badge-tag">{item.bs}</span>}
                       </div>
-                      <span className="item-detalhes">
-                        Tipo: {item.tipo} &middot; Solicitante: {item.solicitante}
-                      </span>
+
+                      <div className="item-acoes">
+                        <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginRight: '8px' }}>
+                          {item.dataSolicitacao}
+                        </span>
+                        <button className="btn-texto" onClick={() => toggleExpandir(item.id)}>
+                          <Eye size={18} /> {isExpandido ? 'Ocultar' : 'Ver Detalhes'}
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="item-acoes">
-                      <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginRight: '8px' }}>
-                        {item.dataSolicitacao}
-                      </span>
-                      <button className="btn-texto">
-                        <Eye size={18} /> Ver Detalhes
-                      </button>
-                    </div>
+                    {/* RENDERIZA OS DETALHES SE ESTIVER EXPANDIDO */}
+                    {isExpandido && renderDetalhes(item)}
+
                   </div>
                 );
               })
