@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import './TransferenciaWBS.css';
 import { ArrowLeftRight, Search, Send, Trash2 } from 'lucide-react'; 
 
-// IMPORTAÇÕES NECESSÁRIAS
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { supabase } from '../../../supabaseClient';
