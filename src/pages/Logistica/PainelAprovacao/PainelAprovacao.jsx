@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import DetalhesTransferencia from './Detalhes/DetalhesTransferencia';
+import DetalhesMaterial from './Detalhes/DetalhesMaterial';
 import './PainelAprovacao.css';
 import { 
   Clock, 
@@ -102,65 +104,21 @@ export default function PainelAprovacao() {
   // =========================================================
   // MÓDULO VISUAL: RENDERIZA OS DETALHES BASEADO NO TIPO
   // =========================================================
-  const renderDetalhes = (item) => {
-    // ⚠️ MOCK: Como o teu backend ainda não traz os itens na rota '/listar', 
-    // coloquei aqui dados fictícios só para veres o layout a funcionar.
-    const itensMockados = [
-      { pn: '1534534', descricao: 'SENSOR DE INDUÇÃO', qtd: 2 },
-      { pn: 'PN-TUB-7890', descricao: 'Tubo Aço Inox 316L', qtd: 4 }
-    ];
-
-    if (item.tipo === 'Transferencia WBS') {
-      return (
-        <div className="area-expandida">
-          <div className="info-detalhe-grid">
-            <div className="info-bloco">
-              <label>Rota da Transferência</label>
-              <span style={{ color: '#2563eb', fontWeight: '600' }}>{item.wbs}</span>
-            </div>
-            <div className="info-bloco">
-              <label>Justificativa do Solicitante</label>
-              <p>O material será realocado porque a manutenção na linha B foi antecipada.</p>
-            </div>
+const renderDetalhes = (item) => {
+    switch (item.tipo) {
+      case 'Transferencia WBS':
+        return <DetalhesTransferencia item={item} />;
+      case 'Material':
+        return <DetalhesMaterial item={item} />;
+      default:
+        return (
+          <div className="area-expandida">
+            <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
+              O painel detalhado para <strong>{item.tipo}</strong> está em desenvolvimento.
+            </p>
           </div>
-
-          <table className="tabela-detalhes-itens">
-            <thead>
-              <tr>
-                <th>PART NUMBER</th>
-                <th>DESCRIÇÃO DO MATERIAL</th>
-                <th style={{ width: '100px', textAlign: 'center' }}>QTD</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itensMockados.map((it, idx) => (
-                <tr key={idx}>
-                  <td style={{ fontFamily: 'monospace', fontWeight: '600' }}>{it.pn}</td>
-                  <td>{it.descricao}</td>
-                  <td style={{ textAlign: 'center', fontWeight: '700', color: '#2563eb' }}>{it.qtd}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {item.status === 'Pendente' && (
-            <div className="acoes-aprovacao">
-              <button className="btn-recusar"><XCircle size={16} /> Recusar Pedido</button>
-              <button className="btn-aprovar"><CheckCircle2 size={16} /> Aprovar Transferência</button>
-            </div>
-          )}
-        </div>
-      );
+        );
     }
-
-    // Se for outro tipo e ainda não tivermos desenhado, mostra isto
-    return (
-      <div className="area-expandida">
-        <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
-          O painel detalhado para <strong>{item.tipo}</strong> será construído em breve.
-        </p>
-      </div>
-    );
   };
 
   if (carregando) {
