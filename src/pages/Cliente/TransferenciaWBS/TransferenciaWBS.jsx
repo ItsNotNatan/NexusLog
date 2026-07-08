@@ -3,9 +3,9 @@ import './TransferenciaWBS.css';
 import { ArrowLeftRight, Search, Send, Trash2 } from 'lucide-react'; 
 
 // IMPORTAÇÕES NECESSÁRIAS
-import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-import GerenciadorAnexos from '../../components/GerenciadorAnexos/GerenciadorAnexos';
-import { supabase } from '../../supabaseClient';
+import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
+import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
+import { supabase } from '../../../supabaseClient';
 
 const itensDisponiveis = [
   { id: 1, pn: '1534534', desc: 'SENSOR DE INDUÇÃO', wbs: 'BRBCBBB20', qtd: 10 },

@@ -10,17 +10,17 @@ import LoginLogistica from './pages/LoginLogistica/LoginLogistica';
 // --- PÁGINAS DA LOGÍSTICA ---
 import Dashboard from './pages/Dashboard/Dashboard';
 import PainelGeralSolicitacoes from './pages/PainelGeralSolicitacoes/PainelGeralSolicitacoes';
-import PainelAprovacao from './pages/PainelAprovacao/PainelAprovacao';
+import PainelAprovacao from './pages/Logistica/PainelAprovacao/PainelAprovacao';
 import EntradaEstoque from './pages/EntradaEstoque/EntradaEstoque';
-import Traceabilly from './pages/Traceabilly/Traceabilly';
-import ExportarDados from './pages/ExportarDados/ExportarDados';
-import FormatacaoSAP from './pages/FormatacaoSAP/FormatacaoSAP';
-import Configuracoes from './pages/Configuracoes/Configuracoes';
+import Traceabilly from './pages/Logistica/Traceabilly/Traceabilly';
+import ExportarDados from './pages/Logistica/ExportarDados/ExportarDados';
+import FormatacaoSAP from './pages/Logistica/FormatacaoSAP/FormatacaoSAP';
+import Configuracoes from './pages/Logistica/Configuracoes/Configuracoes';
 
 // --- PÁGINAS DO CLIENTE ---
 import FazerSolicitacao from './pages/Cliente/FazerSolicitacao/FazerSolicitacao';
 import ConsultaEstoque from './pages/Cliente/ConsultaEstoque/ConsultaEstoque';
-import AcompanhamentoSolicitacoes from './pages/Client/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes';
+import AcompanhamentoSolicitacoes from './pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes';
 
 export const router = createBrowserRouter([
   { path: "/", element: <CentralDeOperacoes /> },

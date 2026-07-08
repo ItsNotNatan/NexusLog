@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 // 2. Importação do Botão Global
-import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
+import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 // IMPORTAÇÃO DOS COMPONENTES FILHOS
 import MaterialEstoque from './MaterialEstoque'; 
