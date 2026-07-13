@@ -8,11 +8,13 @@ import {
   RefreshCw, 
   CheckCircle2, 
   XCircle,
-  Zap
+  Zap,
+  Upload
 } from 'lucide-react';
 
-// 👇 IMPORTAÇÃO DO NOVO COMPONENTE ÚNICO
+// 👇 IMPORTAÇÃO DOS COMPONENTES
 import DetalhesSolicitacao from './Detalhes/DetalhesSolicitacao';
+import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 
 const renderBadgeStatus = (status) => {
   switch (status) {
@@ -62,8 +64,11 @@ export default function AcompanhamentoSolicitacoes() {
   const [carregando, setCarregando] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('Todos');
   
-  // 👇 NOVO ESTADO: Guarda qual linha está aberta
+  // Guarda qual linha está aberta
   const [linhaExpandida, setLinhaExpandida] = useState(null);
+  
+  // 👇 NOVO ESTADO: Guarda os anexos da gaveta aberta
+  const [anexosNovos, setAnexosNovos] = useState([]);
 
   const listaFiltros = [
     'Todos', 'Material', 'Transfer. WBS', 'Nota Fiscal', 'Entrada', 'Crossdocking', 'Reintegração'
@@ -117,9 +122,17 @@ export default function AcompanhamentoSolicitacoes() {
     return passaFiltroAba && passaFiltroStatus && passaPesquisa;
   });
 
-  // Função para abrir/fechar a gaveta
+  // Função para abrir/fechar a gaveta e limpar os anexos antigos
   const toggleLinha = (id) => {
     setLinhaExpandida(linhaExpandida === id ? null : id);
+    setAnexosNovos([]); // Limpa ficheiros se o utilizador trocar de linha
+  };
+
+  // Função provisória para anexar
+  const handleEnviarAnexosExtras = async (idSolicitacao) => {
+    if (anexosNovos.length === 0) return;
+    alert(`Pronto para enviar ${anexosNovos.length} novo(s) anexo(s) para a solicitação ${idSolicitacao}!`);
+    // Aqui vai entrar o upload do Supabase depois
   };
 
   return (
@@ -188,7 +201,6 @@ export default function AcompanhamentoSolicitacoes() {
                       {/* LINHA PRINCIPAL */}
                       <tr className={isExpandida ? 'tr-expandida' : ''}>
                         <td className="col-chevron" onClick={() => toggleLinha(linha.id)}>
-                          {/* Seta animada baseada no estado isExpandida */}
                           <ChevronRight size={18} className={isExpandida ? 'icone-rotacionado' : 'icone-normal'} style={{ color: '#94a3b8' }} />
                         </td>
                         <td>
@@ -221,12 +233,39 @@ export default function AcompanhamentoSolicitacoes() {
                         </td>
                         <td>{renderBadgeStatus(linha.status)}</td>
                       </tr>
-{/* GAVETA EXPANDIDA */}
+
+                      {/* GAVETA EXPANDIDA COM O GERENCIADOR DE ANEXOS */}
                       {isExpandida && (
                         <tr>
                           <td colSpan="8" className="td-expandida">
-                            {/* Passamos o item todo e o componente faz o resto! */}
                             <DetalhesSolicitacao item={linha} />
+                            
+                            {/* Bloco de Anexos Embutido na Gaveta */}
+                            <div style={{ padding: '0 32px 24px 32px', backgroundColor: '#f8fafc' }}>
+                              <hr style={{ border: 'none', borderTop: '1px dashed #cbd5e1', margin: '0 0 16px 0' }} />
+                              
+                              <GerenciadorAnexos 
+                                anexos={anexosNovos} 
+                                setAnexos={setAnexosNovos} 
+                                titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO" 
+                              />
+                              
+                              {anexosNovos.length > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+                                  <button 
+                                    onClick={() => handleEnviarAnexosExtras(linha.id)}
+                                    style={{ 
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', 
+                                      backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', 
+                                      fontWeight: '600', cursor: 'pointer' 
+                                    }}
+                                  >
+                                    <Upload size={16} /> Salvar Novos Anexos
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            
                           </td>
                         </tr>
                       )}

@@ -12,72 +12,83 @@ export default function CarregarArquivo({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Previne o comportamento padrão do navegador que é abrir o ficheiro
+  // --- EVENTOS DE DRAG & DROP ---
   const handleDragOver = (e) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (e) => {
+    e.preventDefault();
     setIsDragging(false);
   };
 
-  // Quando o ficheiro é largado na área
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      onFileSelect(file); // Envia o ficheiro para o componente "Pai"
+    
+    // Pega o ficheiro que foi arrastado
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onFileSelect(e.dataTransfer.files[0]); 
+      e.dataTransfer.clearData(); // Limpa a memória do navegador
     }
   };
 
-  // Quando o utilizador clica e seleciona o ficheiro
+  // --- EVENTOS DE CLIQUE E SELEÇÃO ---
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      onFileSelect(file); // Envia o ficheiro para o componente "Pai"
+    if (e.target.files && e.target.files.length > 0) {
+      onFileSelect(e.target.files[0]); 
     }
-    // Limpa o input para permitir selecionar o mesmo ficheiro novamente, se necessário
-    e.target.value = null;
+    // Reseta o input para permitir selecionar o mesmo ficheiro duas vezes seguidas
+    e.target.value = ''; 
   };
 
-  // O Input nativo fica escondido e é usado em ambas as variantes
-  const InputEscondido = () => (
-    <input 
-      type="file" 
-      accept={accept}
-      className="input-escondido"
-      ref={fileInputRef}
-      onChange={handleFileChange}
-    />
-  );
+  const handleClick = () => {
+    // A interrogação garante que não dá erro se o ref estiver vazio
+    fileInputRef.current?.click();
+  };
 
-  // RENDERIZAR A VERSÃO BOTÃO
+  // ==========================================
+  // RENDERIZAR A VERSÃO: BOTÃO
+  // ==========================================
   if (variante === 'botao') {
     return (
       <button 
         className="upload-botao" 
-        onClick={() => fileInputRef.current.click()}
+        onClick={handleClick}
         type="button"
       >
-        <InputEscondido />
+        <input 
+          type="file" 
+          accept={accept}
+          className="input-escondido"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+        />
         {icone ? icone : <FilePlus size={16} />}
         {label}
       </button>
     );
   }
 
-  // RENDERIZAR A VERSÃO ÁREA (Dropzone)
+  // ==========================================
+  // RENDERIZAR A VERSÃO: ÁREA (Dropzone)
+  // ==========================================
   return (
     <div 
       className={`upload-area ${isDragging ? 'arrastando' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onClick={() => fileInputRef.current.click()}
+      onClick={handleClick}
     >
-      <InputEscondido />
+      <input 
+        type="file" 
+        accept={accept}
+        className="input-escondido"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+      />
       {icone ? icone : <Upload size={24} className="icone" />}
       <span className="upload-texto">{label}</span>
     </div>
