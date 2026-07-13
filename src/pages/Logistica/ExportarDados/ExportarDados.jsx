@@ -3,7 +3,6 @@ import './ExportarDados.css';
 import { 
   Download, 
   FileText, 
-  TrendingUp, 
   Activity, 
   BarChart3, 
   CheckCircle2, 
@@ -14,7 +13,6 @@ import {
 
 const abasNav = [
   { id: 'ps-bs', label: 'PS + BS (Solicitações)', icone: <FileText size={16} />, ativo: true },
-  { id: 'target', label: 'Dentro vs Fora do Target', icone: <TrendingUp size={16} />, ativo: false },
   { id: 'evolucao', label: 'Evolução Histórica', icone: <Activity size={16} />, ativo: false },
   { id: 'volume', label: 'Volume Diário', icone: <BarChart3 size={16} />, ativo: false },
   { id: 'status', label: 'Status dos BS', icone: <CheckCircle2 size={16} />, ativo: false },
@@ -22,17 +20,18 @@ const abasNav = [
 
 const kpis = [
   { titulo: 'Total de PS', valor: '14', estilo: 'padrao' },
-  { titulo: 'Dentro do Target', valor: '0', estilo: 'sucesso' },
-  { titulo: 'Fora do Target', valor: '0', estilo: 'alerta' },
-  { titulo: 'Target Atual', valor: '3d', subtitulo: 'Configurável no Dashboard', estilo: 'info' },
+  { titulo: 'Concluídos', valor: '2', estilo: 'sucesso' },
+  { titulo: 'Cancelados', valor: '2', estilo: 'alerta' },
+  { titulo: 'Em Separação', valor: '1', estilo: 'info' },
 ];
 
+// Atualizado sem a coluna de Target
 const dadosTabela = [
-  { id: 'PS:2306261114', solicitante: 'TESTE', wbs: 'WBS-PRJ-2024-001', status: 'Em Separação', bs: 'PE-BS 10976', criacao: '23/06/2026 14:14', finalizacao: 'não definido' },
-  { id: 'PS:1106261734', solicitante: 'RASDAS', wbs: 'WBS-PRJ-2024-001', status: 'Concluído', bs: 'SP-BS 10975', criacao: '11/06/2026 20:34', finalizacao: 'não definido' },
-  { id: 'PS:1106261648', solicitante: 'DOUGLAS', wbs: 'WBS-PRJ-2024-001', status: 'Concluído', bs: 'SP-BS 10974', criacao: '11/06/2026 19:48', finalizacao: 'não definido' },
-  { id: 'PS:1006261107', solicitante: 'SADFSDAS', wbs: 'WBS-PRJ-2024-001', status: 'Cancelado', bs: '-', criacao: '10/06/2026 14:07', finalizacao: 'não definido' },
-  { id: 'PS:1006261102', solicitante: 'MARCIO', wbs: 'WBS-PRJ-2024-001', status: 'Cancelado', bs: 'SP-BS 10973', criacao: '10/06/2026 14:02', finalizacao: 'não definido' },
+  { id: 'PS:2306261114', solicitante: 'TESTE', wbs: 'WBS-PRJ-2024-001', status: 'Em Separação', bs: 'PE-BS 10976', criacaoBs: '23/06/2026 14:14', dataEntrega: 'não definido', contagem: '3d 00:11:45', contagemStatus: 'verde' },
+  { id: 'PS:1106261734', solicitante: 'RASDAS', wbs: 'WBS-PRJ-2024-001', status: 'Concluído', bs: 'SP-BS 10975', criacaoBs: '11/06/2026 20:34', dataEntrega: '13/06/2026 10:00', contagem: 'Entregue', contagemStatus: 'neutro' },
+  { id: 'PS:0707260938', solicitante: 'MARCIO', wbs: 'WBS-PRJ-2024-001', status: 'Em Atraso', bs: 'SP-BS 10977', criacaoBs: '07/07/2026 15:08', dataEntrega: 'não definido', contagem: '-0d 02:15:30', contagemStatus: 'vermelho' },
+  { id: 'PS:1106261648', solicitante: 'DOUGLAS', wbs: 'WBS-PRJ-2024-001', status: 'Concluído', bs: 'SP-BS 10974', criacaoBs: '11/06/2026 19:48', dataEntrega: '16/06/2026 15:30', contagem: 'Entregue', contagemStatus: 'neutro' },
+  { id: 'PS:1006261107', solicitante: 'SADFSDAS', wbs: 'WBS-PRJ-2024-001', status: 'Cancelado', bs: '-', criacaoBs: '-', dataEntrega: 'não definido', contagem: '-', contagemStatus: 'neutro' },
 ];
 
 // --- COMPONENTE PRINCIPAL ---
@@ -96,7 +95,7 @@ export default function ExportarDados() {
         {/* Informações da Tabela */}
         <div className="tabela-info">
           <span className="info-registros">14 registros</span>
-          <span className="info-target">Target: 3 dia(s) — Lead Time = Criação PS &rarr; Finalização BS</span>
+          <span className="info-target">Lead Time = Criação de BS &rarr; Data de Entrega</span>
         </div>
 
         {/* Tabela de Dados */}
@@ -109,8 +108,9 @@ export default function ExportarDados() {
                 <th>WBS</th>
                 <th>STATUS PS</th>
                 <th>BS</th>
-                <th>CRIAÇÃO PS</th>
-                <th>FINALIZAÇÃO</th>
+                <th>CRIAÇÃO DE BS</th>
+                <th>DATA E HORA DE ENTREGA</th>
+                <th>CONTAGEM</th>
               </tr>
             </thead>
             <tbody>
@@ -129,8 +129,20 @@ export default function ExportarDados() {
                       <span className="texto-cinza">-</span>
                     )}
                   </td>
-                  <td className="texto-cinza">{linha.criacao}</td>
-                  <td className="texto-amarelo">{linha.finalizacao}</td>
+                  <td className="texto-cinza">{linha.criacaoBs}</td>
+                  <td className={linha.dataEntrega === 'não definido' ? 'texto-amarelo' : 'texto-cinza'}>
+                    {linha.dataEntrega}
+                  </td>
+                  <td>
+                    {/* Renderização Condicional da Contagem Digital */}
+                    {linha.contagem.includes('d') ? (
+                      <span className={`badge-countdown countdown-${linha.contagemStatus}`}>
+                        {linha.contagem}
+                      </span>
+                    ) : (
+                      <span className="texto-cinza fonte-negrito">{linha.contagem}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

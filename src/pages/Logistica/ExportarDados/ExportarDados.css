@@ -247,3 +247,56 @@
   font-size: 0.75rem;
   font-weight: 500;
 }
+
+/* ========================================================== */
+/* BADGES TARGET (DENTRO / FORA)                              */
+/* ========================================================== */
+.badge-target-dentro {
+  display: inline-block;
+  padding: 4px 10px;
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-target-fora {
+  display: inline-block;
+  padding: 4px 10px;
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ========================================================== */
+/* CONTAGEM REGRESSIVA (ESTILO RELÓGIO DIGITAL)               */
+/* ========================================================== */
+.badge-countdown {
+  display: inline-block;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 1px;
+}
+
+.countdown-verde {
+  background-color: #ecfdf5; /* Fundo verde clarinho */
+  color: #10b981; /* Verde esmeralda brilhante */
+}
+
+.countdown-vermelho {
+  background-color: #fef2f2;
+  color: #ef4444;
+}
+
+.countdown-neutro {
+  background-color: #f8fafc;
+  color: #64748b;
+}

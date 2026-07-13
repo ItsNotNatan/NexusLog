@@ -6,6 +6,15 @@ import {
   FileText, Download, AlertTriangle 
 } from 'lucide-react';
 
+// DADOS MOCKADOS DA TABELA DE PICKING (Baseado na tua imagem)
+const mockDemandas = [
+  { id: 'PS: 0707261449', filial: 'BR01', urgencia: 'High', wbs: 'BRRRRCY21-SPT', tempoEspera: '0d 45m', status: 'Em Separação - No Prazo', statusCor: 'demanda-verde', bs: 'SP-BS 10999', criacao: '07/07/2026 17:49', finalizacao: 'não definido', leadTime: '0d 45m', target: '–', itens: 1, valorTotal: '10d 15m' },
+  { id: 'PS: 0707261441', filial: 'BR02', urgencia: 'Medium', wbs: 'BRRRRCY21-SPT', tempoEspera: '0d 45m', status: 'Em Separação - Crítico', statusCor: 'demanda-amarela', bs: 'SP-BS 10985', criacao: '07/07/2026 13:38', finalizacao: 'não definido', leadTime: '0d 45m', target: '–', itens: 1, valorTotal: '0d 32m' },
+  { id: 'PS: 0707260938', filial: 'BR04', urgencia: 'Low', wbs: 'BRRRRCY21-SPT', tempoEspera: '0d 45m', status: 'Em Atraso', statusCor: 'demanda-vermelha', bs: 'SP-BS 10977', criacao: '07/07/2026 15:08', finalizacao: 'não definido', leadTime: '0d 15m', target: '–', itens: 2, valorTotal: '0d 15m' },
+  { id: 'PS: 0687261410', filial: 'BR04', urgencia: 'Low', wbs: 'BRRRRBA32-MA...', tempoEspera: '0d 45m', status: 'Concluído', statusCor: 'demanda-cinza', bs: 'SP-BS 10983', criacao: '06/07/2026 17:16', finalizacao: 'não definido', leadTime: '–', target: '–', itens: 1, valorTotal: '–' },
+  { id: 'PS: 0387261122', filial: 'BR06', urgencia: 'Low', wbs: 'BRRRRBBA32-MA...', tempoEspera: '0d 45m', status: 'Concluído', statusCor: 'demanda-cinza', bs: 'SP-BS 10983', criacao: '06/07/2026 12:21', finalizacao: 'não definido', leadTime: '–', target: '–', itens: 2, valorTotal: '–' },
+];
+
 export default function Dashboard() {
   return (
     <div className="dashboard-container">
@@ -184,7 +193,6 @@ export default function Dashboard() {
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
             
-            {/* Barras do Gráfico */}
             <div className="grafico-barras">
               <div className="barra-container">
                 <span className="barra-label-topo" style={{opacity: 0}}>0</span>
@@ -244,7 +252,6 @@ export default function Dashboard() {
              </div>
              
              <div className="grafico-barras">
-                {/* 01/07 */}
                 <div className="barra-container">
                    <div className="barra-segmentada" style={{ height: '95%' }}>
                       <div className="segmento vermelho" style={{ height: '5%' }}></div>
@@ -252,14 +259,12 @@ export default function Dashboard() {
                       <div className="segmento verde" style={{ height: '80%' }}></div>
                    </div>
                 </div>
-                {/* 02/07 */}
                 <div className="barra-container">
                    <div className="barra-segmentada" style={{ height: '76%' }}>
                       <div className="segmento amarelo" style={{ height: '5%' }}></div>
                       <div className="segmento verde" style={{ height: '95%' }}></div>
                    </div>
                 </div>
-                {/* 03/07 */}
                 <div className="barra-container">
                    <div className="barra-segmentada" style={{ height: '68%' }}>
                       <div className="segmento vermelho" style={{ height: '10%' }}></div>
@@ -267,7 +272,6 @@ export default function Dashboard() {
                       <div className="segmento verde" style={{ height: '70%' }}></div>
                    </div>
                 </div>
-                {/* 04/07 */}
                 <div className="barra-container">
                    <div className="barra-segmentada" style={{ height: '68%' }}>
                       <div className="segmento vermelho" style={{ height: '15%' }}></div>
@@ -275,7 +279,6 @@ export default function Dashboard() {
                       <div className="segmento verde" style={{ height: '60%' }}></div>
                    </div>
                 </div>
-                {/* 05/07 */}
                 <div className="barra-container">
                    <div className="barra-segmentada" style={{ height: '80%' }}>
                       <div className="segmento vermelho" style={{ height: '25%' }}></div>
@@ -283,7 +286,6 @@ export default function Dashboard() {
                       <div className="segmento verde" style={{ height: '60%' }}></div>
                    </div>
                 </div>
-                {/* 06/07 */}
                 <div className="barra-container">
                    <div className="barra-segmentada" style={{ height: '48%' }}>
                       <div className="segmento vermelho" style={{ height: '40%' }}></div>
@@ -291,7 +293,6 @@ export default function Dashboard() {
                       <div className="segmento verde" style={{ height: '40%' }}></div>
                    </div>
                 </div>
-                {/* 07/07 */}
                 <div className="barra-container">
                    <div className="barra-segmentada" style={{ height: '28%' }}>
                       <div className="segmento vermelho" style={{ height: '30%' }}></div>
@@ -316,8 +317,6 @@ export default function Dashboard() {
           </div>
           
           <div className="filiais-grid">
-            
-            {/* BR01 */}
             <div className="filial-mini-card">
               <h4>BR01</h4>
               <div className="donut-chart" style={{ background: 'conic-gradient(#10b981 0% 85%, #f59e0b 85% 100%)' }}>
@@ -329,7 +328,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* BR02 */}
             <div className="filial-mini-card">
               <h4>BR02</h4>
               <div className="donut-chart" style={{ background: 'conic-gradient(#10b981 0% 60%, #f59e0b 60% 90%, #ef4444 90% 100%)' }}>
@@ -341,7 +339,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* BR04 */}
             <div className="filial-mini-card">
               <h4>BR04</h4>
               <div className="donut-chart" style={{ background: 'conic-gradient(#10b981 0% 45%, #f59e0b 45% 85%, #ef4444 85% 100%)' }}>
@@ -353,7 +350,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* BR06 */}
             <div className="filial-mini-card">
               <h4>BR06</h4>
               <div className="donut-chart" style={{ background: 'conic-gradient(#3b82f6 0% 60%, #ef4444 60% 70%, #cbd5e1 70% 100%)' }}>
@@ -364,10 +360,68 @@ export default function Dashboard() {
                 Ordem mais crítica <AlertTriangle size={10} color="#dc2626" />
               </div>
             </div>
-
           </div>
         </div>
 
+      </div>
+
+      {/* ============================================================ */}
+      {/* LINHA 3: TABELA DE DEMANDAS DE PICKING                       */}
+      {/* ============================================================ */}
+      <div className="graficos-grid-1col">
+        <div className="demandas-card">
+          <div className="demandas-header">
+            <h3>Detalhe das Demandas de Picking Ativas</h3>
+          </div>
+          <div className="demandas-table-wrapper">
+            <table className="demandas-table">
+              <thead>
+                <tr>
+                  <th>PS ID</th>
+                  <th>FILIAL</th>
+                  <th>URGÊNCIA</th>
+                  <th>WBS</th>
+                  <th>TEMPO DE ESPERA<br/>(LEAD TIME ATUAL)</th>
+                  <th>STATUS</th>
+                  <th>BS</th>
+                  <th>CRIAÇÃO PS</th>
+                  <th>FINALIZAÇÃO BS</th>
+                  <th>LEAD TIME</th>
+                  <th>TARGET</th>
+                  <th>ITENS</th>
+                  <th>VALOR TOTAL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mockDemandas.map((item, index) => (
+                  <tr key={index}>
+                    <td style={{ fontWeight: '500' }}>{item.id}</td>
+                    <td>{item.filial}</td>
+                    <td style={{ fontWeight: '600', color: '#1e293b' }}>{item.urgencia}</td>
+                    <td><a href="#" className="link-tabela">{item.wbs}</a></td>
+                    <td>{item.tempoEspera}</td>
+                    <td>
+                      <span className={`badge-demanda-status ${item.statusCor}`}>
+                        {item.status}
+                      </span>
+                    </td>
+                    <td>
+                      {item.bs !== '-' ? <a href="#" className="link-tabela">{item.bs}</a> : item.bs}
+                    </td>
+                    <td>{item.criacao}</td>
+                    <td className={item.finalizacao === 'não definido' ? 'texto-alerta-amarelo' : ''}>
+                      {item.finalizacao}
+                    </td>
+                    <td>{item.leadTime}</td>
+                    <td>{item.target}</td>
+                    <td style={{ textAlign: 'center' }}>{item.itens}</td>
+                    <td>{item.valorTotal}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
     </div>
