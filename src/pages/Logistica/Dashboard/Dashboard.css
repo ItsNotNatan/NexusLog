@@ -580,3 +580,135 @@
 @media (max-width: 768px) {
   .efficiency-grid { grid-template-columns: 1fr; }
 }
+
+/* ========================================================== */
+/* LINHA 2: GRÁFICO DE BARRAS EMPILHADAS E FILIAIS            */
+/* ========================================================== */
+.graficos-linha-2 {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr; /* O gráfico da esquerda é ligeiramente mais largo */
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+/* --- Gráfico de Barras (Tendência) --- */
+.btn-mensal {
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-mensal:hover {
+  background-color: #e2e8f0;
+}
+
+.barra-segmentada {
+  width: 32px;
+  display: flex;
+  flex-direction: column-reverse; /* Empilha as cores de baixo para cima */
+  border-radius: 2px 2px 0 0;
+  overflow: hidden; /* Garante que os cantos não vazem */
+}
+
+.segmento { width: 100%; }
+.segmento.verde { background-color: #10b981; }
+.segmento.amarelo { background-color: #f59e0b; }
+.segmento.vermelho { background-color: #ef4444; }
+
+.legenda-cor.amarela { background-color: #f59e0b; }
+
+/* --- Resumo por Filial (Gráficos Donut) --- */
+.filiais-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.filial-mini-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.filial-mini-card h4 {
+  font-size: 0.875rem;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+}
+
+/* Gráfico de Anel (Donut) feito puramente em CSS */
+.donut-chart {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.donut-inner {
+  width: 44px;
+  height: 44px;
+  background-color: #ffffff; /* Furo do centro do gráfico */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.filial-volume {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+/* Badges de Alerta */
+.badge-critica {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 4px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.badge-critica.alerta-verde {
+  background-color: #f0fdf4;
+  color: #059669;
+  border: 1px solid #bbf7d0;
+}
+
+.badge-critica.alerta-amarelo {
+  background-color: #fefce8;
+  color: #ca8a04;
+  border: 1px solid #fde047;
+}
+
+.badge-critica.alerta-vermelho {
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+@media (max-width: 1024px) {
+  .graficos-linha-2 { grid-template-columns: 1fr; }
+  .filiais-grid { grid-template-columns: repeat(2, 1fr); }
+}

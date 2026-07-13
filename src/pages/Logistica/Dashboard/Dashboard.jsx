@@ -3,7 +3,7 @@ import './Dashboard.css';
 import { 
   Settings, ClipboardList, FileCheck2, Clock, Activity, 
   Target, CheckCircle2, XCircle, BarChart3, TrendingUp, 
-  FileText, Download, Users, AlertTriangle 
+  FileText, Download, AlertTriangle 
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -208,15 +208,165 @@ export default function Dashboard() {
 
       </div>
 
-      
-
       {/* ============================================================ */}
-      {/* LINHA 2 DE GRÁFICOS (1 Coluna Completa)                      */}
+      {/* LINHA 2 DE GRÁFICOS (Gráficos da Nova Imagem)                */}
       {/* ============================================================ */}
-      <div className="graficos-grid-1col">
+      <div className="graficos-linha-2">
         
+        {/* GRÁFICO 3: TENDÊNCIA DE DEMANDAS DE PICKING (Barras Empilhadas) */}
+        <div className="grafico-card" style={{ padding: '24px' }}>
+          
+          <div className="grafico-header" style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+              Tendência de Demandas de Picking (Semanal)
+            </h3>
+            <button className="btn-mensal">Mensal</button>
+          </div>
 
+          <div className="grafico-legenda" style={{ marginTop: 0, marginBottom: '24px', justifyContent: 'center' }}>
+             <div className="legenda-item"><div className="legenda-cor verde"></div> Dentro do Target</div>
+             <div className="legenda-item"><div className="legenda-cor amarela"></div> Próximo</div>
+             <div className="legenda-item"><div className="legenda-cor vermelha"></div> Em Atraso</div>
+          </div>
 
+          <div className="grafico-area">
+             <div className="grafico-eixo-y">
+               <span>25</span><span>20</span><span>15</span><span>10</span><span>5</span><span>0</span>
+             </div>
+             
+             <div className="grafico-linhas">
+               <div className="linha-horizontal"></div>
+               <div className="linha-horizontal"></div>
+               <div className="linha-horizontal"></div>
+               <div className="linha-horizontal"></div>
+               <div className="linha-horizontal"></div>
+               <div className="linha-horizontal" style={{ borderTopStyle: 'solid' }}></div>
+             </div>
+             
+             <div className="grafico-barras">
+                {/* 01/07 */}
+                <div className="barra-container">
+                   <div className="barra-segmentada" style={{ height: '95%' }}>
+                      <div className="segmento vermelho" style={{ height: '5%' }}></div>
+                      <div className="segmento amarelo" style={{ height: '15%' }}></div>
+                      <div className="segmento verde" style={{ height: '80%' }}></div>
+                   </div>
+                </div>
+                {/* 02/07 */}
+                <div className="barra-container">
+                   <div className="barra-segmentada" style={{ height: '76%' }}>
+                      <div className="segmento amarelo" style={{ height: '5%' }}></div>
+                      <div className="segmento verde" style={{ height: '95%' }}></div>
+                   </div>
+                </div>
+                {/* 03/07 */}
+                <div className="barra-container">
+                   <div className="barra-segmentada" style={{ height: '68%' }}>
+                      <div className="segmento vermelho" style={{ height: '10%' }}></div>
+                      <div className="segmento amarelo" style={{ height: '20%' }}></div>
+                      <div className="segmento verde" style={{ height: '70%' }}></div>
+                   </div>
+                </div>
+                {/* 04/07 */}
+                <div className="barra-container">
+                   <div className="barra-segmentada" style={{ height: '68%' }}>
+                      <div className="segmento vermelho" style={{ height: '15%' }}></div>
+                      <div className="segmento amarelo" style={{ height: '25%' }}></div>
+                      <div className="segmento verde" style={{ height: '60%' }}></div>
+                   </div>
+                </div>
+                {/* 05/07 */}
+                <div className="barra-container">
+                   <div className="barra-segmentada" style={{ height: '80%' }}>
+                      <div className="segmento vermelho" style={{ height: '25%' }}></div>
+                      <div className="segmento amarelo" style={{ height: '15%' }}></div>
+                      <div className="segmento verde" style={{ height: '60%' }}></div>
+                   </div>
+                </div>
+                {/* 06/07 */}
+                <div className="barra-container">
+                   <div className="barra-segmentada" style={{ height: '48%' }}>
+                      <div className="segmento vermelho" style={{ height: '40%' }}></div>
+                      <div className="segmento amarelo" style={{ height: '20%' }}></div>
+                      <div className="segmento verde" style={{ height: '40%' }}></div>
+                   </div>
+                </div>
+                {/* 07/07 */}
+                <div className="barra-container">
+                   <div className="barra-segmentada" style={{ height: '28%' }}>
+                      <div className="segmento vermelho" style={{ height: '30%' }}></div>
+                      <div className="segmento verde" style={{ height: '70%' }}></div>
+                   </div>
+                </div>
+             </div>
+             
+             <div className="grafico-eixo-x" style={{ padding: '0 20px' }}>
+                <span>01/07</span><span>02/07</span><span>03/07</span><span>04/07</span><span>05/07</span><span>06/07</span><span>07/07</span>
+             </div>
+          </div>
+        </div>
+
+        {/* GRÁFICO 4: RESUMO POR FILIAL (DONUT CHARTS) */}
+        <div className="grafico-card" style={{ padding: '24px' }}>
+          
+          <div className="grafico-header" style={{ marginBottom: '8px' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+              Resumo por Filial
+            </h3>
+          </div>
+          
+          <div className="filiais-grid">
+            
+            {/* BR01 */}
+            <div className="filial-mini-card">
+              <h4>BR01</h4>
+              <div className="donut-chart" style={{ background: 'conic-gradient(#10b981 0% 85%, #f59e0b 85% 100%)' }}>
+                <div className="donut-inner">70%</div>
+              </div>
+              <span className="filial-volume">Volume: 13d</span>
+              <div className="badge-critica alerta-verde">
+                Ordem mais crítica <AlertTriangle size={10} color="#eab308" fill="#fefce8" />
+              </div>
+            </div>
+
+            {/* BR02 */}
+            <div className="filial-mini-card">
+              <h4>BR02</h4>
+              <div className="donut-chart" style={{ background: 'conic-gradient(#10b981 0% 60%, #f59e0b 60% 90%, #ef4444 90% 100%)' }}>
+                <div className="donut-inner">90%</div>
+              </div>
+              <span className="filial-volume">Volume: 10d</span>
+              <div className="badge-critica alerta-amarelo">
+                Ordem mais crítica <AlertTriangle size={10} color="#ca8a04" fill="#fefce8" />
+              </div>
+            </div>
+
+            {/* BR04 */}
+            <div className="filial-mini-card">
+              <h4>BR04</h4>
+              <div className="donut-chart" style={{ background: 'conic-gradient(#10b981 0% 45%, #f59e0b 45% 85%, #ef4444 85% 100%)' }}>
+                <div className="donut-inner">60%</div>
+              </div>
+              <span className="filial-volume">Volume: 30d</span>
+              <div className="badge-critica alerta-amarelo">
+                Ordem mais crítica <AlertTriangle size={10} color="#ca8a04" fill="#fefce8" />
+              </div>
+            </div>
+
+            {/* BR06 */}
+            <div className="filial-mini-card">
+              <h4>BR06</h4>
+              <div className="donut-chart" style={{ background: 'conic-gradient(#3b82f6 0% 60%, #ef4444 60% 70%, #cbd5e1 70% 100%)' }}>
+                <div className="donut-inner">60%</div>
+              </div>
+              <span className="filial-volume">Volume: 28d</span>
+              <div className="badge-critica alerta-vermelho">
+                Ordem mais crítica <AlertTriangle size={10} color="#dc2626" />
+              </div>
+            </div>
+
+          </div>
+        </div>
 
       </div>
 
