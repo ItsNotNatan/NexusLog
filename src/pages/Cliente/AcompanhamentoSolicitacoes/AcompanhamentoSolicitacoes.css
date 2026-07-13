@@ -331,3 +331,110 @@
 .kpi-concluidos { border-color: #a7f3d0; }
 .kpi-concluidos strong { color: #22c55e; }
 .kpi-concluidos.ativo { box-shadow: 0 0 0 2px #a7f3d0; background-color: #ecfdf5; }
+
+/* =========================================
+   ÁREA EXPANDIDA (ACORDEÃO CLIENTE)
+========================================= */
+.tr-expandida {
+  background-color: #f8fafc;
+}
+
+.td-expandida {
+  padding: 0 !important;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.area-expandida-cliente {
+  margin: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background-color: #ffffff;
+  padding: 16px;
+  animation: fadeInDown 0.2s ease-out forwards;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.expandida-cabecalho {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.expandida-cabecalho strong {
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.tabela-sub-itens {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.tabela-sub-itens th {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: transparent !important;
+}
+
+.tabela-sub-itens td {
+  font-size: 0.875rem;
+  color: #1e293b;
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tabela-sub-itens tr:last-child td {
+  border-bottom: none;
+}
+
+.texto-azul-link {
+  color: #2563eb;
+  font-weight: 500;
+  text-decoration: none;
+  font-family: monospace, sans-serif;
+}
+
+.texto-azul-link:hover {
+  text-decoration: underline;
+}
+
+.btn-detalhes-olho {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.btn-detalhes-olho:hover {
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+/* Rotação do Ícone da Seta */
+.icone-rotacionado {
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.icone-normal {
+  transition: transform 0.2s ease;
+}
