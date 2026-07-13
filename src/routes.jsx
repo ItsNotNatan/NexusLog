@@ -8,7 +8,8 @@ import SelecionarFilial from './pages/SelecionarFilial/SelecionarFilial';
 import LoginLogistica from './pages/LoginLogistica/LoginLogistica';
 
 // --- PÁGINAS DA LOGÍSTICA ---
-import Dashboard from './pages/Dashboard/Dashboard';
+// 👇 CORREÇÃO 1: O caminho correto do Dashboard
+import Dashboard from './pages/Logistica/Dashboard/Dashboard'; 
 import PainelGeralSolicitacoes from './pages/PainelGeralSolicitacoes/PainelGeralSolicitacoes';
 import PainelAprovacao from './pages/Logistica/PainelAprovacao/PainelAprovacao';
 import EntradaEstoque from './pages/EntradaEstoque/EntradaEstoque';
@@ -17,6 +18,7 @@ import ExportarDados from './pages/Logistica/ExportarDados/ExportarDados';
 import FormatacaoSAP from './pages/Logistica/FormatacaoSAP/FormatacaoSAP';
 import Configuracoes from './pages/Logistica/Configuracoes/Configuracoes';
 import RotaColeta from './pages/Logistica/RotaColeta/RotaColeta';
+import VisaoGeralEstoque from './pages/Logistica/VisaoGeralEstoque/VisaoGeralEstoque';
 
 // --- PÁGINAS DO CLIENTE ---
 import FazerSolicitacao from './pages/Cliente/FazerSolicitacao/FazerSolicitacao';
@@ -50,6 +52,10 @@ export const router = createBrowserRouter([
         children: [
           { path: "painel", element: <PainelGeralSolicitacoes /> },
           { path: "dashboard", element: <Dashboard /> },
+          
+          // 👇 CORREÇÃO 2: Nome exato igual ao do botão na Sidebar
+          { path: "visao-geral", element: <VisaoGeralEstoque /> }, 
+          
           { path: "PainelAprovacao", element: <PainelAprovacao /> },
           { path: "entrada-estoque", element: <EntradaEstoque /> },
           { path: "traceabilly", element: <Traceabilly /> },
