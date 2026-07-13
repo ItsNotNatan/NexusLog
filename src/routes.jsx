@@ -16,6 +16,7 @@ import Traceabilly from './pages/Logistica/Traceabilly/Traceabilly';
 import ExportarDados from './pages/Logistica/ExportarDados/ExportarDados';
 import FormatacaoSAP from './pages/Logistica/FormatacaoSAP/FormatacaoSAP';
 import Configuracoes from './pages/Logistica/Configuracoes/Configuracoes';
+import RotaColeta from './pages/Logistica/RotaColeta/RotaColeta';
 
 // --- PÁGINAS DO CLIENTE ---
 import FazerSolicitacao from './pages/Cliente/FazerSolicitacao/FazerSolicitacao';
@@ -54,6 +55,7 @@ export const router = createBrowserRouter([
           { path: "traceabilly", element: <Traceabilly /> },
           { path: "exportar", element: <ExportarDados /> },
           { path: "formatacao-sap", element: <FormatacaoSAP /> },
+          { path: "rota-coleta", element: <RotaColeta /> },
           
           // Exemplo de rota ultra-restrita: Só ADM pode acessar as configurações
           { 

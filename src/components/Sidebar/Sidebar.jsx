@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 import {
   LayoutDashboard, ListTodo, PackagePlus, Archive, Download, FileSpreadsheet, Settings, Hexagon,
-  ClipboardEdit, Boxes, FileClock, ArrowLeft
+  ClipboardEdit, Boxes, FileClock, ArrowLeft, Waypoints
 } from 'lucide-react';
 
 export default function Sidebar({ modulo }) {
@@ -24,8 +24,9 @@ export default function Sidebar({ modulo }) {
     { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} /> },
     { path: '/logistica/PainelAprovacao', label: 'Painel de Aprovação', icon: <ListTodo size={20} /> },
     { path: '/logistica/traceabilly', label: 'Rastreabilidade', icon: <Archive size={20} /> },
-    { path: '/logistica/exportar', label: 'Exportar Dados', icon: <Download size={20} /> },
+    { path: '/logistica/exportar', label: 'Exportar Dados (PS)', icon: <Download size={20} /> },
     { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} /> },
+    { path: '/logistica/rota-coleta', label: 'Rota de Coleta', icon: <Waypoints size={20} /> },
     { path: '/logistica/configuracoes', label: 'Configurações', icon: <Settings size={20} /> },
   ];
 
@@ -57,7 +58,7 @@ export default function Sidebar({ modulo }) {
         </ul>
       </nav>
 
-      {/* NOVO: Secção inferior com o botão de voltar */}
+      {/* Secção inferior com o botão de voltar */}
       <div className="sidebar-footer">
         <button
           className="btn-voltar-sidebar"
