@@ -5,6 +5,7 @@ import {
   Target, CheckCircle2, XCircle, BarChart3, TrendingUp, 
   FileText, Download, AlertTriangle 
 } from 'lucide-react';
+import TabelaDemandas from'../../../components/TabelaDemandas/TabelaDemandas';
 
 // DADOS MOCKADOS DA TABELA DE PICKING (Baseado na tua imagem)
 const mockDemandas = [
@@ -13,6 +14,13 @@ const mockDemandas = [
   { id: 'PS: 0707260938', filial: 'BR04', urgencia: 'Low', wbs: 'BRRRRCY21-SPT', tempoEspera: '0d 45m', status: 'Em Atraso', statusCor: 'demanda-vermelha', bs: 'SP-BS 10977', criacao: '07/07/2026 15:08', finalizacao: 'não definido', leadTime: '0d 15m', target: '–', itens: 2, valorTotal: '0d 15m' },
   { id: 'PS: 0687261410', filial: 'BR04', urgencia: 'Low', wbs: 'BRRRRBA32-MA...', tempoEspera: '0d 45m', status: 'Concluído', statusCor: 'demanda-cinza', bs: 'SP-BS 10983', criacao: '06/07/2026 17:16', finalizacao: 'não definido', leadTime: '–', target: '–', itens: 1, valorTotal: '–' },
   { id: 'PS: 0387261122', filial: 'BR06', urgencia: 'Low', wbs: 'BRRRRBBA32-MA...', tempoEspera: '0d 45m', status: 'Concluído', statusCor: 'demanda-cinza', bs: 'SP-BS 10983', criacao: '06/07/2026 12:21', finalizacao: 'não definido', leadTime: '–', target: '–', itens: 2, valorTotal: '–' },
+];
+
+const dadosTabela = [
+  { id: 'PS:2306261114', solicitante: 'TESTE', wbs: 'WBS-PRJ-2024-001', status: 'Em Separação', bs: 'PE-BS 10976', criacaoBs: '23/06/2026 14:14', dataEntrega: 'não definido', contagem: '3d 00:11:45', contagemStatus: 'verde' },
+  { id: 'PS:1106261734', solicitante: 'RASDAS', wbs: 'WBS-PRJ-2024-001', status: 'Concluído', bs: 'SP-BS 10975', criacaoBs: '11/06/2026 20:34', dataEntrega: '13/06/2026 10:00', contagem: 'Entregue', contagemStatus: 'neutro' },
+  { id: 'PS:0707260938', solicitante: 'MARCIO', wbs: 'WBS-PRJ-2024-001', status: 'Em Atraso', bs: 'SP-BS 10977', criacaoBs: '07/07/2026 15:08', dataEntrega: 'não definido', contagem: '-0d 02:15:30', contagemStatus: 'vermelho' },
+  { id: 'PS:1106261648', solicitante: 'DOUGLAS', wbs: 'WBS-PRJ-2024-001', status: 'Concluído', bs: 'SP-BS 10974', criacaoBs: '11/06/2026 19:48', dataEntrega: '16/06/2026 15:30', contagem: 'Entregue', contagemStatus: 'neutro' },
 ];
 
 export default function Dashboard() {
@@ -365,63 +373,11 @@ export default function Dashboard() {
 
       </div>
 
-      {/* ============================================================ */}
+{/* ============================================================ */}
       {/* LINHA 3: TABELA DE DEMANDAS DE PICKING                       */}
       {/* ============================================================ */}
-      <div className="graficos-grid-1col">
-        <div className="demandas-card">
-          <div className="demandas-header">
-            <h3>Detalhe das Demandas de Picking Ativas</h3>
-          </div>
-          <div className="demandas-table-wrapper">
-            <table className="demandas-table">
-              <thead>
-                <tr>
-                  <th>PS ID</th>
-                  <th>FILIAL</th>
-                  <th>URGÊNCIA</th>
-                  <th>WBS</th>
-                  <th>TEMPO DE ESPERA<br/>(LEAD TIME ATUAL)</th>
-                  <th>STATUS</th>
-                  <th>BS</th>
-                  <th>CRIAÇÃO PS</th>
-                  <th>FINALIZAÇÃO BS</th>
-                  <th>LEAD TIME</th>
-                  <th>TARGET</th>
-                  <th>ITENS</th>
-                  <th>VALOR TOTAL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockDemandas.map((item, index) => (
-                  <tr key={index}>
-                    <td style={{ fontWeight: '500' }}>{item.id}</td>
-                    <td>{item.filial}</td>
-                    <td style={{ fontWeight: '600', color: '#1e293b' }}>{item.urgencia}</td>
-                    <td><a href="#" className="link-tabela">{item.wbs}</a></td>
-                    <td>{item.tempoEspera}</td>
-                    <td>
-                      <span className={`badge-demanda-status ${item.statusCor}`}>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td>
-                      {item.bs !== '-' ? <a href="#" className="link-tabela">{item.bs}</a> : item.bs}
-                    </td>
-                    <td>{item.criacao}</td>
-                    <td className={item.finalizacao === 'não definido' ? 'texto-alerta-amarelo' : ''}>
-                      {item.finalizacao}
-                    </td>
-                    <td>{item.leadTime}</td>
-                    <td>{item.target}</td>
-                    <td style={{ textAlign: 'center' }}>{item.itens}</td>
-                    <td>{item.valorTotal}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <div className="graficos-grid-1col" style={{ marginTop: '24px' }}>
+         <TabelaDemandas dados={dadosTabela} />
       </div>
 
     </div>
