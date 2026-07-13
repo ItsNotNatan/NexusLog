@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { User, FileText, Paperclip, Send } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
-// IMPORTAÇÃO DA NOVA FUNÇÃO
+// IMPORTAÇÕES DA NOVA MAGIA (Formatação, Anexos e Banco de Dados)
 import { formatarDinheiroTempoReal } from '../../../utils/formatadores';
+import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
+import { supabase } from '../../../supabaseClient';
 
 export default function SolicitarNotaFiscal() {
   
@@ -16,15 +18,85 @@ export default function SolicitarNotaFiscal() {
     observacoes: ''
   });
 
-  // Função provisória para o clique do botão
-  const handleEnviar = () => {
+  // 👇 NOVO ESTADO: Onde o nosso componente vai guardar os ficheiros
+  const [anexos, setAnexos] = useState([]);
+
+  // --- FUNÇÃO DE ENVIO PARA O BACKEND (NODE.JS) ---
+  const handleEnviar = async () => {
     // Validação simples
     if (!formDados.nome || !formDados.wbs || !formDados.descricao) {
       alert('Por favor, preencha os campos obrigatórios (*).');
       return;
     }
-    
-    alert(`Enviando Solicitação de Nota Fiscal...\nValor: ${formDados.valorEstimado}`);
+
+    // =========================================================
+    // LÓGICA DE UPLOAD DE IMAGENS PARA O SUPABASE STORAGE
+    // =========================================================
+    const anexosProcessados = [];
+    if (anexos.length > 0) {
+      for (const arquivo of anexos) {
+        const extensao = arquivo.name.split('.').pop();
+        const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
+        const caminhoNoStorage = `uploads/${nomeUnico}`;
+
+        // Faz o upload para o bucket 'documentos'
+        const { error: erroUpload } = await supabase.storage
+          .from('documentos')
+          .upload(caminhoNoStorage, arquivo);
+
+        if (erroUpload) {
+          console.error("Erro ao subir arquivo:", erroUpload);
+          alert(`Falha ao anexar o ficheiro: ${arquivo.name}`);
+          return; 
+        }
+
+        // Pega o Link Público
+        const { data: linkPublico } = supabase.storage
+          .from('documentos')
+          .getPublicUrl(caminhoNoStorage);
+
+        anexosProcessados.push({
+          nome_arquivo: arquivo.name,
+          url_arquivo: linkPublico.publicUrl
+        });
+      }
+    }
+    // =========================================================
+
+    // Monta o payload final
+    const payload = {
+      solicitante: {
+        nome: formDados.nome,
+        wbs: formDados.wbs,
+        valorEstimado: formDados.valorEstimado,
+        descricao: formDados.descricao,
+        observacoes: formDados.observacoes,
+        tipo: 'Nota Fiscal'
+      },
+      anexos: anexosProcessados // Mandamos a lista com os links para o Backend!
+    };
+
+    try {
+      const resposta = await fetch('http://localhost:3001/api/solicitacoes/nota-fiscal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const dados = await resposta.json();
+
+      if (resposta.ok) {
+        alert(`Sucesso! Solicitação de NF enviada. ID: ${dados.ps_id}`);
+        // Limpa os campos após o sucesso
+        setFormDados({ nome: '', wbs: '', valorEstimado: '', descricao: '', observacoes: '' });
+        setAnexos([]); // Limpa a lista de anexos
+      } else {
+        alert(`Erro do servidor: ${dados.erro}`);
+      }
+    } catch (error) {
+      console.error("Erro na requisição:", error);
+      alert("Falha ao conectar com o servidor.");
+    }
   };
 
   return (
@@ -70,7 +142,6 @@ export default function SolicitarNotaFiscal() {
                 placeholder="R$ 0,00" 
                 value={formDados.valorEstimado}
                 onChange={(e) => {
-                  // A mágica acontece aqui: formata o texto a cada tecla pressionada
                   const valorDigitado = e.target.value;
                   const valorFormatado = formatarDinheiroTempoReal(valorDigitado);
                   setFormDados({ ...formDados, valorEstimado: valorFormatado });
@@ -113,9 +184,9 @@ export default function SolicitarNotaFiscal() {
         </div>
       </div>
 
-      {/* CARTÃO: ANEXOS */}
+      {/* CARTÃO: ANEXOS (Atualizado com o Componente Real!) */}
       <div className="form-cartao">
-        <div className="form-header" style={{ marginBottom: '16px' }}>
+        <div className="form-header" style={{ marginBottom: '0px' }}>
           <div className="form-header-esquerda">
             <div className="form-header-icone cinza redondo"><Paperclip size={18} /></div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -124,9 +195,10 @@ export default function SolicitarNotaFiscal() {
             </div>
           </div>
         </div>
-        <div className="dropzone branca">
-          + Clique para adicionar arquivo
-        </div>
+        
+        {/* 👇 O NOVO COMPONENTE INSERIDO AQUI 👇 */}
+        <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} titulo="" />
+        
       </div>
 
       {/* --- BOTÃO GLOBAL AQUI --- */}
