@@ -8,7 +8,6 @@ import SelecionarFilial from './pages/SelecionarFilial/SelecionarFilial';
 import LoginLogistica from './pages/LoginLogistica/LoginLogistica';
 
 // --- PÁGINAS DA LOGÍSTICA ---
-// 👇 CORREÇÃO 1: O caminho correto do Dashboard
 import Dashboard from './pages/Logistica/Dashboard/Dashboard'; 
 import PainelAprovacao from './pages/Logistica/PainelAprovacao/PainelAprovacao';
 import EntradaEstoque from './pages/EntradaEstoque/EntradaEstoque';
@@ -29,18 +28,24 @@ export const router = createBrowserRouter([
   { path: "/selecionar-filial", element: <SelecionarFilial /> },
   { path: "/login", element: <LoginLogistica /> },
   
+  // ==========================================
   // ÁREA DO CLIENTE
+  // ==========================================
   {
     path: "/cliente",
     element: <AppLayout modulo="cliente" />, 
     children: [
       { path: "consulta-estoque", element: <ConsultaEstoque /> },
       { path: "fazer-solicitacao", element: <FazerSolicitacao /> },
-      { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes /> }
+      
+      // 👇 COMPONENTE PARTILHADO (Versão Cliente)
+      { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes perfil="cliente" /> }
     ]
   },
 
+  // ==========================================
   // ÁREA DA LOGÍSTICA (PROTEGIDA!)
+  // ==========================================
   {
     path: "/logistica",
     // O ProtectedRoute garante que SÓ Operadores e ADMs passem daqui pra baixo
@@ -49,6 +54,10 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout modulo="logistica" />, 
         children: [
+          
+          // 👇 COMPONENTE PARTILHADO (Versão Logística)
+          { path: "painel", element: <AcompanhamentoSolicitacoes perfil="logistica" /> },
+          
           { path: "dashboard", element: <Dashboard /> },
           { path: "visao-geral", element: <VisaoGeralEstoque /> }, 
           { path: "PainelAprovacao", element: <PainelAprovacao /> },
