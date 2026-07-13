@@ -21,12 +21,13 @@ export default function Sidebar({ modulo }) {
   // 2. Menu EXCLUSIVO da Logística
   const menuLogistica = [
     { path: '/logistica/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-    
+
     // 👇 NOVO MENU ADICIONADO AQUI
     { path: '/logistica/visao-geral', label: 'Visão Geral do Estoque', icon: <Boxes size={20} /> },
-    
+
     { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} /> },
     { path: '/logistica/PainelAprovacao', label: 'Painel de Aprovação', icon: <ListTodo size={20} /> },
+    { path: '/logistica/painel-geral', label: 'Painel Geral', icon: <ListTodo size={20} /> },
     { path: '/logistica/traceabilly', label: 'Rastreabilidade', icon: <Archive size={20} /> },
     { path: '/logistica/exportar', label: 'Exportar Dados (PS)', icon: <Download size={20} /> },
     { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} /> },

@@ -50,12 +50,9 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout modulo="logistica" />, 
         children: [
-          { path: "painel", element: <PainelGeralSolicitacoes /> },
+          { path: "painel-geral", element: <PainelGeralSolicitacoes /> },
           { path: "dashboard", element: <Dashboard /> },
-          
-          // 👇 CORREÇÃO 2: Nome exato igual ao do botão na Sidebar
           { path: "visao-geral", element: <VisaoGeralEstoque /> }, 
-          
           { path: "PainelAprovacao", element: <PainelAprovacao /> },
           { path: "entrada-estoque", element: <EntradaEstoque /> },
           { path: "traceabilly", element: <Traceabilly /> },
