@@ -5,12 +5,6 @@ import MostrarArquivo from '../../../../components/MostrarArquivo/MostrarArquivo
 
 export default function DetalhesSolicitacao({ item }) {
 
-  // Mock de arquivos: Usado caso a API ainda não devolva a propriedade "anexos" no item
-  const anexosMock = item.anexos || [
-    { nome_arquivo: 'nota_fiscal_396340.pdf', tamanho: '1.2 MB', url_arquivo: '#' },
-    { nome_arquivo: 'comprovante_recebimento.jpg', tamanho: '850 KB', url_arquivo: '#' }
-  ];
-
   // ========================================================
   // 1. VISUAL: MATERIAL
   // ========================================================
@@ -60,7 +54,7 @@ export default function DetalhesSolicitacao({ item }) {
         </table>
 
         {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={anexosMock} />
+        <MostrarArquivo arquivos={item.anexos} />
       </div>
     );
   }
@@ -101,7 +95,7 @@ export default function DetalhesSolicitacao({ item }) {
         </table>
 
         {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={anexosMock} />
+        <MostrarArquivo arquivos={item.anexos} />
       </div>
     );
   }
@@ -127,7 +121,7 @@ export default function DetalhesSolicitacao({ item }) {
         </div>
 
         {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={anexosMock} tituloCustomizado="Notas Fiscais e Espelhos em Anexo" />
+                        <MostrarArquivo arquivos={item.anexos} tituloCustomizado="Notas Fiscais e Espelhos em Anexo" />
       </div>
     );
   }
@@ -171,7 +165,7 @@ export default function DetalhesSolicitacao({ item }) {
         </table>
 
         {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={anexosMock} tituloCustomizado="Documentos de Recebimento (XML/PDF)" />
+        <MostrarArquivo arquivos={item.anexos} tituloCustomizado="Documentos de Recebimento (XML/PDF)" />
       </div>
     );
   }
@@ -213,7 +207,7 @@ export default function DetalhesSolicitacao({ item }) {
         </table>
 
         {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={anexosMock} tituloCustomizado="Conhecimento de Transporte (CT-e) e NFs" />
+        <MostrarArquivo arquivos={item.anexos} tituloCustomizado="Conhecimento de Transporte (CT-e) e NFs" />
       </div>
     );
   }
@@ -226,7 +220,7 @@ export default function DetalhesSolicitacao({ item }) {
       O painel detalhado para o tipo <strong>{item.tipo}</strong> será construído em breve.
       
       {/* Mesmo não tendo layout específico, mostramos os arquivos se existirem */}
-      <MostrarArquivo arquivos={anexosMock} />
+        <MostrarArquivo arquivos={item.anexos} />
     </div>
   );
 }

@@ -17,6 +17,8 @@ import {
 import DetalhesSolicitacao from './Detalhes/DetalhesSolicitacao';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 
+
+
 // --- FUNÇÕES AUXILIARES DE RENDERIZAÇÃO ---
 const renderBadgeStatus = (status) => {
   switch (status) {
@@ -76,26 +78,72 @@ export default function AcompanhamentoSolicitacoes({ perfil = 'cliente' }) {
     'Todos', 'Material', 'Transfer. WBS', 'Nota Fiscal', 'Entrada', 'Crossdocking', 'Reintegração'
   ];
 
+// SIMULAÇÃO E INTEGRAÇÃO REAL COM A API
   useEffect(() => {
     const buscarSolicitacoes = async () => {
       try {
-        const mockDados = [
-          { prefixo: 'REI', id: '1307261016', tipo: 'Reintegração', solicitante: 'DOUG', wbs: '', bs: '-', dataSolicitacao: '13/07/26 13:16', dataEntrega: '-', status: 'Em Andamento', acaoTipo: 'botao', acaoValor: 'Aprovar', entregaUrgente: true },
-          { prefixo: 'CD', id: '1307261016', tipo: 'Crossdocking', solicitante: 'DOUGLAS', wbs: 'BB29', bs: '-', dataSolicitacao: '13/07/26 13:16', dataEntrega: '-', status: 'Pendente', acaoTipo: 'select', acaoValor: 'Pendente' },
-          { prefixo: 'NF', id: '1307261016', tipo: 'Nota Fiscal', solicitante: 'EMISSÃO DE NOTA FISCAL', wbs: 'TESTE', bs: '-', dataSolicitacao: '13/07/26 13:16', dataEntrega: '-', status: 'Pendente', acaoTipo: 'select', acaoValor: 'Pendente' },
-          { prefixo: 'PS', id: '1307261015', tipo: 'Material', solicitante: 'NATAN GUIMARES', wbs: 'BRBRRBA32-MAT-000-WP001', bs: '-', dataSolicitacao: '13/07/26 13:15', dataEntrega: '-', status: 'Em Andamento', acaoTipo: 'select', acaoValor: 'Ag. Lanç. Planilha' }
-        ];
-        
-        setDadosTabela(mockDados);
-        setCarregando(false);
+        // Faz a requisição real ao teu backend Node.js
+        const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
+        const resultado = await resposta.json();
+
+        if (resposta.ok && resultado.sucesso) {
+          
+          // 👇 A MÁGICA ACONTECE AQUI: Mapeamos os dados do BD para a UI
+          const dadosFormatados = resultado.dados.map((item) => {
+            
+            // 1. Define o Prefixo baseado no tipo da solicitação
+            let prefixo = 'PS';
+            if (item.tipo === 'Crossdocking') prefixo = 'CD';
+            else if (item.tipo === 'Nota Fiscal') prefixo = 'NF';
+            else if (item.tipo === 'Transferencia WBS') prefixo = 'TR';
+            else if (item.tipo === 'Reintegracao') prefixo = 'REI';
+            else if (item.tipo === 'Entrada') prefixo = 'EN';
+
+            // 2. Limpa o ID (O BD salva "PS-17182...", a UI quer só os números)
+            const idNumerico = item.id.replace(/\D/g, '');
+
+            // 3. Lógica inteligente para os botões de ação da Logística
+            let acaoTipo = 'select';
+            let acaoValor = item.status;
+            
+            if (item.status === 'Pendente') {
+              acaoTipo = 'botao'; // Se está pendente, mostra o botão laranja de "Aprovar"
+              acaoValor = 'Aprovar';
+            } else if (item.status === 'Em Separação' || item.status === 'Em Andamento') {
+              acaoValor = 'Em Separação'; // Status no select
+            }
+
+            // Retorna o objeto fundindo os dados do Banco com os dados visuais
+            return {
+              ...item,
+              idOriginal: item.id,       // Guardamos o ID real do banco caso precises enviar atualizações depois
+              id: idNumerico || item.id, // ID limpo para a tela
+              prefixo: prefixo,
+              acaoTipo: acaoTipo,
+              acaoValor: acaoValor,
+              // O backend já devolve a data formatada, mas garantimos os nomes
+              dataSolicitacao: item.dataSolicitacao || '-',
+              dataEntrega: item.dataEntrega || '-',
+              bs: item.bs || '-'
+            };
+          });
+
+          // Atualiza a tabela com os dados reais e formatados!
+          setDadosTabela(dadosFormatados);
+
+        } else {
+          console.error("Erro retornado do servidor:", resultado.erro);
+          // Opcional: Mostrar um toast/alerta de erro aqui
+        }
       } catch (error) {
         console.error("Falha ao conectar à API:", error);
+      } finally {
         setCarregando(false);
       }
     };
+
     buscarSolicitacoes();
   }, []);
-
   const kpiTotal = dadosTabela.length;
   const kpiPendentes = dadosTabela.filter(item => item.status === 'Pendente').length;
   const kpiAndamento = dadosTabela.filter(item => item.status === 'Em Separação' || item.status === 'Em Andamento').length;
