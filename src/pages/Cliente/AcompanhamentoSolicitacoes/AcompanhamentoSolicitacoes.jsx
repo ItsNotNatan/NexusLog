@@ -121,7 +121,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = 'cliente' }) {
               prefixo: prefixo,
               acaoTipo: acaoTipo,
               acaoValor: acaoValor,
-              // O backend já devolve a data formatada, mas garantimos os nomes
               dataSolicitacao: item.dataSolicitacao || '-',
               dataEntrega: item.dataEntrega || '-',
               bs: item.bs || '-'

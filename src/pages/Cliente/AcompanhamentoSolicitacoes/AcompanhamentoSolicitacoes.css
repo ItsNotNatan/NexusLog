@@ -438,3 +438,76 @@
 .icone-normal {
   transition: transform 0.2s ease;
 }
+
+/* ========================================================== */
+/* CARTÕES DE RESUMO (KPIs) - ESTILO CLEAN                    */
+/* ========================================================== */
+.kpis-linha {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr); /* 5 colunas exatas como na imagem */
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpi-card-resumo {
+  background-color: #ffffff;
+  border-radius: 8px; /* Bordas ligeiramente mais suaves */
+  padding: 16px 20px; /* Alinhamento idêntico à imagem */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Alinha o texto à esquerda */
+  gap: 8px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.kpi-card-resumo:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04);
+}
+
+.kpi-card-resumo span {
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.kpi-card-resumo strong {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* --- CORES ESPECÍFICAS (BORDAS E NÚMEROS) --- */
+.kpi-total { border-color: #e2e8f0; }
+.kpi-total strong { color: #1e293b; }
+
+.kpi-pendentes { border-color: #fde047; }
+.kpi-pendentes strong { color: #f59e0b; } /* Amarelo/Laranja igual à imagem */
+
+.kpi-andamento { border-color: #bfdbfe; }
+.kpi-andamento strong { color: #3b82f6; } /* Azul claro */
+
+.kpi-concluidos { border-color: #a7f3d0; }
+.kpi-concluidos strong { color: #10b981; } /* Verde esmeralda */
+
+.kpi-recusados { border-color: #fecaca; }
+.kpi-recusados strong { color: #ef4444; } /* Vermelho suave */
+
+
+/* --- ESTADO ATIVO (QUANDO O UTILIZADOR CLICA PARA FILTRAR) --- */
+.kpi-card-resumo.ativo.kpi-total { background-color: #f8fafc; box-shadow: 0 0 0 1px #e2e8f0; }
+.kpi-card-resumo.ativo.kpi-pendentes { background-color: #fefce8; box-shadow: 0 0 0 1px #fde047; }
+.kpi-card-resumo.ativo.kpi-andamento { background-color: #eff6ff; box-shadow: 0 0 0 1px #bfdbfe; }
+.kpi-card-resumo.ativo.kpi-concluidos { background-color: #ecfdf5; box-shadow: 0 0 0 1px #a7f3d0; }
+.kpi-card-resumo.ativo.kpi-recusados { background-color: #fef2f2; box-shadow: 0 0 0 1px #fecaca; }
+
+/* Responsividade para não quebrar em telemóveis */
+@media (max-width: 1024px) {
+  .kpis-linha { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+  .kpis-linha { grid-template-columns: repeat(2, 1fr); }
+}
