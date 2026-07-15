@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 import {
   LayoutDashboard, ListTodo, PackagePlus, Archive, Download, FileSpreadsheet, Settings, Hexagon,
-  ClipboardEdit, Boxes, FileClock, ArrowLeft, Waypoints, ClipboardList // 👈 Adicionei o ClipboardList aqui
+  ClipboardEdit, Boxes, FileClock, ArrowLeft, Waypoints, ClipboardList
 } from 'lucide-react';
 
 export default function Sidebar({ modulo }) {
@@ -16,6 +16,8 @@ export default function Sidebar({ modulo }) {
     { path: '/cliente/consulta-estoque', label: 'Consulta de Estoque', icon: <Boxes size={20} /> },
     { path: '/cliente/fazer-solicitacao', label: 'Fazer Solicitação', icon: <ClipboardEdit size={20} /> },
     { path: '/cliente/acompanhamento-solicitacoes', label: 'Acompanhamento', icon: <FileClock size={20} /> },
+    // 👇 NOVA ROTA ADICIONADA AQUI
+    { path: '/cliente/rastreabilidade', label: 'Rastreabilidade', icon: <Archive size={20} /> },
   ];
 
   // 2. Menu EXCLUSIVO da Logística

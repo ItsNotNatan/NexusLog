@@ -11,7 +11,7 @@ import LoginLogistica from './pages/LoginLogistica/LoginLogistica';
 import Dashboard from './pages/Logistica/Dashboard/Dashboard'; 
 import PainelAprovacao from './pages/Logistica/PainelAprovacao/PainelAprovacao';
 import EntradaEstoque from './pages/Logistica/EntradaEstoque/EntradaEstoque';
-import Traceabilly from './pages/Logistica/Traceabilly/Traceabilly';
+import Traceabilly from './pages/Logistica/Traceabilly/Traceabilly'; // Este componente agora é partilhado!
 import ExportarDados from './pages/Logistica/ExportarDados/ExportarDados';
 import FormatacaoSAP from './pages/Logistica/FormatacaoSAP/FormatacaoSAP';
 import Configuracoes from './pages/Logistica/Configuracoes/Configuracoes';
@@ -39,7 +39,10 @@ export const router = createBrowserRouter([
       { path: "fazer-solicitacao", element: <FazerSolicitacao /> },
       
       // 👇 COMPONENTE PARTILHADO (Versão Cliente)
-      { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes perfil="cliente" /> }
+      { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes perfil="cliente" /> },
+      
+      // 👇 NOVO COMPONENTE PARTILHADO: Rastreabilidade (Sem o botão de reverter)
+      { path: "rastreabilidade", element: <Traceabilly perfil="cliente" /> }
     ]
   },
 
@@ -62,7 +65,10 @@ export const router = createBrowserRouter([
           { path: "visao-geral", element: <VisaoGeralEstoque /> }, 
           { path: "PainelAprovacao", element: <PainelAprovacao /> },
           { path: "entrada-estoque", element: <EntradaEstoque /> },
-          { path: "traceabilly", element: <Traceabilly /> },
+          
+          // 👇 COMPONENTE PARTILHADO: Rastreabilidade (Com o botão de reverter ativo)
+          { path: "traceabilly", element: <Traceabilly perfil="logistica" /> },
+          
           { path: "exportar", element: <ExportarDados /> },
           { path: "formatacao-sap", element: <FormatacaoSAP /> },
           { path: "rota-coleta", element: <RotaColeta /> },
