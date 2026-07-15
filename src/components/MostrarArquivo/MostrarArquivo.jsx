@@ -1,11 +1,6 @@
 import React from 'react';
 import { 
-  FileText,      // Para documentos PDF / Textos
-  FileImage,     // Para imagens (PNG, JPG, JPEG)
-  FileSpreadsheet, // Para planilhas (Excel / CSV)
-  File,          // Para arquivos genéricos
-  Download,      // Ícone do botão de baixar
-  Paperclip      // Ícone do cabeçalho
+  FileText, FileImage, FileSpreadsheet, File, Download, Paperclip, Trash2 // 👈 Adiciona Trash2 aqui
 } from 'lucide-react';
 import './MostrarArquivo.css';
 
@@ -33,7 +28,7 @@ const obterEstiloArquivo = (nomeArquivo) => {
 // ==========================================================
 // COMPONENTE PRINCIPAL: MostrarArquivo
 // ==========================================================
-export default function MostrarArquivo({ arquivos = [], tituloCustomizado, exibirOrigem = false }) {
+export default function MostrarArquivo({ arquivos = [], tituloCustomizado, exibirOrigem = false, onDelete }) {
   
   // Se não houver arquivos cadastrados para aquela solicitação, o componente não renderiza nada na gaveta
   if (!arquivos || arquivos.length === 0) {
@@ -97,22 +92,31 @@ export default function MostrarArquivo({ arquivos = [], tituloCustomizado, exibi
                 </div>
               </div>
 
-              {/* Lado Direito: Ação de Download */}
-              <a 
-                href={urlFinal} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="btn-download-mostrar"
-              >
-                <Download size={14} />
-                <span>Visualizar / Baixar</span>
-              </a>
+<div style={{ display: 'flex', gap: '8px' }}>
+                
+                {/* 👇 Só renderiza o botão de excluir se recebermos a função onDelete e se o arquivo tiver um ID do banco */}
+                {onDelete && arq.id && (
+                  <button 
+                    onClick={() => onDelete(arq)} 
+                    className="btn-download-mostrar"
+                    style={{ color: '#ef4444', borderColor: '#fecaca', backgroundColor: '#fef2f2' }}
+                    title="Excluir Anexo permanentemente"
+                    type="button"
+                  >
+                    <Trash2 size={14} />
+                    <span>Excluir</span>
+                  </button>
+                )}
 
+                <a href={urlFinal} target="_blank" rel="noopener noreferrer" className="btn-download-mostrar">
+                  <Download size={14} />
+                  <span>Visualizar</span>
+                </a>
+              </div>
             </div>
           );
         })}
       </div>
-
     </div>
   );
 }

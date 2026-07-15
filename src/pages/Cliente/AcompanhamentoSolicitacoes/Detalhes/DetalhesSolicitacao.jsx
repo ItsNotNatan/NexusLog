@@ -3,7 +3,7 @@ import { Eye, PackageX } from 'lucide-react';
 // 👇 IMPORTAÇÃO DO NOVO COMPONENTE
 import MostrarArquivo from '../../../../components/MostrarArquivo/MostrarArquivo';
 
-export default function DetalhesSolicitacao({ item, perfil }) {
+export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   // Pega os itens reais que vêm do banco de dados. Se não houver, usa array vazio.
   const itensReais = item.itens || [];
 
@@ -15,7 +15,7 @@ export default function DetalhesSolicitacao({ item, perfil }) {
   const anexosLogistica = (item.anexos || []).filter(arq => arq.origem === 'logistica');
 
   // Mini-componente para não repetirmos o código de anexos em todas as telas
-  const RenderizarAnexos = ({ tituloCliente, tituloLogistica }) => (
+const RenderizarAnexos = ({ tituloCliente, tituloLogistica }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
       <MostrarArquivo 
         arquivos={anexosCliente} 
@@ -24,7 +24,9 @@ export default function DetalhesSolicitacao({ item, perfil }) {
       <MostrarArquivo 
         arquivos={anexosLogistica} 
         tituloCustomizado={tituloLogistica || "Documentos de Liberação (Logística)"} 
-        exibirOrigem={perfil === 'logistica'} // Se for a logística, mostra a etiqueta
+        exibirOrigem={perfil === 'logistica'} 
+        // 👇 Passa a função de apagar SÓ se o perfil for logística!
+        onDelete={perfil === 'logistica' ? onDeleteAnexo : undefined}
       />
     </div>
   );
