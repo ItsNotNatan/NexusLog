@@ -7,7 +7,7 @@ import ModalProcessamento from '../../../components/ModalProcessamento/ModalProc
 import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
-// 👇 AQUI ESTÁ A CORREÇÃO: Importamos o cliente do Supabase!
+// Cliente do Supabase
 import { supabase } from '../../../supabaseClient';
 
 export default function EntradaMaterial() {
@@ -18,18 +18,16 @@ export default function EntradaMaterial() {
     observacoes: ''
   });
 
-  // Função auxiliar para gerar uma linha vazia com todos os novos campos do SAP
+  // Função auxiliar com a NOVA ordem exata das tuas colunas
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`, 
-    desenhoSAP: '', 
-    materialDescription: '', 
     numPecaFabricante: '', 
     fornecedor: '', 
     qtdFornecida: 1, 
-    referencia: '',
+    nfEntrada: '',
     unidadeMedida: 'Unid', 
     vendorDescription: '',
-    wbs: '',
+    wbsElement: '',
     emissaoNF: '',
     recebNF: '',
     docCompras: '',
@@ -57,26 +55,24 @@ export default function EntradaMaterial() {
     if (itensProcessados && Array.isArray(itensProcessados)) {
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: item.desenhoSAP || item['Material'] || item['DESENHO SAP'] || '',
-        materialDescription: item.materialDescription || item['Material Description'] || item['MATERIAL DESCRIPTION'] || '',
-        numPecaFabricante: item.numPecaFabricante || item['Nº peça fabricante'] || item['Nº PEÇA FABRICANTE'] || '',
-        fornecedor: item.fornecedor || item['Fornecedor'] || item['FORNECEDOR'] || '',
-        qtdFornecida: item.qtdFornecida || item['Qtd.fornecida'] || item['Qtd.'] || 1,
-        referencia: item.referencia || item['Referência'] || item['REFERÊNCIA'] || '',
-        unidadeMedida: item.unidadeMedida || item['Unidade de medida'] || 'Unid',
-        vendorDescription: item.vendorDescription || item['Vendor Description'] || '',
-        wbs: item.wbs || item['WBS'] || item['Elemento PEP'] || '',
-        emissaoNF: item.emissaoNF || item['EMISSÃO NF'] || item['Emissão NF'] || '',
-        recebNF: item.recebNF || item['RECEB. NF'] || item['Receb. NF'] || '',
-        docCompras: item.docCompras || item['Documento de compras'] || item['Doc. Compras'] || '',
-        poNetPrice: item.poNetPrice || item['PO Net Price'] || '',
-        centro: item.centro || item['Centro'] || item['CENTRO'] || '',
-        deposito: item.deposito || item['Depósito'] || item['DEPÓSITO'] || '',
-        alocacao: item.alocacao || item['Alocação'] || item['ALOCAÇÃO'] || ''
+        numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
+        fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
+        qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
+        nfEntrada: item['NF DE ENTRADA'] || '',
+        unidadeMedida: item['Unidade de medida'] || item.unidadeMedida || 'Unid',
+        vendorDescription: item['Vendor Description'] || item.vendorDescription || '',
+        wbsElement: item['WBS Element'] || item.wbs || '',
+        emissaoNF: item['EMISSÃO NF'] || item.emissaoNF || '',
+        recebNF: item['RECEB. NF'] || item.recebNF || '',
+        docCompras: item['Documento de compras'] || item.docCompras || '',
+        poNetPrice: item['PO Net Price'] || item.poNetPrice || '',
+        centro: item['Centro'] || item.centro || '',
+        deposito: item['Depósito'] || item.deposito || '',
+        alocacao: item['Alocação'] || item.alocacao || ''
       }));
 
       setItens(prev => {
-        const listaLimpa = prev.filter(i => i.numPecaFabricante !== '' || i.materialDescription !== '');
+        const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
         return [...listaLimpa, ...novosItensFormatados];
       });
     }
@@ -113,51 +109,44 @@ export default function EntradaMaterial() {
       return;
     }
 
-    const itensIncompletos = itens.some(i => !i.numPecaFabricante || !i.materialDescription || !i.qtdFornecida);
+    // Validação ajustada: Como tiraste a Descrição, validamos apenas o PN e a Quantidade
+    const itensIncompletos = itens.some(i => !i.numPecaFabricante || !i.qtdFornecida);
     if (itensIncompletos) {
-      alert("Preencha os campos obrigatórios (Nº Peça, Descrição e Qtd) em todas as linhas.");
+      alert("Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.");
       return;
     }
 
     try {
-      // ---------------------------------------------------------
-      // MAGIA DOS ANEXOS: Upload para o Supabase Storage primeiro
-      // ---------------------------------------------------------
       const anexosProcessados = [];
       
       if (anexos.length > 0) {
         for (const arquivo of anexos) {
-          // Gera um nome único para o ficheiro para evitar sobreposições
           const extensao = arquivo.name.split('.').pop();
           const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
           const caminhoNoStorage = `uploads/${nomeUnico}`;
 
-          // 1. Faz o upload para o bucket 'documentos'
           const { error: erroUpload } = await supabase.storage
             .from('documentos')
             .upload(caminhoNoStorage, arquivo);
 
           if (erroUpload) {
             console.error("Erro ao subir arquivo:", erroUpload);
-            alert(`Falha ao anexar o ficheiro: ${arquivo.name}. Verifique as permissões do Bucket.`);
-            return; // Para o processo se um ficheiro falhar
+            alert(`Falha ao anexar o ficheiro: ${arquivo.name}.`);
+            return; 
           }
 
-          // 2. Pega o Link Público do ficheiro que acabou de subir
           const { data: linkPublico } = supabase.storage
             .from('documentos')
             .getPublicUrl(caminhoNoStorage);
 
-          // 3. Guarda na nossa lista final
           anexosProcessados.push({
             nome_arquivo: arquivo.name,
             url_arquivo: linkPublico.publicUrl
           });
         }
       }
-      // ---------------------------------------------------------
 
-      // Mapeamos os dados finais
+      // Mapeamos os dados finais injetando 'Sem descrição' para não quebrar o banco de dados
       const payload = {
         solicitante: {
           ...formDados,
@@ -165,9 +154,11 @@ export default function EntradaMaterial() {
         },
         itens: itens.map(item => ({
           ...item,
-          qtd: item.qtdFornecida 
+          qtd: item.qtdFornecida,
+          desenhoSAP: '-', 
+          materialDescription: item.vendorDescription || 'Sem descrição' // Usamos o vendor description como fallback
         })),
-        anexos: anexosProcessados // Adicionamos os links mágicos aqui!
+        anexos: anexosProcessados 
       };
 
       const resposta = await fetch('http://localhost:3001/api/solicitacoes/entrada', {
@@ -195,7 +186,6 @@ export default function EntradaMaterial() {
   return (
     <div className="entrada-container">
       
-      {/* TELA DE CARREGAMENTO DO EXCEL (MODAL) */}
       <ModalProcessamento 
         estaProcessando={processador.estaProcessando}
         concluido={processador.concluido}
@@ -205,7 +195,6 @@ export default function EntradaMaterial() {
         onClose={processador.resetarProcessador}
       />
 
-      {/* --- AVISO SUPERIOR --- */}
       <div className="banner-aviso banner-verde">
         <Package size={24} />
         <div>
@@ -214,7 +203,6 @@ export default function EntradaMaterial() {
         </div>
       </div>
 
-      {/* --- BLOCO 1: DADOS DO SOLICITANTE --- */}
       <div className="form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
@@ -255,10 +243,8 @@ export default function EntradaMaterial() {
         </div>
       </div>
 
-      {/* --- BLOCO 2: ITENS PARA ENTRADA --- */}
       <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
         
-        {/* Cabeçalho da Tabela */}
         <div className="form-header" style={{ padding: '20px 24px', margin: 0, borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
           <div className="form-header-esquerda">
             <div className="form-header-icone verde-quadrado" style={{ width: '28px', height: '28px' }}><Package size={16} /></div>
@@ -273,7 +259,6 @@ export default function EntradaMaterial() {
               <Plus size={16} /> Nova Linha
             </button>
 
-            {/* BOTÃO IMPORTAR EXCEL CONECTADO À FUNÇÃO */}
             <CarregarArquivo 
               variante="botao"
               accept=".xlsx, .xls"
@@ -288,27 +273,24 @@ export default function EntradaMaterial() {
           </div>
         </div>
         
-        {/* Corpo da Tabela */}
         <div className="scroll-tabela-solicitacao">
-          <table className="tabela-solicitacao-dados" style={{ minWidth: '2500px' }}>
+          <table className="tabela-solicitacao-dados" style={{ minWidth: '2200px' }}>
             <thead>
               <tr>
-                <th>AÇÕES</th>
-                <th>DESENHO SAP</th>
-                <th>MATERIAL DESCRIPTION</th>
+                <th style={{ width: '60px', textAlign: 'center' }}>AÇÕES</th>
                 <th>Nº PEÇA FABRICANTE</th>
                 <th>FORNECEDOR</th>
-                <th>QTD. FORNECIDA</th>
-                <th>REFERÊNCIA</th>
-                <th>UNIDADE DE MEDIDA</th>
-                <th>VENDOR DESCRIPTION</th>
-                <th>WBS</th>
+                <th style={{ width: '120px' }}>QTD. FORNECIDA</th>
+                <th>NF DE ENTRADA</th>
+                <th style={{ width: '140px' }}>UNIDADE DE MEDIDA</th>
+                <th style={{ minWidth: '200px' }}>VENDOR DESCRIPTION</th>
+                <th>WBS ELEMENT</th>
                 <th>EMISSÃO NF</th>
                 <th>RECEB. NF</th>
                 <th>DOCUMENTO DE COMPRAS</th>
                 <th>PO NET PRICE</th>
-                <th>CENTRO</th>
-                <th>DEPÓSITO</th>
+                <th style={{ width: '100px' }}>CENTRO</th>
+                <th style={{ width: '100px' }}>DEPÓSITO</th>
                 <th>ALOCAÇÃO</th>
               </tr>
             </thead>
@@ -321,12 +303,6 @@ export default function EntradaMaterial() {
                     </button>
                   </td>
                   <td>
-                    <input className="input-editavel-tabela texto-cinza-claro" value={item.desenhoSAP} onChange={(e) => atualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP" />
-                  </td>
-                  <td style={{ minWidth: '220px' }}>
-                    <input className="input-editavel-tabela texto-preto" value={item.materialDescription} onChange={(e) => atualizarCampo(item.id, 'materialDescription', e.target.value)} placeholder="Descrição do item" />
-                  </td>
-                  <td>
                     <input className="input-editavel-tabela badge-partnumber" value={item.numPecaFabricante} onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
                   </td>
                   <td>
@@ -336,10 +312,10 @@ export default function EntradaMaterial() {
                     <input type="number" className="input-inline-tabela" value={item.qtdFornecida} onChange={(e) => atualizarCampo(item.id, 'qtdFornecida', e.target.value)} placeholder="0" min="1" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela texto-cinza" value={item.referencia} onChange={(e) => atualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Ref" />
+                    <input className="input-editavel-tabela texto-preto" value={item.nfEntrada} onChange={(e) => atualizarCampo(item.id, 'nfEntrada', e.target.value)} placeholder="NF Entrada" />
                   </td>
                   <td>
-                    <select className="input-editavel-tabela texto-cinza" style={{ width: '80px', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
+                    <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
                       <option value="Unid">Unid</option>
                       <option value="Kg">Kg</option>
                       <option value="Metro">Metro</option>
@@ -348,11 +324,11 @@ export default function EntradaMaterial() {
                       <option value="NR">NR</option>
                     </select>
                   </td>
-                  <td style={{ minWidth: '180px' }}>
+                  <td>
                     <input className="input-editavel-tabela texto-cinza" value={item.vendorDescription} onChange={(e) => atualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição do fornecedor" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela link-azul-fake" value={item.wbs} onChange={(e) => atualizarCampo(item.id, 'wbs', e.target.value)} placeholder="WBS" />
+                    <input className="input-editavel-tabela link-azul-fake" value={item.wbsElement} onChange={(e) => atualizarCampo(item.id, 'wbsElement', e.target.value)} placeholder="WBS" />
                   </td>
                   <td>
                     <input type="text" className="input-editavel-tabela texto-cinza" value={item.emissaoNF} onChange={(e) => atualizarCampo(item.id, 'emissaoNF', e.target.value)} placeholder="DD/MM/AAAA" />
@@ -367,10 +343,10 @@ export default function EntradaMaterial() {
                     <input className="input-editavel-tabela texto-preto" value={item.poNetPrice} onChange={(e) => atualizarCampo(item.id, 'poNetPrice', e.target.value)} placeholder="R$ 0,00" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '60px' }} value={item.centro} onChange={(e) => atualizarCampo(item.id, 'centro', e.target.value)} placeholder="Centro" />
+                    <input className="input-editavel-tabela texto-cinza" value={item.centro} onChange={(e) => atualizarCampo(item.id, 'centro', e.target.value)} placeholder="Centro" />
                   </td>
                   <td>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '70px' }} value={item.deposito} onChange={(e) => atualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
+                    <input className="input-editavel-tabela texto-cinza" value={item.deposito} onChange={(e) => atualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
                   </td>
                   <td>
                     <input className="input-editavel-tabela link-azul-fake" value={item.alocacao} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
@@ -382,7 +358,6 @@ export default function EntradaMaterial() {
         </div>
       </div>
 
-      {/* --- BLOCO 3: ANEXOS --- */}
       <div className="form-cartao">
         <div className="input-grupo">
           <label>ANEXOS (OPCIONAL - Notas Fiscais, Manuais, Fotos)</label>
@@ -412,7 +387,6 @@ export default function EntradaMaterial() {
         </div>
       </div>
 
-      {/* --- BLOCO 4: AÇÃO FINAL --- */}
       <BotaoAcaoGlobal 
         texto="Solicitar Entrada de Material" 
         icone={<Send size={16} />} 
