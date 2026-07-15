@@ -33,7 +33,7 @@ const obterEstiloArquivo = (nomeArquivo) => {
 // ==========================================================
 // COMPONENTE PRINCIPAL: MostrarArquivo
 // ==========================================================
-export default function MostrarArquivo({ arquivos = [], tituloCustomizado }) {
+export default function MostrarArquivo({ arquivos = [], tituloCustomizado, exibirOrigem = false }) {
   
   // Se não houver arquivos cadastrados para aquela solicitação, o componente não renderiza nada na gaveta
   if (!arquivos || arquivos.length === 0) {
@@ -53,10 +53,12 @@ export default function MostrarArquivo({ arquivos = [], tituloCustomizado }) {
       {/* Grid/Lista de arquivos anexados */}
       <div className="mostrar-arquivo-lista">
         {arquivos.map((arq, index) => {
-          // Se a sua API retornar um objeto complexo ou apenas a string da URL, tratamos aqui
           const nomeFinal = arq.nome_arquivo || arq.name || `Arquivo_${index + 1}`;
           const urlFinal = arq.url_arquivo || arq.url || arq;
           const { icone, classeCor } = obterEstiloArquivo(nomeFinal);
+
+          // 👇 Identifica quem mandou o arquivo (padrão é cliente se vier nulo)
+          const origemFicheiro = arq.origem === 'logistica' ? 'Logística' : 'Cliente';
 
           return (
             <div key={index} className="mostrar-arquivo-item">
@@ -67,9 +69,28 @@ export default function MostrarArquivo({ arquivos = [], tituloCustomizado }) {
                   {icone}
                 </div>
                 <div className="mostrar-arquivo-textos">
-                  <span className="mostrar-arquivo-nome" title={nomeFinal}>
-                    {nomeFinal}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="mostrar-arquivo-nome" title={nomeFinal}>
+                      {nomeFinal}
+                    </span>
+                    
+                    {/* 👇 Se a prop 'exibirOrigem' for true, renderiza uma etiqueta discreta ao lado */}
+                    {exibirOrigem && (
+                      <span style={{
+                        fontSize: '0.65rem',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: arq.origem === 'logistica' ? '#eff6ff' : '#f1f5f9',
+                        color: arq.origem === 'logistica' ? '#2563eb' : '#475569',
+                        border: `1px solid ${arq.origem === 'logistica' ? '#bfdbfe' : '#e2e8f0'}`
+                      }}>
+                        {origemFicheiro}
+                      </span>
+                    )}
+                  </div>
+                  
                   {arq.tamanho && (
                     <span className="mostrar-arquivo-tamanho">{arq.tamanho}</span>
                   )}

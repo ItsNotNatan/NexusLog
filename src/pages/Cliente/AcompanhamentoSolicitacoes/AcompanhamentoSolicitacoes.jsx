@@ -3,7 +3,7 @@ import './AcompanhamentoSolicitacoes.css';
 import { 
   Search, 
   ChevronRight, 
-  ChevronLeft, // 👈 Novo ícone importado para o botão "Anterior"
+  ChevronLeft, 
   GitBranch, 
   FileText, 
   RefreshCw, 
@@ -14,9 +14,10 @@ import {
   RefreshCcw
 } from 'lucide-react';
 
-// 👇 IMPORTAÇÃO DOS COMPONENTES
+// 👇 IMPORTAÇÃO DOS COMPONENTES E SUPABASE
 import DetalhesSolicitacao from './Detalhes/DetalhesSolicitacao';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
+import { supabase } from '../../../supabaseClient'; // 👈 Essencial para o upload!
 
 // --- FUNÇÕES AUXILIARES DE RENDERIZAÇÃO ---
 const renderBadgeStatus = (status) => {
@@ -73,9 +74,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = 'cliente' }) {
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
 
-  // 👇 NOVOS ESTADOS DE PAGINAÇÃO
+  // ESTADOS DE PAGINAÇÃO
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const itensPorPagina = 10; // 👈 Podes alterar para 15 ou 20 se preferires mostrar mais linhas
+  const itensPorPagina = 10; 
 
   const listaFiltros = [
     'Todos', 'Material', 'Transfer. WBS', 'Nota Fiscal', 'Entrada', 'Crossdocking', 'Reintegração'
@@ -172,13 +173,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = 'cliente' }) {
     return passaFiltroAba && passaFiltroStatus && passaPesquisa;
   });
 
-  // 👇 LÓGICA DE PAGINAÇÃO
   // Reseta para a página 1 sempre que os filtros mudarem
   useEffect(() => {
     setPaginaAtual(1);
   }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  // Fatiar a lista para a página atual
   const indexUltimoItem = paginaAtual * itensPorPagina;
   const indexPrimeiroItem = indexUltimoItem - itensPorPagina;
   const itensAtuais = dadosFiltrados.slice(indexPrimeiroItem, indexUltimoItem);
@@ -186,12 +185,66 @@ export default function AcompanhamentoSolicitacoes({ perfil = 'cliente' }) {
 
   const toggleLinha = (idUnico) => {
     setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
-    setAnexosNovos([]); 
+    setAnexosNovos([]); // Limpa o estado temporário ao mudar de linha
   };
 
+  // 👇 LÓGICA DE ENVIO DOS ANEXOS DA LOGÍSTICA IMPLEMENTADA AQUI
   const handleEnviarAnexosExtras = async (idSolicitacao) => {
     if (anexosNovos.length === 0) return;
-    alert(`Pronto para enviar ${anexosNovos.length} novo(s) anexo(s) para a solicitação ${idSolicitacao}!`);
+
+    try {
+      setCarregando(true);
+      const anexosProcessados = [];
+
+      for (const arquivo of anexosNovos) {
+        const extensao = arquivo.name.split('.').pop();
+        const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
+        const caminhoNoStorage = `uploads/${nomeUnico}`;
+
+        const { error: erroUpload } = await supabase.storage
+          .from('documentos')
+          .upload(caminhoNoStorage, arquivo);
+
+        if (erroUpload) {
+          console.error("Erro ao subir arquivo para o Storage:", erroUpload);
+          alert(`Falha ao anexar o ficheiro: ${arquivo.name}`);
+          setCarregando(false);
+          return;
+        }
+
+        const { data: linkPublico } = supabase.storage
+          .from('documentos')
+          .getPublicUrl(caminhoNoStorage);
+
+        anexosProcessados.push({
+          nome_arquivo: arquivo.name,
+          url_arquivo: linkPublico.publicUrl
+        });
+      }
+
+      // Dispara para a nova rota do Node.js
+      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/anexos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anexos: anexosProcessados })
+      });
+
+      const dados = await resposta.json();
+
+      if (resposta.ok && dados.sucesso) {
+        alert("Sucesso! Novos anexos integrados na base de dados.");
+        setAnexosNovos([]);
+        setLinhaExpandida(null);
+        window.location.reload(); // Recarrega para buscar a lista fresca do banco!
+      } else {
+        alert(`Erro do servidor: ${dados.erro}`);
+      }
+    } catch (error) {
+      console.error("Erro na requisição de anexos extras:", error);
+      alert("Falha ao conectar com o servidor para salvar os anexos.");
+    } finally {
+      setCarregando(false);
+    }
   };
 
   return (
@@ -265,7 +318,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = 'cliente' }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* 👇 MAPEANDO APENAS OS ITENS DA PÁGINA ATUAL (itensAtuais) */}
                   {itensAtuais.map((linha, index) => {
                     
                     const idUnico = `${linha.prefixo}-${linha.id}-${index}`;
@@ -345,52 +397,52 @@ export default function AcompanhamentoSolicitacoes({ perfil = 'cliente' }) {
 
                         </tr>
 
-{/* GAVETA DE DETALHES + BOTÕES DE APROVAÇÃO */}
-                      {isExpandida && (
-                        <tr>
-                          <td colSpan={perfil === 'logistica' ? 8 : 7} className="td-expandida">
-                            
-                            {/* Reutiliza o teu componente visualizador de detalhes perfeito */}
-                            <DetalhesSolicitacao item={linha} />
-                            
-                            {/* 👇 AQUI ESTÁ A CORREÇÃO: Só mostra a caixa de novos anexos se for o perfil Logística! */}
-                            {perfil === 'logistica' && (
-                              <div style={{ padding: '0 32px 24px 32px', backgroundColor: '#f8fafc' }}>
-                                <hr style={{ border: 'none', borderTop: '1px dashed #cbd5e1', margin: '0 0 16px 0' }} />
-                                
-                                <GerenciadorAnexos 
-                                  anexos={anexosNovos} 
-                                  setAnexos={setAnexosNovos} 
-                                  titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO" 
-                                />
-                                
-                                {anexosNovos.length > 0 && (
-                                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-                                    <button 
-                                      onClick={() => handleEnviarAnexosExtras(linha.id)}
-                                      style={{ 
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', 
-                                        backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', 
-                                        fontWeight: '600', cursor: 'pointer' 
-                                      }}
-                                    >
-                                      <Upload size={16} /> Salvar Novos Anexos
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            
-                          </td>
-                        </tr>
-                      )}
+                        {/* GAVETA DE DETALHES + BOTÕES DE APROVAÇÃO */}
+                        {isExpandida && (
+                          <tr>
+                            <td colSpan={perfil === 'logistica' ? 8 : 7} className="td-expandida">
+                              
+                              <DetalhesSolicitacao item={linha} perfil={perfil} />
+                              
+                              {perfil === 'logistica' && (
+                                <div style={{ padding: '0 32px 24px 32px', backgroundColor: '#f8fafc' }}>
+                                  <hr style={{ border: 'none', borderTop: '1px dashed #cbd5e1', margin: '0 0 16px 0' }} />
+                                  
+                                  <GerenciadorAnexos 
+                                    anexos={anexosNovos} 
+                                    setAnexos={setAnexosNovos} 
+                                    titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO" 
+                                  />
+                                  
+                                  {anexosNovos.length > 0 && (
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+                                      <button 
+                                        onClick={() => handleEnviarAnexosExtras(linha.idOriginal)} // 👈 ATENÇÃO: Mudou para idOriginal (ID da base de dados e não visual)
+                                        disabled={carregando}
+                                        style={{ 
+                                          display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', 
+                                          backgroundColor: carregando ? '#94a3b8' : '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', 
+                                          fontWeight: '600', cursor: carregando ? 'not-allowed' : 'pointer' 
+                                        }}
+                                      >
+                                        <Upload size={16} /> 
+                                        {carregando ? 'A salvar...' : 'Salvar Novos Anexos'}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                            </td>
+                          </tr>
+                        )}
                       </React.Fragment>
                     );
                   })}
                 </tbody>
               </table>
 
-              {/* 👇 CONTROLES DA PAGINAÇÃO NO FUNDO DA TABELA */}
+              {/* CONTROLES DA PAGINAÇÃO NO FUNDO DA TABELA */}
               {totalPaginas > 1 && (
                 <div className="paginacao-container">
                   <div className="paginacao-info">

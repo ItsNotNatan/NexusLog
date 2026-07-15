@@ -3,9 +3,31 @@ import { Eye, PackageX } from 'lucide-react';
 // 👇 IMPORTAÇÃO DO NOVO COMPONENTE
 import MostrarArquivo from '../../../../components/MostrarArquivo/MostrarArquivo';
 
-export default function DetalhesSolicitacao({ item }) {
+export default function DetalhesSolicitacao({ item, perfil }) {
   // Pega os itens reais que vêm do banco de dados. Se não houver, usa array vazio.
   const itensReais = item.itens || [];
+
+  // ========================================================
+  // LÓGICA DE SEPARAÇÃO DOS ANEXOS
+  // ========================================================
+  // Tudo o que não for explicitamente da 'logistica' consideramos do 'cliente' (para compatibilidade com itens antigos)
+  const anexosCliente = (item.anexos || []).filter(arq => arq.origem !== 'logistica');
+  const anexosLogistica = (item.anexos || []).filter(arq => arq.origem === 'logistica');
+
+  // Mini-componente para não repetirmos o código de anexos em todas as telas
+  const RenderizarAnexos = ({ tituloCliente, tituloLogistica }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+      <MostrarArquivo 
+        arquivos={anexosCliente} 
+        tituloCustomizado={tituloCliente || "Documentos Anexados pelo Solicitante"} 
+      />
+      <MostrarArquivo 
+        arquivos={anexosLogistica} 
+        tituloCustomizado={tituloLogistica || "Documentos de Liberação (Logística)"} 
+        exibirOrigem={perfil === 'logistica'} // Se for a logística, mostra a etiqueta
+      />
+    </div>
+  );
 
   // ========================================================
   // 1. VISUAL: MATERIAL
@@ -43,8 +65,8 @@ export default function DetalhesSolicitacao({ item }) {
           </tbody>
         </table>
 
-        {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={item.anexos} />
+        {/* 👇 RENDERIZAR ARQUIVOS SEPARADOS USANDO A FUNÇÃO AUXILIAR */}
+        <RenderizarAnexos />
       </div>
     );
   }
@@ -83,8 +105,8 @@ export default function DetalhesSolicitacao({ item }) {
           </tbody>
         </table>
 
-        {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={item.anexos} />
+        {/* 👇 RENDERIZAR ARQUIVOS SEPARADOS */}
+        <RenderizarAnexos />
       </div>
     );
   }
@@ -111,14 +133,14 @@ export default function DetalhesSolicitacao({ item }) {
           </div>
         </div>
 
-        {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={item.anexos} tituloCustomizado="Notas Fiscais e Espelhos em Anexo" />
+        {/* 👇 RENDERIZAR ARQUIVOS SEPARADOS - USANDO TÍTULO CUSTOMIZADO NA FUNÇÃO */}
+        <RenderizarAnexos tituloCliente="Notas Fiscais e Espelhos (Solicitante)" />
       </div>
     );
   }
 
   // ========================================================
-  // 4. VISUAL: ENTRADA (AGORA DINÂMICA!)
+  // 4. VISUAL: ENTRADA (DINÂMICA)
   // ========================================================
   if (item.tipo === 'Entrada') {
     return (
@@ -159,8 +181,8 @@ export default function DetalhesSolicitacao({ item }) {
           </tbody>
         </table>
 
-        {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={item.anexos} tituloCustomizado="Documentos de Recebimento (XML/PDF)" />
+        {/* 👇 RENDERIZAR ARQUIVOS SEPARADOS */}
+        <RenderizarAnexos tituloLogistica="Documentos de Recebimento Final (Logística)" />
       </div>
     );
   }
@@ -197,8 +219,11 @@ export default function DetalhesSolicitacao({ item }) {
           </tbody>
         </table>
 
-        {/* 👇 RENDERIZAR ARQUIVOS DA SOLICITAÇÃO */}
-        <MostrarArquivo arquivos={item.anexos} tituloCustomizado="Conhecimento de Transporte (CT-e) e NFs" />
+        {/* 👇 RENDERIZAR ARQUIVOS SEPARADOS */}
+        <RenderizarAnexos 
+          tituloCliente="Nota Fiscal Original (Solicitante)" 
+          tituloLogistica="Conhecimento de Transporte (CT-e) e NFs (Logística)" 
+        />
       </div>
     );
   }
@@ -208,8 +233,8 @@ export default function DetalhesSolicitacao({ item }) {
   // ========================================================
   return (
     <div className="area-expandida-cliente" style={{ textAlign: 'center', color: '#64748b' }}>
-      O painel detalhado para o tipo <strong>{item.tipo}</strong> será construído em breve.
-      <MostrarArquivo arquivos={item.anexos} />
+      <p>O painel detalhado para o tipo <strong>{item.tipo}</strong> será construído em breve.</p>
+      <RenderizarAnexos />
     </div>
   );
 }
