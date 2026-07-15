@@ -345,11 +345,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = 'cliente' }) {
 
                         </tr>
 
-                        {isExpandida && (
-                          <tr>
-                            <td colSpan={perfil === 'logistica' ? 8 : 7} className="td-expandida">
-                              <DetalhesSolicitacao item={linha} />
-                              
+{/* GAVETA DE DETALHES + BOTÕES DE APROVAÇÃO */}
+                      {isExpandida && (
+                        <tr>
+                          <td colSpan={perfil === 'logistica' ? 8 : 7} className="td-expandida">
+                            
+                            {/* Reutiliza o teu componente visualizador de detalhes perfeito */}
+                            <DetalhesSolicitacao item={linha} />
+                            
+                            {/* 👇 AQUI ESTÁ A CORREÇÃO: Só mostra a caixa de novos anexos se for o perfil Logística! */}
+                            {perfil === 'logistica' && (
                               <div style={{ padding: '0 32px 24px 32px', backgroundColor: '#f8fafc' }}>
                                 <hr style={{ border: 'none', borderTop: '1px dashed #cbd5e1', margin: '0 0 16px 0' }} />
                                 
@@ -374,10 +379,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = 'cliente' }) {
                                   </div>
                                 )}
                               </div>
-                              
-                            </td>
-                          </tr>
-                        )}
+                            )}
+                            
+                          </td>
+                        </tr>
+                      )}
                       </React.Fragment>
                     );
                   })}
