@@ -35,15 +35,12 @@ export const formatarDinheiro = (valor) => {
  */
 export const formatarDinheiroTempoReal = (valorOriginal) => {
   if (!valorOriginal) return '';
-
   // Remove tudo o que não for número
   const apenasNumeros = valorOriginal.replace(/\D/g, '');
 
   if (apenasNumeros === '') return '';
-
   // Divide por 100 para ter sempre 2 casas decimais
   const valorDecimal = parseInt(apenasNumeros, 10) / 100;
-
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
