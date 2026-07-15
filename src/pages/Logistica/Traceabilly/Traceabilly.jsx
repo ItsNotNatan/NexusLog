@@ -1,16 +1,16 @@
 import React from 'react';
-import './Traceabilly.css'; // Importação do nosso CSS exclusivo
+import './Traceabilly.css'; 
 import { 
   Archive, 
   Search, 
   User, 
   Calendar, 
   Box, 
-  ArrowRight 
+  ArrowRight,
+  RotateCcw // 👈 Importamos o ícone da setinha
 } from 'lucide-react';
 
-// 1. DADOS SIMULADOS DA TABELA
-// Criamos um array para facilitar a adição de novas linhas no futuro
+// 1. DADOS SIMULADOS DA TABELA (Atualizado com as colunas da imagem)
 const dadosTabela = [
   {
     id: 1,
@@ -22,12 +22,16 @@ const dadosTabela = [
     solicitacao: 'PS:2306261114',
     solicitanteInicial: 'T',
     solicitanteNome: 'TESTE',
-    alocacao: '400-B-014'
+    alocacao: '400-B-014',
+    qtd: '1 Unid',
+    valor: 'R$ 520.00',
+    wbs: 'WBS-PRJ-2024-001',
+    data: '22/06/2026'
   }
 ];
 
-// 2. COMPONENTE PRINCIPAL
-export default function Traceabilly() {
+// 2. COMPONENTE PRINCIPAL (Aceita o perfil como propriedade)
+export default function Traceabilly({ perfil = 'logistica' }) {
   return (
     <div className="traceabilly-wrapper">
       
@@ -45,7 +49,7 @@ export default function Traceabilly() {
           <div className="titulo-grupo">
             <Archive className="icone-azul" size={20} />
             <h2>Itens Arquivados</h2>
-            <span className="badge-contador">1</span>
+            <span className="badge-contador">{dadosTabela.length}</span>
           </div>
           
           <div className="pesquisa-grupo">
@@ -73,7 +77,7 @@ export default function Traceabilly() {
 
         {/* --- TABELA COM SCROLL HORIZONTAL --- */}
         <div className="tabela-container">
-          <table className="tabela-rastreabilidade">
+          <table className="tabela-rastreabilidade" style={{ minWidth: '1300px' }}>
             {/* Cabeçalho da Tabela */}
             <thead>
               <tr>
@@ -85,6 +89,12 @@ export default function Traceabilly() {
                 <th>SOLICITAÇÃO</th>
                 <th>SOLICITANTE</th>
                 <th>ALOCAÇÃO</th>
+                <th>QTD</th>
+                <th>VALOR</th>
+                <th>WBS</th>
+                <th>DATA</th>
+                {/* 👇 SÓ RENDERIZA ESTA COLUNA SE FOR LOGÍSTICA */}
+                {perfil === 'logistica' && <th style={{ width: '40px' }}></th>}
               </tr>
             </thead>
             
@@ -92,17 +102,12 @@ export default function Traceabilly() {
             <tbody>
               {dadosTabela.map((linha) => (
                 <tr key={linha.id}>
-                  {/* Colunas simples */}
                   <td className="fonte-forte">{linha.partNumber}</td>
                   <td>{linha.descricao}</td>
                   <td className="texto-cinza">{linha.fornecedor}</td>
                   
-                  {/* Etiqueta de NF */}
-                  <td>
-                    <span className="badge-borda">{linha.nfEntrada}</span>
-                  </td>
+                  <td><span className="badge-borda">{linha.nfEntrada}</span></td>
                   
-                  {/* Etiqueta de BS com seta */}
                   <td>
                     <div className="celula-flex">
                       <ArrowRight size={14} className="icone-seta" />
@@ -110,12 +115,8 @@ export default function Traceabilly() {
                     </div>
                   </td>
                   
-                  {/* Etiqueta de Solicitação */}
-                  <td>
-                    <span className="badge-azul-suave">{linha.solicitacao}</span>
-                  </td>
+                  <td><span className="badge-azul-suave">{linha.solicitacao}</span></td>
                   
-                  {/* Avatar e Nome do Solicitante */}
                   <td>
                     <div className="celula-flex">
                       <span className="avatar-circulo">{linha.solicitanteInicial}</span>
@@ -123,10 +124,22 @@ export default function Traceabilly() {
                     </div>
                   </td>
                   
-                  {/* Alocação (Link Azul) */}
-                  <td>
-                    <a href="#" className="link-alocacao">{linha.alocacao}</a>
-                  </td>
+                  <td><a href="#" className="link-alocacao">{linha.alocacao}</a></td>
+                  
+                  {/* Novas colunas mapeadas */}
+                  <td className="fonte-forte">{linha.qtd}</td>
+                  <td className="texto-cinza">{linha.valor}</td>
+                  <td><a href="#" className="link-alocacao">{linha.wbs}</a></td>
+                  <td className="texto-cinza">{linha.data}</td>
+
+                  {/* 👇 SÓ RENDERIZA O BOTÃO SE FOR LOGÍSTICA */}
+                  {perfil === 'logistica' && (
+                    <td>
+                      <button className="btn-reverter" title="Reverter Saída">
+                        <RotateCcw size={16} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

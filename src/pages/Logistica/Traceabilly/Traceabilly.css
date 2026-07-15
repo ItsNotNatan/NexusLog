@@ -242,3 +242,22 @@
 .link-alocacao:hover {
   text-decoration: underline;
 }
+
+/* BOTÃO DE REVERTER SAÍDA (LOGÍSTICA) */
+.btn-reverter {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-reverter:hover {
+  color: #3b82f6; /* Azul no hover */
+  background-color: #eff6ff;
+}
