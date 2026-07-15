@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
-import { User, MapPin, Calendar, Search, Package, Send, FileSpreadsheet, Trash2, Plus, Zap } from 'lucide-react';
+import { User, MapPin, Calendar, Search, Package, Send, Trash2, Zap } from 'lucide-react';
 
 // NOSSOS COMPONENTES E HOOKS
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import ExemploExcel from '../../../components/ExemploExcel/ExemploExcel';
 
-// DADOS MOCK (Estoque da esquerda)
+// 👇 DADOS MOCK: Mudei a unidade de "NR" para "Unid" para a tabela ficar bonita, mas removi da visualização do saldo!
 const estoqueDisponivel = [
-  { desenhoSAP: 'TEXXX-0000022629', materialDescription: 'REPARTIDORES LÓGICOS 4 X M12 FÊMEA', numPecaFabricante: 'PROLOGANT4RP', fornecedor: 'SENSTRONIC', qtdFornecida: '199', referencia: '9095', unidadeMedida: 'NR', vendorDescription: 'SENSTRONIC DO BRASIL', wbs: 'BRBCBBB29-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34026', poNetPrice: 'R$ 1.697,39', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
-  { desenhoSAP: 'TAL-S378006', materialDescription: 'CONECTOR IE FC 180 4X2', numPecaFabricante: '6GK1901-1BB11-2AA0', fornecedor: 'SIEMENS', qtdFornecida: '4', referencia: 'AR-366866', unidadeMedida: 'NR', vendorDescription: 'SIEMENS INFRAESTRUTURA', wbs: 'BRBRRCY21-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34246', poNetPrice: 'R$ 161,77', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
+  { desenhoSAP: 'TLXXX-0000030944', materialDescription: 'BLOQUEADOR PARA VÁLVULA DE ESFERA', numPecaFabricante: 'BLW-ES', fornecedor: 'SENSTRONIC', qtdFornecida: '43', nf: '7446', referencia: '9095', unidadeMedida: 'Unid', vendorDescription: 'SENSTRONIC DO BRASIL', wbs: 'BRBCBBB29-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34026', poNetPrice: 'R$ 1.697,39', centro: 'BR06', deposito: '0020', alocacao: '200-E-006-0054' },
+  { desenhoSAP: 'TMC000000009467', materialDescription: 'BASE PARA TOMADA HC 2 PEGS M25', numPecaFabricante: '19 30 006 0446', fornecedor: 'SIEMENS', qtdFornecida: '2', nf: 'AR-8927', referencia: 'AR-366866', unidadeMedida: 'Unid', vendorDescription: 'SIEMENS INFRAESTRUTURA', wbs: 'BRBRRCY21-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34246', poNetPrice: 'R$ 161,77', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
+  { desenhoSAP: 'TLXXX-000002345', materialDescription: 'INSERTO FEMEA 24POLOS PE', numPecaFabricante: '09 16 024 3101', fornecedor: 'SIEMENS', qtdFornecida: '17', nf: 'AR-8927', referencia: 'AR-366866', unidadeMedida: 'Unid', vendorDescription: 'SIEMENS INFRAESTRUTURA', wbs: 'BRBRRCY21-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34246', poNetPrice: 'R$ 161,77', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
 ];
 
 export default function MaterialEstoque() {
-  // 1. ESTADOS DO FORMULÁRIO
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
@@ -24,10 +24,8 @@ export default function MaterialEstoque() {
   });
   const [itensSelecionados, setItensSelecionados] = useState([]);
   
-  // INICIA O MAESTRO (Hook de Processamento do Excel)
   const processador = useProcessadorExcel();
 
-  // 2. FUNÇÕES DE MANIPULAÇÃO DA TABELA E IMPORTAÇÃO
   const handleImportarExcel = async (arquivo) => {
     const novosItens = await processador.iniciarProcessamento(arquivo);
     if (novosItens && Array.isArray(novosItens)) {
@@ -71,9 +69,7 @@ export default function MaterialEstoque() {
     ]);
   };
 
-  // 3. FUNÇÃO DE ENVIO PARA O BACKEND (NODE.JS)
   const handleEnviar = async () => {
-    // Validação
     if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.dataNecessidade) {
       alert("Por favor, preencha todos os campos obrigatórios do solicitante (*).");
       return;
@@ -90,14 +86,12 @@ export default function MaterialEstoque() {
       return;
     }
 
-    // Prepara o pacote (payload)
     const payload = {
       solicitante: formDados,
       itens: itensSelecionados
     };
 
-try {
-      // 👇 Alterado para a rota modularizada
+    try {
       const resposta = await fetch('http://localhost:3001/api/solicitacoes/material', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -108,7 +102,6 @@ try {
 
       if (resposta.ok) {
         alert(`Sucesso! Solicitação criada com o ID: ${dados.ps_id}`);
-        // Limpa o formulário após o sucesso
         setFormDados({ nome: '', wbs: '', destino: '', dataNecessidade: '', observacoes: '', entregaUrgente: false });
         setItensSelecionados([]);
       } else {
@@ -116,7 +109,7 @@ try {
       }
     } catch (error) {
       console.error("Erro na requisição:", error);
-      alert("Falha ao conectar com o servidor. Verifique se o backend (Node.js) está rodando na porta 3001.");
+      alert("Falha ao conectar com o servidor.");
     }
   };
 
@@ -200,7 +193,6 @@ try {
           </div>
         </div>
 
-        {/* --- COMPONENTE: ENTREGA URGENTE --- */}
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -234,97 +226,174 @@ try {
       </div>
 
       <div className="selecao-itens-grid">
-        <div className="painel-lista">
-          <div className="painel-lista-header">
-            <h3>Estoque Disponível</h3>
-            <span className="badge-contagem">{estoqueDisponivel.length} itens</span>
+        
+        <div className="painel-lista" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          
+          <div className="painel-lista-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b', margin: 0 }}>Estoque Disponível</h3>
+            <span className="badge-contador-simples">116 itens</span>
           </div>
-          <div className="pesquisa-estoque">
-            <Search size={18} className="icone-pesquisa-estoque" />
-            <input type="text" placeholder="Buscar por SAP, PN, Descrição..." />
+          
+          <div className="pesquisa-estoque" style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input 
+                type="text" 
+                placeholder="Buscar por SAP, PN, Descrição..." 
+                style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none', color: '#334155', boxSizing: 'border-box' }}
+              />
+            </div>
           </div>
-          <div className="lista-rolavel">
+
+          <div className="lista-rolavel" style={{ maxHeight: '600px', overflowY: 'auto' }}>
             {estoqueDisponivel.map((item, index) => (
-              <div key={`estoque-${index}`} className="item-estoque-card" onClick={() => adicionarManualmente(item, index)}>
-                <strong className="item-pn">{item.numPecaFabricante}</strong>
-                <p className="item-desc">{item.materialDescription}</p>
-                <div className="item-rodape">
-                  <span className="item-saldo">Saldo: <strong>{item.qtdFornecida} {item.unidadeMedida}</strong></span>
-                  <span className="item-alocacao">{item.alocacao}</span>
+              <div 
+                key={`estoque-${index}`} 
+                className="item-estoque-card" 
+                onClick={() => adicionarManualmente(item, index)}
+                style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }}
+              >
+                <div style={{ marginBottom: '12px' }}>
+                  <span className="badge-sap">{item.desenhoSAP}</span>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontWeight: '600', color: '#475569' }}>{item.numPecaFabricante}</span>
+                  <span className="badge-nf">NF: {item.nf}</span>
+                </div>
+                
+                <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.875rem' }}>
+                  {item.materialDescription}
+                </div>
+                
+                <div style={{ fontSize: '0.875rem', display: 'flex', gap: '8px' }}>
+                  <span style={{ color: '#10b981', fontWeight: '500' }}>
+                    {/* 👇 O "NR" foi removido daqui! */}
+                    Saldo: <strong style={{ fontWeight: '700' }}>{item.qtdFornecida}</strong>
+                  </span>
+                  <span style={{ color: '#2563eb', fontFamily: 'monospace' }}>
+                    {item.alocacao}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="painel-lista">
-          {/* CABEÇALHO COM OS BOTÕES DE EXCEL ADICIONADOS AQUI */}
+        <div className="painel-lista" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          
           <div className="painel-lista-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: '#1e293b' }}>
-              <Package size={18} color="#2563eb" /> Itens da Solicitação
+              <Package size={18} color="#2563eb" /> Itens Selecionados
             </div>
             
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <ExemploExcel />
+              <span className="badge-contador-simples">{listaSegura.length}/25</span>
             </div>
           </div>
 
           {listaSegura.length === 0 ? (
-            <div className="estado-vazio-selecao">
-              <Package size={48} strokeWidth={1} />
+            <div className="estado-vazio-selecao" style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+              <Package size={48} strokeWidth={1} style={{ opacity: 0.3, margin: '0 auto 16px auto', display: 'block' }} />
               <p>Clique nos itens à esquerda, adicione uma linha manual ou importe um Excel do SAP</p>
             </div>
           ) : (
-            <div className="scroll-tabela-solicitacao">
-              <table className="tabela-solicitacao-dados">
+            <div className="scroll-tabela-solicitacao" style={{ overflowX: 'auto' }}>
+              <table className="tabela-solicitacao-dados" style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr>
-                    <th>AÇÕES</th>
-                    <th>MATERIAL DESCRIPTION</th>
-                    <th>Nº PEÇA FABRICANTE</th>
-                    <th>QTD. SOLICITADA</th>
-                    <th>DESENHO SAP</th>
-                    <th>FORNECEDOR</th>
-                    <th>REFERÊNCIA</th>
-                    <th>UNIDADE</th>
-                    <th>WBS</th>
-                    <th>ALOCAÇÃO</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', width: '50px' }}></th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>MATERIAL DESCRIPTION</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Nº PEÇA FABRICANTE</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>QTD. SOLICITADA</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>DESENHO SAP</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>UNIDADE</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>WBS</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>ALOCAÇÃO</th>
                   </tr>
                 </thead>
                 <tbody>
                   {listaSegura.map((item) => (
-                    <tr key={item.id}>
-                      <td style={{ textAlign: 'center' }}>
-                        <button onClick={() => removerItem(item.id)} className="btn-deletar-linha">
+                    <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ textAlign: 'center', padding: '12px' }}>
+                        <button onClick={() => removerItem(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>
                           <Trash2 size={16} />
                         </button>
                       </td>
-                      <td style={{ minWidth: '220px' }}>
-                        <input className="input-editavel-tabela texto-preto" value={item.materialDescription || ''} onChange={(e) => atualizarCampo(item.id, 'materialDescription', e.target.value)} placeholder="Descrição do item" />
+                      <td style={{ minWidth: '220px', padding: '8px 12px' }}>
+                        <input 
+                          value={item.materialDescription || ''} 
+                          onChange={(e) => atualizarCampo(item.id, 'materialDescription', e.target.value)} 
+                          placeholder="Descrição do item" 
+                          style={{ width: '100%', border: 'none', outline: 'none', color: '#334155', backgroundColor: 'transparent' }}
+                        />
                       </td>
-                      <td>
-                        <input className="input-editavel-tabela badge-partnumber" value={item.numPecaFabricante || ''} onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
+                      <td style={{ padding: '8px 12px' }}>
+                        <input 
+                          value={item.numPecaFabricante || ''} 
+                          onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} 
+                          placeholder="PN" 
+                          style={{ width: '100%', border: 'none', outline: 'none', fontWeight: '600', color: '#1e293b', backgroundColor: 'transparent' }}
+                        />
                       </td>
-                      <td className="qtd-solicitada-destaque">
-                        <input type="number" className="input-inline-tabela" value={item.qtdSelecionada || 1} onChange={(e) => atualizarCampo(item.id, 'qtdSelecionada', e.target.value)} />
+                      <td style={{ padding: '8px 12px' }}>
+                        <input 
+                          type="number" 
+                          value={item.qtdSelecionada || 1} 
+                          onChange={(e) => atualizarCampo(item.id, 'qtdSelecionada', e.target.value)} 
+                          style={{ width: '70px', border: '1px solid #a7f3d0', backgroundColor: '#ecfdf5', borderRadius: '6px', padding: '6px 8px', outline: 'none', color: '#10b981', fontWeight: '700', textAlign: 'center' }}
+                        />
                       </td>
-                      <td>
-                        <input className="input-editavel-tabela texto-cinza-claro" value={item.desenhoSAP || ''} onChange={(e) => atualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP" />
+                      <td style={{ padding: '8px 12px' }}>
+                        <input 
+                          value={item.desenhoSAP || ''} 
+                          onChange={(e) => atualizarCampo(item.id, 'desenhoSAP', e.target.value)} 
+                          placeholder="SAP" 
+                          style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '6px 12px', borderRadius: '999px', border: '1px solid #bfdbfe', fontWeight: '600', fontFamily: 'monospace', width: '100%', outline: 'none', boxSizing: 'border-box' }}
+                        />
                       </td>
-                      <td>
-                        <input className="input-editavel-tabela texto-cinza-escuro" value={item.fornecedor || ''} onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
+                      <td style={{ padding: '8px 12px' }}>
+                        <input 
+                          value={item.fornecedor || ''} 
+                          onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} 
+                          placeholder="Fornecedor" 
+                          style={{ width: '100%', border: 'none', outline: 'none', color: '#475569', backgroundColor: 'transparent' }}
+                        />
                       </td>
-                      <td>
-                        <input className="input-editavel-tabela texto-cinza" value={item.referencia || ''} onChange={(e) => atualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Ref" />
+                      <td style={{ padding: '8px 12px' }}>
+                        <input 
+                          value={item.referencia || ''} 
+                          onChange={(e) => atualizarCampo(item.id, 'referencia', e.target.value)} 
+                          placeholder="Ref" 
+                          style={{ width: '100%', border: 'none', outline: 'none', color: '#64748b', backgroundColor: 'transparent' }}
+                        />
                       </td>
-                      <td>
-                        <input className="input-editavel-tabela texto-cinza" style={{ width: '60px' }} value={item.unidadeMedida || ''} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)} placeholder="Unid" />
+                      <td style={{ padding: '8px 12px' }}>
+                        <input 
+                          value={item.unidadeMedida || ''} 
+                          onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)} 
+                          placeholder="Unid" 
+                          style={{ width: '60px', border: 'none', outline: 'none', color: '#475569', backgroundColor: 'transparent' }}
+                        />
                       </td>
-                      <td>
-                        <input className="input-editavel-tabela link-azul-fake" value={item.wbs || ''} onChange={(e) => atualizarCampo(item.id, 'wbs', e.target.value)} placeholder="WBS" />
+                      <td style={{ padding: '8px 12px' }}>
+                        <input 
+                          value={item.wbs || ''} 
+                          onChange={(e) => atualizarCampo(item.id, 'wbs', e.target.value)} 
+                          placeholder="WBS" 
+                          style={{ width: '100%', border: 'none', outline: 'none', color: '#475569', backgroundColor: 'transparent' }}
+                        />
                       </td>
-                      <td>
-                        <input className="input-editavel-tabela link-azul-fake" value={item.alocacao || ''} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
+                      <td style={{ padding: '8px 12px' }}>
+                        <input 
+                          value={item.alocacao || ''} 
+                          onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} 
+                          placeholder="Alocação" 
+                          style={{ width: '100%', border: 'none', outline: 'none', color: '#2563eb', fontFamily: 'monospace', fontWeight: '600', backgroundColor: 'transparent' }}
+                        />
                       </td>
                     </tr>
                   ))}

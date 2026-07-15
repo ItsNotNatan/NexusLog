@@ -374,3 +374,57 @@ textarea.input-campo {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================
+   NOVOS ESTILOS: LAYOUT DA IMAGEM
+========================================= */
+
+.badge-contador-simples {
+  font-size: 0.75rem;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background-color: #ffffff;
+}
+
+.badge-sap {
+  display: inline-block;
+  background-color: #eff6ff;
+  color: #2563eb;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-family: monospace, sans-serif;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: 1px solid #bfdbfe;
+}
+
+.badge-nf {
+  display: inline-block;
+  background-color: #f1f5f9;
+  color: #475569;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+}
+
+/* Ajustes no cabeçalho da coluna esquerda */
+.coluna-esquerda-header {
+  padding: 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.coluna-esquerda-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.coluna-direita-header {
+  padding: 20px;
+  border-bottom: 1px solid #f1f5f9;
+}

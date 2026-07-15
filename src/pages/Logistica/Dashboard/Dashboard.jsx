@@ -315,61 +315,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* GRÁFICO 4: RESUMO POR FILIAL (DONUT CHARTS) */}
-        <div className="grafico-card" style={{ padding: '24px' }}>
-          
-          <div className="grafico-header" style={{ marginBottom: '8px' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
-              Resumo por Filial
-            </h3>
-          </div>
-          
-          <div className="filiais-grid">
-            <div className="filial-mini-card">
-              <h4>BR01</h4>
-              <div className="donut-chart" style={{ background: 'conic-gradient(#10b981 0% 85%, #f59e0b 85% 100%)' }}>
-                <div className="donut-inner">70%</div>
-              </div>
-              <span className="filial-volume">Volume: 13d</span>
-              <div className="badge-critica alerta-verde">
-                Ordem mais crítica <AlertTriangle size={10} color="#eab308" fill="#fefce8" />
-              </div>
-            </div>
-
-            <div className="filial-mini-card">
-              <h4>BR02</h4>
-              <div className="donut-chart" style={{ background: 'conic-gradient(#10b981 0% 60%, #f59e0b 60% 90%, #ef4444 90% 100%)' }}>
-                <div className="donut-inner">90%</div>
-              </div>
-              <span className="filial-volume">Volume: 10d</span>
-              <div className="badge-critica alerta-amarelo">
-                Ordem mais crítica <AlertTriangle size={10} color="#ca8a04" fill="#fefce8" />
-              </div>
-            </div>
-
-            <div className="filial-mini-card">
-              <h4>BR04</h4>
-              <div className="donut-chart" style={{ background: 'conic-gradient(#10b981 0% 45%, #f59e0b 45% 85%, #ef4444 85% 100%)' }}>
-                <div className="donut-inner">60%</div>
-              </div>
-              <span className="filial-volume">Volume: 30d</span>
-              <div className="badge-critica alerta-amarelo">
-                Ordem mais crítica <AlertTriangle size={10} color="#ca8a04" fill="#fefce8" />
-              </div>
-            </div>
-
-            <div className="filial-mini-card">
-              <h4>BR06</h4>
-              <div className="donut-chart" style={{ background: 'conic-gradient(#3b82f6 0% 60%, #ef4444 60% 70%, #cbd5e1 70% 100%)' }}>
-                <div className="donut-inner">60%</div>
-              </div>
-              <span className="filial-volume">Volume: 28d</span>
-              <div className="badge-critica alerta-vermelho">
-                Ordem mais crítica <AlertTriangle size={10} color="#dc2626" />
-              </div>
-            </div>
-          </div>
-        </div>
 
       </div>
 

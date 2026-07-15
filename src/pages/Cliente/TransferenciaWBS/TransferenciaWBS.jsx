@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import './TransferenciaWBS.css';
-import { ArrowLeftRight, Search, Send, Trash2 } from 'lucide-react'; 
+import { Search, Send, Trash2, Box } from 'lucide-react'; 
 
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { supabase } from '../../../supabaseClient';
 
+// 👇 DADOS MOCKADOS: Removida a propriedade 'un'
 const itensDisponiveis = [
-  { id: 1, pn: '1534534', desc: 'SENSOR DE INDUÇÃO', wbs: 'BRBCBBB20', qtd: 10 },
-  { id: 2, pn: 'PN-TUB-7890', desc: 'Tubo Aço Inox 316L 6" Sch40', wbs: 'WBS-PRJ-2024-001', qtd: 4 },
-  { id: 3, pn: 'PN-FLG-1580', desc: 'Flange Cego 4" ANSI 150', wbs: 'WBS-PRJ-2024-001', qtd: 17 },
+  { id: 1, sap: 'TLXXX-0000030944', pn: 'BLW-ES', desc: 'BLOQUEADOR PARA VÁLVULA DE ESFERA', nf: '7446', wbs: 'BRBCBBB20', qtd: 43, alocacao: '200-E-006-0054' },
+  { id: 2, sap: 'TMC000000009467', pn: '19 30 006 0446', desc: 'BASE PARA TOMADA HC 2 PEGS M25', nf: 'AR-8927', wbs: 'WBS-PRJ-2024-001', qtd: 2, alocacao: '002-B-004' },
+  { id: 3, sap: 'TLXXX-000002345', pn: '09 16 024 3101', desc: 'INSERTO FEMEA 24POLOS PE', nf: 'AR-8927', wbs: 'WBS-PRJ-2024-001', qtd: 17, alocacao: '002-B-004' },
 ];
 
 export default function TransferenciaWBS() {
@@ -21,8 +22,6 @@ export default function TransferenciaWBS() {
   });
 
   const [itensSelecionados, setItensSelecionados] = useState([]);
-  
-  // 👇 NOVO ESTADO: Onde o nosso componente vai guardar os ficheiros
   const [anexos, setAnexos] = useState([]);
 
   const adicionarItem = (item) => {
@@ -53,9 +52,6 @@ export default function TransferenciaWBS() {
       return;
     }
 
-    // =========================================================
-    // LÓGICA DE UPLOAD DE IMAGENS PARA O SUPABASE STORAGE
-    // =========================================================
     const anexosProcessados = [];
     if (anexos.length > 0) {
       for (const arquivo of anexos) {
@@ -63,7 +59,6 @@ export default function TransferenciaWBS() {
         const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
         const caminhoNoStorage = `uploads/${nomeUnico}`;
 
-        // Faz o upload para o bucket 'documentos'
         const { error: erroUpload } = await supabase.storage
           .from('documentos')
           .upload(caminhoNoStorage, arquivo);
@@ -74,7 +69,6 @@ export default function TransferenciaWBS() {
           return; 
         }
 
-        // Pega o Link Público
         const { data: linkPublico } = supabase.storage
           .from('documentos')
           .getPublicUrl(caminhoNoStorage);
@@ -85,8 +79,6 @@ export default function TransferenciaWBS() {
         });
       }
     }
-
-    // =========================================================
 
     const payload = {
       solicitante: {
@@ -100,9 +92,10 @@ export default function TransferenciaWBS() {
         numPecaFabricante: item.pn,
         materialDescription: item.desc,
         qtd: item.qtdTransferencia,
-        wbsOrigem: item.wbs 
+        wbsOrigem: item.wbs,
+        alocacao: item.alocacao 
       })),
-      anexos: anexosProcessados // Mandamos a lista com os links para o Backend!
+      anexos: anexosProcessados 
     };
 
     try {
@@ -118,7 +111,7 @@ export default function TransferenciaWBS() {
         alert(`Sucesso! Transferência solicitada. ID: ${dados.ps_id}`);
         setFormDados({ nome: '', wbsDestino: '', justificativa: '', entregaUrgente: false });
         setItensSelecionados([]);
-        setAnexos([]); // Limpa a lista de anexos após enviar
+        setAnexos([]); 
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
       }
@@ -131,13 +124,6 @@ export default function TransferenciaWBS() {
   return (
     <>
       <div className="form-cartao">
-        <div className="form-header">
-          <div className="form-header-esquerda">
-            <div className="form-header-icone"><ArrowLeftRight size={18} /></div>
-            <h2>Dados da Transferência</h2>
-          </div>
-        </div>
-
         <div className="form-grid">
           <div className="input-grupo">
             <label>SOLICITANTE *</label>
@@ -173,68 +159,82 @@ export default function TransferenciaWBS() {
           </div>
         </div>
 
-        {/* 👇 O NOVO COMPONENTE INSERIDO AQUI 👇 */}
         <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} />
-
       </div>
 
       <div className="transferencia-grid-inferior">
 
-        {/* COLUNA ESQUERDA - Itens Disponíveis */}
         <div className="coluna-cartao">
           <div className="coluna-esquerda-header">
-            <h3>Selecionar Itens para Transferência</h3>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3>Estoque Disponível</h3>
+              <span className="badge-contador-simples">116 itens</span> 
+            </div>
+
             <div className="pesquisa-itens-wrapper">
               <Search size={16} className="icone-busca-itens" />
               <input type="text" placeholder="Buscar por SAP, PN, Descrição..." />
             </div>
           </div>
+
           <div className="lista-itens-scroll">
             {itensDisponiveis.map(item => (
               <div 
                 key={item.id} 
                 className="item-lista" 
                 onClick={() => adicionarItem(item)}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', padding: '16px 20px' }}
               >
-                <div className="item-lista-pn">{item.pn}</div>
-                <div className="item-lista-desc">{item.desc}</div>
-                <div>
-                  <span className="item-lista-wbs" title="WBS Origem">{item.wbs}</span>
-                  <span className="item-lista-qtd">Disponível: {item.qtd}</span>
+                <div style={{ marginBottom: '12px' }}>
+                  <span className="badge-sap">{item.sap}</span>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span className="item-lista-pn" style={{ margin: 0 }}>{item.pn}</span>
+                  <span className="badge-nf">NF: {item.nf}</span>
+                </div>
+                
+                <div className="item-lista-desc" style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.875rem' }}>
+                  {item.desc}
+                </div>
+                
+                <div style={{ fontSize: '0.875rem', display: 'flex', gap: '8px' }}>
+                  <span style={{ color: '#10b981', fontWeight: '500' }}>
+                    {/* 👇 Removido o item.un aqui */}
+                    Saldo: <strong style={{ fontWeight: '700' }}>{item.qtd}</strong>
+                  </span>
+                  <span style={{ color: '#2563eb', fontFamily: 'monospace' }}>
+                    {item.alocacao}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* COLUNA DIREITA - Itens Selecionados */}
         <div className="coluna-cartao">
-          <div className="coluna-direita-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ArrowLeftRight size={20} className="icone-header-direita" /> Itens para Transferência
+          <div className="coluna-direita-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', fontWeight: '700', color: '#1e293b' }}>
+              <Box size={20} color="#2563eb" /> Itens Selecionados
             </div>
-            {itensSelecionados.length > 0 && (
-              <span style={{ fontSize: '0.75rem', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '12px', fontWeight: '600' }}>
-                {itensSelecionados.length} itens
-              </span>
-            )}
+            <span className="badge-contador-simples">{itensSelecionados.length}/25</span>
           </div>
 
           {itensSelecionados.length === 0 ? (
             <div className="estado-vazio-itens" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-              Selecione os itens à esquerda para transferir de WBS
             </div>
           ) : (
             <div className="lista-itens-scroll">
               {itensSelecionados.map(item => (
-                <div key={`selecionado-${item.id}`} className="item-lista" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={`selecionado-${item.id}`} className="item-lista" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
                   
                   <div style={{ flex: 1 }}>
-                    <div className="item-lista-pn">{item.pn}</div>
+                    <div style={{ marginBottom: '6px' }}><span className="badge-sap" style={{ fontSize: '0.75rem', padding: '4px 12px' }}>{item.sap}</span></div>
+                    <div className="item-lista-pn" style={{ marginBottom: '4px' }}>{item.pn}</div>
                     <div className="item-lista-desc">{item.desc}</div>
                     
-                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>QTD:</label>
                       <input 
                         type="number" 
@@ -244,7 +244,7 @@ export default function TransferenciaWBS() {
                         onChange={(e) => atualizarQuantidade(item.id, e.target.value)}
                         style={{ width: '70px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none', color: '#1e293b', fontSize: '0.875rem' }}
                       />
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>/ {item.qtd}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>/ {item.qtd} (Saldo)</span>
                     </div>
                   </div>
 
