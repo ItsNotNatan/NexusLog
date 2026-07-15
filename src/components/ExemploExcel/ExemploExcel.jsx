@@ -2,7 +2,7 @@ import React from 'react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { Download } from 'lucide-react';
-import './ExemploExcel.css'; // O CSS que vamos criar a seguir
+import './ExemploExcel.css'; 
 
 export default function ExemploExcel() {
   const baixarModelo = async () => {
@@ -11,23 +11,21 @@ export default function ExemploExcel() {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Modelo SAP');
 
-      // 2. Define os nomes das colunas exatamente como o teu leitor espera
+      // 2. Define os nomes das colunas com a tua nova lista
       const colunas = [
-        'DESENHO SAP', 
-        'Material Description', 
-        'Nº peça fabricante', 
-        'Fornecedor', 
-        'Qtd.fornecida', 
-        'Referência', 
-        'Unidade de medida', 
-        'Vendor Description', 
-        'WBS', 
-        'EMISSÃO NF', 
-        'RECEB. NF', 
-        'Documento de compras', 
-        'PO Net Price', 
-        'Centro', 
-        'Depósito', 
+        'Nº peça fabricante',
+        'FORNECEDOR',
+        'Qtd.fornecida',
+        'NF DE ENTRADA',
+        'Unidade de medida',
+        'Vendor Description',
+        'WBS Element',
+        'EMISSÃO NF',
+        'RECEB. NF',
+        'Documento de compras',
+        'PO Net Price',
+        'Centro',
+        'Depósito',
         'Alocação'
       ];
 
@@ -47,17 +45,15 @@ export default function ExemploExcel() {
       });
       linhaCabecalho.height = 25;
 
-      // 4. (Opcional) Adiciona uma linha de exemplo preenchida para guiar o utilizador
+      // 4. Adiciona uma linha de exemplo preenchida para guiar o utilizador (Mapeada para as novas colunas)
       worksheet.addRow({
-        'DESENHO SAP': 'EX-SAP-123',
-        'Material Description': 'Exemplo de Material',
         'Nº peça fabricante': 'PN-12345',
-        'Fornecedor': 'Fornecedor A',
+        'FORNECEDOR': 'Fornecedor A',
         'Qtd.fornecida': 10,
-        'Referência': 'REF-001',
+        'NF DE ENTRADA': 'NF-001',
         'Unidade de medida': 'Unid',
         'Vendor Description': 'Desc Vendor',
-        'WBS': 'WBS-EX-001',
+        'WBS Element': 'WBS-EX-001',
         'EMISSÃO NF': '01/01/2026',
         'RECEB. NF': '05/01/2026',
         'Documento de compras': 'DOC-999',
