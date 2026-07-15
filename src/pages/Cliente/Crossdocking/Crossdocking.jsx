@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
-// IMPORTAÇÃO DO CSS CONSERTADA AQUI
+// IMPORTAÇÕES PARA OS ANEXOS FUNCIONAREM
+import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
+import { supabase } from '../../../supabaseClient';
+
 import './Crossdocking.css';
 
 export default function Crossdocking() {
@@ -20,6 +23,9 @@ export default function Crossdocking() {
   const [itensParciais, setItensParciais] = useState([
     { id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }
   ]);
+
+  // 👇 ESTADO PARA OS ARQUIVOS DA NOTA FISCAL
+  const [anexos, setAnexos] = useState([]);
 
   // --- FUNÇÕES DA TABELA PARCIAL ---
   const adicionarItemParcial = () => {
@@ -51,6 +57,12 @@ export default function Crossdocking() {
       return;
     }
 
+    // Validação da Nota Fiscal (obrigatório para Crossdocking)
+    if (anexos.length === 0) {
+      alert("A anexação da Nota Fiscal (ou XML) é obrigatória para operações de Crossdocking.");
+      return;
+    }
+
     // Se for parcial, valida se preencheu os itens da tabela
     if (tipoSaida === 'parcial') {
       const temItemIncompleto = itensParciais.some(i => !i.desenhoSAP || !i.quantidade);
@@ -59,6 +71,36 @@ export default function Crossdocking() {
         return;
       }
     }
+
+    // =========================================================
+    // LÓGICA DE UPLOAD DE IMAGENS PARA O SUPABASE STORAGE
+    // =========================================================
+    const anexosProcessados = [];
+    for (const arquivo of anexos) {
+      const extensao = arquivo.name.split('.').pop();
+      const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
+      const caminhoNoStorage = `uploads/${nomeUnico}`;
+
+      const { error: erroUpload } = await supabase.storage
+        .from('documentos')
+        .upload(caminhoNoStorage, arquivo);
+
+      if (erroUpload) {
+        console.error("Erro ao subir arquivo:", erroUpload);
+        alert(`Falha ao anexar o ficheiro: ${arquivo.name}`);
+        return; 
+      }
+
+      const { data: linkPublico } = supabase.storage
+        .from('documentos')
+        .getPublicUrl(caminhoNoStorage);
+
+      anexosProcessados.push({
+        nome_arquivo: arquivo.name,
+        url_arquivo: linkPublico.publicUrl
+      });
+    }
+    // =========================================================
 
     // Prepara os itens para o payload (se for total, vai lista vazia; se parcial, mapeia)
     const listaItensFinais = tipoSaida === 'total' 
@@ -77,11 +119,11 @@ export default function Crossdocking() {
         observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'}] ${formDados.observacoes}`,
         tipo: 'Crossdocking'
       },
-      itens: listaItensFinais
+      itens: listaItensFinais,
+      anexos: anexosProcessados // Mandamos os links gerados para o backend
     };
 
-try {
-      // 👇 Alterado para a rota modularizada
+    try {
       const resposta = await fetch('http://localhost:3001/api/solicitacoes/crossdocking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,6 +138,7 @@ try {
         setFormDados({ nome: '', wbs: '', observacoes: '' });
         setTipoSaida(null);
         setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
+        setAnexos([]); // Limpa a lista de arquivos
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
       }
@@ -158,11 +201,9 @@ try {
           </div>
         </div>
         <div className="form-grid coluna-unica">
-          <div className="input-grupo">
-            <label>NOTA FISCAL <span className="texto-vermelho">*</span></label>
-            <div className="dropzone cinza">
-              <Upload size={16} /> Clique para anexar a Nota Fiscal (obrigatório)
-            </div>
+          
+          <div style={{ marginBottom: '8px' }}>
+             <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} titulo="NOTA FISCAL (OBRIGATÓRIO)" />
           </div>
           
           <div className="input-grupo">
@@ -189,7 +230,7 @@ try {
           {tipoSaida === 'parcial' && (
             <div style={{ marginTop: '16px', animation: 'fadeIn 0.2s ease-in-out' }}>
               
-              {/* Linha de Sub-aviso e botão adicionar */}
+              {/* 👇 AQUI ESTAVA O ERRO (justifyContent em vez de justify-content) */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <span style={{ fontSize: '0.85rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <AlertTriangle size={16} /> Saída Parcial — adicione todos os itens da NF que serão separados
@@ -284,7 +325,6 @@ try {
         </div>
       </div>
 
-      {/* BOTÃO GLOBAL CONECTADO À FUNÇÃO DE ENVIO */}
       <BotaoAcaoGlobal 
         texto="Enviar Crossdocking" 
         icone={<Send size={16} />} 

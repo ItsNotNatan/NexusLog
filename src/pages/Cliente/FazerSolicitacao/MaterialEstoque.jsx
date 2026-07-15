@@ -5,8 +5,10 @@ import { User, MapPin, Calendar, Search, Package, Send, Trash2, Zap } from 'luci
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import ExemploExcel from '../../../components/ExemploExcel/ExemploExcel';
+import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos'; // 👈 IMPORTADO
+import { supabase } from '../../../supabaseClient'; // 👈 IMPORTADO PARA O UPLOAD
 
-// 👇 DADOS MOCK: Mudei a unidade de "NR" para "Unid" para a tabela ficar bonita, mas removi da visualização do saldo!
+// 👇 DADOS MOCK: Sem o "NR" na exibição do Saldo
 const estoqueDisponivel = [
   { desenhoSAP: 'TLXXX-0000030944', materialDescription: 'BLOQUEADOR PARA VÁLVULA DE ESFERA', numPecaFabricante: 'BLW-ES', fornecedor: 'SENSTRONIC', qtdFornecida: '43', nf: '7446', referencia: '9095', unidadeMedida: 'Unid', vendorDescription: 'SENSTRONIC DO BRASIL', wbs: 'BRBCBBB29-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34026', poNetPrice: 'R$ 1.697,39', centro: 'BR06', deposito: '0020', alocacao: '200-E-006-0054' },
   { desenhoSAP: 'TMC000000009467', materialDescription: 'BASE PARA TOMADA HC 2 PEGS M25', numPecaFabricante: '19 30 006 0446', fornecedor: 'SIEMENS', qtdFornecida: '2', nf: 'AR-8927', referencia: 'AR-366866', unidadeMedida: 'Unid', vendorDescription: 'SIEMENS INFRAESTRUTURA', wbs: 'BRBRRCY21-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34246', poNetPrice: 'R$ 161,77', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
@@ -22,7 +24,11 @@ export default function MaterialEstoque() {
     observacoes: '',
     entregaUrgente: false 
   });
+  
   const [itensSelecionados, setItensSelecionados] = useState([]);
+  
+  // 👇 NOVO ESTADO: Guarda os ficheiros do utilizador
+  const [anexos, setAnexos] = useState([]); 
   
   const processador = useProcessadorExcel();
 
@@ -51,24 +57,6 @@ export default function MaterialEstoque() {
     }]);
   };
 
-  const adicionarLinhaEmBranco = () => {
-    setItensSelecionados(prev => [
-      ...prev,
-      {
-        id: `linha-vazia-${Date.now()}`,
-        desenhoSAP: '',
-        materialDescription: '',
-        numPecaFabricante: '',
-        fornecedor: '',
-        qtdSelecionada: 1,
-        referencia: '',
-        unidadeMedida: 'Unid',
-        wbs: '',
-        alocacao: ''
-      }
-    ]);
-  };
-
   const handleEnviar = async () => {
     if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.dataNecessidade) {
       alert("Por favor, preencha todos os campos obrigatórios do solicitante (*).");
@@ -86,9 +74,43 @@ export default function MaterialEstoque() {
       return;
     }
 
+    // =========================================================
+    // LÓGICA DE UPLOAD DE IMAGENS PARA O SUPABASE STORAGE
+    // =========================================================
+    const anexosProcessados = [];
+    if (anexos.length > 0) {
+      for (const arquivo of anexos) {
+        const extensao = arquivo.name.split('.').pop();
+        const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
+        const caminhoNoStorage = `uploads/${nomeUnico}`;
+
+        const { error: erroUpload } = await supabase.storage
+          .from('documentos')
+          .upload(caminhoNoStorage, arquivo);
+
+        if (erroUpload) {
+          console.error("Erro ao subir arquivo:", erroUpload);
+          alert(`Falha ao anexar o ficheiro: ${arquivo.name}`);
+          return; 
+        }
+
+        const { data: linkPublico } = supabase.storage
+          .from('documentos')
+          .getPublicUrl(caminhoNoStorage);
+
+        anexosProcessados.push({
+          nome_arquivo: arquivo.name,
+          url_arquivo: linkPublico.publicUrl
+        });
+      }
+    }
+    // =========================================================
+
+    // Adicionamos os anexos processados ao payload
     const payload = {
       solicitante: formDados,
-      itens: itensSelecionados
+      itens: itensSelecionados,
+      anexos: anexosProcessados 
     };
 
     try {
@@ -104,6 +126,7 @@ export default function MaterialEstoque() {
         alert(`Sucesso! Solicitação criada com o ID: ${dados.ps_id}`);
         setFormDados({ nome: '', wbs: '', destino: '', dataNecessidade: '', observacoes: '', entregaUrgente: false });
         setItensSelecionados([]);
+        setAnexos([]); // 👈 Limpa a caixa de anexos
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
       }
@@ -193,6 +216,9 @@ export default function MaterialEstoque() {
           </div>
         </div>
 
+        {/* 👇 COMPONENTE DE ANEXOS ADICIONADO AQUI! */}
+        <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} />
+
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -268,7 +294,6 @@ export default function MaterialEstoque() {
                 
                 <div style={{ fontSize: '0.875rem', display: 'flex', gap: '8px' }}>
                   <span style={{ color: '#10b981', fontWeight: '500' }}>
-                    {/* 👇 O "NR" foi removido daqui! */}
                     Saldo: <strong style={{ fontWeight: '700' }}>{item.qtdFornecida}</strong>
                   </span>
                   <span style={{ color: '#2563eb', fontFamily: 'monospace' }}>
