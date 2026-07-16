@@ -39,28 +39,25 @@
 /* ========================================================================== */
 
 .tipos-container {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr); /* 👈 A MÁGICA: Força exatamente 7 colunas iguais na mesma linha */
   gap: 12px;
   margin-bottom: 24px;
-  overflow-x: auto;
-  padding-bottom: 8px;
+  width: 100%;
 }
 
-.tipos-container::-webkit-scrollbar { height: 6px; }
-.tipos-container::-webkit-scrollbar-track { background: transparent; }
-.tipos-container::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
-
 .tipo-cartao {
-  flex: 1; /* Divide o espaço igualmente por todos os cartões */
-  min-width: 120px; /* Evita que o texto esmague em telas pequenas */
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 12px;
+  padding: 16px 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
+  align-items: flex-start; /* 👈 Garante que o ícone e texto ficam encostados à esquerda como na imagem */
+  text-align: left;        /* 👈 Texto alinhado à esquerda */
+  min-width: 0;            /* Permite encolher sem criar barra de scroll */
 }
 
 .tipo-cartao:hover {
@@ -79,14 +76,17 @@
   justify-content: center;
   margin-bottom: 12px;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .tipo-titulo {
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: #1e293b;
   margin-bottom: 4px;
   line-height: 1.2;
+  width: 100%;
+  word-wrap: break-word; /* Quebra palavras grandes se a tela for menor */
 }
 
 .tipo-desc {
@@ -126,6 +126,10 @@
 .tipo-cartao.ativo-vermelho .tipo-titulo { color: #dc2626; }
 .tipo-cartao.ativo-vermelho .tipo-desc { color: #ef4444; }
 
+.tipo-cartao.ativo-amarelo { background-color: #fefce8; border-color: #fef08a; }
+.tipo-cartao.ativo-amarelo .tipo-icone { background-color: transparent; color: #eab308; }
+.tipo-cartao.ativo-amarelo .tipo-titulo { color: #ca8a04; }
+.tipo-cartao.ativo-amarelo .tipo-desc { color: #eab308; }
 
 /* ========================================================================== */
 /* 3. FORMULÁRIOS GENÉRICOS (Reutilizados em várias abas)                     */
@@ -231,7 +235,7 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
 /* Grid de Seleção (Estoque / Planilha) - EMPILHADA */
 .selecao-itens-grid {
   display: flex;
-  flex-direction: column; /* Uma debaixo da outra */
+  flex-direction: column;
   gap: 24px;
   margin-bottom: 24px;
 }
@@ -357,12 +361,10 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   cursor: pointer;
 }
 
-/* Quando passa o rato por cima, avisa que é clicável */
 .input-inline-tabela:hover {
   background-color: #dbeafe;
 }
 
-/* Quando clica para editar, vira um campo de texto normal */
 .input-inline-tabela:focus {
   background-color: #ffffff;
   border-color: #93c5fd;
@@ -370,7 +372,6 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
-/* Remove as setinhas feias de aumentar/diminuir do campo number */
 .input-inline-tabela::-webkit-inner-spin-button, 
 .input-inline-tabela::-webkit-outer-spin-button { 
   -webkit-appearance: none; 
@@ -381,9 +382,6 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
 /* EDIÇÃO INLINE DA TABELA (Quantidade e Texto Geral)                         */
 /* ========================================================================== */
 
-/* ... (mantém o CSS do input-inline-tabela que já lá está) ... */
-
-/* NOVO: Para campos de texto gerais da tabela */
 .input-editavel-tabela {
   width: 100%;
   min-width: 80px;
@@ -408,20 +406,4 @@ textarea.input-campo { resize: vertical; min-height: 42px; }
   background-color: #ffffff;
   border-color: #93c5fd;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-}
-
-/* --- ESTILOS ATIVOS (Amarelo - Específico para Transferência) --- */
-.tipo-cartao.ativo-amarelo { 
-  background-color: #fefce8; 
-  border-color: #fef08a; 
-}
-.tipo-cartao.ativo-amarelo .tipo-icone { 
-  background-color: transparent; 
-  color: #eab308; 
-}
-.tipo-cartao.ativo-amarelo .tipo-titulo { 
-  color: #ca8a04; 
-}
-.tipo-cartao.ativo-amarelo .tipo-desc { 
-  color: #eab308; 
 }
