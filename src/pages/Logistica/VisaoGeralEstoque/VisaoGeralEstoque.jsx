@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './VisaoGeralEstoque.css';
-import { DollarSign, Search, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { DollarSign, Search, CheckCircle2, XCircle, Loader2, Edit } from 'lucide-react'; // 👈 Importamos o Edit
 
-export default function VisaoGeralEstoque() {
+// 👇 Adicionada a prop 'perfil'
+export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
   const [pesquisa, setPesquisa] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('Todos');
   
@@ -36,7 +37,6 @@ export default function VisaoGeralEstoque() {
               saldo: item.quantidade_solicitada || 0, 
               un: item.unidade_medida_manual || 'Unid',
               
-              // 👇 Guardamos o número puro para poder fazer contas depois
               valorUnitRaw: item.valor_unitario_manual || 0, 
               
               valorUnit: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual.toFixed(2)}` : 'R$ 0,00',
@@ -76,32 +76,36 @@ export default function VisaoGeralEstoque() {
     return passaStatus && passaPesquisa;
   });
 
-  // =======================================================
-  // 🧮 CÁLCULO DOS KPIs E DO VALOR TOTAL
-  // =======================================================
+  // KPIs
   const totalItens = dadosEstoque.length;
   const disponiveis = dadosEstoque.filter(i => i.status === 'Disponível').length;
   const zerados = dadosEstoque.filter(i => i.status === 'Zerado').length;
 
-  // 1. O método .reduce() passa por cada item da lista (dadosEstoque)
-  // 2. A variável 'acumulador' guarda a soma que vai crescendo
-  // 3. Multiplicamos a quantidade (saldo) pelo preço puro (valorUnitRaw)
   const somaTotal = dadosEstoque.reduce((acumulador, item) => {
     return acumulador + (item.saldo * item.valorUnitRaw);
-  }, 0); // O 0 no final indica que a soma começa em zero
+  }, 0); 
 
-  // Formata o número final (ex: 1500.5) para o visual brasileiro (R$ 1.500,50)
   const valorTotalFormatado = new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL'
   }).format(somaTotal);
+
+  // 👇 Função para lidar com o clique no botão Editar
+  const handleEditarItem = (idItem) => {
+    alert(`Ação de edição para o item ${idItem} ainda será construída!`);
+  };
 
   return (
     <div className="visao-geral-wrapper">
       
       <header className="visao-cabecalho">
         <h1>Visão Geral do Estoque</h1>
-        <p>Edição manual completa de todos os materiais — perfil Logística</p>
+        {/* 👇 Descrição dinâmica baseada no perfil */}
+        <p>
+          {perfil === 'logistica' 
+            ? 'Edição manual completa de todos os materiais — perfil Logística' 
+            : 'Consulta em tempo real dos materiais disponíveis — perfil Cliente'}
+        </p>
       </header>
 
       <div className="cartao-resumo-estoque">
@@ -111,7 +115,6 @@ export default function VisaoGeralEstoque() {
           </div>
           <div className="textos-valor">
             <label>VALOR TOTAL DO ESTOQUE</label>
-            {/* 👇 Mostra o valor calculado e formatado aqui */}
             <h2>{valorTotalFormatado}</h2> 
           </div>
         </div>
@@ -177,19 +180,21 @@ export default function VisaoGeralEstoque() {
                 <th>ALOCAÇÃO</th>
                 <th>WBS</th>
                 <th>SITUAÇÃO</th>
+                {/* 👇 Condição para mostrar a coluna de ações apenas para logística */}
+                {perfil === 'logistica' && <th style={{ textAlign: 'center' }}>AÇÕES</th>}
               </tr>
             </thead>
             <tbody>
               {carregando ? (
                 <tr>
-                  <td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                  <td colSpan={perfil === 'logistica' ? "13" : "12"} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                     <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px auto', display: 'block' }} />
                     Carregando estoque do banco de dados...
                   </td>
                 </tr>
               ) : dadosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                  <td colSpan={perfil === 'logistica' ? "13" : "12"} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                     Nenhum material encontrado no estoque ou aguardando aprovação de novas entradas.
                   </td>
                 </tr>
@@ -220,6 +225,29 @@ export default function VisaoGeralEstoque() {
                         </span>
                       )}
                     </td>
+
+                    {/* 👇 Botão de edição visível apenas para Logística */}
+                    {perfil === 'logistica' && (
+                      <td style={{ textAlign: 'center' }}>
+                        <button 
+                          onClick={() => handleEditarItem(item.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#3b82f6',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                          onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          title="Editar Item"
+                        >
+                          <Edit size={16} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
