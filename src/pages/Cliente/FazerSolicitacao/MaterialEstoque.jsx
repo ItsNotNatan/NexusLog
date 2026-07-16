@@ -1,19 +1,12 @@
-import React, { useState } from 'react';
-import { User, MapPin, Calendar, Search, Package, Send, Trash2, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, MapPin, Calendar, Search, Package, Send, Trash2, Zap, Loader2 } from 'lucide-react'; // 👈 Loader2 adicionado
 
 // NOSSOS COMPONENTES E HOOKS
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import ExemploExcel from '../../../components/ExemploExcel/ExemploExcel';
-import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos'; // 👈 IMPORTADO
-import { supabase } from '../../../supabaseClient'; // 👈 IMPORTADO PARA O UPLOAD
-
-// 👇 DADOS MOCK: Sem o "NR" na exibição do Saldo
-const estoqueDisponivel = [
-  { desenhoSAP: 'TLXXX-0000030944', materialDescription: 'BLOQUEADOR PARA VÁLVULA DE ESFERA', numPecaFabricante: 'BLW-ES', fornecedor: 'SENSTRONIC', qtdFornecida: '43', nf: '7446', referencia: '9095', unidadeMedida: 'Unid', vendorDescription: 'SENSTRONIC DO BRASIL', wbs: 'BRBCBBB29-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34026', poNetPrice: 'R$ 1.697,39', centro: 'BR06', deposito: '0020', alocacao: '200-E-006-0054' },
-  { desenhoSAP: 'TMC000000009467', materialDescription: 'BASE PARA TOMADA HC 2 PEGS M25', numPecaFabricante: '19 30 006 0446', fornecedor: 'SIEMENS', qtdFornecida: '2', nf: 'AR-8927', referencia: 'AR-366866', unidadeMedida: 'Unid', vendorDescription: 'SIEMENS INFRAESTRUTURA', wbs: 'BRBRRCY21-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34246', poNetPrice: 'R$ 161,77', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
-  { desenhoSAP: 'TLXXX-000002345', materialDescription: 'INSERTO FEMEA 24POLOS PE', numPecaFabricante: '09 16 024 3101', fornecedor: 'SIEMENS', qtdFornecida: '17', nf: 'AR-8927', referencia: 'AR-366866', unidadeMedida: 'Unid', vendorDescription: 'SIEMENS INFRAESTRUTURA', wbs: 'BRBRRCY21-...', emissaoNF: '23/06/2026', recebNF: '30/06/2026', docCompras: '34246', poNetPrice: 'R$ 161,77', centro: 'BR06', deposito: '0020', alocacao: '002-B-004' },
-];
+import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
+import { supabase } from '../../../supabaseClient';
 
 export default function MaterialEstoque() {
   const [formDados, setFormDados] = useState({
@@ -26,11 +19,74 @@ export default function MaterialEstoque() {
   });
   
   const [itensSelecionados, setItensSelecionados] = useState([]);
-  
-  // 👇 NOVO ESTADO: Guarda os ficheiros do utilizador
   const [anexos, setAnexos] = useState([]); 
   
+  // 👇 NOVOS ESTADOS PARA O ESTOQUE REAL
+  const [estoqueDisponivel, setEstoqueDisponivel] = useState([]);
+  const [carregandoEstoque, setCarregandoEstoque] = useState(true);
+  const [pesquisaEstoque, setPesquisaEstoque] = useState(''); // Para a barra de busca funcionar
+  
   const processador = useProcessadorExcel();
+
+  // =========================================================
+  // MÁGICA: BUSCAR ESTOQUE REAL DA API PARA A LISTA LATERAL
+  // =========================================================
+  useEffect(() => {
+    const buscarEstoqueReal = async () => {
+      try {
+        const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
+        const resultado = await resposta.json();
+
+        if (resposta.ok && resultado.sucesso) {
+          // Pega apenas Entradas Aprovadas
+          const entradasAprovadas = resultado.dados.filter(sol => 
+            sol.tipo === 'Entrada' && 
+            (sol.status === 'Em Separação' || sol.status === 'Concluído')
+          );
+
+          // Extrai e formata os itens para os cartõezinhos laterais
+          const itensExtraidos = entradasAprovadas.flatMap(sol => {
+            return sol.itens.map(item => ({
+              idBD: item.id,
+              desenhoSAP: item.desenho_sap_manual || '-',
+              materialDescription: item.descricao_manual || '-',
+              numPecaFabricante: item.part_number_manual || '-',
+              fornecedor: item.fornecedor || '-',
+              qtdFornecida: item.quantidade_solicitada || 0, // Funciona como o Saldo visual aqui
+              nf: item.nf_entrada || '-',
+              referencia: '-',
+              unidadeMedida: item.unidade_medida_manual || 'Unid',
+              vendorDescription: item.descricao_manual || '-',
+              wbs: item.wbs_element || sol.wbs || '-',
+              alocacao: item.alocacao || '-'
+            }));
+          });
+
+          // Mostramos na lista apenas os que têm saldo maior que 0
+          const itensComSaldo = itensExtraidos.filter(i => i.qtdFornecida > 0);
+          setEstoqueDisponivel(itensComSaldo);
+        } else {
+          console.error("Erro retornado do servidor:", resultado.erro);
+        }
+      } catch (error) {
+        console.error("Falha ao buscar dados do estoque:", error);
+      } finally {
+        setCarregandoEstoque(false);
+      }
+    };
+
+    buscarEstoqueReal();
+  }, []);
+
+  // Filtra a lista lateral com base no que o utilizador escreve na barra de pesquisa
+  const estoqueFiltrado = estoqueDisponivel.filter(item => {
+    const termo = pesquisaEstoque.toLowerCase();
+    return (
+      item.desenhoSAP.toLowerCase().includes(termo) ||
+      item.numPecaFabricante.toLowerCase().includes(termo) ||
+      item.materialDescription.toLowerCase().includes(termo)
+    );
+  });
 
   const handleImportarExcel = async (arquivo) => {
     const novosItens = await processador.iniciarProcessamento(arquivo);
@@ -104,9 +160,7 @@ export default function MaterialEstoque() {
         });
       }
     }
-    // =========================================================
 
-    // Adicionamos os anexos processados ao payload
     const payload = {
       solicitante: formDados,
       itens: itensSelecionados,
@@ -126,7 +180,7 @@ export default function MaterialEstoque() {
         alert(`Sucesso! Solicitação criada com o ID: ${dados.ps_id}`);
         setFormDados({ nome: '', wbs: '', destino: '', dataNecessidade: '', observacoes: '', entregaUrgente: false });
         setItensSelecionados([]);
-        setAnexos([]); // 👈 Limpa a caixa de anexos
+        setAnexos([]);
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
       }
@@ -216,19 +270,9 @@ export default function MaterialEstoque() {
           </div>
         </div>
 
-        {/* 👇 COMPONENTE DE ANEXOS ADICIONADO AQUI! */}
         <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} />
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '12px',
-          padding: '16px',
-          border: '1px solid #cbd5e1',
-          borderRadius: '8px',
-          backgroundColor: '#f8fafc',
-          marginTop: '20px'
-        }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#f8fafc', marginTop: '20px' }}>
           <input 
             type="checkbox" 
             id="checkbox-urgente"
@@ -253,11 +297,14 @@ export default function MaterialEstoque() {
 
       <div className="selecao-itens-grid">
         
+        {/* ========================================================= */}
+        {/* COLUNA ESQUERDA: LISTA DE ESTOQUE REAL                    */}
+        {/* ========================================================= */}
         <div className="painel-lista" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           
           <div className="painel-lista-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b', margin: 0 }}>Estoque Disponível</h3>
-            <span className="badge-contador-simples">116 itens</span>
+            <span className="badge-contador-simples">{estoqueFiltrado.length} itens</span>
           </div>
           
           <div className="pesquisa-estoque" style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
@@ -266,42 +313,55 @@ export default function MaterialEstoque() {
               <input 
                 type="text" 
                 placeholder="Buscar por SAP, PN, Descrição..." 
+                value={pesquisaEstoque}
+                onChange={(e) => setPesquisaEstoque(e.target.value)} // 👈 Busca real ativada
                 style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none', color: '#334155', boxSizing: 'border-box' }}
               />
             </div>
           </div>
 
           <div className="lista-rolavel" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-            {estoqueDisponivel.map((item, index) => (
-              <div 
-                key={`estoque-${index}`} 
-                className="item-estoque-card" 
-                onClick={() => adicionarManualmente(item, index)}
-                style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }}
-              >
-                <div style={{ marginBottom: '12px' }}>
-                  <span className="badge-sap">{item.desenhoSAP}</span>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontWeight: '600', color: '#475569' }}>{item.numPecaFabricante}</span>
-                  <span className="badge-nf">NF: {item.nf}</span>
-                </div>
-                
-                <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.875rem' }}>
-                  {item.materialDescription}
-                </div>
-                
-                <div style={{ fontSize: '0.875rem', display: 'flex', gap: '8px' }}>
-                  <span style={{ color: '#10b981', fontWeight: '500' }}>
-                    Saldo: <strong style={{ fontWeight: '700' }}>{item.qtdFornecida}</strong>
-                  </span>
-                  <span style={{ color: '#2563eb', fontFamily: 'monospace' }}>
-                    {item.alocacao}
-                  </span>
-                </div>
+            {carregandoEstoque ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px auto', display: 'block' }} />
+                Carregando materiais disponíveis...
               </div>
-            ))}
+            ) : estoqueFiltrado.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                Nenhum material encontrado no estoque físico.
+              </div>
+            ) : (
+              estoqueFiltrado.map((item, index) => (
+                <div 
+                  key={`estoque-${index}`} 
+                  className="item-estoque-card" 
+                  onClick={() => adicionarManualmente(item, index)}
+                  style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }}
+                >
+                  <div style={{ marginBottom: '12px' }}>
+                    <span className="badge-sap">{item.desenhoSAP}</span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ fontWeight: '600', color: '#475569' }}>{item.numPecaFabricante}</span>
+                    <span className="badge-nf">NF: {item.nf}</span>
+                  </div>
+                  
+                  <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.875rem' }}>
+                    {item.materialDescription}
+                  </div>
+                  
+                  <div style={{ fontSize: '0.875rem', display: 'flex', gap: '8px' }}>
+                    <span style={{ color: '#10b981', fontWeight: '500' }}>
+                      Saldo: <strong style={{ fontWeight: '700' }}>{item.qtdFornecida}</strong>
+                    </span>
+                    <span style={{ color: '#2563eb', fontFamily: 'monospace' }}>
+                      {item.alocacao}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -314,7 +374,7 @@ export default function MaterialEstoque() {
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <ExemploExcel />
-              <span className="badge-contador-simples">{listaSegura.length}/25</span>
+              <span className="badge-contador-simples">{listaSegura.length} itens</span>
             </div>
           </div>
 
