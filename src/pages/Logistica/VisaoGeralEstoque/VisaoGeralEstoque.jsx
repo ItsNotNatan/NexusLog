@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import './VisaoGeralEstoque.css';
-import { DollarSign, Search, CheckCircle2, XCircle, Loader2, Edit } from 'lucide-react'; // 👈 Importamos o Edit
+import { DollarSign, Search, CheckCircle2, XCircle, Loader2, Edit, Box, X } from 'lucide-react'; // 👈 Importamos Box e X
 
-// 👇 Adicionada a prop 'perfil'
+// Dados Mockados do Histórico (Exatamente como na tua imagem)
+const mockHistorico = [
+  { bs: '#10993', data: '14/07/2026', solicitante: 'NATAN GUIMARES', destino: 'TESTE', qtdSaida: 1, status: 'Em Separação' },
+  { bs: '#10992', data: '14/07/2026', solicitante: 'NATAN G', destino: 'TESTE', qtdSaida: 10, status: 'Em Separação' },
+  { bs: '#10985', data: '06/07/2026', solicitante: 'DOUGLAS FELIPE', destino: 'BR01 - MANUFACTURING', qtdSaida: 1, status: 'Em Separação' },
+  { bs: '#10984', data: '06/07/2026', solicitante: 'TESTE', destino: 'TESTE', qtdSaida: 40, status: 'Em Separação' },
+  { bs: '#10983', data: '03/07/2026', solicitante: 'teste', destino: 'teste', qtdSaida: 1, status: 'Em Separação' },
+  { bs: '#10982', data: '03/07/2026', solicitante: 'HADELINE', destino: 'MANUFACTURING', qtdSaida: 40, status: 'Em Separação' },
+];
+
 export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
   const [pesquisa, setPesquisa] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('Todos');
@@ -10,7 +19,9 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
   const [dadosEstoque, setDadosEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
-  // MÁGICA: Buscar dados reais da API quando a página carrega
+  // 👇 NOVO ESTADO: Controla qual item está aberto no modal (se null, o modal está fechado)
+  const [modalItem, setModalItem] = useState(null);
+
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
@@ -18,13 +29,11 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
         const resultado = await resposta.json();
 
         if (resposta.ok && resultado.sucesso) {
-          // 1. Filtra APENAS as solicitações de "Entrada" que já foram aprovadas
           const entradasAprovadas = resultado.dados.filter(sol => 
             sol.tipo === 'Entrada' && 
             (sol.status === 'Em Separação' || sol.status === 'Concluído')
           );
 
-          // 2. Extrai todos os itens de dentro dessas solicitações e formata para a tabela
           const itensExtraidos = entradasAprovadas.flatMap(sol => {
             return sol.itens.map(item => ({
               id: item.id,
@@ -36,9 +45,7 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
               qtdNf: item.quantidade_solicitada || 0,
               saldo: item.quantidade_solicitada || 0, 
               un: item.unidade_medida_manual || 'Unid',
-              
               valorUnitRaw: item.valor_unitario_manual || 0, 
-              
               valorUnit: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual.toFixed(2)}` : 'R$ 0,00',
               alocacao: item.alocacao || '-',
               wbs: item.wbs_element || sol.wbs || '-', 
@@ -60,7 +67,6 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
     buscarEstoqueReal();
   }, []);
 
-  // Lógica de Filtragem 
   const dadosFiltrados = dadosEstoque.filter((item) => {
     let passaStatus = true;
     if (filtroStatus === 'Disponíveis') passaStatus = item.status === 'Disponível';
@@ -76,7 +82,6 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
     return passaStatus && passaPesquisa;
   });
 
-  // KPIs
   const totalItens = dadosEstoque.length;
   const disponiveis = dadosEstoque.filter(i => i.status === 'Disponível').length;
   const zerados = dadosEstoque.filter(i => i.status === 'Zerado').length;
@@ -90,7 +95,6 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
     currency: 'BRL'
   }).format(somaTotal);
 
-  // 👇 Função para lidar com o clique no botão Editar
   const handleEditarItem = (idItem) => {
     alert(`Ação de edição para o item ${idItem} ainda será construída!`);
   };
@@ -100,7 +104,6 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
       
       <header className="visao-cabecalho">
         <h1>Visão Geral do Estoque</h1>
-        {/* 👇 Descrição dinâmica baseada no perfil */}
         <p>
           {perfil === 'logistica' 
             ? 'Edição manual completa de todos os materiais — perfil Logística' 
@@ -162,6 +165,10 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
 
         <div className="tabela-info-resultados">
           {dadosFiltrados.length} resultado(s)
+          {/* 👇 Avisozinho discreto para o utilizador */}
+          <span style={{ marginLeft: '12px', fontSize: '0.75rem', color: '#94a3b8' }}>
+            (Dê um duplo clique numa linha para ver o Histórico de Saídas)
+          </span>
         </div>
 
         <div className="tabela-scroll">
@@ -180,7 +187,6 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
                 <th>ALOCAÇÃO</th>
                 <th>WBS</th>
                 <th>SITUAÇÃO</th>
-                {/* 👇 Condição para mostrar a coluna de ações apenas para logística */}
                 {perfil === 'logistica' && <th style={{ textAlign: 'center' }}>AÇÕES</th>}
               </tr>
             </thead>
@@ -200,7 +206,11 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
                 </tr>
               ) : (
                 dadosFiltrados.map((item, index) => (
-                  <tr key={index}>
+                  <tr 
+                    key={index} 
+                    className="linha-tabela-hover"
+                    onDoubleClick={() => setModalItem(item)} // 👈 A MÁGICA DO DUPLO CLIQUE AQUI
+                  >
                     <td className="fonte-mono">{item.sap}</td>
                     <td className="fonte-mono">{item.pn}</td>
                     <td style={{ minWidth: '220px' }}>{item.desc}</td>
@@ -225,20 +235,14 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
                         </span>
                       )}
                     </td>
-
-                    {/* 👇 Botão de edição visível apenas para Logística */}
+                    
                     {perfil === 'logistica' && (
                       <td style={{ textAlign: 'center' }}>
                         <button 
-                          onClick={() => handleEditarItem(item.id)}
+                          onClick={(e) => { e.stopPropagation(); handleEditarItem(item.id); }} // e.stopPropagation evita que o clique no botão ative a linha
                           style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#3b82f6',
-                            cursor: 'pointer',
-                            padding: '6px',
-                            borderRadius: '6px',
-                            transition: 'background-color 0.2s'
+                            background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer',
+                            padding: '6px', borderRadius: '6px', transition: 'background-color 0.2s'
                           }}
                           onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
                           onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -254,8 +258,87 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
             </tbody>
           </table>
         </div>
-
       </div>
+
+{/* ======================================================== */}
+      {/* 👇 O NOSSO NOVO MODAL DE HISTÓRICO                       */}
+      {/* ======================================================== */}
+      {modalItem && (
+        <div className="modal-historico-overlay" onClick={() => setModalItem(null)}>
+          <div className="modal-historico-content" onClick={(e) => e.stopPropagation()}>
+            
+            {/* Header do Modal */}
+            <div className="modal-historico-header">
+              <div className="modal-historico-titulo">
+                <div className="modal-icone-bg"><Box size={24} /></div>
+                <div>
+                  <h3>Histórico de Saídas</h3>
+                  <p>{modalItem.pn}</p>
+                </div>
+              </div>
+              <button className="btn-fechar-modal" onClick={() => setModalItem(null)}>
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Faixa de Resumo */}
+            <div className="modal-historico-resumo">
+              <div className="resumo-item" style={{ flex: 1, minWidth: '200px' }}>
+                <span>Descrição</span>
+                <strong style={{ fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {modalItem.desc}
+                </strong>
+              </div>
+              <div className="resumo-item">
+                <span>Saldo Atual</span>
+                {/* 👇 Removido o modalItem.un daqui */}
+                <strong className="texto-verde-modal">{modalItem.saldo}</strong>
+              </div>
+              <div className="resumo-item">
+                <span>Qtd. Original (NF)</span>
+                {/* 👇 Removido o modalItem.un daqui */}
+                <strong>{modalItem.qtdNf}</strong>
+              </div>
+              <div className="resumo-item">
+                <span>Total Saído</span>
+                {/* 👇 Removido o modalItem.un daqui */}
+                <strong className="texto-vermelho-modal">93</strong>
+              </div>
+            </div>
+
+            {/* Tabela de Saídas */}
+            <div className="modal-historico-tabela-wrapper">
+              <table className="tabela-modal">
+                <thead>
+                  <tr>
+                    <th>BS</th>
+                    <th>DATA</th>
+                    <th>SOLICITANTE</th>
+                    <th>DESTINO</th>
+                    <th>QTD. SAÍDA</th>
+                    <th>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mockHistorico.map((hist, idx) => (
+                    <tr key={idx}>
+                      <td className="fonte-mono"><a href="#" className="link-azul">{hist.bs}</a></td>
+                      <td>{hist.data}</td>
+                      <td className="fonte-negrito" style={{ textTransform: 'uppercase' }}>{hist.solicitante}</td>
+                      <td>{hist.destino}</td>
+                      {/* 👇 Removido o modalItem.un daqui também */}
+                      <td className="texto-vermelho-destaque">{hist.qtdSaida}</td>
+                      <td><span className="badge-separacao-modal">{hist.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
