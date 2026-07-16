@@ -40,7 +40,7 @@
 
 .tipos-container {
   display: grid;
-  grid-template-columns: repeat(7, 1fr); /* 👈 A MÁGICA: Força exatamente 7 colunas iguais na mesma linha */
+  grid-template-columns: repeat(7, minmax(0, 1fr)); /* 👈 A VERDADEIRA MÁGICA: minmax(0, 1fr) espreme as 7 colunas à força para caberem na tela! */
   gap: 12px;
   margin-bottom: 24px;
   width: 100%;
@@ -50,14 +50,15 @@
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 16px 12px;
+  padding: 14px 10px; /* Ligeiro ajuste no padding para caber melhor */
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
-  align-items: flex-start; /* 👈 Garante que o ícone e texto ficam encostados à esquerda como na imagem */
-  text-align: left;        /* 👈 Texto alinhado à esquerda */
-  min-width: 0;            /* Permite encolher sem criar barra de scroll */
+  align-items: flex-start;
+  text-align: left;
+  min-width: 0; 
+  overflow: hidden; /* 👈 Impede o conteúdo de vazar e quebrar o cartão */
 }
 
 .tipo-cartao:hover {
@@ -66,8 +67,8 @@
 }
 
 .tipo-icone {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   background-color: #f8fafc;
   color: #64748b;
   border-radius: 8px;
@@ -80,17 +81,19 @@
 }
 
 .tipo-titulo {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 700; /* Mais negrito para se destacar mesmo sendo menor */
   color: #1e293b;
   margin-bottom: 4px;
   line-height: 1.2;
   width: 100%;
-  word-wrap: break-word; /* Quebra palavras grandes se a tela for menor */
+  overflow-wrap: break-word; /* 👈 Quebra as palavras com segurança */
+  word-wrap: break-word;
+  hyphens: auto; /* 👈 Coloca um tracinho (-) caso precise quebrar palavras grandes */
 }
 
 .tipo-desc {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #64748b;
   line-height: 1.3;
 }
