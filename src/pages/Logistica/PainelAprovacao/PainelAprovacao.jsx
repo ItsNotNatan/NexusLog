@@ -1,46 +1,23 @@
 import React, { useState, useEffect } from 'react';
-
-// 👇 MÁGICA: Importamos o CSS do Acompanhamento para ficar 100% igual sem duplicar código!
-import '../../Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.css';
-
+import './PainelAprovacao.css';
 import { 
   Search, 
-  ChevronRight, 
-  GitBranch, 
+  Clock, 
   FileText, 
-  CheckCircle2, 
-  XCircle,
-  Zap,
-  Loader2,
-  Clock
+  Check, 
+  X, 
+  Eye, 
+  Loader2 
 } from 'lucide-react';
 
-// 👇 IMPORTAÇÃO DOS COMPONENTES
 import DetalhesSolicitacao from '../../Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao';
-
-const obterClasseBadgeTipo = (tipo) => {
-  switch (tipo) {
-    case 'Transfer. WBS':
-    case 'Transferencia WBS': return 'badge-tipo-amarelo';
-    case 'Nota Fiscal': return 'badge-tipo-roxo';
-    case 'Entrada': return 'badge-tipo-verde';
-    case 'Crossdocking': return 'badge-tipo-ciano';
-    case 'Reintegração':
-    case 'Reintegracao': return 'badge-tipo-laranja';
-    case 'Cancelado': return 'badge-tipo-vermelho';
-    case 'Material':
-    default: return 'badge-tipo-azul';
-  }
-};
 
 export default function PainelAprovacao() {
   const [dadosTabela, setDadosTabela] = useState([]);
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [carregando, setCarregando] = useState(true);
-  
   const [linhaExpandida, setLinhaExpandida] = useState(null);
 
-  // --- BUSCA OS DADOS REAIS DA API ---
   useEffect(() => {
     const buscarPendentes = async () => {
       try {
@@ -48,8 +25,6 @@ export default function PainelAprovacao() {
         const resultado = await resposta.json();
 
         if (resposta.ok && resultado.sucesso) {
-          
-          // Filtramos APENAS os Pendentes e formatamos
           const dadosFormatados = resultado.dados
             .filter(item => item.status === 'Pendente')
             .map((item) => {
@@ -58,9 +33,19 @@ export default function PainelAprovacao() {
               else if (item.tipo === 'Nota Fiscal') prefixo = 'NF';
               else if (item.tipo === 'Transferencia WBS') prefixo = 'TR';
               else if (item.tipo === 'Reintegracao') prefixo = 'REI';
-              else if (item.tipo === 'Entrada') prefixo = 'EN';
+              else if (item.tipo === 'Entrada') prefixo = 'ENT';
 
               const idNumerico = item.id.replace(/\D/g, '');
+
+              // Calcula o total para as Entradas
+              let valorTotal = 0;
+              let centro = '-';
+              let dep = '-';
+              if (item.tipo === 'Entrada' && item.itens && item.itens.length > 0) {
+                valorTotal = item.itens.reduce((acc, it) => acc + (Number(it.quantidade_solicitada) * Number(it.valor_unitario_manual || 0)), 0);
+                centro = item.itens[0].centro || 'BR06'; // Fallback visual
+                dep = item.itens[0].deposito || '0020';
+              }
 
               return {
                 ...item,
@@ -68,12 +53,13 @@ export default function PainelAprovacao() {
                 id: idNumerico || item.id,
                 prefixo: prefixo,
                 dataSolicitacao: item.dataSolicitacao || '-',
-                bs: item.bs || '-'
+                valorTotalFormatado: valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : null,
+                centro,
+                deposito: dep
               };
             });
 
           setDadosTabela(dadosFormatados);
-
         } else {
           console.error("Erro retornado do servidor:", resultado.erro);
         }
@@ -87,7 +73,6 @@ export default function PainelAprovacao() {
     buscarPendentes();
   }, []);
 
-  // FILTRAGEM DE PESQUISA EM TEMPO REAL
   const dadosFiltrados = dadosTabela.filter((linha) => {
     const termoLower = termoPesquisa.toLowerCase();
     return (
@@ -97,223 +82,232 @@ export default function PainelAprovacao() {
     );
   });
 
+  // SEPARADOR DE LISTAS
+  const entradasPendentes = dadosFiltrados.filter(item => item.tipo === 'Entrada');
+  const outrasPendentes = dadosFiltrados.filter(item => item.tipo !== 'Entrada');
+
   const toggleLinha = (idUnico) => {
     setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
   };
 
-  // =========================================================================
-  // --- FUNÇÕES DE APROVAÇÃO E RECUSA REAIS (Conectadas ao Backend) ---
-  // =========================================================================
-
   const handleAprovar = async (e, idOriginal) => {
-    e.stopPropagation(); // 👈 Impede que a linha se expanda ao clicar no botão
-
-    if (window.confirm(`Tem a certeza que deseja APROVAR a solicitação ${idOriginal} e gerar o BS?`)) {
+    e.stopPropagation();
+    if (window.confirm(`Aprovar a solicitação ${idOriginal}?`)) {
       try {
         const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH', 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'Em Separação' }) 
         });
-
         if (resposta.ok) {
-          alert(`Solicitação ${idOriginal} aprovada! BS gerado com sucesso.`);
-          // Remove o item aprovado da tela imediatamente
+          alert(`Solicitação aprovada!`);
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
         } else {
-          const erro = await resposta.json();
-          alert(`Erro ao aprovar: ${erro.mensagem || 'Falha no servidor.'}`);
+          alert("Erro ao aprovar no servidor.");
         }
       } catch (error) {
-        console.error("Erro na requisição de aprovação:", error);
-        alert("Erro ao conectar com o servidor. Verifique se o backend está a rodar.");
+        alert("Erro de conexão.");
       }
     }
   };
 
   const handleRecusar = async (e, idOriginal) => {
-    e.stopPropagation(); // 👈 Impede que a linha se expanda ao clicar no botão
-
-    const motivo = window.prompt(`Qual o motivo da reprovação para a solicitação ${idOriginal}?`);
-    
+    e.stopPropagation();
+    const motivo = window.prompt(`Motivo da recusa para ${idOriginal}?`);
     if (motivo) {
       try {
         const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH', 
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            status: 'Recusado',
-            motivo_recusa: motivo 
-          }) 
+          body: JSON.stringify({ status: 'Recusado', motivo_recusa: motivo }) 
         });
-
         if (resposta.ok) {
-          alert(`Solicitação ${idOriginal} reprovada com sucesso.`);
-          // Remove o item recusado da tela imediatamente
+          alert(`Solicitação recusada.`);
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
         } else {
-          const erro = await resposta.json();
-          alert(`Erro ao reprovar: ${erro.mensagem || 'Falha no servidor.'}`);
+          alert("Erro ao recusar no servidor.");
         }
       } catch (error) {
-        console.error("Erro na requisição de recusa:", error);
-        alert("Erro ao conectar com o servidor. Verifique se o backend está a rodar.");
+        alert("Erro de conexão.");
       }
     }
   };
 
   return (
-    <div className="acompanhamento-wrapper">
-
-      {/* CABEÇALHO */}
+    <div className="dashboard-container">
+      
       <header className="acompanhamento-cabecalho">
         <h1>Painel de Aprovação</h1>
-        <p>Aprove rapidamente solicitações pendentes para gerar o Boletim de Saída (BS).</p>
+        <p>Analise e aprove as solicitações pendentes para dar andamento à operação.</p>
       </header>
 
-      {/* TABELA */}
-      <div className="tabela-cartao-container">
-        
-        <div className="tabela-controlos-topo">
-          <div className="filtros-botoes">
-            <button className="btn-aba ativo" style={{ cursor: 'default' }}>
-              <Clock size={14} style={{ display: 'inline', marginBottom: '-2px', marginRight: '6px' }} />
-              Aguardando Aprovação ({dadosFiltrados.length})
-            </button>
-          </div>
-          <div className="pesquisa-wrapper-direita">
-            <Search className="icone-pesquisa-dir" size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar por ID, solicitante, WBS..." 
-              value={termoPesquisa} 
-              onChange={(e) => setTermoPesquisa(e.target.value)} 
-            />
-          </div>
-        </div>
+      <div className="pesquisa-wrapper-direita">
+        <Search className="icone-pesquisa-dir" size={18} />
+        <input 
+          type="text" 
+          placeholder="Buscar por ID, WBS ou Solicitante..." 
+          value={termoPesquisa} 
+          onChange={(e) => setTermoPesquisa(e.target.value)} 
+        />
+      </div>
 
-        <div className="tabela-scroll-horizontal">
-          {carregando ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '40px', color: '#94a3b8' }}>
-              <Loader2 size={24} className="animate-spin" />
-              <span style={{ fontSize: '0.875rem' }}>Buscando solicitações pendentes...</span>
+      {carregando ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px', color: '#94a3b8' }}>
+          <Loader2 size={32} className="animate-spin" style={{ marginBottom: '12px' }} />
+          <span>Carregando solicitações...</span>
+        </div>
+      ) : (
+        <>
+          {/* ======================================================== */}
+          {/* SECÇÃO 1: SOLICITAÇÕES GERAIS (Amarelo)                  */}
+          {/* ======================================================== */}
+          <div className="seccao-painel tema-amarelo">
+            <div className="seccao-header borda-amarela">
+              <div className="seccao-titulo amarelo">
+                <Clock size={20} />
+                Solicitações Pendentes
+              </div>
+              <span className="badge-contagem-seccao amarelo">{outrasPendentes.length}</span>
             </div>
-          ) : dadosFiltrados.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-              <CheckCircle2 size={48} style={{ opacity: 0.2, margin: '0 auto 16px auto', display: 'block' }} />
-              Nenhuma solicitação pendente no momento. Bom trabalho!
-            </div>
-          ) : (
-            <table className="tabela-solicitacoes">
-              <thead>
-                <tr>
-                  <th className="col-chevron"></th>
-                  <th>TIPO</th>
-                  <th>ID / SOLICITANTE / WBS</th>
-                  <th>DATA CRIAÇÃO</th>
-                  <th>STATUS</th>
-                  <th style={{ textAlign: 'right' }}>AÇÕES</th> 
-                </tr>
-              </thead>
-              <tbody>
-                {dadosFiltrados.map((linha, index) => {
-                  const idUnico = `${linha.prefixo}-${linha.id}-${index}`;
+
+            {outrasPendentes.length === 0 ? (
+              <div className="estado-vazio-seccao">
+                <div className="circulo-check verde-claro">
+                  <Check size={24} />
+                </div>
+                <span>Nenhuma solicitação pendente</span>
+              </div>
+            ) : (
+              <div className="lista-solicitacoes">
+                {outrasPendentes.map((linha, index) => {
+                  const idUnico = `geral-${linha.idOriginal}`;
                   const isExpandida = linhaExpandida === idUnico;
                   
                   return (
                     <React.Fragment key={idUnico}>
-                      
-                      <tr className={isExpandida ? 'tr-expandida' : ''} style={{ cursor: 'pointer' }} onClick={() => toggleLinha(idUnico)}>
-                        <td className="col-chevron">
-                          <ChevronRight size={18} className={isExpandida ? 'icone-rotacionado' : 'icone-normal'} style={{ color: '#94a3b8' }} />
-                        </td>
+                      <div className="item-lista-horizontal">
                         
-                        <td>
-                          <div className="bloco-tipo-id">
-                            <span className={`badge-tipo ${obterClasseBadgeTipo(linha.tipo)} ${linha.entregaUrgente ? 'badge-urgente-critico' : ''}`}>
-                              {linha.entregaUrgente ? <Zap size={13} color="#ef4444" fill="#ef4444" /> : <GitBranch size={13} />} 
-                              {linha.tipo}
-                            </span>
+                        <div className="item-info-principal">
+                          <div className="item-linha-id">
+                            {linha.prefixo}:{linha.id}
+                            <span className="badge-tipo-lista azul">{linha.tipo}</span>
                           </div>
-                        </td>
-
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#1e293b' }}>
-                              {linha.prefixo || 'PS'}:{linha.id}
-                            </span>
-                            <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>
-                              {linha.solicitante}
-                            </span>
-                            {linha.wbs && (
-                              <span style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: '500' }}>
-                                {linha.wbs}
-                              </span>
-                            )}
+                          
+                          <div className="item-meta-info">
+                            WBS: <a href="#" className="link-wbs">{linha.wbs}</a> &middot;
+                            {linha.itens?.length || 0} itens &middot;
+                            {linha.solicitante} &middot;
+                            {linha.dataSolicitacao}
                           </div>
-                        </td>
+                          
+                          {linha.observacoes && (
+                            <div className="item-obs">Obs: {linha.observacoes}</div>
+                          )}
+                        </div>
 
-                        <td className="texto-data">{linha.dataSolicitacao}</td>
-                        
-                        <td>
-                          <span className="badge-status status-separacao" style={{ backgroundColor: '#fffbeb', color: '#d97706', borderColor: '#fde68a' }}>
-                            <Clock size={14} /> Pendente
-                          </span>
-                        </td>
+                        <div className="item-acoes-grupo">
+                          <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico)}>
+                            <Eye size={16} /> Ver Itens
+                          </button>
+                          <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
+                            <X size={16} /> Recusar
+                          </button>
+                          <button className="btn-acao-lista btn-aprovar-solid azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
+                            <Check size={16} /> Aprovar
+                          </button>
+                        </div>
+                      </div>
 
-                        {/* 👇 CÉLULA COM OS BOTÕES DE AÇÃO DIRETOS NA LINHA */}
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                            {/* 👇 BOTÃO REPROVAR ATUALIZADO AQUI */}
-                            <button 
-                              onClick={(e) => handleRecusar(e, linha.idOriginal)}
-                              style={{ 
-                                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', 
-                                backgroundColor: '#ffffff', color: '#ef4444', border: '1px solid #fecaca', 
-                                borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
-                              }}
-                              title="Reprovar Solicitação"
-                              onMouseOver={e => e.currentTarget.style.backgroundColor = '#fef2f2'}
-                              onMouseOut={e => e.currentTarget.style.backgroundColor = '#ffffff'}
-                            >
-                              <XCircle size={16} /> Reprovar
-                            </button>
-
-                            <button 
-                              onClick={(e) => handleAprovar(e, linha.idOriginal)}
-                              style={{ 
-                                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', 
-                                backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', 
-                                fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
-                              }}
-                              onMouseOver={e => e.currentTarget.style.backgroundColor = '#059669'}
-                              onMouseOut={e => e.currentTarget.style.backgroundColor = '#10b981'}
-                            >
-                              <CheckCircle2 size={16} /> Aprovar e Gerar BS
-                            </button>
-                          </div>
-                        </td>
-
-                      </tr>
-
-                      {/* GAVETA DE DETALHES */}
                       {isExpandida && (
-                        <tr>
-                          <td colSpan={6} className="td-expandida">
-                            <DetalhesSolicitacao item={linha} />
-                          </td>
-                        </tr>
+                        <div className="gaveta-detalhes">
+                          <DetalhesSolicitacao item={linha} perfil="logistica" />
+                        </div>
                       )}
                     </React.Fragment>
                   );
                 })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+              </div>
+            )}
+          </div>
+
+          {/* ======================================================== */}
+          {/* SECÇÃO 2: ENTRADAS DE ESTOQUE (Verde)                      */}
+          {/* ======================================================== */}
+          <div className="seccao-painel tema-verde">
+            <div className="seccao-header borda-verde">
+              <div className="seccao-titulo verde">
+                <FileText size={20} />
+                Entradas de Estoque Pendentes
+              </div>
+              <span className="badge-contagem-seccao verde">{entradasPendentes.length}</span>
+            </div>
+
+            {entradasPendentes.length === 0 ? (
+              <div className="estado-vazio-seccao">
+                <div className="circulo-check verde-claro">
+                  <Check size={24} />
+                </div>
+                <span>Nenhuma entrada pendente</span>
+              </div>
+            ) : (
+              <div className="lista-solicitacoes">
+                {entradasPendentes.map((linha) => {
+                  const idUnico = `entrada-${linha.idOriginal}`;
+                  const isExpandida = linhaExpandida === idUnico;
+                  
+                  return (
+                    <React.Fragment key={idUnico}>
+                      <div className="item-lista-horizontal">
+                        
+                        <div className="item-info-principal">
+                          <div className="item-linha-id">
+                            {linha.prefixo}:{linha.id}
+                            <span className="badge-tipo-lista verde">Entrada</span>
+                          </div>
+                          
+                          <div className="item-meta-info">
+                            WBS: <a href="#" className="link-wbs">{linha.wbs}</a> &middot;
+                            {linha.itens?.length || 0} itens &middot;
+                            {linha.solicitante} &middot;
+                            Centro: {linha.centro} &middot;
+                            Dep: {linha.deposito} &middot;
+                            <span className="texto-valor-rs">{linha.valorTotalFormatado || 'R$ 0,00'}</span>
+                          </div>
+                          
+                          {linha.observacoes && (
+                            <div className="item-obs">Obs: {linha.observacoes}</div>
+                          )}
+                        </div>
+
+                        <div className="item-acoes-grupo">
+                          <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico)}>
+                            <Eye size={16} /> Ver Itens
+                          </button>
+                          <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
+                            <X size={16} /> Recusar
+                          </button>
+                          <button className="btn-acao-lista btn-aprovar-solid" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
+                            <Check size={16} /> Aprovar Entrada
+                          </button>
+                        </div>
+                      </div>
+
+                      {isExpandida && (
+                        <div className="gaveta-detalhes">
+                          <DetalhesSolicitacao item={linha} perfil="logistica" />
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
     </div>
   );
 }

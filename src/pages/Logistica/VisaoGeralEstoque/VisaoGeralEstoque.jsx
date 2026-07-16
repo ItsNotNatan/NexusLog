@@ -6,7 +6,6 @@ export default function VisaoGeralEstoque() {
   const [pesquisa, setPesquisa] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('Todos');
   
-  // 👇 NOVOS ESTADOS: Para guardar os dados reais do banco e controlar o carregamento
   const [dadosEstoque, setDadosEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
@@ -34,11 +33,15 @@ export default function VisaoGeralEstoque() {
               fornecedor: item.fornecedor || '-',
               nf: item.nf_entrada || '-',
               qtdNf: item.quantidade_solicitada || 0,
-              saldo: item.quantidade_solicitada || 0, // Num sistema avançado, este saldo seria calculado (Entradas - Saídas)
+              saldo: item.quantidade_solicitada || 0, 
               un: item.unidade_medida_manual || 'Unid',
+              
+              // 👇 Guardamos o número puro para poder fazer contas depois
+              valorUnitRaw: item.valor_unitario_manual || 0, 
+              
               valorUnit: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual.toFixed(2)}` : 'R$ 0,00',
               alocacao: item.alocacao || '-',
-              wbs: item.wbs_element || sol.wbs || '-', // Puxa do item, se não tiver, puxa da solicitação pai
+              wbs: item.wbs_element || sol.wbs || '-', 
               status: 'Disponível'
             }));
           });
@@ -57,14 +60,12 @@ export default function VisaoGeralEstoque() {
     buscarEstoqueReal();
   }, []);
 
-  // Lógica de Filtragem (Agora usando o estado dadosEstoque real)
+  // Lógica de Filtragem 
   const dadosFiltrados = dadosEstoque.filter((item) => {
-    // 1. Filtro de Status
     let passaStatus = true;
     if (filtroStatus === 'Disponíveis') passaStatus = item.status === 'Disponível';
     if (filtroStatus === 'Zerados') passaStatus = item.status === 'Zerado';
 
-    // 2. Filtro de Pesquisa (SAP, PN, Descrição, WBS)
     const termo = pesquisa.toLowerCase();
     const passaPesquisa = 
       item.sap.toLowerCase().includes(termo) ||
@@ -75,21 +76,34 @@ export default function VisaoGeralEstoque() {
     return passaStatus && passaPesquisa;
   });
 
-  // KPIs
+  // =======================================================
+  // 🧮 CÁLCULO DOS KPIs E DO VALOR TOTAL
+  // =======================================================
   const totalItens = dadosEstoque.length;
   const disponiveis = dadosEstoque.filter(i => i.status === 'Disponível').length;
   const zerados = dadosEstoque.filter(i => i.status === 'Zerado').length;
 
+  // 1. O método .reduce() passa por cada item da lista (dadosEstoque)
+  // 2. A variável 'acumulador' guarda a soma que vai crescendo
+  // 3. Multiplicamos a quantidade (saldo) pelo preço puro (valorUnitRaw)
+  const somaTotal = dadosEstoque.reduce((acumulador, item) => {
+    return acumulador + (item.saldo * item.valorUnitRaw);
+  }, 0); // O 0 no final indica que a soma começa em zero
+
+  // Formata o número final (ex: 1500.5) para o visual brasileiro (R$ 1.500,50)
+  const valorTotalFormatado = new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(somaTotal);
+
   return (
     <div className="visao-geral-wrapper">
       
-      {/* CABEÇALHO */}
       <header className="visao-cabecalho">
         <h1>Visão Geral do Estoque</h1>
         <p>Edição manual completa de todos os materiais — perfil Logística</p>
       </header>
 
-      {/* CARTÃO RESUMO (VALORES E KPIs) */}
       <div className="cartao-resumo-estoque">
         <div className="bloco-valor-total">
           <div className="icone-cifrao-bg">
@@ -97,7 +111,8 @@ export default function VisaoGeralEstoque() {
           </div>
           <div className="textos-valor">
             <label>VALOR TOTAL DO ESTOQUE</label>
-            <h2>R$ --,--</h2> {/* Numa fase futura podemos criar um .reduce() para somar os valoresUnit * saldo */}
+            {/* 👇 Mostra o valor calculado e formatado aqui */}
+            <h2>{valorTotalFormatado}</h2> 
           </div>
         </div>
 
@@ -117,10 +132,7 @@ export default function VisaoGeralEstoque() {
         </div>
       </div>
 
-      {/* TABELA E CONTROLES */}
       <div className="cartao-tabela">
-        
-        {/* Controles: Abas e Pesquisa */}
         <div className="tabela-controles">
           <div className="filtros-abas">
             {['Todos', 'Disponíveis', 'Zerados'].map(aba => (
@@ -145,12 +157,10 @@ export default function VisaoGeralEstoque() {
           </div>
         </div>
 
-        {/* Total de Resultados da Busca */}
         <div className="tabela-info-resultados">
           {dadosFiltrados.length} resultado(s)
         </div>
 
-        {/* Tabela Scrollável */}
         <div className="tabela-scroll">
           <table className="dados-table">
             <thead>
