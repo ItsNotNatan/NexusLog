@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './VisaoGeralEstoque.css';
-import { DollarSign, Search, CheckCircle2, XCircle, Loader2, Edit, Box, X } from 'lucide-react'; // 👈 Importamos Box e X
+import { DollarSign, Search, CheckCircle2, XCircle, Loader2, Edit, Box, X } from 'lucide-react'; // 👈 Ícones importados
 
-// Dados Mockados do Histórico (Exatamente como na tua imagem)
+// 👇 Dados Mockados do Histórico (Como não temos rota para isto ainda, usamos os dados da imagem)
 const mockHistorico = [
   { bs: '#10993', data: '14/07/2026', solicitante: 'NATAN GUIMARES', destino: 'TESTE', qtdSaida: 1, status: 'Em Separação' },
   { bs: '#10992', data: '14/07/2026', solicitante: 'NATAN G', destino: 'TESTE', qtdSaida: 10, status: 'Em Separação' },
@@ -19,7 +19,7 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
   const [dadosEstoque, setDadosEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
-  // 👇 NOVO ESTADO: Controla qual item está aberto no modal (se null, o modal está fechado)
+  // 👇 NOVO ESTADO: Controla qual item está a ser visualizado no modal. Se for null, o modal fica fechado.
   const [modalItem, setModalItem] = useState(null);
 
   useEffect(() => {
@@ -35,22 +35,26 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
           );
 
           const itensExtraidos = entradasAprovadas.flatMap(sol => {
-            return sol.itens.map(item => ({
-              id: item.id,
-              sap: item.desenho_sap_manual || '-',
-              pn: item.part_number_manual || '-',
-              desc: item.descricao_manual || '-',
-              fornecedor: item.fornecedor || '-',
-              nf: item.nf_entrada || '-',
-              qtdNf: item.quantidade_solicitada || 0,
-              saldo: item.quantidade_solicitada || 0, 
-              un: item.unidade_medida_manual || 'Unid',
-              valorUnitRaw: item.valor_unitario_manual || 0, 
-              valorUnit: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual.toFixed(2)}` : 'R$ 0,00',
-              alocacao: item.alocacao || '-',
-              wbs: item.wbs_element || sol.wbs || '-', 
-              status: 'Disponível'
-            }));
+            return sol.itens.map(item => {
+              const saldoAtual = item.quantidade_solicitada || 0; // Se houvesse saídas, a matemática seria feita aqui
+              
+              return {
+                id: item.id,
+                sap: item.desenho_sap_manual || '-',
+                pn: item.part_number_manual || '-',
+                desc: item.descricao_manual || '-',
+                fornecedor: item.fornecedor || '-',
+                nf: item.nf_entrada || '-',
+                qtdNf: item.quantidade_solicitada || 0,
+                saldo: saldoAtual, 
+                un: item.unidade_medida_manual || 'Unid',
+                valorUnitRaw: item.valor_unitario_manual || 0, 
+                valorUnit: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual.toFixed(2)}` : 'R$ 0,00',
+                alocacao: item.alocacao || '-',
+                wbs: item.wbs_element || sol.wbs || '-', 
+                status: saldoAtual === 0 ? 'Zerado' : 'Disponível' // 👇 Ajustado para suportar itens zerados dinamicamente
+              };
+            });
           });
 
           setDadosEstoque(itensExtraidos);
@@ -165,7 +169,7 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
 
         <div className="tabela-info-resultados">
           {dadosFiltrados.length} resultado(s)
-          {/* 👇 Avisozinho discreto para o utilizador */}
+          {/* 👇 Pequeno aviso de usabilidade para ensinar o utilizador que existe a funcionalidade */}
           <span style={{ marginLeft: '12px', fontSize: '0.75rem', color: '#94a3b8' }}>
             (Dê um duplo clique numa linha para ver o Histórico de Saídas)
           </span>
@@ -209,7 +213,7 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
                   <tr 
                     key={index} 
                     className="linha-tabela-hover"
-                    onDoubleClick={() => setModalItem(item)} // 👈 A MÁGICA DO DUPLO CLIQUE AQUI
+                    onDoubleClick={() => setModalItem(item)} // 👈 A MÁGICA: O Duplo Clique chama o Modal
                   >
                     <td className="fonte-mono">{item.sap}</td>
                     <td className="fonte-mono">{item.pn}</td>
@@ -235,14 +239,19 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
                         </span>
                       )}
                     </td>
-                    
+
                     {perfil === 'logistica' && (
                       <td style={{ textAlign: 'center' }}>
                         <button 
-                          onClick={(e) => { e.stopPropagation(); handleEditarItem(item.id); }} // e.stopPropagation evita que o clique no botão ative a linha
+                          onClick={(e) => { e.stopPropagation(); handleEditarItem(item.id); }} // 👈 StopPropagation impede que clicar em editar abra o modal
                           style={{
-                            background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer',
-                            padding: '6px', borderRadius: '6px', transition: 'background-color 0.2s'
+                            background: 'none',
+                            border: 'none',
+                            color: '#3b82f6',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            transition: 'background-color 0.2s'
                           }}
                           onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
                           onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -258,10 +267,11 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
             </tbody>
           </table>
         </div>
+
       </div>
 
-{/* ======================================================== */}
-      {/* 👇 O NOSSO NOVO MODAL DE HISTÓRICO                       */}
+      {/* ======================================================== */}
+      {/* 👇 MODAL DO HISTÓRICO DE SAÍDAS (Mostrado se houver clique duplo) */}
       {/* ======================================================== */}
       {modalItem && (
         <div className="modal-historico-overlay" onClick={() => setModalItem(null)}>
@@ -281,7 +291,7 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
               </button>
             </div>
 
-            {/* Faixa de Resumo */}
+            {/* Faixa de Resumo (SEM os NRs/unidades coladas aos números) */}
             <div className="modal-historico-resumo">
               <div className="resumo-item" style={{ flex: 1, minWidth: '200px' }}>
                 <span>Descrição</span>
@@ -291,22 +301,19 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
               </div>
               <div className="resumo-item">
                 <span>Saldo Atual</span>
-                {/* 👇 Removido o modalItem.un daqui */}
                 <strong className="texto-verde-modal">{modalItem.saldo}</strong>
               </div>
               <div className="resumo-item">
                 <span>Qtd. Original (NF)</span>
-                {/* 👇 Removido o modalItem.un daqui */}
                 <strong>{modalItem.qtdNf}</strong>
               </div>
               <div className="resumo-item">
                 <span>Total Saído</span>
-                {/* 👇 Removido o modalItem.un daqui */}
                 <strong className="texto-vermelho-modal">93</strong>
               </div>
             </div>
 
-            {/* Tabela de Saídas */}
+            {/* Tabela de Saídas (SEM os NRs/unidades) */}
             <div className="modal-historico-tabela-wrapper">
               <table className="tabela-modal">
                 <thead>
@@ -326,7 +333,6 @@ export default function VisaoGeralEstoque({ perfil = 'cliente' }) {
                       <td>{hist.data}</td>
                       <td className="fonte-negrito" style={{ textTransform: 'uppercase' }}>{hist.solicitante}</td>
                       <td>{hist.destino}</td>
-                      {/* 👇 Removido o modalItem.un daqui também */}
                       <td className="texto-vermelho-destaque">{hist.qtdSaida}</td>
                       <td><span className="badge-separacao-modal">{hist.status}</span></td>
                     </tr>
