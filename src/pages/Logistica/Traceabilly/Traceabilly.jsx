@@ -8,17 +8,20 @@ import {
   Box, 
   ArrowRight,
   RotateCcw,
-  Loader // Ícone extra para mostrar carregamento
+  Loader
 } from 'lucide-react';
+
+// 👇 Importamos o teu sistema de alertas globais!
+import { useAlert } from '../../../contexts/AlertContext'; 
 
 export default function Traceabilly({ perfil = 'logistica' }) {
   // 1. ESTADOS DO COMPONENTE
-  // Guardamos os itens reais vindos do banco de dados
   const [dadosRastreabilidade, setDadosRastreabilidade] = useState([]);
-  // Controlamos se a tela está a carregar
   const [carregando, setCarregando] = useState(true);
-  // Controlamos o campo de pesquisa
   const [termoPesquisa, setTermoPesquisa] = useState('');
+  
+  // Instanciamos o disparador de alertas
+  const { mostrarAlerta } = useAlert();
 
   // 2. BUSCA DE DADOS (Executado quando a tela abre)
   useEffect(() => {
@@ -28,21 +31,15 @@ export default function Traceabilly({ perfil = 'logistica' }) {
   const buscarHistorico = async () => {
     try {
       setCarregando(true);
-      // Faz a chamada à tua API real
       const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
       const json = await resposta.json();
 
       if (json.sucesso) {
         let itensExtraidos = [];
 
-        // 3. LÓGICA DE EXTRAÇÃO: A API devolve as solicitações.
-        // Precisamos de extrair os "itens" de dentro de cada solicitação aprovada.
         json.dados.forEach(solicitacao => {
-          // Filtramos apenas o que já foi processado pela logística
           if (solicitacao.status === 'Em Separação' || solicitacao.status === 'Concluído') {
-            
             solicitacao.itens.forEach(item => {
-              // Formatamos os dados para encaixar perfeitamente na tua tabela
               itensExtraidos.push({
                 id: item.id,
                 partNumber: item.part_number_manual || '-',
@@ -67,13 +64,54 @@ export default function Traceabilly({ perfil = 'logistica' }) {
       }
     } catch (error) {
       console.error("Erro ao buscar rastreabilidade:", error);
+      mostrarAlerta('Erro ao carregar o histórico.', 'erro');
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  // =========================================================================
+  // 🎯 A MÁGICA DO FRONT-END: Função para Reverter o Item ao Estoque
+  // =========================================================================
+  const handleReverterItem = async (item) => {
+    // 1. Confirmação de segurança dupla
+    const confirmar = window.confirm(`Deseja devolver o item ${item.partNumber} ao estoque e removê-lo do histórico de saídas?`);
+    if (!confirmar) return; 
+
+    try {
+      setCarregando(true);
+      
+      // 2. Comunicar com a rota do Back-end que criámos anteriormente
+      const resposta = await fetch('http://localhost:3001/api/solicitacoes/reverter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_item: item.id
+        })
+      });
+
+      const json = await resposta.json();
+
+      if (resposta.ok && json.sucesso) {
+        // 3. Sucesso! Mostra o alerta verde e remove o item da tabela visualmente
+        mostrarAlerta(`O item ${item.partNumber} retornou ao estoque principal!`, 'sucesso');
+        
+        setDadosRastreabilidade(dadosAtuais => 
+          dadosAtuais.filter(dado => dado.id !== item.id)
+        );
+      } else {
+        // Se o back-end disser que algo falhou
+        mostrarAlerta(`Falha ao reverter: ${json.erro}`, 'erro');
+      }
+    } catch (error) {
+      console.error("Erro na reversão:", error);
+      mostrarAlerta('Falha de conexão com o servidor.', 'erro');
     } finally {
       setCarregando(false);
     }
   };
 
   // 4. FILTRO DE PESQUISA INTELIGENTE
-  // Filtra a tabela conforme o utilizador digita no input de pesquisa
   const dadosFiltrados = dadosRastreabilidade.filter(item => 
     item.partNumber.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
     item.descricao.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
@@ -93,7 +131,6 @@ export default function Traceabilly({ perfil = 'logistica' }) {
       {/* --- CARTÃO PRINCIPAL --- */}
       <div className="traceabilly-cartao">
         
-        {/* Barra superior com Título e Pesquisa */}
         <div className="cartao-topo">
           <div className="titulo-grupo">
             <Archive className="icone-azul" size={20} />
@@ -108,12 +145,11 @@ export default function Traceabilly({ perfil = 'logistica' }) {
               placeholder="Buscar por PN, NF, BS, WBS, Solicitante..." 
               className="input-pesquisa"
               value={termoPesquisa}
-              onChange={(e) => setTermoPesquisa(e.target.value)} // Atualiza o termo de pesquisa
+              onChange={(e) => setTermoPesquisa(e.target.value)} 
             />
           </div>
         </div>
 
-        {/* Linha de Filtros Rápidos */}
         <div className="filtros-linha">
           <button className="btn-filtro">
             <User size={16} /> Quem solicitou
@@ -126,10 +162,8 @@ export default function Traceabilly({ perfil = 'logistica' }) {
           </button>
         </div>
 
-        {/* --- TABELA COM SCROLL HORIZONTAL --- */}
         <div className="tabela-container">
           {carregando ? (
-             // Feedback visual enquanto carrega os dados
             <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
               <Loader className="icone-girando" size={32} />
               <p>A carregar o histórico de saídas...</p>
@@ -157,7 +191,6 @@ export default function Traceabilly({ perfil = 'logistica' }) {
               <tbody>
                 {dadosFiltrados.length > 0 ? (
                   dadosFiltrados.map((linha, index) => (
-                    // Usamos index + linha.id como key para garantir unicidade
                     <tr key={`${linha.id}-${index}`}>
                       <td className="fonte-forte">{linha.partNumber}</td>
                       <td>{linha.descricao}</td>
@@ -190,7 +223,12 @@ export default function Traceabilly({ perfil = 'logistica' }) {
 
                       {perfil === 'logistica' && (
                         <td>
-                          <button className="btn-reverter" title="Reverter Saída">
+                          {/* 🎯 AQUI: Ligamos a função ao clique do botão e passamos a linha inteira! */}
+                          <button 
+                            className="btn-reverter" 
+                            title="Devolver item ao estoque"
+                            onClick={() => handleReverterItem(linha)} 
+                          >
                             <RotateCcw size={16} />
                           </button>
                         </td>
