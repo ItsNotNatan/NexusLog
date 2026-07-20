@@ -9,7 +9,7 @@ import {
   Trash2,
   Zap,
   Loader2,
-} from "lucide-react"; // 👈 Loader2 adicionado
+} from "lucide-react";
 
 // NOSSOS COMPONENTES E HOOKS
 import ModalProcessamento from "../../../components/ModalProcessamento/ModalProcessamento";
@@ -31,10 +31,9 @@ export default function MaterialEstoque() {
   const [itensSelecionados, setItensSelecionados] = useState([]);
   const [anexos, setAnexos] = useState([]);
 
-  // 👇 NOVOS ESTADOS PARA O ESTOQUE REAL
   const [estoqueDisponivel, setEstoqueDisponivel] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
-  const [pesquisaEstoque, setPesquisaEstoque] = useState(""); // Para a barra de busca funcionar
+  const [pesquisaEstoque, setPesquisaEstoque] = useState("");
 
   const processador = useProcessadorExcel();
 
@@ -44,41 +43,30 @@ export default function MaterialEstoque() {
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
-        const resposta = await fetch(
-          "http://localhost:3001/api/solicitacoes/listar",
-        );
+        // 👇 CORREÇÃO 1: Apontamos para a rota real do estoque!
+        const resposta = await fetch("http://localhost:3001/api/estoque/listar");
         const resultado = await resposta.json();
 
         if (resposta.ok && resultado.sucesso) {
-          // Pega apenas Entradas Aprovadas
-          const entradasAprovadas = resultado.dados.filter(
-            (sol) =>
-              sol.tipo === "Entrada" &&
-              (sol.status === "Em Separação" || sol.status === "Concluído"),
-          );
-
-          // Extrai e formata os itens para os cartõezinhos laterais
-          const itensExtraidos = entradasAprovadas.flatMap((sol) => {
-            return sol.itens.map((item) => ({
-              idBD: item.id,
-              desenhoSAP: item.desenho_sap_manual || "-",
-              materialDescription: item.descricao_manual || "-",
-              numPecaFabricante: item.part_number_manual || "-",
+          
+          // 👇 CORREÇÃO 2: Lemos diretamente da tabela de estoque físico
+          const itensComSaldo = resultado.dados
+            .filter((item) => item.quantidade_disponivel > 0) // Pega só o que tem saldo
+            .map((item) => ({
+              idBD: item.id, // AGORA SIM! Este é o ID real da prateleira na tabela "estoque"
+              desenhoSAP: item.desenho_sap_manual || item.desenho_sap || "-",
+              materialDescription: item.descricao_manual || item.descricao || "-",
+              numPecaFabricante: item.part_number_manual || item.part_number || "-",
               fornecedor: item.fornecedor || "-",
-              qtdFornecida: item.quantidade_solicitada || 0, // Funciona como o Saldo visual aqui
+              qtdFornecida: item.quantidade_disponivel || 0, // Mostramos o Saldo Real
               nf: item.nf_entrada || "-",
               referencia: "-",
-              unidadeMedida: item.unidade_medida_manual || "Unid",
-              vendorDescription: item.descricao_manual || "-",
-              wbs: item.wbs_element || sol.wbs || "-",
+              unidadeMedida: item.unidade_medida_manual || item.unidade_medida || "Unid",
+              vendorDescription: item.descricao_manual || item.descricao || "-",
+              wbs: item.wbs_element || item.wbs || "-",
               alocacao: item.alocacao || "-",
             }));
-          });
 
-          // Mostramos na lista apenas os que têm saldo maior que 0
-          const itensComSaldo = itensExtraidos.filter(
-            (i) => i.qtdFornecida > 0,
-          );
           setEstoqueDisponivel(itensComSaldo);
         } else {
           console.error("Erro retornado do servidor:", resultado.erro);
@@ -93,7 +81,6 @@ export default function MaterialEstoque() {
     buscarEstoqueReal();
   }, []);
 
-  // Filtra a lista lateral com base no que o utilizador escreve na barra de pesquisa
   const estoqueFiltrado = estoqueDisponivel.filter((item) => {
     const termo = pesquisaEstoque.toLowerCase();
     return (
@@ -111,16 +98,12 @@ export default function MaterialEstoque() {
   };
 
   const removerItem = (idParaRemover) => {
-    setItensSelecionados((prev) =>
-      prev.filter((item) => item.id !== idParaRemover),
-    );
+    setItensSelecionados((prev) => prev.filter((item) => item.id !== idParaRemover));
   };
 
   const atualizarCampo = (id, campo, novoValor) => {
     setItensSelecionados((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, [campo]: novoValor } : item,
-      ),
+      prev.map((item) => (item.id === id ? { ...item, [campo]: novoValor } : item))
     );
   };
 
@@ -128,9 +111,8 @@ export default function MaterialEstoque() {
     setItensSelecionados((prev) => [
       ...prev,
       {
-        id: `manual-${Date.now()}-${index}`, // Mantemos isto para o React organizar a tabela visualmente
-        // 👇 A PONTE MÁGICA: Passamos o ID real do banco para o nome que o backend entende!
-        estoque_id: item.idBD || null,
+        id: `manual-${Date.now()}-${index}`, 
+        estoque_id: item.idBD || null, // A ponte mágica agora transporta o ID verdadeiro!
         ...item,
         qtdSelecionada: 1,
       },
@@ -138,15 +120,8 @@ export default function MaterialEstoque() {
   };
 
   const handleEnviar = async () => {
-    if (
-      !formDados.nome ||
-      !formDados.wbs ||
-      !formDados.destino ||
-      !formDados.dataNecessidade
-    ) {
-      alert(
-        "Por favor, preencha todos os campos obrigatórios do solicitante (*).",
-      );
+    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.dataNecessidade) {
+      alert("Por favor, preencha todos os campos obrigatórios do solicitante (*).");
       return;
     }
 
@@ -156,19 +131,14 @@ export default function MaterialEstoque() {
     }
 
     const itensIncompletos = itensSelecionados.some(
-      (i) =>
-        !i.numPecaFabricante || !i.materialDescription || !i.qtdSelecionada,
+      (i) => !i.numPecaFabricante || !i.materialDescription || !i.qtdSelecionada
     );
+    
     if (itensIncompletos) {
-      alert(
-        "Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela.",
-      );
+      alert("Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela.");
       return;
     }
 
-    // =========================================================
-    // LÓGICA DE UPLOAD DE IMAGENS PARA O SUPABASE STORAGE
-    // =========================================================
     const anexosProcessados = [];
     if (anexos.length > 0) {
       for (const arquivo of anexos) {
@@ -176,9 +146,7 @@ export default function MaterialEstoque() {
         const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
         const caminhoNoStorage = `uploads/${nomeUnico}`;
 
-        const { error: erroUpload } = await supabase.storage
-          .from("documentos")
-          .upload(caminhoNoStorage, arquivo);
+        const { error: erroUpload } = await supabase.storage.from("documentos").upload(caminhoNoStorage, arquivo);
 
         if (erroUpload) {
           console.error("Erro ao subir arquivo:", erroUpload);
@@ -186,9 +154,7 @@ export default function MaterialEstoque() {
           return;
         }
 
-        const { data: linkPublico } = supabase.storage
-          .from("documentos")
-          .getPublicUrl(caminhoNoStorage);
+        const { data: linkPublico } = supabase.storage.from("documentos").getPublicUrl(caminhoNoStorage);
 
         anexosProcessados.push({
           nome_arquivo: arquivo.name,
@@ -203,15 +169,15 @@ export default function MaterialEstoque() {
       anexos: anexosProcessados,
     };
 
+    console.log("🚀 [FRONTEND] Dados exatos que vão para o Backend:", payload);
+    console.table(payload.itens);
+
     try {
-      const resposta = await fetch(
-        "http://localhost:3001/api/solicitacoes/material",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-      );
+      const resposta = await fetch("http://localhost:3001/api/solicitacoes/material", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
       const dados = await resposta.json();
 
@@ -239,6 +205,7 @@ export default function MaterialEstoque() {
   const listaSegura = Array.isArray(itensSelecionados) ? itensSelecionados : [];
 
   return (
+    // ... TODO O TEU RETURN (HTML) MANTÉM-SE EXATAMENTE IGUAL! ...
     <>
       <ModalProcessamento
         estaProcessando={processador.estaProcessando}
@@ -397,9 +364,6 @@ export default function MaterialEstoque() {
       </div>
 
       <div className="selecao-itens-grid">
-        {/* ========================================================= */}
-        {/* COLUNA ESQUERDA: LISTA DE ESTOQUE REAL                    */}
-        {/* ========================================================= */}
         <div
           className="painel-lista"
           style={{
@@ -453,7 +417,7 @@ export default function MaterialEstoque() {
                 type="text"
                 placeholder="Buscar por SAP, PN, Descrição..."
                 value={pesquisaEstoque}
-                onChange={(e) => setPesquisaEstoque(e.target.value)} // 👈 Busca real ativada
+                onChange={(e) => setPesquisaEstoque(e.target.value)}
                 style={{
                   width: "100%",
                   padding: "10px 12px 10px 36px",
