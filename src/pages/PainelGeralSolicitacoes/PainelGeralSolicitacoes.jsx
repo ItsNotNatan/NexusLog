@@ -11,8 +11,8 @@ import {
   Edit2
 } from 'lucide-react';
 
-// DADOS MOCKADOS BASEADOS NA IMAGEM
-const dadosTabela = [
+// DADOS MOCKADOS: Agora servem apenas como estado inicial
+const dadosIniciais = [
   {
     id: '2306261114',
     tipo: 'Material',
@@ -65,6 +65,12 @@ const renderBadgeStatus = (status) => {
           <RefreshCw size={14} /> Em Separação
         </span>
       );
+    case 'Pendente':
+      return (
+        <span className="badge-status status-pendente" style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '4px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+           Pendente
+        </span>
+      );
     case 'Concluído':
       return (
         <span className="badge-status status-concluido">
@@ -84,6 +90,25 @@ const renderBadgeStatus = (status) => {
 
 export default function PainelGeralSolicitacoes() {
   const [filtroAtivo, setFiltroAtivo] = useState('Todos');
+  
+  // 1. ✨ MAGIA AQUI: Guardamos a lista de solicitações no Estado do React
+  const [solicitacoes, setSolicitacoes] = useState(dadosIniciais);
+
+  // 2. ✨ FUNÇÃO DE ATUALIZAÇÃO: Muda o status na memória
+  const lidarComMudancaStatus = (idSolicitacao, novoStatus) => {
+    // Aqui no futuro tu podes colocar a chamada fetch() para o Backend!
+    // Ex: await fetch(`/api/solicitacoes/${idSolicitacao}/status`, ...)
+    
+    // Atualizamos a lista localmente
+    const listaAtualizada = solicitacoes.map(sol => {
+      if (sol.id === idSolicitacao) {
+        return { ...sol, status: novoStatus }; // Altera apenas o status da linha selecionada
+      }
+      return sol; // Mantém as outras intactas
+    });
+
+    setSolicitacoes(listaAtualizada); // Substitui a memória antiga pela nova
+  };
 
   return (
     <div className="painel-geral-wrapper">
@@ -97,23 +122,24 @@ export default function PainelGeralSolicitacoes() {
       <div className="kpis-linha-5">
         <div className="kpi-card-resumo kpi-total">
           <span>Total</span>
-          <strong>14</strong>
+          <strong>{solicitacoes.length}</strong>
         </div>
+        {/* Adicionado cálculos dinâmicos básicos para os KPIs */}
         <div className="kpi-card-resumo kpi-pendentes">
           <span>Pendentes</span>
-          <strong>0</strong>
+          <strong>{solicitacoes.filter(s => s.status === 'Pendente').length}</strong>
         </div>
         <div className="kpi-card-resumo kpi-andamento">
           <span>Em Andamento</span>
-          <strong>1</strong>
+          <strong>{solicitacoes.filter(s => s.status === 'Em Separação').length}</strong>
         </div>
         <div className="kpi-card-resumo kpi-concluidos">
           <span>Concluídos</span>
-          <strong>10</strong>
+          <strong>{solicitacoes.filter(s => s.status === 'Concluído').length}</strong>
         </div>
         <div className="kpi-card-resumo kpi-recusados">
-          <span>Recusados</span>
-          <strong>3</strong>
+          <span>Cancelados</span>
+          <strong>{solicitacoes.filter(s => s.status === 'Cancelado').length}</strong>
         </div>
       </div>
 
@@ -161,8 +187,9 @@ export default function PainelGeralSolicitacoes() {
               </tr>
             </thead>
             <tbody>
-              {dadosTabela.map((linha, index) => (
-                <tr key={index}>
+              {/* 3. ✨ Usamos a variável de estado 'solicitacoes' em vez da constante fixa */}
+              {solicitacoes.map((linha) => (
+                <tr key={linha.id}>
                   
                   <td className="col-chevron">
                     <ChevronRight size={18} />
@@ -217,7 +244,13 @@ export default function PainelGeralSolicitacoes() {
                   </td>
 
                   <td>
-                    <select className="select-acao" defaultValue={linha.status}>
+                    {/* 4. ✨ EVENTO ONCHANGE ADICIONADO AO SELECT */}
+                    <select 
+                      className="select-acao" 
+                      value={linha.status} 
+                      onChange={(e) => lidarComMudancaStatus(linha.id, e.target.value)}
+                    >
+                      <option value="Pendente">Pendente</option>
                       <option value="Em Separação">Em Separação</option>
                       <option value="Concluído">Concluído</option>
                       <option value="Cancelado">Cancelado</option>
