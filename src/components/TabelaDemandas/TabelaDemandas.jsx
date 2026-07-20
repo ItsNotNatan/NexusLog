@@ -1,9 +1,47 @@
-import React from 'react';
-import { Search } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, X, History, Loader } from 'lucide-react';
 
 export default function TabelaDemandas({ dados }) {
+  // 1. ESTADOS DO MODAL
+  const [modalAberto, setModalAberto] = useState(false);
+  const [itemSelecionado, setItemSelecionado] = useState(null);
+  const [historicoItem, setHistoricoItem] = useState([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+
+  // 2. FUNÇÃO ATIVADA PELO DUPLO CLIQUE
+  const handleDuploClique = async (linha) => {
+    // Guarda quem foi clicado e abre a janelinha
+    setItemSelecionado(linha);
+    setModalAberto(true);
+    setCarregandoHistorico(true);
+
+    try {
+      // 🎯 Aqui tu farias o fetch para a tua nova rota do Backend!
+      // Exemplo: const resposta = await fetch(`http://localhost:3001/api/estoque/${linha.id}/historico`);
+      // const json = await resposta.json();
+      
+      // Simulando uma resposta rápida do servidor para fins didáticos:
+      setTimeout(() => {
+        setHistoricoItem([
+          { data: '18/07/2026', solicitante: 'Marcio (Cliente)', qtd: 2, ps: 'PS-123456' },
+          { data: '19/07/2026', solicitante: 'João (Manutenção)', qtd: 5, ps: 'PS-123488' }
+        ]);
+        setCarregandoHistorico(false);
+      }, 800);
+
+    } catch (error) {
+      console.error("Erro ao buscar histórico:", error);
+      setCarregandoHistorico(false);
+    }
+  };
+
+  const fecharModal = () => {
+    setModalAberto(false);
+    setHistoricoItem([]);
+  };
+
   return (
-    <div className="tabela-cartao">
+    <div className="tabela-cartao" style={{ position: 'relative' }}>
       
       {/* Filtros e Pesquisa */}
       <div className="tabela-controles">
@@ -24,7 +62,7 @@ export default function TabelaDemandas({ dados }) {
       {/* Informações da Tabela */}
       <div className="tabela-info">
         <span className="info-registros">{dados.length} registros</span>
-        <span className="info-target">Lead Time = Criação de BS &rarr; Data de Entrega</span>
+        <span className="info-target">Dica: Dê duplo clique numa linha para ver o histórico de saídas</span>
       </div>
 
       {/* Tabela de Dados */}
@@ -44,7 +82,12 @@ export default function TabelaDemandas({ dados }) {
           </thead>
           <tbody>
             {dados.map((linha, index) => (
-              <tr key={index}>
+              <tr 
+                key={index} 
+                onDoubleClick={() => handleDuploClique(linha)} // 👈 A MÁGICA ESTÁ AQUI
+                style={{ cursor: 'pointer' }} // Muda a setinha do rato para uma mãozinha
+                title="Duplo clique para histórico"
+              >
                 <td className="fonte-negrito">{linha.id}</td>
                 <td>{linha.solicitante}</td>
                 <td><a href="#" className="link-azul">{linha.wbs}</a></td>
@@ -77,6 +120,72 @@ export default function TabelaDemandas({ dados }) {
         </table>
       </div>
 
+      {/* ========================================================= */}
+      {/* 🪟 JANELA MODAL DE HISTÓRICO DE SAÍDAS                    */}
+      {/* ========================================================= */}
+      {modalAberto && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
+          justifyContent: 'center', alignItems: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            backgroundColor: '#fff', padding: '24px', borderRadius: '8px',
+            width: '500px', maxWidth: '90%', boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+          }}>
+            
+            {/* Cabeçalho do Modal */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '12px', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <History size={20} color="#0056b3" />
+                Histórico de Saídas
+              </h3>
+              <button onClick={fecharModal} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} color="#666" />
+              </button>
+            </div>
+
+            {/* Informação de qual item estamos a ver */}
+            <p style={{ color: '#666', fontSize: '14px', marginBottom: '16px' }}>
+              Mostrando o registro de saídas referentes ao pedido: <strong>{itemSelecionado?.id}</strong>
+            </p>
+
+            {/* Corpo do Modal: Tabela de Histórico */}
+            {carregandoHistorico ? (
+              <div style={{ textAlign: 'center', padding: '30px' }}>
+                <Loader size={24} className="icone-girando" color="#0056b3" />
+                <p style={{ color: '#666', marginTop: '10px' }}>A buscar histórico...</p>
+              </div>
+            ) : historicoItem.length > 0 ? (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8f9fa', textAlign: 'left' }}>
+                    <th style={{ padding: '8px', borderBottom: '2px solid #ddd' }}>Data</th>
+                    <th style={{ padding: '8px', borderBottom: '2px solid #ddd' }}>Qtd</th>
+                    <th style={{ padding: '8px', borderBottom: '2px solid #ddd' }}>Solicitante</th>
+                    <th style={{ padding: '8px', borderBottom: '2px solid #ddd' }}>PS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historicoItem.map((hist, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '8px' }}>{hist.data}</td>
+                      <td style={{ padding: '8px', fontWeight: 'bold' }}>{hist.qtd}</td>
+                      <td style={{ padding: '8px' }}>{hist.solicitante}</td>
+                      <td style={{ padding: '8px', color: '#0056b3' }}>{hist.ps}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+                Nenhuma saída registrada para este item até o momento.
+              </p>
+            )}
+            
+          </div>
+        </div>
+      )}
     </div>
   );
 }

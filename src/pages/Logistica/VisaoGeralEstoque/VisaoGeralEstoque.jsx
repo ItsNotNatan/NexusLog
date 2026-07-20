@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Boxes, Loader2 } from 'lucide-react';
 import { supabase } from '../../../supabaseClient';
-import './VisaoGeralEstoque.css'; // Importa o CSS específico para esta página
+import './VisaoGeralEstoque.css'; 
 
 export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
   const [dadosEstoque, setDadosEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
 
-  // Define os textos baseados em quem está acessando (Logística ou Cliente)
   const tituloPagina = perfil === 'cliente' ? 'Consulta de Estoque' : 'Visão Geral do Estoque';
   const subtituloPagina = perfil === 'cliente' 
     ? 'Consulte a disponibilidade de materiais em tempo real.' 
@@ -19,21 +18,42 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
       try {
         setCarregando(true);
 
-        // 1. Busca os dados da tabela estoque no Supabase
+        // 1. Busca os dados da tabela estoque E cruza com a tabela materiais (caso existam)
         const { data, error } = await supabase
           .from('estoque')
-          .select('*')
-          .order('part_number', { ascending: true });
+          .select(`
+            *,
+            materiais (
+              part_number,
+              descricao
+            )
+          `);
 
         if (error) throw error;
 
-        // 🎯 2. O FILTRO INTELIGENTE: Removemos quem tem quantidade zerada
-        const estoqueLimpo = (data || []).filter((item) => {
-          // Só entra na memória do React quem tem quantidade maior que zero
-          return item.quantidade_disponivel > 0;
-        });
+        // 2. O FILTRO INTELIGENTE E FORMATAÇÃO DOS DADOS
+        let estoqueLimpo = (data || [])
+          .filter((item) => {
+            // Só entra na memória quem tem quantidade maior que zero e status 'Disponível'
+            return item.quantidade_disponivel > 0 && item.status === 'Disponível';
+          })
+          .map((item) => {
+            // 👇 A MÁGICA AQUI: Lemos primeiro da própria tabela de estoque!
+            // Se por acaso estiver vazio, tentamos buscar no catálogo de materiais.
+            const pnFinal = item.part_number || item.materiais?.part_number || 'Sem PN';
+            const descFinal = item.descricao || item.materiais?.descricao || 'Sem descrição';
 
-        // 3. Salva a lista limpa no estado
+            return {
+              ...item,
+              part_number: pnFinal,
+              descricao: descFinal
+            };
+          });
+
+        // 3. ORDENAÇÃO ALFABÉTICA PELO PART NUMBER
+        estoqueLimpo.sort((a, b) => a.part_number.localeCompare(b.part_number));
+
+        // 4. Salva a lista pronta no estado
         setDadosEstoque(estoqueLimpo);
 
       } catch (erro) {
@@ -46,7 +66,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     carregarEstoque();
   }, []);
 
-  // Lógica de pesquisa em tempo real
   const dadosFiltrados = dadosEstoque.filter((item) => {
     const termo = termoPesquisa.toLowerCase();
     return (
@@ -115,10 +134,10 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
                 {dadosFiltrados.map((item) => (
                   <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.2s' }}>
                     <td style={{ padding: '16px', fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace', color: '#1e293b' }}>
-                      {item.part_number || '-'}
+                      {item.part_number}
                     </td>
                     <td style={{ padding: '16px', fontSize: '0.875rem', color: '#334155' }}>
-                      {item.descricao || 'Sem descrição'}
+                      {item.descricao}
                     </td>
                     <td style={{ padding: '16px', fontSize: '0.875rem', color: '#2563eb', fontWeight: '500', fontFamily: 'monospace' }}>
                       {item.alocacao || 'Não alocado'}

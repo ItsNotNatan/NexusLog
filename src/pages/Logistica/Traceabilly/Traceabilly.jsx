@@ -28,47 +28,60 @@ export default function Traceabilly({ perfil = 'logistica' }) {
     buscarHistorico();
   }, []);
 
-  const buscarHistorico = async () => {
-    try {
-      setCarregando(true);
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
-      const json = await resposta.json();
+const buscarHistorico = async () => {
+  try {
+    setCarregando(true);
+    // Comunica com o backend para listar todas as solicitações
+    const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
+    const json = await resposta.json();
 
-      if (json.sucesso) {
-        let itensExtraidos = [];
+    if (json.sucesso) {
+      let itensExtraidos = [];
 
-        json.dados.forEach(solicitacao => {
-          if (solicitacao.status === 'Em Separação' || solicitacao.status === 'Concluído') {
-            solicitacao.itens.forEach(item => {
-              itensExtraidos.push({
-                id: item.id,
-                partNumber: item.part_number_manual || '-',
-                descricao: item.descricao_manual || '-',
-                fornecedor: item.fornecedor || '-',
-                nfEntrada: item.nf_entrada || 'N/A',
-                bsSaida: solicitacao.bs || '-',
-                solicitacao: solicitacao.id,
-                solicitanteInicial: solicitacao.solicitante.charAt(0).toUpperCase(),
-                solicitanteNome: solicitacao.solicitante,
-                alocacao: item.alocacao || 'Padrão',
-                qtd: `${item.quantidade_solicitada} ${item.unidade_medida_manual || 'Unid'}`,
-                valor: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual}` : '-',
-                wbs: solicitacao.wbs || '-',
-                data: solicitacao.dataSolicitacao
-              });
+      json.dados.forEach(solicitacao => {
+        // 👇 ETAPA 1: Regras de Negócio para Filtragem
+        // Verifica se a solicitação já foi aprovada pela logística
+        const estaAprovado = solicitacao.status === 'Em Separação' || solicitacao.status === 'Concluído';
+        
+        // Verifica se o tipo NÃO é 'Entrada'. Entradas vão só para o estoque!
+        const naoEEntrada = solicitacao.tipo !== 'Entrada';
+
+        // 👇 ETAPA 2: Aplicação da Regra
+        // Só entra na tela de Rastreabilidade se for aprovado E não for uma Entrada
+        if (estaAprovado && naoEEntrada) {
+          
+          // ETAPA 3: Formatação dos Dados
+          solicitacao.itens.forEach(item => {
+            itensExtraidos.push({
+              id: item.id,
+              partNumber: item.part_number_manual || '-',
+              descricao: item.descricao_manual || '-',
+              fornecedor: item.fornecedor || '-',
+              nfEntrada: item.nf_entrada || 'N/A',
+              bsSaida: solicitacao.bs || '-',
+              solicitacao: solicitacao.id,
+              solicitanteInicial: solicitacao.solicitante.charAt(0).toUpperCase(),
+              solicitanteNome: solicitacao.solicitante,
+              alocacao: item.alocacao || 'Padrão',
+              qtd: `${item.quantidade_solicitada} ${item.unidade_medida_manual || 'Unid'}`,
+              valor: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual}` : '-',
+              wbs: solicitacao.wbs || '-',
+              data: solicitacao.dataSolicitacao
             });
-          }
-        });
+          });
+        }
+      });
 
-        setDadosRastreabilidade(itensExtraidos);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar rastreabilidade:", error);
-      mostrarAlerta('Erro ao carregar o histórico.', 'erro');
-    } finally {
-      setCarregando(false);
+      // Atualiza a tela com os itens filtrados
+      setDadosRastreabilidade(itensExtraidos);
     }
-  };
+  } catch (error) {
+    console.error("Erro ao buscar rastreabilidade:", error);
+    mostrarAlerta('Erro ao carregar o histórico.', 'erro');
+  } finally {
+    setCarregando(false);
+  }
+};
 
   // =========================================================================
   // 🎯 A MÁGICA DO FRONT-END: Função para Reverter o Item ao Estoque
