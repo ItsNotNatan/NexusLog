@@ -1,31 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { User, MapPin, Calendar, Search, Package, Send, Trash2, Zap, Loader2 } from 'lucide-react'; // 👈 Loader2 adicionado
+import React, { useState, useEffect } from "react";
+import {
+  User,
+  MapPin,
+  Calendar,
+  Search,
+  Package,
+  Send,
+  Trash2,
+  Zap,
+  Loader2,
+} from "lucide-react"; // 👈 Loader2 adicionado
 
 // NOSSOS COMPONENTES E HOOKS
-import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
-import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
-import ExemploExcel from '../../../components/ExemploExcel/ExemploExcel';
-import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
-import { supabase } from '../../../supabaseClient';
+import ModalProcessamento from "../../../components/ModalProcessamento/ModalProcessamento";
+import { useProcessadorExcel } from "../../../hooks/useProcessadorExcel";
+import ExemploExcel from "../../../components/ExemploExcel/ExemploExcel";
+import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
+import { supabase } from "../../../supabaseClient";
 
 export default function MaterialEstoque() {
   const [formDados, setFormDados] = useState({
-    nome: '',
-    wbs: '',
-    destino: '',
-    dataNecessidade: '',
-    observacoes: '',
-    entregaUrgente: false 
+    nome: "",
+    wbs: "",
+    destino: "",
+    dataNecessidade: "",
+    observacoes: "",
+    entregaUrgente: false,
   });
-  
+
   const [itensSelecionados, setItensSelecionados] = useState([]);
-  const [anexos, setAnexos] = useState([]); 
-  
+  const [anexos, setAnexos] = useState([]);
+
   // 👇 NOVOS ESTADOS PARA O ESTOQUE REAL
   const [estoqueDisponivel, setEstoqueDisponivel] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
-  const [pesquisaEstoque, setPesquisaEstoque] = useState(''); // Para a barra de busca funcionar
-  
+  const [pesquisaEstoque, setPesquisaEstoque] = useState(""); // Para a barra de busca funcionar
+
   const processador = useProcessadorExcel();
 
   // =========================================================
@@ -34,36 +44,41 @@ export default function MaterialEstoque() {
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
-        const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
+        const resposta = await fetch(
+          "http://localhost:3001/api/solicitacoes/listar",
+        );
         const resultado = await resposta.json();
 
         if (resposta.ok && resultado.sucesso) {
           // Pega apenas Entradas Aprovadas
-          const entradasAprovadas = resultado.dados.filter(sol => 
-            sol.tipo === 'Entrada' && 
-            (sol.status === 'Em Separação' || sol.status === 'Concluído')
+          const entradasAprovadas = resultado.dados.filter(
+            (sol) =>
+              sol.tipo === "Entrada" &&
+              (sol.status === "Em Separação" || sol.status === "Concluído"),
           );
 
           // Extrai e formata os itens para os cartõezinhos laterais
-          const itensExtraidos = entradasAprovadas.flatMap(sol => {
-            return sol.itens.map(item => ({
+          const itensExtraidos = entradasAprovadas.flatMap((sol) => {
+            return sol.itens.map((item) => ({
               idBD: item.id,
-              desenhoSAP: item.desenho_sap_manual || '-',
-              materialDescription: item.descricao_manual || '-',
-              numPecaFabricante: item.part_number_manual || '-',
-              fornecedor: item.fornecedor || '-',
+              desenhoSAP: item.desenho_sap_manual || "-",
+              materialDescription: item.descricao_manual || "-",
+              numPecaFabricante: item.part_number_manual || "-",
+              fornecedor: item.fornecedor || "-",
               qtdFornecida: item.quantidade_solicitada || 0, // Funciona como o Saldo visual aqui
-              nf: item.nf_entrada || '-',
-              referencia: '-',
-              unidadeMedida: item.unidade_medida_manual || 'Unid',
-              vendorDescription: item.descricao_manual || '-',
-              wbs: item.wbs_element || sol.wbs || '-',
-              alocacao: item.alocacao || '-'
+              nf: item.nf_entrada || "-",
+              referencia: "-",
+              unidadeMedida: item.unidade_medida_manual || "Unid",
+              vendorDescription: item.descricao_manual || "-",
+              wbs: item.wbs_element || sol.wbs || "-",
+              alocacao: item.alocacao || "-",
             }));
           });
 
           // Mostramos na lista apenas os que têm saldo maior que 0
-          const itensComSaldo = itensExtraidos.filter(i => i.qtdFornecida > 0);
+          const itensComSaldo = itensExtraidos.filter(
+            (i) => i.qtdFornecida > 0,
+          );
           setEstoqueDisponivel(itensComSaldo);
         } else {
           console.error("Erro retornado do servidor:", resultado.erro);
@@ -79,7 +94,7 @@ export default function MaterialEstoque() {
   }, []);
 
   // Filtra a lista lateral com base no que o utilizador escreve na barra de pesquisa
-  const estoqueFiltrado = estoqueDisponivel.filter(item => {
+  const estoqueFiltrado = estoqueDisponivel.filter((item) => {
     const termo = pesquisaEstoque.toLowerCase();
     return (
       item.desenhoSAP.toLowerCase().includes(termo) ||
@@ -91,31 +106,47 @@ export default function MaterialEstoque() {
   const handleImportarExcel = async (arquivo) => {
     const novosItens = await processador.iniciarProcessamento(arquivo);
     if (novosItens && Array.isArray(novosItens)) {
-      setItensSelecionados(prev => [...prev, ...novosItens]);
+      setItensSelecionados((prev) => [...prev, ...novosItens]);
     }
   };
 
   const removerItem = (idParaRemover) => {
-    setItensSelecionados(prev => prev.filter(item => item.id !== idParaRemover));
+    setItensSelecionados((prev) =>
+      prev.filter((item) => item.id !== idParaRemover),
+    );
   };
 
   const atualizarCampo = (id, campo, novoValor) => {
-    setItensSelecionados(prev => 
-      prev.map(item => item.id === id ? { ...item, [campo]: novoValor } : item)
+    setItensSelecionados((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, [campo]: novoValor } : item,
+      ),
     );
   };
 
   const adicionarManualmente = (item, index) => {
-    setItensSelecionados(prev => [...prev, {
-      id: `manual-${Date.now()}-${index}`,
-      ...item,
-      qtdSelecionada: 1 
-    }]);
+    setItensSelecionados((prev) => [
+      ...prev,
+      {
+        id: `manual-${Date.now()}-${index}`, // Mantemos isto para o React organizar a tabela visualmente
+        // 👇 A PONTE MÁGICA: Passamos o ID real do banco para o nome que o backend entende!
+        estoque_id: item.idBD || null,
+        ...item,
+        qtdSelecionada: 1,
+      },
+    ]);
   };
 
   const handleEnviar = async () => {
-    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.dataNecessidade) {
-      alert("Por favor, preencha todos os campos obrigatórios do solicitante (*).");
+    if (
+      !formDados.nome ||
+      !formDados.wbs ||
+      !formDados.destino ||
+      !formDados.dataNecessidade
+    ) {
+      alert(
+        "Por favor, preencha todos os campos obrigatórios do solicitante (*).",
+      );
       return;
     }
 
@@ -124,9 +155,14 @@ export default function MaterialEstoque() {
       return;
     }
 
-    const itensIncompletos = itensSelecionados.some(i => !i.numPecaFabricante || !i.materialDescription || !i.qtdSelecionada);
+    const itensIncompletos = itensSelecionados.some(
+      (i) =>
+        !i.numPecaFabricante || !i.materialDescription || !i.qtdSelecionada,
+    );
     if (itensIncompletos) {
-      alert("Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela.");
+      alert(
+        "Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela.",
+      );
       return;
     }
 
@@ -136,27 +172,27 @@ export default function MaterialEstoque() {
     const anexosProcessados = [];
     if (anexos.length > 0) {
       for (const arquivo of anexos) {
-        const extensao = arquivo.name.split('.').pop();
+        const extensao = arquivo.name.split(".").pop();
         const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
         const caminhoNoStorage = `uploads/${nomeUnico}`;
 
         const { error: erroUpload } = await supabase.storage
-          .from('documentos')
+          .from("documentos")
           .upload(caminhoNoStorage, arquivo);
 
         if (erroUpload) {
           console.error("Erro ao subir arquivo:", erroUpload);
           alert(`Falha ao anexar o ficheiro: ${arquivo.name}`);
-          return; 
+          return;
         }
 
         const { data: linkPublico } = supabase.storage
-          .from('documentos')
+          .from("documentos")
           .getPublicUrl(caminhoNoStorage);
 
         anexosProcessados.push({
           nome_arquivo: arquivo.name,
-          url_arquivo: linkPublico.publicUrl
+          url_arquivo: linkPublico.publicUrl,
         });
       }
     }
@@ -164,21 +200,31 @@ export default function MaterialEstoque() {
     const payload = {
       solicitante: formDados,
       itens: itensSelecionados,
-      anexos: anexosProcessados 
+      anexos: anexosProcessados,
     };
 
     try {
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/material', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const resposta = await fetch(
+        "http://localhost:3001/api/solicitacoes/material",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
 
       const dados = await resposta.json();
 
       if (resposta.ok) {
         alert(`Sucesso! Solicitação criada com o ID: ${dados.ps_id}`);
-        setFormDados({ nome: '', wbs: '', destino: '', dataNecessidade: '', observacoes: '', entregaUrgente: false });
+        setFormDados({
+          nome: "",
+          wbs: "",
+          destino: "",
+          dataNecessidade: "",
+          observacoes: "",
+          entregaUrgente: false,
+        });
         setItensSelecionados([]);
         setAnexos([]);
       } else {
@@ -194,7 +240,7 @@ export default function MaterialEstoque() {
 
   return (
     <>
-      <ModalProcessamento 
+      <ModalProcessamento
         estaProcessando={processador.estaProcessando}
         concluido={processador.concluido}
         estadoProgresso={processador.estadoProgresso}
@@ -206,156 +252,306 @@ export default function MaterialEstoque() {
       <div className="form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
-            <div className="form-header-icone"><User size={18} /></div>
+            <div className="form-header-icone">
+              <User size={18} />
+            </div>
             <h2>Dados do Solicitante</h2>
           </div>
         </div>
-        
+
         <div className="form-grid">
           <div className="input-grupo">
             <label>NOME DO SOLICITANTE *</label>
-            <input 
-              type="text" 
-              className="input-campo" 
+            <input
+              type="text"
+              className="input-campo"
               placeholder="Seu nome completo"
               value={formDados.nome}
-              onChange={(e) => setFormDados({...formDados, nome: e.target.value})}
+              onChange={(e) =>
+                setFormDados({ ...formDados, nome: e.target.value })
+              }
             />
           </div>
           <div className="input-grupo">
             <label>WBS / CENTRO DE CUSTO *</label>
-            <input 
-              type="text" 
-              className="input-campo" 
+            <input
+              type="text"
+              className="input-campo"
               placeholder="Ex: WBS-PRJ-2024-001"
               value={formDados.wbs}
-              onChange={(e) => setFormDados({...formDados, wbs: e.target.value})}
+              onChange={(e) =>
+                setFormDados({ ...formDados, wbs: e.target.value })
+              }
             />
           </div>
           <div className="input-grupo">
-            <label><MapPin size={14} /> FILIAL DE ORIGEM</label>
+            <label>
+              <MapPin size={14} /> FILIAL DE ORIGEM
+            </label>
             <div className="input-wrapper-fixo">
               <MapPin size={16} className="icone-dentro-input" />
-              <input type="text" className="input-campo" value="BR04 — Goiana, PE" readOnly />
+              <input
+                type="text"
+                className="input-campo"
+                value="BR04 — Goiana, PE"
+                readOnly
+              />
               <span className="badge-fixo">Fixo</span>
             </div>
           </div>
           <div className="input-grupo row-span-2">
-            <label><MapPin size={14} /> DESTINO *</label>
-            <textarea 
-              className="input-campo" 
+            <label>
+              <MapPin size={14} /> DESTINO *
+            </label>
+            <textarea
+              className="input-campo"
               placeholder="Local de destino do material"
               value={formDados.destino}
-              onChange={(e) => setFormDados({...formDados, destino: e.target.value})}
+              onChange={(e) =>
+                setFormDados({ ...formDados, destino: e.target.value })
+              }
             ></textarea>
           </div>
           <div className="input-grupo">
-            <label><Calendar size={14} /> DATA DE NECESSIDADE *</label>
-            <input 
-              type="date" 
+            <label>
+              <Calendar size={14} /> DATA DE NECESSIDADE *
+            </label>
+            <input
+              type="date"
               className="input-campo"
               value={formDados.dataNecessidade}
-              onChange={(e) => setFormDados({...formDados, dataNecessidade: e.target.value})}
+              onChange={(e) =>
+                setFormDados({ ...formDados, dataNecessidade: e.target.value })
+              }
             />
           </div>
           <div className="input-grupo span-2">
             <label>OBSERVAÇÕES</label>
-            <textarea 
-              className="input-campo" 
-              placeholder="Informações adicionais..." 
+            <textarea
+              className="input-campo"
+              placeholder="Informações adicionais..."
               rows="2"
               value={formDados.observacoes}
-              onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})}
+              onChange={(e) =>
+                setFormDados({ ...formDados, observacoes: e.target.value })
+              }
             ></textarea>
           </div>
         </div>
 
         <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} />
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#f8fafc', marginTop: '20px' }}>
-          <input 
-            type="checkbox" 
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "12px",
+            padding: "16px",
+            border: "1px solid #cbd5e1",
+            borderRadius: "8px",
+            backgroundColor: "#f8fafc",
+            marginTop: "20px",
+          }}
+        >
+          <input
+            type="checkbox"
             id="checkbox-urgente"
             checked={formDados.entregaUrgente}
-            onChange={(e) => setFormDados({...formDados, entregaUrgente: e.target.checked})}
-            style={{ marginTop: '4px', cursor: 'pointer', width: '16px', height: '16px' }}
+            onChange={(e) =>
+              setFormDados({ ...formDados, entregaUrgente: e.target.checked })
+            }
+            style={{
+              marginTop: "4px",
+              cursor: "pointer",
+              width: "16px",
+              height: "16px",
+            }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <Zap size={16} color="#475569" />
-              <label htmlFor="checkbox-urgente" style={{ fontWeight: '600', color: '#0f172a', margin: 0, cursor: 'pointer' }}>
+              <label
+                htmlFor="checkbox-urgente"
+                style={{
+                  fontWeight: "600",
+                  color: "#0f172a",
+                  margin: 0,
+                  cursor: "pointer",
+                }}
+              >
                 Entrega Urgente
               </label>
             </div>
-            <span style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
-              Marcando esta opção, a solicitação entrará em fila de aprovação exclusiva do Administrador.
+            <span
+              style={{
+                fontSize: "0.85rem",
+                color: "#64748b",
+                marginTop: "4px",
+              }}
+            >
+              Marcando esta opção, a solicitação entrará em fila de aprovação
+              exclusiva do Administrador.
             </span>
           </div>
         </div>
-
       </div>
 
       <div className="selecao-itens-grid">
-        
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: LISTA DE ESTOQUE REAL                    */}
         {/* ========================================================= */}
-        <div className="painel-lista" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          
-          <div className="painel-lista-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b', margin: 0 }}>Estoque Disponível</h3>
-            <span className="badge-contador-simples">{estoqueFiltrado.length} itens</span>
+        <div
+          className="painel-lista"
+          style={{
+            backgroundColor: "#ffffff",
+            borderRadius: "12px",
+            border: "1px solid #e2e8f0",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            className="painel-lista-header"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "16px 20px",
+              borderBottom: "1px solid #f1f5f9",
+            }}
+          >
+            <h3
+              style={{
+                fontSize: "1rem",
+                fontWeight: "600",
+                color: "#1e293b",
+                margin: 0,
+              }}
+            >
+              Estoque Disponível
+            </h3>
+            <span className="badge-contador-simples">
+              {estoqueFiltrado.length} itens
+            </span>
           </div>
-          
-          <div className="pesquisa-estoque" style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input 
-                type="text" 
-                placeholder="Buscar por SAP, PN, Descrição..." 
+
+          <div
+            className="pesquisa-estoque"
+            style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9" }}
+          >
+            <div style={{ position: "relative" }}>
+              <Search
+                size={16}
+                style={{
+                  position: "absolute",
+                  left: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#94a3b8",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Buscar por SAP, PN, Descrição..."
                 value={pesquisaEstoque}
                 onChange={(e) => setPesquisaEstoque(e.target.value)} // 👈 Busca real ativada
-                style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none', color: '#334155', boxSizing: 'border-box' }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px 10px 36px",
+                  borderRadius: "8px",
+                  border: "1px solid #e2e8f0",
+                  backgroundColor: "#f8fafc",
+                  outline: "none",
+                  color: "#334155",
+                  boxSizing: "border-box",
+                }}
               />
             </div>
           </div>
 
-          <div className="lista-rolavel" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+          <div
+            className="lista-rolavel"
+            style={{ maxHeight: "600px", overflowY: "auto" }}
+          >
             {carregandoEstoque ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-                <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px auto', display: 'block' }} />
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "#94a3b8",
+                }}
+              >
+                <Loader2
+                  size={24}
+                  className="animate-spin"
+                  style={{ margin: "0 auto 8px auto", display: "block" }}
+                />
                 Carregando materiais disponíveis...
               </div>
             ) : estoqueFiltrado.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "#94a3b8",
+                }}
+              >
                 Nenhum material encontrado no estoque físico.
               </div>
             ) : (
               estoqueFiltrado.map((item, index) => (
-                <div 
-                  key={`estoque-${index}`} 
-                  className="item-estoque-card" 
+                <div
+                  key={`estoque-${index}`}
+                  className="item-estoque-card"
                   onClick={() => adicionarManualmente(item, index)}
-                  style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }}
+                  style={{
+                    padding: "16px 20px",
+                    borderBottom: "1px solid #f1f5f9",
+                    cursor: "pointer",
+                    transition: "background 0.2s",
+                  }}
                 >
-                  <div style={{ marginBottom: '12px' }}>
+                  <div style={{ marginBottom: "12px" }}>
                     <span className="badge-sap">{item.desenhoSAP}</span>
                   </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ fontWeight: '600', color: '#475569' }}>{item.numPecaFabricante}</span>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span style={{ fontWeight: "600", color: "#475569" }}>
+                      {item.numPecaFabricante}
+                    </span>
                     <span className="badge-nf">NF: {item.nf}</span>
                   </div>
-                  
-                  <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.875rem' }}>
+
+                  <div
+                    style={{
+                      marginBottom: "8px",
+                      color: "#64748b",
+                      fontSize: "0.875rem",
+                    }}
+                  >
                     {item.materialDescription}
                   </div>
-                  
-                  <div style={{ fontSize: '0.875rem', display: 'flex', gap: '8px' }}>
-                    <span style={{ color: '#10b981', fontWeight: '500' }}>
-                      Saldo: <strong style={{ fontWeight: '700' }}>{item.qtdFornecida}</strong>
+
+                  <div
+                    style={{
+                      fontSize: "0.875rem",
+                      display: "flex",
+                      gap: "8px",
+                    }}
+                  >
+                    <span style={{ color: "#10b981", fontWeight: "500" }}>
+                      Saldo:{" "}
+                      <strong style={{ fontWeight: "700" }}>
+                        {item.qtdFornecida}
+                      </strong>
                     </span>
-                    <span style={{ color: '#2563eb', fontFamily: 'monospace' }}>
+                    <span style={{ color: "#2563eb", fontFamily: "monospace" }}>
                       {item.alocacao}
                     </span>
                   </div>
@@ -365,119 +561,393 @@ export default function MaterialEstoque() {
           </div>
         </div>
 
-        <div className="painel-lista" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          
-          <div className="painel-lista-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: '#1e293b' }}>
+        <div
+          className="painel-lista"
+          style={{
+            backgroundColor: "#ffffff",
+            borderRadius: "12px",
+            border: "1px solid #e2e8f0",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            className="painel-lista-header"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "16px 20px",
+              borderBottom: "1px solid #f1f5f9",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontWeight: "600",
+                color: "#1e293b",
+              }}
+            >
               <Package size={18} color="#2563eb" /> Itens Selecionados
             </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <ExemploExcel />
-              <span className="badge-contador-simples">{listaSegura.length} itens</span>
+              <span className="badge-contador-simples">
+                {listaSegura.length} itens
+              </span>
             </div>
           </div>
 
           {listaSegura.length === 0 ? (
-            <div className="estado-vazio-selecao" style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-              <Package size={48} strokeWidth={1} style={{ opacity: 0.3, margin: '0 auto 16px auto', display: 'block' }} />
-              <p>Clique nos itens à esquerda, adicione uma linha manual ou importe um Excel do SAP</p>
+            <div
+              className="estado-vazio-selecao"
+              style={{ padding: "60px", textAlign: "center", color: "#94a3b8" }}
+            >
+              <Package
+                size={48}
+                strokeWidth={1}
+                style={{
+                  opacity: 0.3,
+                  margin: "0 auto 16px auto",
+                  display: "block",
+                }}
+              />
+              <p>
+                Clique nos itens à esquerda, adicione uma linha manual ou
+                importe um Excel do SAP
+              </p>
             </div>
           ) : (
-            <div className="scroll-tabela-solicitacao" style={{ overflowX: 'auto' }}>
-              <table className="tabela-solicitacao-dados" style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div
+              className="scroll-tabela-solicitacao"
+              style={{ overflowX: "auto" }}
+            >
+              <table
+                className="tabela-solicitacao-dados"
+                style={{
+                  width: "100%",
+                  minWidth: "1300px",
+                  borderCollapse: "collapse",
+                  textAlign: "left",
+                }}
+              >
                 <thead>
                   <tr>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', width: '50px' }}></th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>MATERIAL DESCRIPTION</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Nº PEÇA FABRICANTE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>QTD. SOLICITADA</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>DESENHO SAP</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>UNIDADE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>WBS</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>ALOCAÇÃO</th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                        width: "50px",
+                      }}
+                    ></th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      MATERIAL DESCRIPTION
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      Nº PEÇA FABRICANTE
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      QTD. SOLICITADA
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      DESENHO SAP
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      FORNECEDOR
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      REFERÊNCIA
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      UNIDADE
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      WBS
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      ALOCAÇÃO
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {listaSegura.map((item) => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ textAlign: 'center', padding: '12px' }}>
-                        <button onClick={() => removerItem(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>
+                    <tr
+                      key={item.id}
+                      style={{ borderBottom: "1px solid #f1f5f9" }}
+                    >
+                      <td style={{ textAlign: "center", padding: "12px" }}>
+                        <button
+                          onClick={() => removerItem(item.id)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "#ef4444",
+                            cursor: "pointer",
+                            padding: "4px",
+                          }}
+                        >
                           <Trash2 size={16} />
                         </button>
                       </td>
-                      <td style={{ minWidth: '220px', padding: '8px 12px' }}>
-                        <input 
-                          value={item.materialDescription || ''} 
-                          onChange={(e) => atualizarCampo(item.id, 'materialDescription', e.target.value)} 
-                          placeholder="Descrição do item" 
-                          style={{ width: '100%', border: 'none', outline: 'none', color: '#334155', backgroundColor: 'transparent' }}
+                      <td style={{ minWidth: "220px", padding: "8px 12px" }}>
+                        <input
+                          value={item.materialDescription || ""}
+                          onChange={(e) =>
+                            atualizarCampo(
+                              item.id,
+                              "materialDescription",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Descrição do item"
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            outline: "none",
+                            color: "#334155",
+                            backgroundColor: "transparent",
+                          }}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <input 
-                          value={item.numPecaFabricante || ''} 
-                          onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} 
-                          placeholder="PN" 
-                          style={{ width: '100%', border: 'none', outline: 'none', fontWeight: '600', color: '#1e293b', backgroundColor: 'transparent' }}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          value={item.numPecaFabricante || ""}
+                          onChange={(e) =>
+                            atualizarCampo(
+                              item.id,
+                              "numPecaFabricante",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="PN"
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            outline: "none",
+                            fontWeight: "600",
+                            color: "#1e293b",
+                            backgroundColor: "transparent",
+                          }}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <input 
-                          type="number" 
-                          value={item.qtdSelecionada || 1} 
-                          onChange={(e) => atualizarCampo(item.id, 'qtdSelecionada', e.target.value)} 
-                          style={{ width: '70px', border: '1px solid #a7f3d0', backgroundColor: '#ecfdf5', borderRadius: '6px', padding: '6px 8px', outline: 'none', color: '#10b981', fontWeight: '700', textAlign: 'center' }}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          type="number"
+                          value={item.qtdSelecionada || 1}
+                          onChange={(e) =>
+                            atualizarCampo(
+                              item.id,
+                              "qtdSelecionada",
+                              e.target.value,
+                            )
+                          }
+                          style={{
+                            width: "70px",
+                            border: "1px solid #a7f3d0",
+                            backgroundColor: "#ecfdf5",
+                            borderRadius: "6px",
+                            padding: "6px 8px",
+                            outline: "none",
+                            color: "#10b981",
+                            fontWeight: "700",
+                            textAlign: "center",
+                          }}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <input 
-                          value={item.desenhoSAP || ''} 
-                          onChange={(e) => atualizarCampo(item.id, 'desenhoSAP', e.target.value)} 
-                          placeholder="SAP" 
-                          style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '6px 12px', borderRadius: '999px', border: '1px solid #bfdbfe', fontWeight: '600', fontFamily: 'monospace', width: '100%', outline: 'none', boxSizing: 'border-box' }}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          value={item.desenhoSAP || ""}
+                          onChange={(e) =>
+                            atualizarCampo(
+                              item.id,
+                              "desenhoSAP",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="SAP"
+                          style={{
+                            backgroundColor: "#eff6ff",
+                            color: "#2563eb",
+                            padding: "6px 12px",
+                            borderRadius: "999px",
+                            border: "1px solid #bfdbfe",
+                            fontWeight: "600",
+                            fontFamily: "monospace",
+                            width: "100%",
+                            outline: "none",
+                            boxSizing: "border-box",
+                          }}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <input 
-                          value={item.fornecedor || ''} 
-                          onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} 
-                          placeholder="Fornecedor" 
-                          style={{ width: '100%', border: 'none', outline: 'none', color: '#475569', backgroundColor: 'transparent' }}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          value={item.fornecedor || ""}
+                          onChange={(e) =>
+                            atualizarCampo(
+                              item.id,
+                              "fornecedor",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Fornecedor"
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            outline: "none",
+                            color: "#475569",
+                            backgroundColor: "transparent",
+                          }}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <input 
-                          value={item.referencia || ''} 
-                          onChange={(e) => atualizarCampo(item.id, 'referencia', e.target.value)} 
-                          placeholder="Ref" 
-                          style={{ width: '100%', border: 'none', outline: 'none', color: '#64748b', backgroundColor: 'transparent' }}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          value={item.referencia || ""}
+                          onChange={(e) =>
+                            atualizarCampo(
+                              item.id,
+                              "referencia",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Ref"
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            outline: "none",
+                            color: "#64748b",
+                            backgroundColor: "transparent",
+                          }}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <input 
-                          value={item.unidadeMedida || ''} 
-                          onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)} 
-                          placeholder="Unid" 
-                          style={{ width: '60px', border: 'none', outline: 'none', color: '#475569', backgroundColor: 'transparent' }}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          value={item.unidadeMedida || ""}
+                          onChange={(e) =>
+                            atualizarCampo(
+                              item.id,
+                              "unidadeMedida",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Unid"
+                          style={{
+                            width: "60px",
+                            border: "none",
+                            outline: "none",
+                            color: "#475569",
+                            backgroundColor: "transparent",
+                          }}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <input 
-                          value={item.wbs || ''} 
-                          onChange={(e) => atualizarCampo(item.id, 'wbs', e.target.value)} 
-                          placeholder="WBS" 
-                          style={{ width: '100%', border: 'none', outline: 'none', color: '#475569', backgroundColor: 'transparent' }}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          value={item.wbs || ""}
+                          onChange={(e) =>
+                            atualizarCampo(item.id, "wbs", e.target.value)
+                          }
+                          placeholder="WBS"
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            outline: "none",
+                            color: "#475569",
+                            backgroundColor: "transparent",
+                          }}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <input 
-                          value={item.alocacao || ''} 
-                          onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} 
-                          placeholder="Alocação" 
-                          style={{ width: '100%', border: 'none', outline: 'none', color: '#2563eb', fontFamily: 'monospace', fontWeight: '600', backgroundColor: 'transparent' }}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          value={item.alocacao || ""}
+                          onChange={(e) =>
+                            atualizarCampo(item.id, "alocacao", e.target.value)
+                          }
+                          placeholder="Alocação"
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            outline: "none",
+                            color: "#2563eb",
+                            fontFamily: "monospace",
+                            fontWeight: "600",
+                            backgroundColor: "transparent",
+                          }}
                         />
                       </td>
                     </tr>
@@ -488,7 +958,7 @@ export default function MaterialEstoque() {
           )}
         </div>
       </div>
-      
+
       <div className="form-acoes-final mt-4">
         <button className="btn-enviar-azul" onClick={handleEnviar}>
           <Send size={16} /> Enviar Solicitação
