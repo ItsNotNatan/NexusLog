@@ -12,12 +12,12 @@ import {
   Zap,
   Upload,
   RefreshCcw,
+  AlertCircle // 👈 Novo ícone importado para o aviso amarelo
 } from "lucide-react";
 
-// 👇 IMPORTAÇÃO DOS COMPONENTES E SUPABASE
 import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
-import { supabase } from "../../../supabaseClient"; // 👈 Essencial para o upload!
+import { supabase } from "../../../supabaseClient";
 
 // --- FUNÇÕES AUXILIARES DE RENDERIZAÇÃO ---
 const renderBadgeStatus = (status) => {
@@ -73,6 +73,7 @@ const obterClasseBadgeTipo = (tipo) => {
 // --- COMPONENTE PRINCIPAL ---
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [dadosTabela, setDadosTabela] = useState([]);
+  const [estoque, setEstoque] = useState([]); // 👈 NOVO: Estado para armazenar o estoque
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [termoPesquisa, setTermoPesquisa] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -81,7 +82,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
 
-  // ESTADOS DE PAGINAÇÃO
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 10;
 
@@ -97,15 +97,24 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   // SIMULAÇÃO E INTEGRAÇÃO REAL COM A API
   useEffect(() => {
-    const buscarSolicitacoes = async () => {
+    const buscarDados = async () => {
       try {
-        const resposta = await fetch(
-          "http://localhost:3001/api/solicitacoes/listar",
-        );
-        const resultado = await resposta.json();
+        setCarregando(true);
+        // 👈 NOVO: Buscamos Solicitações e Estoque simultaneamente
+        const [resSolicitacoes, resEstoque] = await Promise.all([
+          fetch("http://localhost:3001/api/solicitacoes/listar"),
+          fetch("http://localhost:3001/api/estoque/listar")
+        ]);
 
-        if (resposta.ok && resultado.sucesso) {
-          const dadosFormatados = resultado.dados.map((item) => {
+        const resultadoSol = await resSolicitacoes.json();
+        const resultadoEst = await resEstoque.json();
+
+        if (resEstoque.ok && resultadoEst.sucesso) {
+          setEstoque(resultadoEst.dados);
+        }
+
+        if (resSolicitacoes.ok && resultadoSol.sucesso) {
+          const dadosFormatados = resultadoSol.dados.map((item) => {
             let prefixo = "PS";
             if (item.tipo === "Crossdocking") prefixo = "CD";
             else if (item.tipo === "Nota Fiscal") prefixo = "NF";
@@ -121,10 +130,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             if (item.status === "Pendente") {
               acaoTipo = "botao";
               acaoValor = "Aprovar";
-            } else if (
-              item.status === "Em Separação" ||
-              item.status === "Em Andamento"
-            ) {
+            } else if (item.status === "Em Separação" || item.status === "Em Andamento") {
               acaoValor = "Em Separação";
             }
 
@@ -138,12 +144,14 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataSolicitacao: item.dataSolicitacao || "-",
               dataEntrega: item.dataEntrega || "-",
               bs: item.bs || "-",
+              // 👈 Garantimos a captura da NF
+              nfCrossdocking: item.nfCrossdocking || null 
             };
           });
 
           setDadosTabela(dadosFormatados);
         } else {
-          console.error("Erro retornado do servidor:", resultado.erro);
+          console.error("Erro retornado do servidor:", resultadoSol.erro);
         }
       } catch (error) {
         console.error("Falha ao conectar à API:", error);
@@ -152,43 +160,68 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       }
     };
 
-    buscarSolicitacoes();
+    buscarDados();
   }, []);
 
+  // 👇 NOVA FUNÇÃO: Altera o status no banco de dados
+  const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
+    if (!window.confirm(`Tem certeza que deseja mudar o status para "${novoStatus}"?`)) return;
+
+    let motivo = null;
+    if (novoStatus === 'Recusado' || novoStatus === 'Cancelado') {
+      motivo = window.prompt("Por favor, informe o motivo:");
+      if (!motivo) return; 
+    }
+
+    try {
+      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
+      });
+
+      if (resposta.ok) {
+        setDadosTabela(prev => prev.map(sol => {
+          if (sol.idOriginal === idSolicitacao) {
+            return { 
+              ...sol, 
+              status: novoStatus, 
+              acaoValor: novoStatus, 
+              acaoTipo: novoStatus === 'Pendente' ? 'botao' : 'select' 
+            };
+          }
+          return sol;
+        }));
+        alert(`Status atualizado para ${novoStatus} com sucesso!`);
+      } else {
+        alert("Erro ao atualizar o status no servidor.");
+      }
+    } catch (error) {
+      console.error("Erro de conexão:", error);
+      alert("Falha de conexão com o servidor.");
+    }
+  };
+
   const kpiTotal = dadosTabela.length;
-  const kpiPendentes = dadosTabela.filter(
-    (item) => item.status === "Pendente",
-  ).length;
-  const kpiAndamento = dadosTabela.filter(
-    (item) => item.status === "Em Separação" || item.status === "Em Andamento",
-  ).length;
-  const kpiConcluidos = dadosTabela.filter(
-    (item) => item.status === "Concluído",
-  ).length;
-  const kpiRecusados = dadosTabela.filter(
-    (item) => item.status === "Recusado" || item.status === "Cancelado",
-  ).length;
+  const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
+  const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
+  const kpiConcluidos = dadosTabela.filter((item) => item.status === "Concluído").length;
+  const kpiRecusados = dadosTabela.filter((item) => item.status === "Recusado" || item.status === "Cancelado").length;
 
   const dadosFiltrados = dadosTabela.filter((linha) => {
     let passaFiltroAba = true;
     if (filtroAtivo !== "Todos") {
       const tipoMapeado =
-        filtroAtivo === "Transfer. WBS"
-          ? "Transferencia WBS"
-          : filtroAtivo === "Reintegração"
-            ? "Reintegracao"
-            : filtroAtivo;
+        filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
       passaFiltroAba = linha.tipo === tipoMapeado || linha.tipo === filtroAtivo;
     }
 
     let passaFiltroStatus = true;
     if (filtroStatus !== "Todos") {
       if (filtroStatus === "Em Separação") {
-        passaFiltroStatus =
-          linha.status === "Em Separação" || linha.status === "Em Andamento";
+        passaFiltroStatus = linha.status === "Em Separação" || linha.status === "Em Andamento";
       } else if (filtroStatus === "Recusado") {
-        passaFiltroStatus =
-          linha.status === "Recusado" || linha.status === "Cancelado";
+        passaFiltroStatus = linha.status === "Recusado" || linha.status === "Cancelado";
       } else {
         passaFiltroStatus = linha.status === filtroStatus;
       }
@@ -197,15 +230,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const termoLower = termoPesquisa.toLowerCase();
     const passaPesquisa =
       linha.id.toString().toLowerCase().includes(termoLower) ||
-      (linha.solicitante &&
-        linha.solicitante.toLowerCase().includes(termoLower)) ||
+      (linha.solicitante && linha.solicitante.toLowerCase().includes(termoLower)) ||
       (linha.wbs && linha.wbs.toLowerCase().includes(termoLower)) ||
       (linha.bs && linha.bs.toLowerCase().includes(termoLower));
 
     return passaFiltroAba && passaFiltroStatus && passaPesquisa;
   });
 
-  // Reseta para a página 1 sempre que os filtros mudarem
   useEffect(() => {
     setPaginaAtual(1);
   }, [filtroAtivo, filtroStatus, termoPesquisa]);
@@ -217,37 +248,22 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const toggleLinha = (idUnico) => {
     setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
-    setAnexosNovos([]); // Limpa o estado temporário ao mudar de linha
+    setAnexosNovos([]);
   };
 
   const handleDeletarAnexo = async (idSolicitacao, anexo) => {
-    if (
-      !window.confirm(
-        `Tem a certeza que deseja apagar permanentemente o ficheiro "${anexo.nome_arquivo}"?`,
-      )
-    )
-      return;
+    if (!window.confirm(`Tem a certeza que deseja apagar permanentemente o ficheiro "${anexo.nome_arquivo}"?`)) return;
 
     try {
-      const resposta = await fetch(
-        `http://localhost:3001/api/solicitacoes/anexo/${anexo.id}`,
-        {
-          method: "DELETE",
-        },
-      );
-
+      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/anexo/${anexo.id}`, { method: "DELETE" });
       if (resposta.ok) {
-        // Remove visualmente o anexo da tabela sem precisar de recarregar a página!
         setDadosTabela((prev) =>
           prev.map((sol) => {
             if (sol.idOriginal === idSolicitacao) {
-              return {
-                ...sol,
-                anexos: sol.anexos.filter((a) => a.id !== anexo.id),
-              };
+              return { ...sol, anexos: sol.anexos.filter((a) => a.id !== anexo.id) };
             }
             return sol;
-          }),
+          })
         );
       } else {
         alert("Erro ao apagar o anexo.");
@@ -258,7 +274,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  // 👇 LÓGICA DE ENVIO DOS ANEXOS DA LOGÍSTICA IMPLEMENTADA AQUI
   const handleEnviarAnexosExtras = async (idSolicitacao) => {
     if (anexosNovos.length === 0) return;
 
@@ -271,9 +286,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
         const caminhoNoStorage = `uploads/${nomeUnico}`;
 
-        const { error: erroUpload } = await supabase.storage
-          .from("documentos")
-          .upload(caminhoNoStorage, arquivo);
+        const { error: erroUpload } = await supabase.storage.from("documentos").upload(caminhoNoStorage, arquivo);
 
         if (erroUpload) {
           console.error("Erro ao subir arquivo para o Storage:", erroUpload);
@@ -282,9 +295,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           return;
         }
 
-        const { data: linkPublico } = supabase.storage
-          .from("documentos")
-          .getPublicUrl(caminhoNoStorage);
+        const { data: linkPublico } = supabase.storage.from("documentos").getPublicUrl(caminhoNoStorage);
 
         anexosProcessados.push({
           nome_arquivo: arquivo.name,
@@ -292,15 +303,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         });
       }
 
-      // Dispara para a nova rota do Node.js
-      const resposta = await fetch(
-        `http://localhost:3001/api/solicitacoes/${idSolicitacao}/anexos`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ anexos: anexosProcessados }),
-        },
-      );
+      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/anexos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ anexos: anexosProcessados }),
+      });
 
       const dados = await resposta.json();
 
@@ -308,7 +315,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         alert("Sucesso! Novos anexos integrados na base de dados.");
         setAnexosNovos([]);
         setLinhaExpandida(null);
-        window.location.reload(); // Recarrega para buscar a lista fresca do banco!
+        window.location.reload(); 
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
       }
@@ -323,53 +330,25 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   return (
     <div className="acompanhamento-wrapper">
       <header className="acompanhamento-cabecalho">
-        <h1>
-          {perfil === "logistica"
-            ? "Painel Geral de Solicitações"
-            : "Acompanhamento de Solicitações"}
-        </h1>
-        <p>
-          {perfil === "logistica"
-            ? "Gerencie todas as solicitações — materiais, WBS, NFs, entradas, crossdocking e reintegrações"
-            : "Visualize todas as solicitações abertas do sistema"}
-        </p>
+        <h1>{perfil === "logistica" ? "Painel Geral de Solicitações" : "Acompanhamento de Solicitações"}</h1>
+        <p>{perfil === "logistica" ? "Gerencie todas as solicitações — materiais, WBS, NFs, entradas, crossdocking e reintegrações" : "Visualize todas as solicitações abertas do sistema"}</p>
       </header>
 
       <div className="kpis-linha">
-        <div
-          className={`kpi-card-resumo kpi-total ${filtroStatus === "Todos" ? "ativo" : ""}`}
-          onClick={() => setFiltroStatus("Todos")}
-        >
-          <span>Total</span>
-          <strong>{kpiTotal}</strong>
+        <div className={`kpi-card-resumo kpi-total ${filtroStatus === "Todos" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Todos")}>
+          <span>Total</span><strong>{kpiTotal}</strong>
         </div>
-        <div
-          className={`kpi-card-resumo kpi-pendentes ${filtroStatus === "Pendente" ? "ativo" : ""}`}
-          onClick={() => setFiltroStatus("Pendente")}
-        >
-          <span>Pendentes</span>
-          <strong>{kpiPendentes}</strong>
+        <div className={`kpi-card-resumo kpi-pendentes ${filtroStatus === "Pendente" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Pendente")}>
+          <span>Pendentes</span><strong>{kpiPendentes}</strong>
         </div>
-        <div
-          className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Separação" ? "ativo" : ""}`}
-          onClick={() => setFiltroStatus("Em Separação")}
-        >
-          <span>Em Andamento</span>
-          <strong>{kpiAndamento}</strong>
+        <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Separação" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Em Separação")}>
+          <span>Em Andamento</span><strong>{kpiAndamento}</strong>
         </div>
-        <div
-          className={`kpi-card-resumo kpi-concluidos ${filtroStatus === "Concluído" ? "ativo" : ""}`}
-          onClick={() => setFiltroStatus("Concluído")}
-        >
-          <span>Concluídos</span>
-          <strong>{kpiConcluidos}</strong>
+        <div className={`kpi-card-resumo kpi-concluidos ${filtroStatus === "Concluído" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Concluído")}>
+          <span>Concluídos</span><strong>{kpiConcluidos}</strong>
         </div>
-        <div
-          className={`kpi-card-resumo kpi-recusados ${filtroStatus === "Recusado" ? "ativo" : ""}`}
-          onClick={() => setFiltroStatus("Recusado")}
-        >
-          <span>Recusados</span>
-          <strong>{kpiRecusados}</strong>
+        <div className={`kpi-card-resumo kpi-recusados ${filtroStatus === "Recusado" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Recusado")}>
+          <span>Recusados</span><strong>{kpiRecusados}</strong>
         </div>
       </div>
 
@@ -399,20 +378,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         <div className="tabela-scroll-horizontal">
           {carregando ? (
-            <div
-              style={{
-                padding: "40px",
-                textAlign: "center",
-                color: "#64748b",
-                fontWeight: "500",
-              }}
-            >
+            <div style={{ padding: "40px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>
               Carregando solicitações...
             </div>
           ) : dadosFiltrados.length === 0 ? (
-            <div
-              style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}
-            >
+            <div style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>
               Nenhuma solicitação encontrada.
             </div>
           ) : (
@@ -435,35 +405,36 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                     const idUnico = `${linha.prefixo}-${linha.id}-${index}`;
                     const isExpandida = linhaExpandida === idUnico;
 
+                    // 👇 LÓGICA DE BLOQUEIO DO CROSSDOCKING
+                    const isCrossdocking = linha.tipo === 'Crossdocking';
+                    let nfNoEstoque = true;
+
+                    if (isCrossdocking && linha.nfCrossdocking) {
+                      nfNoEstoque = estoque.some(itemEstoque => {
+                        const nfEstoqueLimpa = String(itemEstoque.nf_entrada || '').trim();
+                        const nfSolicitacaoLimpa = String(linha.nfCrossdocking || '').trim();
+                        return nfEstoqueLimpa === nfSolicitacaoLimpa && nfEstoqueLimpa !== '';
+                      });
+                    }
+
+                    const statusBloqueado = isCrossdocking && !nfNoEstoque;
+
                     return (
                       <React.Fragment key={idUnico}>
                         <tr className={isExpandida ? "tr-expandida" : ""}>
-                          <td
-                            className="col-chevron"
-                            onClick={() => toggleLinha(idUnico)}
-                          >
+                          <td className="col-chevron" onClick={() => toggleLinha(idUnico)}>
                             <ChevronRight
                               size={18}
-                              className={
-                                isExpandida
-                                  ? "icone-rotacionado"
-                                  : "icone-normal"
-                              }
+                              className={isExpandida ? "icone-rotacionado" : "icone-normal"}
                               style={{ color: "#94a3b8" }}
                             />
                           </td>
 
                           <td>
                             <div className="bloco-tipo-id">
-                              <span
-                                className={`badge-tipo ${obterClasseBadgeTipo(linha.tipo)} ${linha.entregaUrgente ? "badge-urgente-critico" : ""}`}
-                              >
+                              <span className={`badge-tipo ${obterClasseBadgeTipo(linha.tipo)} ${linha.entregaUrgente ? "badge-urgente-critico" : ""}`}>
                                 {linha.entregaUrgente ? (
-                                  <Zap
-                                    size={13}
-                                    color="#ef4444"
-                                    fill="#ef4444"
-                                  />
+                                  <Zap size={13} color="#ef4444" fill="#ef4444" />
                                 ) : (
                                   <GitBranch size={13} />
                                 )}
@@ -473,39 +444,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           </td>
 
                           <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "4px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: "0.875rem",
-                                  fontWeight: "700",
-                                  color: "#1e293b",
-                                }}
-                              >
+                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                              <span style={{ fontSize: "0.875rem", fontWeight: "700", color: "#1e293b" }}>
                                 {linha.prefixo || "PS"}:{linha.id}
                               </span>
-                              <span
-                                style={{
-                                  fontSize: "0.75rem",
-                                  color: "#64748b",
-                                  textTransform: "uppercase",
-                                }}
-                              >
+                              <span style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "uppercase" }}>
                                 {linha.solicitante}
                               </span>
                               {linha.wbs && (
-                                <span
-                                  style={{
-                                    fontSize: "0.75rem",
-                                    color: "#2563eb",
-                                    fontWeight: "500",
-                                  }}
-                                >
+                                <span style={{ fontSize: "0.75rem", color: "#2563eb", fontWeight: "500" }}>
                                   {linha.wbs}
                                 </span>
                               )}
@@ -513,9 +460,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           </td>
 
                           <td>
-                            {linha.bs &&
-                            linha.bs !== "-" &&
-                            linha.bs !== "—" ? (
+                            {linha.bs && linha.bs !== "-" && linha.bs !== "—" ? (
                               <span className="badge-bs">
                                 <FileText size={14} /> {linha.bs}
                               </span>
@@ -523,142 +468,122 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               <span className="traco-vazio">—</span>
                             )}
                           </td>
-                          <td className="texto-data">
-                            {linha.dataSolicitacao}
-                          </td>
+                          <td className="texto-data">{linha.dataSolicitacao}</td>
                           <td>
-                            {linha.dataEntrega &&
-                            linha.dataEntrega !== "-" &&
-                            linha.dataEntrega !== "—" ? (
-                              <span className="texto-data-verde">
-                                {linha.dataEntrega}
-                              </span>
+                            {linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? (
+                              <span className="texto-data-verde">{linha.dataEntrega}</span>
                             ) : (
                               <span className="traco-vazio">—</span>
                             )}
                           </td>
                           <td>{renderBadgeStatus(linha.status)}</td>
 
+                          {/* 👇 COLUNA DE AÇÕES COM O NOVO ESTADO VISUAL */}
                           {perfil === "logistica" && (
-                            <td>
-                              {linha.acaoTipo === "botao" ? (
-                                <button
-                                  className="btn-aprovar-acao"
-                                  style={{
-                                    backgroundColor: "#ea580c",
-                                    color: "#fff",
-                                    border: "none",
-                                    borderRadius: "20px",
-                                    padding: "6px 16px",
-                                    fontSize: "0.875rem",
-                                    fontWeight: "600",
-                                    cursor: "pointer",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                  }}
-                                >
-                                  <RefreshCcw size={14} />{" "}
-                                  {linha.acaoValor || "Aprovar"}
-                                </button>
+                            <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {linha.status === 'Pendente' ? (
+                                statusBloqueado ? (
+                                  <div 
+                                    title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} 
+                                    style={{ 
+                                      color: '#d97706', 
+                                      backgroundColor: '#fefce8', 
+                                      border: '1px solid #fde047',
+                                      padding: '6px 12px', 
+                                      borderRadius: '20px', 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      gap: '6px',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '600'
+                                    }}
+                                  >
+                                    <AlertCircle size={14} /> Aguardando NF
+                                  </div>
+                                ) : (
+                                  <button 
+                                    className="btn-aprovar-acao" 
+                                    style={{
+                                      backgroundColor: '#ea580c',
+                                      color: '#fff',
+                                      border: 'none',
+                                      borderRadius: '20px',
+                                      padding: '6px 16px',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '600',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      lidarComMudancaStatus(linha.idOriginal || linha.id, 'Em Separação');
+                                    }}
+                                  >
+                                    <RefreshCw size={14} /> Aprovar
+                                  </button>
+                                )
                               ) : (
                                 <select
                                   className="select-acao"
-                                  defaultValue={linha.acaoValor}
+                                  value={linha.status}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value);
+                                  }}
                                   style={{
-                                    padding: "6px 12px",
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "20px",
-                                    backgroundColor: "#f8fafc",
-                                    fontSize: "0.875rem",
-                                    color: "#334155",
-                                    outline: "none",
-                                    cursor: "pointer",
+                                    padding: '6px 12px',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '20px',
+                                    backgroundColor: '#f8fafc',
+                                    fontSize: '0.875rem',
+                                    color: '#334155',
+                                    outline: 'none',
+                                    cursor: 'pointer',
                                   }}
                                 >
-                                  <option value={linha.acaoValor}>
-                                    {linha.acaoValor}
-                                  </option>
+                                  <option value="Pendente" disabled>Pendente</option>
+                                  <option value="Em Separação">Em Separação</option>
                                   <option value="Concluído">Concluído</option>
                                   <option value="Cancelado">Cancelado</option>
+                                  <option value="Recusado">Recusado</option>
                                 </select>
                               )}
                             </td>
                           )}
                         </tr>
 
-                        {/* GAVETA DE DETALHES + BOTÕES DE APROVAÇÃO */}
                         {isExpandida && (
                           <tr>
-                            <td
-                              colSpan={perfil === "logistica" ? 8 : 7}
-                              className="td-expandida"
-                            >
+                            <td colSpan={perfil === "logistica" ? 8 : 7} className="td-expandida">
                               <DetalhesSolicitacao
                                 item={linha}
                                 perfil={perfil}
-                                onDeleteAnexo={(anexo) =>
-                                  handleDeletarAnexo(linha.idOriginal, anexo)
-                                } // 👈 Adiciona isto!
+                                onDeleteAnexo={(anexo) => handleDeletarAnexo(linha.idOriginal, anexo)}
                               />
-
                               {perfil === "logistica" && (
-                                <div
-                                  style={{
-                                    padding: "0 32px 24px 32px",
-                                    backgroundColor: "#f8fafc",
-                                  }}
-                                >
-                                  <hr
-                                    style={{
-                                      border: "none",
-                                      borderTop: "1px dashed #cbd5e1",
-                                      margin: "0 0 16px 0",
-                                    }}
-                                  />
-
+                                <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
+                                  <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
                                   <GerenciadorAnexos
                                     anexos={anexosNovos}
                                     setAnexos={setAnexosNovos}
                                     titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO"
                                   />
-
                                   {anexosNovos.length > 0 && (
-                                    <div
-                                      style={{
-                                        display: "flex",
-                                        justifyContent: "flex-end",
-                                        marginTop: "16px",
-                                      }}
-                                    >
+                                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
                                       <button
-                                        onClick={() =>
-                                          handleEnviarAnexosExtras(
-                                            linha.idOriginal,
-                                          )
-                                        } // 👈 ATENÇÃO: Mudou para idOriginal (ID da base de dados e não visual)
+                                        onClick={() => handleEnviarAnexosExtras(linha.idOriginal)}
                                         disabled={carregando}
                                         style={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: "8px",
-                                          padding: "10px 20px",
-                                          backgroundColor: carregando
-                                            ? "#94a3b8"
-                                            : "#2563eb",
-                                          color: "#fff",
-                                          border: "none",
-                                          borderRadius: "8px",
-                                          fontWeight: "600",
-                                          cursor: carregando
-                                            ? "not-allowed"
-                                            : "pointer",
+                                          display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px",
+                                          backgroundColor: carregando ? "#94a3b8" : "#2563eb",
+                                          color: "#fff", border: "none", borderRadius: "8px", fontWeight: "600",
+                                          cursor: carregando ? "not-allowed" : "pointer",
                                         }}
                                       >
                                         <Upload size={16} />
-                                        {carregando
-                                          ? "A salvar..."
-                                          : "Salvar Novos Anexos"}
+                                        {carregando ? "A salvar..." : "Salvar Novos Anexos"}
                                       </button>
                                     </div>
                                   )}
@@ -673,36 +598,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 </tbody>
               </table>
 
-              {/* CONTROLES DA PAGINAÇÃO NO FUNDO DA TABELA */}
               {totalPaginas > 1 && (
                 <div className="paginacao-container">
                   <div className="paginacao-info">
                     Mostrando <strong>{indexPrimeiroItem + 1}</strong> a{" "}
-                    <strong>
-                      {Math.min(indexUltimoItem, dadosFiltrados.length)}
-                    </strong>{" "}
-                    de <strong>{dadosFiltrados.length}</strong> resultados
+                    <strong>{Math.min(indexUltimoItem, dadosFiltrados.length)}</strong> de <strong>{dadosFiltrados.length}</strong> resultados
                   </div>
-
                   <div className="paginacao-botoes">
-                    <button
-                      className="btn-paginacao"
-                      onClick={() =>
-                        setPaginaAtual((prev) => Math.max(prev - 1, 1))
-                      }
-                      disabled={paginaAtual === 1}
-                    >
+                    <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1}>
                       <ChevronLeft size={16} /> Anterior
                     </button>
-                    <button
-                      className="btn-paginacao"
-                      onClick={() =>
-                        setPaginaAtual((prev) =>
-                          Math.min(prev + 1, totalPaginas),
-                        )
-                      }
-                      disabled={paginaAtual === totalPaginas}
-                    >
+                    <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas}>
                       Próxima <ChevronRight size={16} />
                     </button>
                   </div>

@@ -9,7 +9,7 @@ import {
   CheckCircle2,
   XCircle,
   Edit2,
-  AlertCircle 
+  AlertCircle
 } from 'lucide-react';
 
 const filtrosArray = ['Todos', 'Material', 'Transferencia WBS', 'Nota Fiscal', 'Entrada', 'Crossdocking', 'Reintegracao'];
@@ -304,63 +304,83 @@ export default function PainelGeralSolicitacoes() {
 
                       {/* 🛠️ AÇÕES ATUALIZADAS AQUI */}
                       <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {statusBloqueado ? (
-                          // 🔒 BLOQUEADO: Exibe a etiqueta amarela
-                          <div 
-                            title={`Aguardando NF ${linha.nfCrossdocking} no estoque`} 
-                            style={{ 
-                              color: '#d97706', 
-                              backgroundColor: '#fef3c7', 
-                              padding: '6px 12px', 
-                              borderRadius: '6px', 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              gap: '6px',
-                              fontSize: '13px',
-                              fontWeight: '600'
-                            }}
-                          >
-                            <AlertCircle size={14} /> Aguardando NF
-                          </div>
-                        ) : linha.status === 'Pendente' ? (
-                          // ✅ LIBERADO E PENDENTE: Exibe o botão de Aprovar
-                          <button 
-                            className="btn-aprovar-laranja" 
-                            style={{
-                              backgroundColor: '#f97316',
-                              color: 'white',
-                              border: 'none',
-                              padding: '6px 16px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontWeight: 'bold',
-                              fontSize: '13px'
-                            }}
-                            onClick={() => lidarComMudancaStatus(linha.id, 'Em Separação')}
-                          >
-                            <RefreshCw size={14} /> Aprovar
-                          </button>
+                        {linha.status === 'Pendente' ? (
+                          statusBloqueado ? (
+                            // 🔒 BLOQUEADO: Exibe a etiqueta amarela avisando que falta a NF
+                            <div
+                              title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`}
+                              style={{
+                                color: '#d97706',
+                                backgroundColor: '#fefce8',
+                                border: '1px solid #fde047',
+                                padding: '6px 12px',
+                                borderRadius: '20px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600'
+                              }}
+                            >
+                              <AlertCircle size={14} /> Aguardando NF
+                            </div>
+                          ) : (
+                            // ✅ LIBERADO: Exibe o botão de Aprovar laranja
+                            <button
+                              className="btn-aprovar-acao"
+                              style={{
+                                backgroundColor: '#ea580c',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '20px',
+                                padding: '6px 16px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Evita expandir a linha (se tiveres gaveta)
+                                lidarComMudancaStatus(linha.idOriginal || linha.id, 'Em Separação');
+                              }}
+                            >
+                              <RefreshCw size={14} /> Aprovar
+                            </button>
+                          )
                         ) : (
-                          // 🔄 EM ANDAMENTO/OUTROS: Mantém o select para poder concluir ou cancelar posteriormente
+                          // 🔄 OUTROS STATUS (Já aprovado): Mostra o select normal para gerenciar
                           <select
                             className="select-acao"
                             value={linha.status}
-                            onChange={(e) => lidarComMudancaStatus(linha.id, e.target.value)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value);
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '20px',
+                              backgroundColor: '#f8fafc',
+                              fontSize: '0.875rem',
+                              color: '#334155',
+                              outline: 'none',
+                              cursor: 'pointer',
+                            }}
                           >
+                            <option value="Pendente" disabled>Pendente</option>
                             <option value="Em Separação">Em Separação</option>
                             <option value="Concluído">Concluído</option>
                             <option value="Cancelado">Cancelado</option>
+                            <option value="Recusado">Recusado</option>
                           </select>
                         )}
                       </td>
-
                     </tr>
                   );
                 })}
-                
+
               </tbody>
             </table>
           </div>
