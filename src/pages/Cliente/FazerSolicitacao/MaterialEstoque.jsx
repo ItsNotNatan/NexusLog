@@ -9,6 +9,7 @@ import {
   Trash2,
   Zap,
   Loader2,
+  ArrowLeftRight // 👈 Novo ícone importado para indicar transferência
 } from "lucide-react";
 
 // NOSSOS COMPONENTES E HOOKS
@@ -43,28 +44,28 @@ export default function MaterialEstoque() {
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
-        // 👇 CORREÇÃO 1: Apontamos para a rota real do estoque!
         const resposta = await fetch("http://localhost:3001/api/estoque/listar");
         const resultado = await resposta.json();
 
         if (resposta.ok && resultado.sucesso) {
           
-          // 👇 CORREÇÃO 2: Lemos diretamente da tabela de estoque físico
           const itensComSaldo = resultado.dados
-            .filter((item) => item.quantidade_disponivel > 0) // Pega só o que tem saldo
+            .filter((item) => item.quantidade_disponivel > 0)
             .map((item) => ({
-              idBD: item.id, // AGORA SIM! Este é o ID real da prateleira na tabela "estoque"
+              idBD: item.id,
               desenhoSAP: item.desenho_sap_manual || item.desenho_sap || "-",
               materialDescription: item.descricao_manual || item.descricao || "-",
               numPecaFabricante: item.part_number_manual || item.part_number || "-",
               fornecedor: item.fornecedor || "-",
-              qtdFornecida: item.quantidade_disponivel || 0, // Mostramos o Saldo Real
+              qtdFornecida: item.quantidade_disponivel || 0,
               nf: item.nf_entrada || "-",
               referencia: "-",
               unidadeMedida: item.unidade_medida_manual || item.unidade_medida || "Unid",
               vendorDescription: item.descricao_manual || item.descricao || "-",
               wbs: item.wbs_element || item.wbs || "-",
               alocacao: item.alocacao || "-",
+              // 👇 NOVA LINHA: Capturamos a flag de transferência que vem do Banco de Dados
+              isTransferencia: item.is_transferencia || false 
             }));
 
           setEstoqueDisponivel(itensComSaldo);
@@ -112,7 +113,7 @@ export default function MaterialEstoque() {
       ...prev,
       {
         id: `manual-${Date.now()}-${index}`, 
-        estoque_id: item.idBD || null, // A ponte mágica agora transporta o ID verdadeiro!
+        estoque_id: item.idBD || null,
         ...item,
         qtdSelecionada: 1,
       },
@@ -169,9 +170,6 @@ export default function MaterialEstoque() {
       anexos: anexosProcessados,
     };
 
-    console.log("🚀 [FRONTEND] Dados exatos que vão para o Backend:", payload);
-    console.table(payload.itens);
-
     try {
       const resposta = await fetch("http://localhost:3001/api/solicitacoes/material", {
         method: "POST",
@@ -205,7 +203,6 @@ export default function MaterialEstoque() {
   const listaSegura = Array.isArray(itensSelecionados) ? itensSelecionados : [];
 
   return (
-    // ... TODO O TEU RETURN (HTML) MANTÉM-SE EXATAMENTE IGUAL! ...
     <>
       <ModalProcessamento
         estaProcessando={processador.estaProcessando}
@@ -474,8 +471,25 @@ export default function MaterialEstoque() {
                     transition: "background 0.2s",
                   }}
                 >
-                  <div style={{ marginBottom: "12px" }}>
+                  {/* 👇 RENDERIZAMOS A ETIQUETA SE FOR UM ITEM TRANSFERIDO */}
+                  <div style={{ marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
                     <span className="badge-sap">{item.desenhoSAP}</span>
+                    {item.isTransferencia && (
+                      <span style={{
+                        backgroundColor: '#fefce8',
+                        color: '#ca8a04',
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '0.7rem',
+                        fontWeight: '600',
+                        border: '1px solid #fde047',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <ArrowLeftRight size={12} /> Transferido
+                      </span>
+                    )}
                   </div>
 
                   <div
@@ -897,22 +911,30 @@ export default function MaterialEstoque() {
                         />
                       </td>
                       <td style={{ padding: "8px 12px" }}>
-                        <input
-                          value={item.alocacao || ""}
-                          onChange={(e) =>
-                            atualizarCampo(item.id, "alocacao", e.target.value)
-                          }
-                          placeholder="Alocação"
-                          style={{
-                            width: "100%",
-                            border: "none",
-                            outline: "none",
-                            color: "#2563eb",
-                            fontFamily: "monospace",
-                            fontWeight: "600",
-                            backgroundColor: "transparent",
-                          }}
-                        />
+                        {/* 👇 MOSTRAMOS SE É TRANSFERIDO NA COLUNA ALOCAÇÃO */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <input
+                            value={item.alocacao || ""}
+                            onChange={(e) =>
+                              atualizarCampo(item.id, "alocacao", e.target.value)
+                            }
+                            placeholder="Alocação"
+                            style={{
+                              width: "100%",
+                              border: "none",
+                              outline: "none",
+                              color: "#2563eb",
+                              fontFamily: "monospace",
+                              fontWeight: "600",
+                              backgroundColor: "transparent",
+                            }}
+                          />
+                          {item.isTransferencia && (
+                            <span style={{ fontSize: '0.65rem', color: '#ca8a04', fontWeight: 'bold' }}>
+                              *Transferido
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
