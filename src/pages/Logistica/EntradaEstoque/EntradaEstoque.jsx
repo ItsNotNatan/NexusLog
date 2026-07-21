@@ -166,6 +166,8 @@ export default function EntradaEstoque() {
         },
         itens: itens.map(item => ({
           ...item,
+          // 👇 AQUI ESTÁ A ALTERAÇÃO: Limpamos os espaços vazios da NF antes de enviar
+          nfEntrada: item.nfEntrada ? item.nfEntrada.trim() : '', 
           qtd: item.qtdFornecida,
           desenhoSAP: '-', 
           materialDescription: item.vendorDescription || 'Sem descrição'
