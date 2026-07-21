@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Boxes, Loader2, MapPin, X, History, ArrowRightLeft } from 'lucide-react'; // 👈 ArrowRightLeft adicionado
+import { Search, Boxes, Loader2, MapPin, X, History, ArrowRightLeft } from 'lucide-react';
 import './VisaoGeralEstoque.css'; 
 
 export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
-  // --- 1. VARIÁVEIS DE ESTADO DO ESTOQUE ---
   const [dadosEstoque, setDadosEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
 
-  // 🎯 NOVOS ESTADOS: Para controlar a exibição da Tabela de Demandas ao duplo clique
   const [modalDemandasAberto, setModalDemandasAberto] = useState(false);
   const [materialSelecionado, setMaterialSelecionado] = useState(null);
   const [demandasDoMaterial, setDemandasDoMaterial] = useState([]);
@@ -19,7 +17,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     ? 'Consulte a disponibilidade de materiais em tempo real.' 
     : 'Painel de controle do saldo físico de todas as filiais.';
 
-  // --- 2. CARREGAMENTO DOS DADOS DO ESTOQUE ---
   useEffect(() => {
     const carregarEstoqueDoBackend = async () => {
       try {
@@ -45,7 +42,9 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
           valor_unitario: item.valor_unitario || 0,
           alocacao: item.alocacao || 'Pendente',
           wbs: item.wbs || '—',
-          situacao: item.status || 'Disponível'
+          situacao: item.status || 'Disponível',
+          // ✨ LÊ A NOVA COLUNA DE TRANSFERÊNCIA DIRETAMENTE DO BANCO DE DADOS
+          is_transferencia: item.is_transferencia || false 
         }));
         
         estoqueTratado.sort((a, b) => a.part_number.localeCompare(b.part_number));
@@ -60,7 +59,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     carregarEstoqueDoBackend();
   }, []);
 
-  // --- 3. AÇÃO DE DUPLO CLIQUE: BUSCAR DEMANDAS DO ITEM ---
   const handleLinhaDuploClique = async (material) => {
     setMaterialSelecionado(material);
     setModalDemandasAberto(true);
@@ -93,7 +91,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     setMaterialSelecionado(null);
   };
 
-  // --- 4. FILTRO DA BARRA DE PESQUISA ---
   const dadosFiltrados = dadosEstoque.filter((item) => {
     const termo = termoPesquisa.toLowerCase();
     return (
@@ -113,16 +110,13 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
   return (
     <div style={{ padding: '32px', backgroundColor: '#f4f5f7', minHeight: '100vh', boxSizing: 'border-box' }}>
       
-      {/* CABEÇALHO */}
       <header style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1e293b', margin: '0 0 8px 0' }}>{tituloPagina}</h1>
         <p style={{ fontSize: '1rem', color: '#64748b', margin: 0 }}>{subtituloPagina}</p>
       </header>
 
-      {/* CARD DA TABELA PRINCIPAL */}
       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
         
-        {/* Barra de Pesquisa */}
         <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ position: 'relative', width: '380px' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
@@ -139,7 +133,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
           </span>
         </div>
 
-        {/* Tabela Física de Saldo */}
         <div style={{ width: '100%', overflowX: 'auto' }}>
           {carregando ? (
             <div style={{ padding: '60px', textAlign: 'center' }}><Loader2 size={32} className="animate-spin" color="#2563eb" /></div>
@@ -183,22 +176,23 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>{item.unidade_medida}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'monospace' }}>{Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor_unitario)}</td>
                     
-                    {/* 👇 MÁGICA VISUAL DA ALOCAÇÃO E TRANSFERÊNCIA 👇 */}
+                    {/* ✨ LÓGICA VISUAL ATUALIZADA PARA LER A COLUNA DO BANCO ✨ */}
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>
-                      {item.alocacao?.includes('Transferido') ? (
+                      {item.is_transferencia ? (
                         <span style={{ 
                           display: 'inline-flex', 
                           alignItems: 'center', 
                           gap: '6px', 
-                          backgroundColor: '#ffedd5', // Laranja bem clarinho
-                          color: '#c2410c',           // Laranja escuro
+                          backgroundColor: '#ffedd5', 
+                          color: '#c2410c',           
                           padding: '4px 8px', 
                           borderRadius: '6px', 
                           fontSize: '0.75rem',
                           border: '1px solid #fed7aa'
-                        }}>
+                        }}
+                        title="Este material foi recebido via Transferência WBS">
                           <ArrowRightLeft size={14} />
-                          {item.alocacao}
+                          Transferido ({item.alocacao})
                         </span>
                       ) : (
                         <span style={{ color: '#2563eb' }}>{item.alocacao}</span>
@@ -217,7 +211,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
         </div>
       </div>
 
-      {/* JANELA MODAL MANTIDA INTACTA AQUI (Omitida para focar no que importa, mas já está no código acima!) */}
       {modalDemandasAberto && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
           <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', width: '700px', maxWidth: '90%', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>

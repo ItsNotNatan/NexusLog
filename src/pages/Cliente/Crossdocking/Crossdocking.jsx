@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText } from 'lucide-react'; // 👈 FileText importado para o ícone da NF
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 // IMPORTAÇÕES PARA OS ANEXOS FUNCIONAREM
@@ -13,7 +13,8 @@ export default function Crossdocking() {
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
-    observacoes: ''
+    observacoes: '',
+    nf: '' // ✨ NOVO: Estado para guardar o número da Nota Fiscal
   });
   
   // Estado para o tipo de saída (parcial ou total)
@@ -24,7 +25,7 @@ export default function Crossdocking() {
     { id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }
   ]);
 
-  // 👇 ESTADO PARA OS ARQUIVOS DA NOTA FISCAL
+  // ESTADO PARA OS ARQUIVOS DA NOTA FISCAL
   const [anexos, setAnexos] = useState([]);
 
   // --- FUNÇÕES DA TABELA PARCIAL ---
@@ -51,15 +52,15 @@ export default function Crossdocking() {
 
   // 2. FUNÇÃO DE ENVIO PARA O BACKEND (NODE.JS)
   const handleEnviar = async () => {
-    // Validação dos campos obrigatórios
-    if (!formDados.nome || !formDados.wbs || !tipoSaida) {
-      alert("Por favor, preencha o Nome, WBS e selecione o Tipo de Saída.");
+    // ✨ NOVO: Validação agora inclui a NF
+    if (!formDados.nome || !formDados.wbs || !formDados.nf || !tipoSaida) {
+      alert("Por favor, preencha o Nome, WBS, Número da NF e selecione o Tipo de Saída.");
       return;
     }
 
-    // Validação da Nota Fiscal (obrigatório para Crossdocking)
+    // Validação da Nota Fiscal em anexo (obrigatório para Crossdocking)
     if (anexos.length === 0) {
-      alert("A anexação da Nota Fiscal (ou XML) é obrigatória para operações de Crossdocking.");
+      alert("A anexação do documento da Nota Fiscal (PDF ou XML) é obrigatória para operações de Crossdocking.");
       return;
     }
 
@@ -116,6 +117,7 @@ export default function Crossdocking() {
       solicitante: {
         nome: formDados.nome,
         wbs: formDados.wbs,
+        nf: formDados.nf, // ✨ NOVO: A NF viaja aqui para o Backend
         observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'}] ${formDados.observacoes}`,
         tipo: 'Crossdocking'
       },
@@ -135,7 +137,7 @@ export default function Crossdocking() {
       if (resposta.ok) {
         alert(`Sucesso! Solicitação de Crossdocking enviada. ID: ${dados.ps_id}`);
         // Limpa os campos após o sucesso
-        setFormDados({ nome: '', wbs: '', observacoes: '' });
+        setFormDados({ nome: '', wbs: '', observacoes: '', nf: '' });
         setTipoSaida(null);
         setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
         setAnexos([]); // Limpa a lista de arquivos
@@ -189,6 +191,20 @@ export default function Crossdocking() {
               onChange={(e) => setFormDados({...formDados, wbs: e.target.value})}
             />
           </div>
+          
+          {/* ✨ NOVO: Campo obrigatório do Número da Nota Fiscal */}
+          <div className="input-grupo">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FileText size={14} color="#2563eb" /> NÚMERO DA NOTA FISCAL *
+            </label>
+            <input 
+              type="text" 
+              className="input-campo foco-ciano" 
+              placeholder="Ex: 123456" 
+              value={formDados.nf}
+              onChange={(e) => setFormDados({...formDados, nf: e.target.value})}
+            />
+          </div>
         </div>
       </div>
 
@@ -230,7 +246,6 @@ export default function Crossdocking() {
           {tipoSaida === 'parcial' && (
             <div style={{ marginTop: '16px', animation: 'fadeIn 0.2s ease-in-out' }}>
               
-              {/* 👇 AQUI ESTAVA O ERRO (justifyContent em vez de justify-content) */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <span style={{ fontSize: '0.85rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <AlertTriangle size={16} /> Saída Parcial — adicione todos os itens da NF que serão separados

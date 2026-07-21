@@ -7,25 +7,39 @@ import {
   Check, 
   X, 
   Eye, 
-  Loader2 
+  Loader2,
+  AlertCircle // 👈 Novo ícone importado para o aviso
 } from 'lucide-react';
 
 import DetalhesSolicitacao from '../../Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao';
 
 export default function PainelAprovacao() {
   const [dadosTabela, setDadosTabela] = useState([]);
+  const [estoque, setEstoque] = useState([]); // ✨ NOVO: Estado para guardar o estoque atual
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [linhaExpandida, setLinhaExpandida] = useState(null);
 
   useEffect(() => {
-    const buscarPendentes = async () => {
+    const buscarDados = async () => {
       try {
-        const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
-        const resultado = await resposta.json();
+        // ✨ NOVO: Busca as solicitações e o estoque ao mesmo tempo
+        const [resSolicitacoes, resEstoque] = await Promise.all([
+          fetch('http://localhost:3001/api/solicitacoes/listar'),
+          fetch('http://localhost:3001/api/estoque/listar')
+        ]);
 
-        if (resposta.ok && resultado.sucesso) {
-          const dadosFormatados = resultado.dados
+        const resultadoSol = await resSolicitacoes.json();
+        const resultadoEst = await resEstoque.json();
+
+        // 1. Guarda o estoque
+        if (resEstoque.ok && resultadoEst.sucesso) {
+          setEstoque(resultadoEst.dados);
+        }
+
+        // 2. Guarda as solicitações
+        if (resSolicitacoes.ok && resultadoSol.sucesso) {
+          const dadosFormatados = resultadoSol.dados
             .filter(item => item.status === 'Pendente')
             .map((item) => {
               let prefixo = 'PS';
@@ -43,7 +57,7 @@ export default function PainelAprovacao() {
               let dep = '-';
               if (item.tipo === 'Entrada' && item.itens && item.itens.length > 0) {
                 valorTotal = item.itens.reduce((acc, it) => acc + (Number(it.quantidade_solicitada) * Number(it.valor_unitario_manual || 0)), 0);
-                centro = item.itens[0].centro || 'BR06'; // Fallback visual
+                centro = item.itens[0].centro || 'BR06';
                 dep = item.itens[0].deposito || '0020';
               }
 
@@ -61,7 +75,7 @@ export default function PainelAprovacao() {
 
           setDadosTabela(dadosFormatados);
         } else {
-          console.error("Erro retornado do servidor:", resultado.erro);
+          console.error("Erro retornado do servidor nas solicitações:", resultadoSol.erro);
         }
       } catch (error) {
         console.error("Falha ao conectar à API:", error);
@@ -70,7 +84,7 @@ export default function PainelAprovacao() {
       }
     };
 
-    buscarPendentes();
+    buscarDados();
   }, []);
 
   const dadosFiltrados = dadosTabela.filter((linha) => {
@@ -181,10 +195,19 @@ export default function PainelAprovacao() {
               </div>
             ) : (
               <div className="lista-solicitacoes">
-                {outrasPendentes.map((linha, index) => {
+                {outrasPendentes.map((linha) => {
                   const idUnico = `geral-${linha.idOriginal}`;
                   const isExpandida = linhaExpandida === idUnico;
                   
+                  // ✨ NOVO: A NOSSA REGRA DE CROSSDOCKING AQUI ✨
+                  const isCrossdocking = linha.tipo === 'Crossdocking';
+                  let nfNoEstoque = true; // Por defeito assumimos que pode aprovar
+
+                  if (isCrossdocking && linha.nfCrossdocking) {
+                    // Verifica se existe alguma linha no estoque com esta NF
+                    nfNoEstoque = estoque.some(itemEstoque => itemEstoque.nf_entrada === linha.nfCrossdocking);
+                  }
+
                   return (
                     <React.Fragment key={idUnico}>
                       <div className="item-lista-horizontal">
@@ -207,17 +230,30 @@ export default function PainelAprovacao() {
                           )}
                         </div>
 
+                        {/* ✨ RENDEREIZAÇÃO CONDICIONAL DOS BOTÕES */}
                         <div className="item-acoes-grupo">
                           <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico)}>
                             <Eye size={16} /> Ver Itens
                           </button>
-                          <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
-                            <X size={16} /> Recusar
-                          </button>
-                          <button className="btn-acao-lista btn-aprovar-solid azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
-                            <Check size={16} /> Aprovar
-                          </button>
+
+                          {isCrossdocking && !nfNoEstoque ? (
+                            // 🔒 BLOQUEADO: Se for Crossdocking e não tiver NF no estoque, mostra o aviso
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#fef3c7', color: '#d97706', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '500', marginLeft: '12px' }}>
+                              <AlertCircle size={16} /> Aguardando NF {linha.nfCrossdocking} no estoque
+                            </div>
+                          ) : (
+                            // 🟢 LIBERADO: Se não for crossdocking OU se a NF já estiver no estoque, mostra os botões
+                            <>
+                              <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
+                                <X size={16} /> Recusar
+                              </button>
+                              <button className="btn-acao-lista btn-aprovar-solid azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
+                                <Check size={16} /> Aprovar
+                              </button>
+                            </>
+                          )}
                         </div>
+
                       </div>
 
                       {isExpandida && (
@@ -233,7 +269,7 @@ export default function PainelAprovacao() {
           </div>
 
           {/* ======================================================== */}
-          {/* SECÇÃO 2: ENTRADAS DE ESTOQUE (Verde)                      */}
+          {/* SECÇÃO 2: ENTRADAS DE ESTOQUE (Verde)                    */}
           {/* ======================================================== */}
           <div className="seccao-painel tema-verde">
             <div className="seccao-header borda-verde">
