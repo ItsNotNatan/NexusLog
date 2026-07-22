@@ -1,47 +1,33 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 
-const AuthContext = createContext({});
+export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [usuario, setUsuario] = useState(null);
 
+  // Quando o app carrega, verifica se já tem alguém logado (salvo no LocalStorage)
   useEffect(() => {
-    // Quando a página carrega, verifica se o usuário já logou (salvo no navegador)
-    const userSalvo = localStorage.getItem('nexus_user');
-    if (userSalvo) {
-      const parsed = JSON.parse(userSalvo);
-      setUser(parsed);
-      setRole(parsed.cargo);
+    const usuarioSalvo = localStorage.getItem('@NexusLog:usuario');
+    if (usuarioSalvo) {
+      setUsuario(JSON.parse(usuarioSalvo));
     }
-    setLoading(false);
   }, []);
 
-  // Função para fazer o login manual e salvar no navegador
-  const loginManual = (dadosUsuario) => {
-    localStorage.setItem('nexus_user', JSON.stringify(dadosUsuario));
-    setUser(dadosUsuario);
-    setRole(dadosUsuario.cargo);
+  // Função para salvar o usuário ao fazer login
+  const login = (dadosUsuario) => {
+    setUsuario(dadosUsuario);
+    localStorage.setItem('@NexusLog:usuario', JSON.stringify(dadosUsuario));
   };
 
-  // Função para sair
-  const logoutManual = () => {
-    localStorage.removeItem('nexus_user');
-    setUser(null);
-    setRole(null);
+  // Função para sair do sistema
+  const logout = () => {
+    setUsuario(null);
+    localStorage.removeItem('@NexusLog:usuario');
   };
-
-// ... resto do código acima
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, loginManual, logoutManual }}>
+    <AuthContext.Provider value={{ usuario, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
-
-// Adicione esta linha de comentário logo abaixo para silenciar o aviso do Vite:
-/* eslint-disable-next-line react-refresh/only-export-components */
-
-export const useAuth = () => useContext(AuthContext);
