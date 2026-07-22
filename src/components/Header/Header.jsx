@@ -9,8 +9,10 @@ export default function Header() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout(); // Limpa os dados do contexto e LocalStorage
-    navigate('/login', { replace: true }); // Redireciona para o login e impede voltar na seta do navegador
+    logout(); // Limpa os dados do contexto e os tokens do LocalStorage
+    
+    // 👇 CORREÇÃO AQUI: Em vez de ir para '/login', voltamos para a raiz '/'
+    navigate('/', { replace: true }); 
   };
 
   return (
@@ -18,8 +20,8 @@ export default function Header() {
       <div className="header-user-info">
         <div className="user-badge">
           <User size={16} />
-          {/* Exibe o nome do utilizador e o cargo (ou fallback se não carregar a tempo) */}
-          <span>{usuario?.nome || 'Utilizador'} ({usuario?.cargo || 'Visitante'})</span>
+          {/* Se não houver utilizador logado (Cliente), exibe "Visitante" */}
+          <span>{usuario?.nome || 'Cliente'} ({usuario?.cargo || 'Visitante'})</span>
         </div>
         
         <button className="btn-logout" onClick={handleLogout} type="button">

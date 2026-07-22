@@ -14,13 +14,12 @@ export default function LoginLogistica() {
   const navigate = useNavigate();
   const { login } = useAuth(); 
 
-  const handleLogin = async (e) => {
+const handleLogin = async (e) => {
     e.preventDefault();
     setCarregando(true);
     setErro('');
 
     try {
-      // Faz o POST para o NOSSO back-end Node.js
       const resposta = await fetch('http://localhost:3001/api/auth/login', {
         method: 'POST',
         headers: {
@@ -31,19 +30,19 @@ export default function LoginLogistica() {
 
       const data = await resposta.json();
 
-      // Se o back-end devolveu erro (ex: senha errada)
       if (!resposta.ok || !data.sucesso) {
         throw new Error(data.erro || 'Erro ao fazer login.');
       }
 
-      // Valida o cargo para garantir que o cliente não tente acessar o painel logístico
       if (data.usuario.cargo !== 'ADM' && data.usuario.cargo !== 'OPERADOR') {
         throw new Error('Acesso negado. Este portal é exclusivo para a equipe de Logística.');
       }
 
       // Sucesso! Guarda os dados globalmente
       login(data.usuario);
-      navigate('/logistica/painel');
+      
+      // 👇 CORREÇÃO: Redireciona para os Galpões, e guarda o destino final na memória!
+      navigate('/selecionar-filial', { state: { destinoFinal: '/logistica/painel' } });
 
     } catch (error) {
       setErro(error.message);
@@ -51,7 +50,7 @@ export default function LoginLogistica() {
       setCarregando(false);
     }
   };
-
+  
   return (
     <div className="login-page-wrapper">
       <div className="login-card">
