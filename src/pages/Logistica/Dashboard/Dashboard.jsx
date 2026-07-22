@@ -1,29 +1,130 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './Dashboard.css';
 import { 
   Settings, ClipboardList, FileCheck2, Clock, Activity, 
   Target, CheckCircle2, XCircle, BarChart3, TrendingUp, 
-  FileText, Download, AlertTriangle 
+  FileText, Download, AlertTriangle, Loader2 
 } from 'lucide-react';
-import TabelaDemandas from'../../../components/TabelaDemandas/TabelaDemandas';
-
-// DADOS MOCKADOS DA TABELA DE PICKING (Baseado na tua imagem)
-const mockDemandas = [
-  { id: 'PS: 0707261449', filial: 'BR01', urgencia: 'High', wbs: 'BRRRRCY21-SPT', tempoEspera: '0d 45m', status: 'Em Separação - No Prazo', statusCor: 'demanda-verde', bs: 'SP-BS 10999', criacao: '07/07/2026 17:49', finalizacao: 'não definido', leadTime: '0d 45m', target: '–', itens: 1, valorTotal: '10d 15m' },
-  { id: 'PS: 0707261441', filial: 'BR02', urgencia: 'Medium', wbs: 'BRRRRCY21-SPT', tempoEspera: '0d 45m', status: 'Em Separação - Crítico', statusCor: 'demanda-amarela', bs: 'SP-BS 10985', criacao: '07/07/2026 13:38', finalizacao: 'não definido', leadTime: '0d 45m', target: '–', itens: 1, valorTotal: '0d 32m' },
-  { id: 'PS: 0707260938', filial: 'BR04', urgencia: 'Low', wbs: 'BRRRRCY21-SPT', tempoEspera: '0d 45m', status: 'Em Atraso', statusCor: 'demanda-vermelha', bs: 'SP-BS 10977', criacao: '07/07/2026 15:08', finalizacao: 'não definido', leadTime: '0d 15m', target: '–', itens: 2, valorTotal: '0d 15m' },
-  { id: 'PS: 0687261410', filial: 'BR04', urgencia: 'Low', wbs: 'BRRRRBA32-MA...', tempoEspera: '0d 45m', status: 'Concluído', statusCor: 'demanda-cinza', bs: 'SP-BS 10983', criacao: '06/07/2026 17:16', finalizacao: 'não definido', leadTime: '–', target: '–', itens: 1, valorTotal: '–' },
-  { id: 'PS: 0387261122', filial: 'BR06', urgencia: 'Low', wbs: 'BRRRRBBA32-MA...', tempoEspera: '0d 45m', status: 'Concluído', statusCor: 'demanda-cinza', bs: 'SP-BS 10983', criacao: '06/07/2026 12:21', finalizacao: 'não definido', leadTime: '–', target: '–', itens: 2, valorTotal: '–' },
-];
-
-const dadosTabela = [
-  { id: 'PS:2306261114', solicitante: 'TESTE', wbs: 'WBS-PRJ-2024-001', status: 'Em Separação', bs: 'PE-BS 10976', criacaoBs: '23/06/2026 14:14', dataEntrega: 'não definido', contagem: '3d 00:11:45', contagemStatus: 'verde' },
-  { id: 'PS:1106261734', solicitante: 'RASDAS', wbs: 'WBS-PRJ-2024-001', status: 'Concluído', bs: 'SP-BS 10975', criacaoBs: '11/06/2026 20:34', dataEntrega: '13/06/2026 10:00', contagem: 'Entregue', contagemStatus: 'neutro' },
-  { id: 'PS:0707260938', solicitante: 'MARCIO', wbs: 'WBS-PRJ-2024-001', status: 'Em Atraso', bs: 'SP-BS 10977', criacaoBs: '07/07/2026 15:08', dataEntrega: 'não definido', contagem: '-0d 02:15:30', contagemStatus: 'vermelho' },
-  { id: 'PS:1106261648', solicitante: 'DOUGLAS', wbs: 'WBS-PRJ-2024-001', status: 'Concluído', bs: 'SP-BS 10974', criacaoBs: '11/06/2026 19:48', dataEntrega: '16/06/2026 15:30', contagem: 'Entregue', contagemStatus: 'neutro' },
-];
+import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 
 export default function Dashboard() {
+  // ============================================================================
+  // 1. ESTADOS GERAIS
+  // ============================================================================
+  const [dadosTabela, setDadosTabela] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  
+  // O motor do cronómetro (atualizado a cada segundo)
+  const [tempoAtual, setTempoAtual] = useState(new Date());
+
+  // ============================================================================
+  // 2. BUSCAR DADOS REAIS DO BACKEND (A Fonte da Verdade)
+  // ============================================================================
+  useEffect(() => {
+    const buscarDados = async () => {
+      try {
+        const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
+        const resultado = await resposta.json();
+
+        if (resposta.ok && resultado.sucesso) {
+          // Mapeamos os dados para que a TabelaDemandas os entenda
+          const dadosFormatados = resultado.dados.map((item) => ({
+            id: `PS:${item.id.replace(/\D/g, '') || item.id}`,
+            solicitante: item.solicitante,
+            wbs: item.wbs,
+            status: item.status,
+            bs: item.bs || '-',
+            criacaoBs: item.dataSolicitacao, // Usaremos isto para o cálculo!
+            dataEntrega: item.dataEntrega || 'não definido'
+          }));
+          
+          setDadosTabela(dadosFormatados);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar os dados do Dashboard:", error);
+      } finally {
+        setCarregando(false);
+      }
+    };
+
+    buscarDados();
+  }, []);
+
+  // ============================================================================
+  // 3. MOTOR DO RELÓGIO (Atualiza a página a cada 1 segundo)
+  // ============================================================================
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      setTempoAtual(new Date());
+    }, 1000);
+    return () => clearInterval(intervalo);
+  }, []);
+
+  // ============================================================================
+  // 4. LÓGICA MATEMÁTICA DO CRONÓMETRO
+  // ============================================================================
+  
+  // Função A: Converte "23/06/2026 14:14" para um objeto de Data legível pelo JS
+  const parseDataBackend = (dataStr) => {
+    if (!dataStr || typeof dataStr !== 'string' || !dataStr.includes('/')) return null;
+    try {
+      const [dataParte, horaParte] = dataStr.split(' ');
+      const [dia, mes, ano] = dataParte.split('/');
+      const [hora, minuto] = horaParte.split(':');
+      return new Date(ano, mes - 1, dia, hora, minuto);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // Função B: O cálculo do tempo restante
+  const calcularTempoRestante = (dataStr, status) => {
+    if (status === 'Concluído') return { texto: 'Entregue', cor: 'neutro' };
+    if (status === 'Cancelado' || status === 'Recusado') return { texto: 'Cancelado', cor: 'neutro' };
+    
+    const dataCriacao = parseDataBackend(dataStr);
+    if (!dataCriacao) return { texto: '—', cor: 'neutro' };
+
+    // Nosso Target é 3 dias (3 dias * 24 horas * 60 min * 60 seg * 1000 ms)
+    const prazoTargetMs = 3 * 24 * 60 * 60 * 1000; 
+    
+    // O momento exato em que o prazo se esgota
+    const dataLimite = new Date(dataCriacao.getTime() + prazoTargetMs);
+    
+    // Quanto tempo falta entre o limite e o EXATO SEGUNDO de agora
+    const diferencaMs = dataLimite.getTime() - tempoAtual.getTime();
+    
+    const pad = (num) => String(num).padStart(2, '0');
+
+    if (diferencaMs < 0) {
+      // 🚨 ATRASADO
+      const atrasoAbsoluto = Math.abs(diferencaMs);
+      const dias = Math.floor(atrasoAbsoluto / (1000 * 60 * 60 * 24));
+      const horas = Math.floor((atrasoAbsoluto / (1000 * 60 * 60)) % 24);
+      const minutos = Math.floor((atrasoAbsoluto / 1000 / 60) % 60);
+      const segundos = Math.floor((atrasoAbsoluto / 1000) % 60);
+      return { texto: `-${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, cor: 'vermelho' };
+    } else {
+      // ✅ NO PRAZO
+      const dias = Math.floor(diferencaMs / (1000 * 60 * 60 * 24));
+      const horas = Math.floor((diferencaMs / (1000 * 60 * 60)) % 24);
+      const minutos = Math.floor((diferencaMs / 1000 / 60) % 60);
+      const segundos = Math.floor((diferencaMs / 1000) % 60);
+      const corStatus = dias === 0 ? 'amarelo' : 'verde';
+      return { texto: `${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, cor: corStatus };
+    }
+  };
+
+  // Preparamos a lista injetando o cronómetro calculado no momento
+  const dadosTabelaAoVivo = dadosTabela.map(item => {
+    const contagemAoVivo = calcularTempoRestante(item.criacaoBs, item.status);
+    return {
+      ...item,
+      contagem: contagemAoVivo.texto,
+      contagemStatus: contagemAoVivo.cor
+    };
+  });
+
   return (
     <div className="dashboard-container">
       
@@ -33,7 +134,6 @@ export default function Dashboard() {
           <h1>Dashboard de Operações</h1>
           <p>Métricas de desempenho e visão geral da logística</p>
         </div>
-        
         <div className="header-actions">
           <div className="target-badge">
             <Settings size={16} />
@@ -47,24 +147,15 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* --- CARDS SUPERIORES (KPIs) --- */}
+      {/* --- CARDS SUPERIORES (KPIs Dinâmicos!) --- */}
       <div className="cards-grid">
         <div className="stat-card">
           <div className="card-header">
             <h3 className="card-title">Solicitações Recebidas</h3>
             <div className="icon-wrapper icon-blue"><ClipboardList size={20} /></div>
           </div>
-          <p className="card-value value-blue">14</p>
+          <p className="card-value value-blue">{carregando ? '-' : dadosTabela.length}</p>
           <p className="card-description">Total de PS no período</p>
-        </div>
-
-        <div className="stat-card">
-          <div className="card-header">
-            <h3 className="card-title">BS Emitidos</h3>
-            <div className="icon-wrapper icon-blue"><FileCheck2 size={20} /></div>
-          </div>
-          <p className="card-value value-blue">12</p>
-          <p className="card-description">Boletins criados</p>
         </div>
 
         <div className="stat-card">
@@ -72,7 +163,9 @@ export default function Dashboard() {
             <h3 className="card-title">Aguardando Aprovação</h3>
             <div className="icon-wrapper icon-orange"><Clock size={20} /></div>
           </div>
-          <p className="card-value value-orange">0</p>
+          <p className="card-value value-orange">
+            {carregando ? '-' : dadosTabela.filter(i => i.status === 'Pendente').length}
+          </p>
           <p className="card-description">Pendentes na fila</p>
         </div>
 
@@ -81,8 +174,21 @@ export default function Dashboard() {
             <h3 className="card-title">Em Separação</h3>
             <div className="icon-wrapper icon-blue"><Activity size={20} /></div>
           </div>
-          <p className="card-value value-blue">1</p>
+          <p className="card-value value-blue">
+            {carregando ? '-' : dadosTabela.filter(i => i.status === 'Em Separação').length}
+          </p>
           <p className="card-description">Sendo processados agora</p>
+        </div>
+
+        <div className="stat-card">
+          <div className="card-header">
+            <h3 className="card-title">Finalizados</h3>
+            <div className="icon-wrapper icon-blue"><CheckCircle2 size={20} /></div>
+          </div>
+          <p className="card-value value-blue">
+            {carregando ? '-' : dadosTabela.filter(i => i.status === 'Concluído').length}
+          </p>
+          <p className="card-description">Demandas entregues</p>
         </div>
       </div>
 
@@ -117,18 +223,14 @@ export default function Dashboard() {
             <strong>0</strong>
           </div>
         </div>
-
-        <p className="efficiency-footer">
-          Nenhum BS concluído ainda para cálculo de eficiência.
-        </p>
+        <p className="efficiency-footer">Nenhum BS concluído ainda para cálculo de eficiência.</p>
       </div>
 
       {/* ============================================================ */}
       {/* LINHA 1 DE GRÁFICOS (2 Colunas)                              */}
       {/* ============================================================ */}
       <div className="graficos-grid-2col">
-        
-        {/* GRÁFICO 1: Dentro vs Fora do Target */}
+        {/* GRÁFICO 1 */}
         <div className="grafico-card">
           <div className="grafico-header">
             <div className="grafico-titulo-grupo">
@@ -143,10 +245,7 @@ export default function Dashboard() {
 
           <div className="meses-selecao">
             {['jan/26', 'fev/26', 'mar/26', 'abr/26', 'mai/26', 'jun/26'].map(mes => (
-              <div key={mes} className="mes-box">
-                <span>{mes}</span>
-                <span style={{color: '#cbd5e1'}}>—</span>
-              </div>
+              <div key={mes} className="mes-box"><span>{mes}</span><span style={{color: '#cbd5e1'}}>—</span></div>
             ))}
           </div>
 
@@ -155,10 +254,8 @@ export default function Dashboard() {
               <span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span>
             </div>
             <div className="grafico-linhas">
-              <div className="linha-horizontal"></div>
-              <div className="linha-horizontal"></div>
-              <div className="linha-horizontal"></div>
-              <div className="linha-horizontal"></div>
+              <div className="linha-horizontal"></div><div className="linha-horizontal"></div>
+              <div className="linha-horizontal"></div><div className="linha-horizontal"></div>
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
             <div className="grafico-eixo-x">
@@ -168,11 +265,10 @@ export default function Dashboard() {
           <div className="grafico-legenda">
             <div className="legenda-item"><div className="legenda-cor verde"></div> Dentro (%)</div>
             <div className="legenda-item"><div className="legenda-cor vermelha"></div> Fora (%)</div>
-            <div className="legenda-item"><TrendingUp size={14} color="#eab308" /> Evolução (%)</div>
           </div>
         </div>
 
-        {/* GRÁFICO 2: Acompanhamento de BS por Status */}
+        {/* GRÁFICO 2 */}
         <div className="grafico-card">
           <div className="grafico-header">
             <div className="grafico-titulo-grupo">
@@ -186,143 +282,42 @@ export default function Dashboard() {
           </div>
 
           <div className="status-caixas-grid">
-            <div className="status-box status-verde"><span>Finalizados</span><strong>0</strong></div>
-            <div className="status-box status-vermelho"><span>Recusados</span><strong>1</strong></div>
-            <div className="status-box status-azul"><span>Em Andamento</span><strong>11</strong></div>
+            <div className="status-box status-verde"><span>Finalizados</span><strong>{dadosTabela.filter(i => i.status === 'Concluído').length}</strong></div>
+            <div className="status-box status-vermelho"><span>Recusados</span><strong>{dadosTabela.filter(i => i.status === 'Recusado' || i.status === 'Cancelado').length}</strong></div>
+            <div className="status-box status-azul"><span>Em Andamento</span><strong>{dadosTabela.filter(i => i.status === 'Em Separação').length}</strong></div>
           </div>
 
           <div className="grafico-area">
-            <div className="grafico-eixo-y">
-              <span>12</span><span>9</span><span>6</span><span>3</span><span>0</span>
-            </div>
+            <div className="grafico-eixo-y"><span>12</span><span>9</span><span>6</span><span>3</span><span>0</span></div>
             <div className="grafico-linhas">
               <div className="linha-horizontal"></div><div className="linha-horizontal"></div>
               <div className="linha-horizontal"></div><div className="linha-horizontal"></div>
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
-            
             <div className="grafico-barras">
-              <div className="barra-container">
-                <span className="barra-label-topo" style={{opacity: 0}}>0</span>
-                <div className="barra-preenchimento verde" style={{height: '0%'}}></div>
-              </div>
-              <div className="barra-container">
-                <span className="barra-label-topo">1</span>
-                <div className="barra-preenchimento vermelha" style={{height: '8.3%'}}></div>
-              </div>
-              <div className="barra-container">
-                <span className="barra-label-topo">11</span>
-                <div className="barra-preenchimento azul" style={{height: '91.6%'}}></div>
-              </div>
+              <div className="barra-container"><span className="barra-label-topo" style={{opacity: 0}}>0</span><div className="barra-preenchimento verde" style={{height: '0%'}}></div></div>
+              <div className="barra-container"><span className="barra-label-topo">1</span><div className="barra-preenchimento vermelha" style={{height: '8.3%'}}></div></div>
+              <div className="barra-container"><span className="barra-label-topo">11</span><div className="barra-preenchimento azul" style={{height: '91.6%'}}></div></div>
             </div>
-
             <div className="grafico-eixo-x" style={{padding: '0 30px'}}>
               <span>Finalizados</span><span>Recusados</span><span>Em Andamento</span>
             </div>
           </div>
         </div>
-
       </div>
 
       {/* ============================================================ */}
-      {/* LINHA 2 DE GRÁFICOS (Gráficos da Nova Imagem)                */}
-      {/* ============================================================ */}
-      <div className="graficos-linha-2">
-        
-        {/* GRÁFICO 3: TENDÊNCIA DE DEMANDAS DE PICKING (Barras Empilhadas) */}
-        <div className="grafico-card" style={{ padding: '24px' }}>
-          
-          <div className="grafico-header" style={{ marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
-              Tendência de Demandas de Picking (Semanal)
-            </h3>
-            <button className="btn-mensal">Mensal</button>
-          </div>
-
-          <div className="grafico-legenda" style={{ marginTop: 0, marginBottom: '24px', justifyContent: 'center' }}>
-             <div className="legenda-item"><div className="legenda-cor verde"></div> Dentro do Target</div>
-             <div className="legenda-item"><div className="legenda-cor amarela"></div> Próximo</div>
-             <div className="legenda-item"><div className="legenda-cor vermelha"></div> Em Atraso</div>
-          </div>
-
-          <div className="grafico-area">
-             <div className="grafico-eixo-y">
-               <span>25</span><span>20</span><span>15</span><span>10</span><span>5</span><span>0</span>
-             </div>
-             
-             <div className="grafico-linhas">
-               <div className="linha-horizontal"></div>
-               <div className="linha-horizontal"></div>
-               <div className="linha-horizontal"></div>
-               <div className="linha-horizontal"></div>
-               <div className="linha-horizontal"></div>
-               <div className="linha-horizontal" style={{ borderTopStyle: 'solid' }}></div>
-             </div>
-             
-             <div className="grafico-barras">
-                <div className="barra-container">
-                   <div className="barra-segmentada" style={{ height: '95%' }}>
-                      <div className="segmento vermelho" style={{ height: '5%' }}></div>
-                      <div className="segmento amarelo" style={{ height: '15%' }}></div>
-                      <div className="segmento verde" style={{ height: '80%' }}></div>
-                   </div>
-                </div>
-                <div className="barra-container">
-                   <div className="barra-segmentada" style={{ height: '76%' }}>
-                      <div className="segmento amarelo" style={{ height: '5%' }}></div>
-                      <div className="segmento verde" style={{ height: '95%' }}></div>
-                   </div>
-                </div>
-                <div className="barra-container">
-                   <div className="barra-segmentada" style={{ height: '68%' }}>
-                      <div className="segmento vermelho" style={{ height: '10%' }}></div>
-                      <div className="segmento amarelo" style={{ height: '20%' }}></div>
-                      <div className="segmento verde" style={{ height: '70%' }}></div>
-                   </div>
-                </div>
-                <div className="barra-container">
-                   <div className="barra-segmentada" style={{ height: '68%' }}>
-                      <div className="segmento vermelho" style={{ height: '15%' }}></div>
-                      <div className="segmento amarelo" style={{ height: '25%' }}></div>
-                      <div className="segmento verde" style={{ height: '60%' }}></div>
-                   </div>
-                </div>
-                <div className="barra-container">
-                   <div className="barra-segmentada" style={{ height: '80%' }}>
-                      <div className="segmento vermelho" style={{ height: '25%' }}></div>
-                      <div className="segmento amarelo" style={{ height: '15%' }}></div>
-                      <div className="segmento verde" style={{ height: '60%' }}></div>
-                   </div>
-                </div>
-                <div className="barra-container">
-                   <div className="barra-segmentada" style={{ height: '48%' }}>
-                      <div className="segmento vermelho" style={{ height: '40%' }}></div>
-                      <div className="segmento amarelo" style={{ height: '20%' }}></div>
-                      <div className="segmento verde" style={{ height: '40%' }}></div>
-                   </div>
-                </div>
-                <div className="barra-container">
-                   <div className="barra-segmentada" style={{ height: '28%' }}>
-                      <div className="segmento vermelho" style={{ height: '30%' }}></div>
-                      <div className="segmento verde" style={{ height: '70%' }}></div>
-                   </div>
-                </div>
-             </div>
-             
-             <div className="grafico-eixo-x" style={{ padding: '0 20px' }}>
-                <span>01/07</span><span>02/07</span><span>03/07</span><span>04/07</span><span>05/07</span><span>06/07</span><span>07/07</span>
-             </div>
-          </div>
-        </div>
-
-
-      </div>
-
-{/* ============================================================ */}
-      {/* LINHA 3: TABELA DE DEMANDAS DE PICKING                       */}
+      {/* LINHA 3: TABELA DE DEMANDAS DE PICKING COM O CRONÓMETRO      */}
       {/* ============================================================ */}
       <div className="graficos-grid-1col" style={{ marginTop: '24px' }}>
-         <TabelaDemandas dados={dadosTabela} />
+         {carregando ? (
+           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px', color: '#94a3b8', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+             <Loader2 size={32} className="animate-spin" style={{ marginBottom: '12px' }} />
+             <span>A sincronizar os dados do servidor...</span>
+           </div>
+         ) : (
+           <TabelaDemandas dados={dadosTabelaAoVivo} />
+         )}
       </div>
 
     </div>
