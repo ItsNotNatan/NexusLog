@@ -8,22 +8,28 @@ import {
   X, 
   Eye, 
   Loader2,
-  AlertCircle // 👈 Novo ícone importado para o aviso
+  AlertCircle,
+  ChevronLeft, // 👈 Importado para a paginação
+  ChevronRight // 👈 Importado para a paginação
 } from 'lucide-react';
 
 import DetalhesSolicitacao from '../../Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao';
 
 export default function PainelAprovacao() {
   const [dadosTabela, setDadosTabela] = useState([]);
-  const [estoque, setEstoque] = useState([]); // ✨ NOVO: Estado para guardar o estoque atual
+  const [estoque, setEstoque] = useState([]); 
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [linhaExpandida, setLinhaExpandida] = useState(null);
 
+  // 📄 ESTADOS DE PAGINAÇÃO INDEPENDENTES (5 por página)
+  const [paginaGeral, setPaginaGeral] = useState(1);
+  const [paginaEntradas, setPaginaEntradas] = useState(1);
+  const itensPorPagina = 5;
+
   useEffect(() => {
     const buscarDados = async () => {
       try {
-        // ✨ NOVO: Busca as solicitações e o estoque ao mesmo tempo
         const [resSolicitacoes, resEstoque] = await Promise.all([
           fetch('http://localhost:3001/api/solicitacoes/listar'),
           fetch('http://localhost:3001/api/estoque/listar')
@@ -32,12 +38,10 @@ export default function PainelAprovacao() {
         const resultadoSol = await resSolicitacoes.json();
         const resultadoEst = await resEstoque.json();
 
-        // 1. Guarda o estoque
         if (resEstoque.ok && resultadoEst.sucesso) {
           setEstoque(resultadoEst.dados);
         }
 
-        // 2. Guarda as solicitações
         if (resSolicitacoes.ok && resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados
             .filter(item => item.status === 'Pendente')
@@ -51,7 +55,6 @@ export default function PainelAprovacao() {
 
               const idNumerico = item.id.replace(/\D/g, '');
 
-              // Calcula o total para as Entradas
               let valorTotal = 0;
               let centro = '-';
               let dep = '-';
@@ -99,6 +102,34 @@ export default function PainelAprovacao() {
   // SEPARADOR DE LISTAS
   const entradasPendentes = dadosFiltrados.filter(item => item.tipo === 'Entrada');
   const outrasPendentes = dadosFiltrados.filter(item => item.tipo !== 'Entrada');
+
+  // ✨ LÓGICA DE PAGINAÇÃO: SOLICITAÇÕES GERAIS
+  const totalPaginasGeral = Math.max(1, Math.ceil(outrasPendentes.length / itensPorPagina));
+  const indexPrimeiroGeral = (paginaGeral - 1) * itensPorPagina;
+  const indexUltimoGeral = paginaGeral * itensPorPagina;
+  const outrasPendentesPaginadas = outrasPendentes.slice(indexPrimeiroGeral, indexUltimoGeral);
+
+  // ✨ LÓGICA DE PAGINAÇÃO: ENTRADAS
+  const totalPaginasEntradas = Math.max(1, Math.ceil(entradasPendentes.length / itensPorPagina));
+  const indexPrimeiroEntradas = (paginaEntradas - 1) * itensPorPagina;
+  const indexUltimoEntradas = paginaEntradas * itensPorPagina;
+  const entradasPendentesPaginadas = entradasPendentes.slice(indexPrimeiroEntradas, indexUltimoEntradas);
+
+  // Reseta as páginas se o usuário digitar na pesquisa
+  useEffect(() => {
+    setPaginaGeral(1);
+    setPaginaEntradas(1);
+  }, [termoPesquisa]);
+
+  // Garante que a página retorne caso o último item da página atual seja aprovado/recusado
+  useEffect(() => {
+    if (paginaGeral > totalPaginasGeral) setPaginaGeral(totalPaginasGeral);
+  }, [outrasPendentes.length, paginaGeral, totalPaginasGeral]);
+
+  useEffect(() => {
+    if (paginaEntradas > totalPaginasEntradas) setPaginaEntradas(totalPaginasEntradas);
+  }, [entradasPendentes.length, paginaEntradas, totalPaginasEntradas]);
+
 
   const toggleLinha = (idUnico) => {
     setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
@@ -195,16 +226,15 @@ export default function PainelAprovacao() {
               </div>
             ) : (
               <div className="lista-solicitacoes">
-                {outrasPendentes.map((linha) => {
+                {/* 👈 MAPEANDO OS DADOS PAGINADOS (5 ITENS) */}
+                {outrasPendentesPaginadas.map((linha) => {
                   const idUnico = `geral-${linha.idOriginal}`;
                   const isExpandida = linhaExpandida === idUnico;
                   
-                  // ✨ NOVO: A NOSSA REGRA DE CROSSDOCKING AQUI ✨
                   const isCrossdocking = linha.tipo === 'Crossdocking';
-                  let nfNoEstoque = true; // Por defeito assumimos que pode aprovar
+                  let nfNoEstoque = true; 
 
                   if (isCrossdocking && linha.nfCrossdocking) {
-                    // Verifica se existe alguma linha no estoque com esta NF
                     nfNoEstoque = estoque.some(itemEstoque => itemEstoque.nf_entrada === linha.nfCrossdocking);
                   }
 
@@ -230,19 +260,16 @@ export default function PainelAprovacao() {
                           )}
                         </div>
 
-                        {/* ✨ RENDEREIZAÇÃO CONDICIONAL DOS BOTÕES */}
                         <div className="item-acoes-grupo">
                           <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico)}>
                             <Eye size={16} /> Ver Itens
                           </button>
 
                           {isCrossdocking && !nfNoEstoque ? (
-                            // 🔒 BLOQUEADO: Se for Crossdocking e não tiver NF no estoque, mostra o aviso
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#fef3c7', color: '#d97706', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '500', marginLeft: '12px' }}>
                               <AlertCircle size={16} /> Aguardando NF {linha.nfCrossdocking} no estoque
                             </div>
                           ) : (
-                            // 🟢 LIBERADO: Se não for crossdocking OU se a NF já estiver no estoque, mostra os botões
                             <>
                               <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
                                 <X size={16} /> Recusar
@@ -253,7 +280,6 @@ export default function PainelAprovacao() {
                             </>
                           )}
                         </div>
-
                       </div>
 
                       {isExpandida && (
@@ -264,6 +290,47 @@ export default function PainelAprovacao() {
                     </React.Fragment>
                   );
                 })}
+
+                {/* 📄 CONTROLE DE PAGINAÇÃO: SECÇÃO AMARELA */}
+                {totalPaginasGeral > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 8px 8px' }}>
+                    <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                      Página <strong>{paginaGeral}</strong> de <strong>{totalPaginasGeral}</strong>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <button 
+                        onClick={() => setPaginaGeral(p => Math.max(p - 1, 1))} 
+                        disabled={paginaGeral === 1}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaGeral === 1 ? 'not-allowed' : 'pointer', opacity: paginaGeral === 1 ? 0.6 : 1 }}
+                      >
+                        <ChevronLeft size={16} /> Anterior
+                      </button>
+
+                      {Array.from({ length: totalPaginasGeral }, (_, i) => {
+                        const num = i + 1;
+                        const ehAtiva = paginaGeral === num;
+                        return (
+                          <button
+                            key={num}
+                            onClick={() => setPaginaGeral(num)}
+                            style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: 'pointer' }}
+                          >
+                            {num}
+                          </button>
+                        );
+                      })}
+
+                      <button 
+                        onClick={() => setPaginaGeral(p => Math.min(p + 1, totalPaginasGeral))} 
+                        disabled={paginaGeral === totalPaginasGeral}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaGeral === totalPaginasGeral ? 'not-allowed' : 'pointer', opacity: paginaGeral === totalPaginasGeral ? 0.6 : 1 }}
+                      >
+                        Próxima <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -289,7 +356,8 @@ export default function PainelAprovacao() {
               </div>
             ) : (
               <div className="lista-solicitacoes">
-                {entradasPendentes.map((linha) => {
+                {/* 👈 MAPEANDO OS DADOS PAGINADOS (5 ITENS) */}
+                {entradasPendentesPaginadas.map((linha) => {
                   const idUnico = `entrada-${linha.idOriginal}`;
                   const isExpandida = linhaExpandida === idUnico;
                   
@@ -338,6 +406,47 @@ export default function PainelAprovacao() {
                     </React.Fragment>
                   );
                 })}
+
+                {/* 📄 CONTROLE DE PAGINAÇÃO: SECÇÃO VERDE */}
+                {totalPaginasEntradas > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 8px 8px' }}>
+                    <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                      Página <strong>{paginaEntradas}</strong> de <strong>{totalPaginasEntradas}</strong>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <button 
+                        onClick={() => setPaginaEntradas(p => Math.max(p - 1, 1))} 
+                        disabled={paginaEntradas === 1}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaEntradas === 1 ? 'not-allowed' : 'pointer', opacity: paginaEntradas === 1 ? 0.6 : 1 }}
+                      >
+                        <ChevronLeft size={16} /> Anterior
+                      </button>
+
+                      {Array.from({ length: totalPaginasEntradas }, (_, i) => {
+                        const num = i + 1;
+                        const ehAtiva = paginaEntradas === num;
+                        return (
+                          <button
+                            key={num}
+                            onClick={() => setPaginaEntradas(num)}
+                            style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#16a34a' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#16a34a' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: 'pointer' }}
+                          >
+                            {num}
+                          </button>
+                        );
+                      })}
+
+                      <button 
+                        onClick={() => setPaginaEntradas(p => Math.min(p + 1, totalPaginasEntradas))} 
+                        disabled={paginaEntradas === totalPaginasEntradas}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaEntradas === totalPaginasEntradas ? 'not-allowed' : 'pointer', opacity: paginaEntradas === totalPaginasEntradas ? 0.6 : 1 }}
+                      >
+                        Próxima <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
