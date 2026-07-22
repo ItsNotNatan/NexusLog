@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './TransferenciaWBS.css';
-import { Search, Send, Trash2, Box, Loader2 } from 'lucide-react'; 
+import { Send, Trash2, Box } from 'lucide-react'; 
 
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
+import SeletorEstoqueLateral from '../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral';
 import { supabase } from '../../../supabaseClient';
 
 export default function TransferenciaWBS() {
@@ -17,10 +18,9 @@ export default function TransferenciaWBS() {
   const [itensSelecionados, setItensSelecionados] = useState([]);
   const [anexos, setAnexos] = useState([]);
 
-  // --- 2. NOVOS ESTADOS PARA O ESTOQUE REAL ---
+  // --- 2. ESTADOS PARA O ESTOQUE REAL ---
   const [estoqueReal, setEstoqueReal] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
-  const [termoBusca, setTermoBusca] = useState('');
 
   // --- 3. BUSCAR DADOS REAIS DO BACKEND ---
   useEffect(() => {
@@ -94,18 +94,7 @@ export default function TransferenciaWBS() {
     ));
   };
 
-  // --- 6. FILTRO DE PESQUISA DO ESTOQUE ---
-  const estoqueFiltrado = estoqueReal.filter((item) => {
-    const termo = termoBusca.toLowerCase();
-    return (
-      (item.part_number && item.part_number.toLowerCase().includes(termo)) ||
-      (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
-      (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
-      (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termo))
-    );
-  });
-
-  // --- 7. ENVIO PARA O BACKEND ---
+  // --- 6. ENVIO PARA O BACKEND ---
   const handleEnviar = async () => {
     if (!formDados.nome || !formDados.wbsDestino) {
       alert("Preencha o Nome do Solicitante e o WBS de Destino.");
@@ -118,7 +107,6 @@ export default function TransferenciaWBS() {
     }
 
     const anexosProcessados = [];
-    // ... (Lógica de upload do Supabase mantida idêntica à tua original)
     if (anexos.length > 0) {
       for (const arquivo of anexos) {
         const extensao = arquivo.name.split('.').pop();
@@ -233,78 +221,13 @@ export default function TransferenciaWBS() {
 
       <div className="transferencia-grid-inferior">
 
-        {/* COLUNA ESQUERDA: ESTOQUE DISPONÍVEL */}
-        <div className="coluna-cartao">
-          <div className="coluna-esquerda-header">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3>Estoque Disponível</h3>
-              <span className="badge-contador-simples">{estoqueFiltrado.length} itens</span> 
-            </div>
-
-            <div className="pesquisa-itens-wrapper">
-              <Search size={16} className="icone-busca-itens" />
-              <input 
-                type="text" 
-                placeholder="Buscar por SAP, PN, Descrição..." 
-                value={termoBusca}
-                onChange={(e) => setTermoBusca(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="lista-itens-scroll">
-            {carregandoEstoque ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 12px auto' }} />
-                Carregando estoque do servidor...
-              </div>
-            ) : estoqueFiltrado.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-                Nenhum material encontrado.
-              </div>
-            ) : (
-              estoqueFiltrado.map(item => {
-                const saldoAtual = getSaldoRestante(item);
-                const semSaldo = saldoAtual <= 0;
-
-                return (
-                  <div 
-                    key={item.id} 
-                    className="item-lista" 
-                    onClick={() => !semSaldo && adicionarItem(item)}
-                    style={{ 
-                      cursor: semSaldo ? 'not-allowed' : 'pointer', 
-                      padding: '16px 20px',
-                      opacity: semSaldo ? 0.5 : 1 // Deixa o item meio transparente se não tiver saldo
-                    }}
-                  >
-                    <div style={{ marginBottom: '12px' }}>
-                      <span className="badge-sap">{item.desenho_sap || 'S/ SAP'}</span>
-                    </div>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                      <span className="item-lista-pn" style={{ margin: 0 }}>{item.part_number}</span>
-                      <span className="badge-nf">NF: {item.nf_entrada || '—'}</span>
-                    </div>
-                    
-                    <div className="item-lista-desc" style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.875rem' }}>
-                      {item.descricao}
-                    </div>
-                    
-                    <div style={{ fontSize: '0.875rem', display: 'flex', gap: '8px' }}>
-                      <span style={{ color: semSaldo ? '#ef4444' : '#10b981', fontWeight: '500' }}>
-                        Saldo Disponível: <strong style={{ fontWeight: '700' }}>{saldoAtual}</strong>
-                      </span>
-                      <span style={{ color: '#2563eb', fontFamily: 'monospace' }}>
-                        Alocação: {item.alocacao || 'Pendente'}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
+        {/* 👇 O NOVO COMPONENTE ISOLADO FAZ TUDO AQUI! 👇 */}
+        <SeletorEstoqueLateral 
+          estoque={estoqueReal}
+          carregando={carregandoEstoque}
+          onAdicionarItem={adicionarItem}
+          calcularSaldo={getSaldoRestante}
+        />
 
         {/* COLUNA DIREITA: ITENS SELECIONADOS */}
         <div className="coluna-cartao">

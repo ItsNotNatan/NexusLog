@@ -3,13 +3,10 @@ import {
   User,
   MapPin,
   Calendar,
-  Search,
   Package,
   Send,
   Trash2,
-  Zap,
-  Loader2,
-  ArrowLeftRight // 👈 Novo ícone importado para indicar transferência
+  Zap
 } from "lucide-react";
 
 // NOSSOS COMPONENTES E HOOKS
@@ -17,6 +14,7 @@ import ModalProcessamento from "../../../components/ModalProcessamento/ModalProc
 import { useProcessadorExcel } from "../../../hooks/useProcessadorExcel";
 import ExemploExcel from "../../../components/ExemploExcel/ExemploExcel";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
+import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral"; // 👈 NOVO COMPONENTE
 import { supabase } from "../../../supabaseClient";
 
 export default function MaterialEstoque() {
@@ -44,7 +42,6 @@ export default function MaterialEstoque() {
 
   const [estoqueDisponivel, setEstoqueDisponivel] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
-  const [pesquisaEstoque, setPesquisaEstoque] = useState("");
 
   const processador = useProcessadorExcel();
 
@@ -74,7 +71,6 @@ export default function MaterialEstoque() {
               vendorDescription: item.descricao_manual || item.descricao || "-",
               wbs: item.wbs_element || item.wbs || "-",
               alocacao: item.alocacao || "-",
-              // 👇 NOVA LINHA: Capturamos a flag de transferência que vem do Banco de Dados
               isTransferencia: item.is_transferencia || false 
             }));
 
@@ -91,15 +87,6 @@ export default function MaterialEstoque() {
 
     buscarEstoqueReal();
   }, []);
-
-  const estoqueFiltrado = estoqueDisponivel.filter((item) => {
-    const termo = pesquisaEstoque.toLowerCase();
-    return (
-      item.desenhoSAP.toLowerCase().includes(termo) ||
-      item.numPecaFabricante.toLowerCase().includes(termo) ||
-      item.materialDescription.toLowerCase().includes(termo)
-    );
-  });
 
   const handleImportarExcel = async (arquivo) => {
     const novosItens = await processador.iniciarProcessamento(arquivo);
@@ -136,7 +123,6 @@ export default function MaterialEstoque() {
       return;
     }
 
-    // ✨ Trava de Segurança no Envio (Backend do Componente)
     if (formDados.dataNecessidade && formDados.dataNecessidade < dataMinima) {
       alert("A Data de Necessidade não pode ser anterior ao dia de hoje. Por favor, corrija no calendário.");
       return;
@@ -296,7 +282,6 @@ export default function MaterialEstoque() {
             <label>
               <Calendar size={14} /> DATA DE NECESSIDADE *
             </label>
-            {/* ✨ BLOQUEIOS DE DATA INSERIDOS AQUI */}
             <input
               type="date"
               className="input-campo"
@@ -382,183 +367,13 @@ export default function MaterialEstoque() {
       </div>
 
       <div className="selecao-itens-grid">
-        <div
-          className="painel-lista"
-          style={{
-            backgroundColor: "#ffffff",
-            borderRadius: "12px",
-            border: "1px solid #e2e8f0",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            className="painel-lista-header"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "16px 20px",
-              borderBottom: "1px solid #f1f5f9",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "1rem",
-                fontWeight: "600",
-                color: "#1e293b",
-                margin: 0,
-              }}
-            >
-              Estoque Disponível
-            </h3>
-            <span className="badge-contador-simples">
-              {estoqueFiltrado.length} itens
-            </span>
-          </div>
-
-          <div
-            className="pesquisa-estoque"
-            style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9" }}
-          >
-            <div style={{ position: "relative" }}>
-              <Search
-                size={16}
-                style={{
-                  position: "absolute",
-                  left: "12px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "#94a3b8",
-                }}
-              />
-              <input
-                type="text"
-                placeholder="Buscar por SAP, PN, Descrição..."
-                value={pesquisaEstoque}
-                onChange={(e) => setPesquisaEstoque(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px 10px 36px",
-                  borderRadius: "8px",
-                  border: "1px solid #e2e8f0",
-                  backgroundColor: "#f8fafc",
-                  outline: "none",
-                  color: "#334155",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-          </div>
-
-          <div
-            className="lista-rolavel"
-            style={{ maxHeight: "600px", overflowY: "auto" }}
-          >
-            {carregandoEstoque ? (
-              <div
-                style={{
-                  padding: "40px",
-                  textAlign: "center",
-                  color: "#94a3b8",
-                }}
-              >
-                <Loader2
-                  size={24}
-                  className="animate-spin"
-                  style={{ margin: "0 auto 8px auto", display: "block" }}
-                />
-                Carregando materiais disponíveis...
-              </div>
-            ) : estoqueFiltrado.length === 0 ? (
-              <div
-                style={{
-                  padding: "40px",
-                  textAlign: "center",
-                  color: "#94a3b8",
-                }}
-              >
-                Nenhum material encontrado no estoque físico.
-              </div>
-            ) : (
-              estoqueFiltrado.map((item, index) => (
-                <div
-                  key={`estoque-${index}`}
-                  className="item-estoque-card"
-                  onClick={() => adicionarManualmente(item, index)}
-                  style={{
-                    padding: "16px 20px",
-                    borderBottom: "1px solid #f1f5f9",
-                    cursor: "pointer",
-                    transition: "background 0.2s",
-                  }}
-                >
-                  {/* 👇 RENDERIZAMOS A ETIQUETA SE FOR UM ITEM TRANSFERIDO */}
-                  <div style={{ marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className="badge-sap">{item.desenhoSAP}</span>
-                    {item.isTransferencia && (
-                      <span style={{
-                        backgroundColor: '#fefce8',
-                        color: '#ca8a04',
-                        padding: '4px 10px',
-                        borderRadius: '999px',
-                        fontSize: '0.7rem',
-                        fontWeight: '600',
-                        border: '1px solid #fde047',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        <ArrowLeftRight size={12} /> Transferido
-                      </span>
-                    )}
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    <span style={{ fontWeight: "600", color: "#475569" }}>
-                      {item.numPecaFabricante}
-                    </span>
-                    <span className="badge-nf">NF: {item.nf}</span>
-                  </div>
-
-                  <div
-                    style={{
-                      marginBottom: "8px",
-                      color: "#64748b",
-                      fontSize: "0.875rem",
-                    }}
-                  >
-                    {item.materialDescription}
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: "0.875rem",
-                      display: "flex",
-                      gap: "8px",
-                    }}
-                  >
-                    <span style={{ color: "#10b981", fontWeight: "500" }}>
-                      Saldo:{" "}
-                      <strong style={{ fontWeight: "700" }}>
-                        {item.qtdFornecida}
-                      </strong>
-                    </span>
-                    <span style={{ color: "#2563eb", fontFamily: "monospace" }}>
-                      {item.alocacao}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        
+        {/* 👇 O NOVO COMPONENTE ISOLADO FAZ TUDO AQUI! 👇 */}
+        <SeletorEstoqueLateral 
+          estoque={estoqueDisponivel}
+          carregando={carregandoEstoque}
+          onAdicionarItem={adicionarManualmente}
+        />
 
         <div
           className="painel-lista"

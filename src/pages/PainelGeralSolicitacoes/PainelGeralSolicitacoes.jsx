@@ -3,6 +3,7 @@ import './PainelGeralSolicitacoes.css';
 import {
   Search,
   ChevronRight,
+  ChevronLeft,
   GitBranch,
   FileText,
   RefreshCw,
@@ -48,20 +49,30 @@ const renderBadgeStatus = (status) => {
 
 export default function PainelGeralSolicitacoes() {
   const [filtroAtivo, setFiltroAtivo] = useState('Todos');
-
-  // 1. ✨ ESTADOS REAIS
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
 
-  // 2. ✨ BUSCA OS DADOS REAIS DO BACKEND AO ABRIR A TELA
+  // 📄 CONTROLE DE PAGINAÇÃO REAL (Manda para a API)
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalRegistros, setTotalRegistros] = useState(0); // Guardará o COUNT(*) total do banco
+  const itensPorPagina = 20; // Pegará de 20 em 20 itens por vez
+
+  // ✨ BUSCA DADOS PAGINADOS DO BACKEND ATRAVÉS DE DEPENDÊNCIAS
   useEffect(() => {
-    const buscarDados = async () => {
+    const buscarDadosPaginados = async () => {
       try {
         setCarregando(true);
+
+        // Mapeia o nome da aba para enviar como filtro se não for 'Todos'
+        const tipoFiltro = filtroAtivo === 'Transfer. WBS' ? 'Transferencia WBS' : filtroAtivo;
+        
+        // Constrói a URL passando a página atual, limite e termos de busca/filtro direto para a query da API
+        const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoFiltro !== 'Todos' ? tipoFiltro : ''}`;
+
         const [resSolicitacoes, resEstoque] = await Promise.all([
-          fetch('http://localhost:3001/api/solicitacoes/listar'),
+          fetch(urlSolicitacoes),
           fetch('http://localhost:3001/api/estoque/listar')
         ]);
 
@@ -73,29 +84,41 @@ export default function PainelGeralSolicitacoes() {
         }
 
         if (resSolicitacoes.ok && resultadoSol.sucesso) {
-          // Formatamos os dados para a tabela
           const dadosFormatados = resultadoSol.dados.map(item => ({
             ...item,
             idNumerico: item.id.replace(/\D/g, '') || item.id,
-            // A data que vem do banco (dataSolicitacao) ou created_at
             dataCriacaoFormatada: item.dataSolicitacao || new Date(item.created_at).toLocaleDateString('pt-BR'),
             nfCrossdocking: item.notas_fiscais && item.notas_fiscais.length > 0 ? item.notas_fiscais[0].numero_nf : (item.notas_fiscais?.numero_nf || null)
           }));
+          
           setSolicitacoes(dadosFormatados);
+          
+          // O seu backend deve retornar uma chave 'total' informando quantas linhas existem no total do banco
+          setTotalRegistros(resultadoSol.total || resultadoSol.dados.length); 
         }
       } catch (error) {
-        console.error("Erro ao buscar dados do painel geral:", error);
+        console.error("Erro ao buscar dados paginados:", error);
       } finally {
         setCarregando(false);
       }
     };
 
-    buscarDados();
-  }, []);
+    buscarDadosPaginados();
+    // Executa a função novamente toda vez que a página, filtro ou termo de pesquisa mudarem
+  }, [paginaAtual, filtroAtivo, termoPesquisa]);
 
-  // 3. ✨ FUNÇÃO PARA ATUALIZAR STATUS REAL NO BACKEND
+  // Se mudar o filtro ou fizer uma nova pesquisa, reseta para a página 1
+  const lidarComMudancaFiltro = (novoFiltro) => {
+    setFiltroAtivo(novoFiltro);
+    setPaginaAtual(1);
+  };
+
+  const lidarComMudancaPesquisa = (e) => {
+    setTermoPesquisa(e.target.value);
+    setPaginaAtual(1);
+  };
+
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
-    // Confirmação de segurança
     if (!window.confirm(`Tem certeza que deseja mudar o status da solicitação ${idSolicitacao} para "${novoStatus}"?`)) {
       return;
     }
@@ -103,11 +126,10 @@ export default function PainelGeralSolicitacoes() {
     let motivo = null;
     if (novoStatus === 'Recusado' || novoStatus === 'Cancelado') {
       motivo = window.prompt("Por favor, informe o motivo do cancelamento/recusa:");
-      if (!motivo) return; // Cancela a operação se não houver motivo
+      if (!motivo) return;
     }
 
     try {
-      // Faz a chamada real ao backend
       const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -115,14 +137,7 @@ export default function PainelGeralSolicitacoes() {
       });
 
       if (resposta.ok) {
-        // Atualizamos a lista localmente para não precisar recarregar a página
-        const listaAtualizada = solicitacoes.map(sol => {
-          if (sol.id === idSolicitacao) {
-            return { ...sol, status: novoStatus };
-          }
-          return sol;
-        });
-        setSolicitacoes(listaAtualizada);
+        setSolicitacoes(prev => prev.map(sol => sol.id === idSolicitacao ? { ...sol, status: novoStatus } : sol));
         alert(`Status atualizado com sucesso!`);
       } else {
         alert("Erro ao atualizar o status no servidor.");
@@ -133,19 +148,8 @@ export default function PainelGeralSolicitacoes() {
     }
   };
 
-  // 4. ✨ LÓGICA DE FILTRAGEM
-  const dadosFiltrados = solicitacoes.filter((linha) => {
-    // Filtro por Aba
-    const passaAba = filtroAtivo === 'Todos' || linha.tipo === filtroAtivo || (filtroAtivo === 'Transfer. WBS' && linha.tipo === 'Transferencia WBS');
-
-    // Filtro por Pesquisa
-    const termoLower = termoPesquisa.toLowerCase();
-    const passaPesquisa = linha.id.toLowerCase().includes(termoLower) ||
-      (linha.solicitante && linha.solicitante.toLowerCase().includes(termoLower)) ||
-      (linha.wbs && linha.wbs.toLowerCase().includes(termoLower));
-
-    return passaAba && passaPesquisa;
-  });
+  const totalPaginas = Math.ceil(totalRegistros / itensPorPagina);
+  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
 
   return (
     <div className="painel-geral-wrapper">
@@ -155,11 +159,11 @@ export default function PainelGeralSolicitacoes() {
         <p>Gerencie todas as solicitações — materiais, WBS, NFs, entradas, crossdocking e reintegrações</p>
       </header>
 
-      {/* CARTÕES DE RESUMO SUPERIORES (KPIs) */}
+      {/* CARD KPIs SUPERIORES */}
       <div className="kpis-linha-5">
         <div className="kpi-card-resumo kpi-total">
-          <span>Total</span>
-          <strong>{solicitacoes.length}</strong>
+          <span>Total Filtrado</span>
+          <strong>{totalRegistros}</strong>
         </div>
         <div className="kpi-card-resumo kpi-pendentes">
           <span>Pendentes</span>
@@ -188,7 +192,7 @@ export default function PainelGeralSolicitacoes() {
               <button
                 key={filtro}
                 className={`btn-aba ${filtroAtivo === filtro ? 'ativo' : ''}`}
-                onClick={() => setFiltroAtivo(filtro)}
+                onClick={() => lidarComMudancaFiltro(filtro)}
               >
                 {filtro}
               </button>
@@ -207,14 +211,16 @@ export default function PainelGeralSolicitacoes() {
                 type="text"
                 placeholder="Buscar solicitações..."
                 value={termoPesquisa}
-                onChange={(e) => setTermoPesquisa(e.target.value)}
+                onChange={lidarComMudancaPesquisa}
               />
             </div>
           </div>
         </div>
 
         {carregando ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Carregando dados do servidor...</div>
+          <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Carregando página {paginaAtual} do servidor...</div>
+        ) : solicitacoes.length === 0 ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Nenhuma solicitação encontrada para esta página.</div>
         ) : (
           <div className="tabela-scroll-horizontal">
             <table className="tabela-solicitacoes">
@@ -231,12 +237,10 @@ export default function PainelGeralSolicitacoes() {
                 </tr>
               </thead>
               <tbody>
-                {dadosFiltrados.map((linha) => {
-                  // ✨ REGRA DE BLOQUEIO DE CROSSDOCKING ✨
+                {solicitacoes.map((linha) => {
                   const isCrossdocking = linha.tipo === 'Crossdocking';
-                  let nfNoEstoque = true; // Por defeito, liberado
+                  let nfNoEstoque = true;
 
-                  // Se for Crossdocking e tiver NF, procuramos a NF na lista de estoque usando conversão de texto e trim()
                   if (isCrossdocking && linha.nfCrossdocking) {
                     nfNoEstoque = estoque.some(itemEstoque => {
                       const nfEstoqueLimpa = String(itemEstoque.nf_entrada || '').trim();
@@ -245,7 +249,6 @@ export default function PainelGeralSolicitacoes() {
                     });
                   }
 
-                  // A ação fica bloqueada se for Crossdocking E a NF não tiver dado entrada
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
 
                   return (
@@ -298,15 +301,11 @@ export default function PainelGeralSolicitacoes() {
                         )}
                       </td>
 
-                      <td>
-                        {renderBadgeStatus(linha.status)}
-                      </td>
+                      <td>{renderBadgeStatus(linha.status)}</td>
 
-                      {/* 🛠️ AÇÕES ATUALIZADAS AQUI */}
                       <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {linha.status === 'Pendente' ? (
                           statusBloqueado ? (
-                            // 🔒 BLOQUEADO: Exibe a etiqueta amarela avisando que falta a NF
                             <div
                               title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`}
                               style={{
@@ -325,7 +324,6 @@ export default function PainelGeralSolicitacoes() {
                               <AlertCircle size={14} /> Aguardando NF
                             </div>
                           ) : (
-                            // ✅ LIBERADO: Exibe o botão de Aprovar laranja
                             <button
                               className="btn-aprovar-acao"
                               style={{
@@ -342,7 +340,7 @@ export default function PainelGeralSolicitacoes() {
                                 gap: '6px',
                               }}
                               onClick={(e) => {
-                                e.stopPropagation(); // Evita expandir a linha (se tiveres gaveta)
+                                e.stopPropagation();
                                 lidarComMudancaStatus(linha.idOriginal || linha.id, 'Em Separação');
                               }}
                             >
@@ -350,7 +348,6 @@ export default function PainelGeralSolicitacoes() {
                             </button>
                           )
                         ) : (
-                          // 🔄 OUTROS STATUS (Já aprovado): Mostra o select normal para gerenciar
                           <select
                             className="select-acao"
                             value={linha.status}
@@ -380,9 +377,35 @@ export default function PainelGeralSolicitacoes() {
                     </tr>
                   );
                 })}
-
               </tbody>
             </table>
+
+            {/* CONTROLE DE PAGINAÇÃO EM TEMPO REAL COM O BANCO */}
+            {totalPaginas > 1 && (
+              <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
+                <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                  Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {solicitacoes.length} de <strong>{totalRegistros}</strong> resultados totais
+                </div>
+                <div className="paginacao-botoes" style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    className="btn-paginacao" 
+                    onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} 
+                    disabled={paginaAtual === 1}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer', opacity: paginaAtual === 1 ? 0.6 : 1 }}
+                  >
+                    <ChevronLeft size={16} /> Anterior
+                  </button>
+                  <button 
+                    className="btn-paginacao" 
+                    onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} 
+                    disabled={paginaAtual === totalPaginas}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer', opacity: paginaAtual === totalPaginas ? 0.6 : 1 }}
+                  >
+                    Próxima <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
