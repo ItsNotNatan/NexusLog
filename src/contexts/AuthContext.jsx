@@ -21,10 +21,11 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('@NexusLog:usuario', JSON.stringify(dadosUsuario));
   };
 
-  // Função para sair do sistema
+// Função para sair do sistema
   const logout = () => {
     setUsuario(null);
     localStorage.removeItem('@NexusLog:usuario');
+    localStorage.removeItem('@NexusLog:token'); // 👈 Garante que o Token de segurança também é apagado
   };
 
   return (

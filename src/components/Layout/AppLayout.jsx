@@ -1,19 +1,24 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../Sidebar/Sidebar';
+import Header from '../Header/Header'; // 👈 Importamos o Cabeçalho
 
-// Aqui recebemos a propriedade "modulo" (que vem do routes.jsx)
 export default function AppLayout({ modulo }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f5f7' }}>
       
-      {/* Passamos o "modulo" para a Sidebar saber qual menu desenhar! */}
+      {/* Esquerda: Menu Lateral */}
       <Sidebar modulo={modulo} />
       
-      {/* Direita: O conteúdo dinâmico (As tuas páginas) */}
-      <main style={{ flex: 1, overflowX: 'hidden' }}>
-        <Outlet />
-      </main>
+      {/* Direita: Cabeçalho + O conteúdo dinâmico (As páginas) */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+        
+        <Header /> {/* 👈 Injetamos o cabeçalho no topo de todas as telas */}
+        
+        <main style={{ flex: 1, overflowY: 'auto' }}>
+          <Outlet />
+        </main>
+      </div>
       
     </div>
   );
