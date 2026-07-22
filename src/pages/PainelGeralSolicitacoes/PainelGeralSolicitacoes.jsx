@@ -54,21 +54,18 @@ export default function PainelGeralSolicitacoes() {
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
 
-  // 📄 CONTROLE DE PAGINAÇÃO REAL (Manda para a API)
+  // 📄 CONTROLE DE PAGINAÇÃO REAL (10 por vez)
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [totalRegistros, setTotalRegistros] = useState(0); // Guardará o COUNT(*) total do banco
-  const itensPorPagina = 20; // Pegará de 20 em 20 itens por vez
+  const [totalRegistros, setTotalRegistros] = useState(0); 
+  const itensPorPagina = 10; 
 
-  // ✨ BUSCA DADOS PAGINADOS DO BACKEND ATRAVÉS DE DEPENDÊNCIAS
+  // ✨ BUSCA DADOS PAGINADOS DO BACKEND
   useEffect(() => {
     const buscarDadosPaginados = async () => {
       try {
         setCarregando(true);
 
-        // Mapeia o nome da aba para enviar como filtro se não for 'Todos'
         const tipoFiltro = filtroAtivo === 'Transfer. WBS' ? 'Transferencia WBS' : filtroAtivo;
-        
-        // Constrói a URL passando a página atual, limite e termos de busca/filtro direto para a query da API
         const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoFiltro !== 'Todos' ? tipoFiltro : ''}`;
 
         const [resSolicitacoes, resEstoque] = await Promise.all([
@@ -92,8 +89,6 @@ export default function PainelGeralSolicitacoes() {
           }));
           
           setSolicitacoes(dadosFormatados);
-          
-          // O seu backend deve retornar uma chave 'total' informando quantas linhas existem no total do banco
           setTotalRegistros(resultadoSol.total || resultadoSol.dados.length); 
         }
       } catch (error) {
@@ -104,10 +99,8 @@ export default function PainelGeralSolicitacoes() {
     };
 
     buscarDadosPaginados();
-    // Executa a função novamente toda vez que a página, filtro ou termo de pesquisa mudarem
   }, [paginaAtual, filtroAtivo, termoPesquisa]);
 
-  // Se mudar o filtro ou fizer uma nova pesquisa, reseta para a página 1
   const lidarComMudancaFiltro = (novoFiltro) => {
     setFiltroAtivo(novoFiltro);
     setPaginaAtual(1);
@@ -148,8 +141,7 @@ export default function PainelGeralSolicitacoes() {
     }
   };
 
-  const totalPaginas = Math.ceil(totalRegistros / itensPorPagina);
-  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
+  const totalPaginas = Math.max(1, Math.ceil(totalRegistros / itensPorPagina));
 
   return (
     <div className="painel-geral-wrapper">
@@ -217,27 +209,35 @@ export default function PainelGeralSolicitacoes() {
           </div>
         </div>
 
-        {carregando ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Carregando página {paginaAtual} do servidor...</div>
-        ) : solicitacoes.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Nenhuma solicitação encontrada para esta página.</div>
-        ) : (
-          <div className="tabela-scroll-horizontal">
-            <table className="tabela-solicitacoes">
-              <thead>
+        <div className="tabela-scroll-horizontal">
+          <table className="tabela-solicitacoes">
+            <thead>
+              <tr>
+                <th className="col-chevron"></th>
+                <th>TIPO</th>
+                <th>ID / SOLICITANTE / WBS</th>
+                <th>Nº DO BS</th>
+                <th>DATA CRIAÇÃO</th>
+                <th>DATA/HORA FINALIZ.</th>
+                <th>STATUS</th>
+                <th>AÇÕES</th>
+              </tr>
+            </thead>
+            <tbody>
+              {carregando ? (
                 <tr>
-                  <th className="col-chevron"></th>
-                  <th>TIPO</th>
-                  <th>ID / SOLICITANTE / WBS</th>
-                  <th>Nº DO BS</th>
-                  <th>DATA CRIAÇÃO</th>
-                  <th>DATA/HORA FINALIZ.</th>
-                  <th>STATUS</th>
-                  <th>AÇÕES</th>
+                  <td colSpan="8" style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
+                    Carregando dados do servidor...
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {solicitacoes.map((linha) => {
+              ) : solicitacoes.length === 0 ? (
+                <tr>
+                  <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                    Nenhuma solicitação encontrada para esta página.
+                  </td>
+                </tr>
+              ) : (
+                solicitacoes.map((linha) => {
                   const isCrossdocking = linha.tipo === 'Crossdocking';
                   let nfNoEstoque = true;
 
@@ -376,40 +376,69 @@ export default function PainelGeralSolicitacoes() {
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
+                })
+              )}
+            </tbody>
+          </table>
 
-            {/* CONTROLE DE PAGINAÇÃO EM TEMPO REAL COM O BANCO */}
-            {totalPaginas > 1 && (
-              <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-                <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                  Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {solicitacoes.length} de <strong>{totalRegistros}</strong> resultados totais
-                </div>
-                <div className="paginacao-botoes" style={{ display: 'flex', gap: '8px' }}>
-                  <button 
-                    className="btn-paginacao" 
-                    onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} 
-                    disabled={paginaAtual === 1}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer', opacity: paginaAtual === 1 ? 0.6 : 1 }}
+          {/* 📄 CONTROLE DE PAGINAÇÃO COM BOTÕES NUMÉRICOS CLICÁVEIS */}
+          <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
+            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {solicitacoes.length} de <strong>{totalRegistros}</strong> resultados
+            </div>
+            
+            <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* Botão Anterior */}
+              <button 
+                className="btn-paginacao" 
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} 
+                disabled={paginaAtual === 1 || carregando}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}
+              >
+                <ChevronLeft size={16} /> Anterior
+              </button>
+
+              {/* ✨ GERADOR DINÂMICO DOS NÚMEROS DAS PÁGINAS (1, 2, 3...) */}
+              {Array.from({ length: totalPaginas }, (_, index) => {
+                const numeroPagina = index + 1;
+                const ehAtiva = paginaAtual === numeroPagina;
+                
+                return (
+                  <button
+                    key={numeroPagina}
+                    onClick={() => setPaginaAtual(numeroPagina)}
+                    disabled={carregando}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', 
+                      color: ehAtiva ? '#ffffff' : '#334155',
+                      border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`,
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      fontWeight: ehAtiva ? '600' : '500',
+                      cursor: carregando ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
                   >
-                    <ChevronLeft size={16} /> Anterior
+                    {numeroPagina}
                   </button>
-                  <button 
-                    className="btn-paginacao" 
-                    onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} 
-                    disabled={paginaAtual === totalPaginas}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer', opacity: paginaAtual === totalPaginas ? 0.6 : 1 }}
-                  >
-                    Próxima <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
+                );
+              })}
+
+              {/* Botão Próxima */}
+              <button 
+                className="btn-paginacao" 
+                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} 
+                disabled={paginaAtual === totalPaginas || carregando || totalRegistros === 0}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistros === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistros === 0) ? 0.6 : 1 }}
+              >
+                Próxima <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
 
+      </div>
     </div>
   );
 }
