@@ -11,8 +11,9 @@ export default function Sidebar({ modulo }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // 👇 Extraímos APENAS o utilizador e depois lemos o seu cargo para evitar ecrã branco
   const { usuario } = useAuth();
-  const { role } = useAuth(); // Pegamos o cargo do utilizador logado (ADM, LIDER ou OPERADOR)
+  const role = usuario?.cargo; 
 
   // Menu EXCLUSIVO do Cliente
   const menuCliente = [
@@ -22,15 +23,13 @@ export default function Sidebar({ modulo }) {
     { path: '/cliente/rastreabilidade', label: 'Rastreabilidade', icon: <Archive size={20} /> },
   ];
 
-// 👇 Menu da Logística atualizado
+  // Menu da Logística atualizado
   const menuLogistica = [
     // --- NÍVEL 1: ACESSO LIVRE (ADM, LÍDER E OPERADOR) ---
     { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/traceabilly', label: 'Rastreabilidade', icon: <Archive size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/painel', label: 'Painel Geral', icon: <ClipboardList size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
-    
-    // 👇 Visão Geral desceu para cá e agora inclui o OPERADOR!
     { path: '/logistica/visao-geral', label: 'Visão Geral do Estoque', icon: <Boxes size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
 
     // --- NÍVEL 2: ACESSO INTERMÉDIO (ADM E LÍDER) ---

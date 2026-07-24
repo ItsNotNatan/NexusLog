@@ -7,8 +7,8 @@ export const AuthProvider = ({ children }) => {
   const [usuario, setUsuario] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // O novo estado para controlar a filial/estoque
-  const [estoqueAtual, setEstoqueAtual] = useState('ESTOQUE_1');
+  // 👇 ALTA: Mude de 'ESTOQUE_1' para 'BR02'
+  const [estoqueAtual, setEstoqueAtual] = useState('BR02');
 
   // Verifica se já existe um usuário logado ao carregar a aplicação
   useEffect(() => {

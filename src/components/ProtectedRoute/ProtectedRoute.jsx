@@ -3,7 +3,8 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx'; 
 
 export default function ProtectedRoute({ allowedRoles }) {
-  const { usuario, role, loading } = useAuth();
+  // 1. Retirámos o "role" daqui, porque ele não vem direto do useAuth
+  const { usuario, loading } = useAuth();
 
   // Enquanto lê o LocalStorage, mostramos uma tela em branco ou loading
   if (loading) return <div style={{ padding: '50px', textAlign: 'center' }}>Carregando acesso...</div>;
@@ -13,11 +14,15 @@ export default function ProtectedRoute({ allowedRoles }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Se a rota exige um cargo específico e o usuário não tem, chuta para o dashboard (ou painel geral)
+  // 2. Extraímos o cargo corretamente de dentro do objeto do utilizador
+  const role = usuario?.cargo;
+
+  // Se a rota exige um cargo específico e o utilizador não o tem
   if (allowedRoles && !allowedRoles.includes(role)) {
-    return <Navigate to="/logistica/dashboard" replace />;
+    // 👇 Redirecionamos para o "painel" (que todos têm acesso) em vez do "dashboard"
+    return <Navigate to="/logistica/painel" replace />;
   }
 
-  // Se passou em tudo, libera a catraca (renderiza a página que ele queria ver)
+  // Se passou em tudo, liberta o acesso
   return <Outlet />;
 }
