@@ -28,16 +28,24 @@ export const router = createBrowserRouter([
   { path: "/login", element: <LoginLogistica /> },
 
   // ==========================================
-  // ÁREA DO CLIENTE
+  // ÁREA DO CLIENTE (AGORA PROTEGIDA!)
   // ==========================================
   {
     path: "/cliente",
-    element: <AppLayout modulo="cliente" />,
+    // 🛡️ 1º Escudo do Cliente: Verifica se o utilizador está logado. 
+    // NOTA: Se os teus clientes tiverem uma "role" específica no teu sistema (ex: 'CLIENTE'), 
+    // podes adicionar allowedRoles={['CLIENTE']} tal como na logística.
+    element: <ProtectedRoute />, 
     children: [
-      { path: "consulta-estoque", element: <VisaoGeralEstoque perfil="cliente" /> },
-      { path: "fazer-solicitacao", element: <FazerSolicitacao /> },
-      { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes perfil="cliente" /> },
-      { path: "rastreabilidade", element: <Traceabilly perfil="cliente" /> }
+      {
+        element: <AppLayout modulo="cliente" />,
+        children: [
+          { path: "consulta-estoque", element: <VisaoGeralEstoque perfil="cliente" /> },
+          { path: "fazer-solicitacao", element: <FazerSolicitacao /> },
+          { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes perfil="cliente" /> },
+          { path: "rastreabilidade", element: <Traceabilly perfil="cliente" /> }
+        ]
+      }
     ]
   },
 

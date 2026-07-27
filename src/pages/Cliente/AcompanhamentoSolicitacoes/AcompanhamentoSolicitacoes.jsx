@@ -97,7 +97,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     ''
   ).toLowerCase().trim();
 
-  // Verifica se a role logada é Operador
   const isOperador = textoCargo.includes('operador');
 
   const listaFiltros = [
@@ -494,7 +493,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                         <td>{renderBadgeStatus(linha.status)}</td>
 
-                        {/* 🔒 Coluna de Ações: Bloqueada para Operador, Liberada para ADM e LIDER */}
                         {perfil === "logistica" && (
                           <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {isOperador ? (
