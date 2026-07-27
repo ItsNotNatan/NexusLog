@@ -14,7 +14,7 @@ export default function LoginLogistica() {
   const navigate = useNavigate();
   const { login } = useAuth(); 
 
-const handleLogin = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setCarregando(true);
     setErro('');
@@ -28,22 +28,22 @@ const handleLogin = async (e) => {
         body: JSON.stringify({ email, senha }),
       });
 
-// ... (resto do código igual)
       const data = await resposta.json();
 
       if (!resposta.ok || !data.sucesso) {
         throw new Error(data.erro || 'Erro ao fazer login.');
       }
 
-      // 👇 CORREÇÃO: Agora permitimos ADM, LIDER e OPERADOR
+      // Validação de segurança: apenas a equipa de logística pode entrar
       if (data.usuario.cargo !== 'ADM' && data.usuario.cargo !== 'LIDER' && data.usuario.cargo !== 'OPERADOR') {
         throw new Error('Acesso negado. Este portal é exclusivo para a equipe de Logística.');
       }
 
-      // Sucesso! Guarda os dados globalmente
-      login(data.usuario);
+      // CORREÇÃO APLICADA: Agora passamos o utilizador E o token para o contexto!
+      await login(data.usuario, data.token);
+      
+      // Redireciona o utilizador após guardar os dados com sucesso
       navigate('/selecionar-filial', { state: { destinoFinal: '/logistica/painel' } });
-// ... (resto do código igual)
 
     } catch (error) {
       setErro(error.message);
