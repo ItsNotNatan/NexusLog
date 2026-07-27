@@ -86,9 +86,25 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [totalRegistros, setTotalRegistros] = useState(0); 
   const itensPorPagina = 10;
 
-  // 🔒 CONTROLE DE ACESSO (RBAC)
+  // 🔒 CONTROLE DE ACESSO (RBAC) - CORRIGIDO
   const usuarioLogado = JSON.parse(localStorage.getItem('usuario')) || {};
-  const isOperador = usuarioLogado.cargo?.toLowerCase() === 'operador';
+  
+  // Imprime no console do navegador para descobrirmos como a palavra está vindo
+  console.log("👉 DADOS COMPLETOS DO USUÁRIO:", usuarioLogado);
+
+  // Tenta pegar o cargo de várias formas comuns e remove espaços em branco (.trim)
+  const textoCargo = String(
+    usuarioLogado.cargo || 
+    usuarioLogado.perfil || 
+    usuarioLogado.user?.cargo || 
+    ''
+  ).toLowerCase().trim();
+
+  // Usa .includes() em vez de === para funcionar com "Operador Logístico", etc.
+  const isOperador = textoCargo.includes('operador');
+  
+  console.log("👉 CARGO DETECTADO:", textoCargo);
+  console.log("👉 ESTÁ BLOQUEADO COMO OPERADOR?", isOperador);
 
   const listaFiltros = [
     "Todos",
