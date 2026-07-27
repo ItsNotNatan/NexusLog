@@ -34,12 +34,43 @@ export default function PainelAprovacao() {
   const [paginaEntradas, setPaginaEntradas] = useState(1);
   const itensPorPagina = 5;
 
+  // 👇 Lemos o utilizador E O TOKEN do cofre do navegador
+  const usuarioLogado = JSON.parse(localStorage.getItem('@NexusLog:user')) || {};
+  const token = localStorage.getItem('@NexusLog:token') || '';
+  
+  const textoCargo = String(
+    usuarioLogado.cargo || 
+    usuarioLogado.perfil || 
+    usuarioLogado.user?.cargo || 
+    ''
+  ).toLowerCase().trim();
+
+  const isOperador = textoCargo.includes('operador');
+
+  // 🕵️ ALERT: Validação de Sessão Inicial
+  useEffect(() => {
+    const diagnosticoSessao = `🕵️ DETECTOR DE SESSÃO NEXUSLOG:\n\n` +
+      `- Cargo lido do LocalStorage: "${textoCargo}"\n` +
+      `- Token de Segurança encontrado? ${token ? "🟢 SIM" : "🔴 NÃO"}\n` +
+      `- O sistema considera Operador? ${isOperador ? "🟢 SIM (Acesso Liberado)" : "⚪ NÃO"}`;
+    alert(diagnosticoSessao);
+  }, [textoCargo, isOperador, token]);
+
   useEffect(() => {
     const buscarDados = async () => {
       try {
+        setCarregando(true);
+
+        // 👇 Anexamos o crachá de segurança nas requisições
+        const opcoesFetch = {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        };
+
         const [resSolicitacoes, resEstoque] = await Promise.all([
-          fetch('http://localhost:3001/api/solicitacoes/listar'),
-          fetch('http://localhost:3001/api/estoque/listar')
+          fetch('http://localhost:3001/api/solicitacoes/listar', opcoesFetch),
+          fetch('http://localhost:3001/api/estoque/listar', opcoesFetch)
         ]);
 
         const resultadoSol = await resSolicitacoes.json();
@@ -53,8 +84,6 @@ export default function PainelAprovacao() {
           const dadosFormatados = resultadoSol.dados
             .filter(item => item.status === 'Pendente')
             .map((item) => {
-              // 👇 Toda aquela gambiarra de prefixos e limpar o ID sumiu daqui!
-              
               let valorTotal = 0;
               let centro = '-';
               let dep = '-';
@@ -66,9 +95,9 @@ export default function PainelAprovacao() {
 
               return {
                 ...item,
-                idOriginal: item.id, // O UUID longo que o backend precisa para salvar
-                ps: item.ps || 'PS-Pendente', // 👈 Pega o PS real do banco
-                bs: item.bs || null,          // 👈 Pega o BS (se já existir)
+                idOriginal: item.id, 
+                ps: item.ps || 'PS-Pendente', 
+                bs: item.bs || null,          
                 dataSolicitacao: item.dataSolicitacao || '-',
                 valorTotalFormatado: valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : null,
                 centro,
@@ -78,6 +107,8 @@ export default function PainelAprovacao() {
             });
 
           setDadosTabela(dadosFormatados);
+        } else {
+          alert(`❌ ERRO NA LISTAGEM:\nO servidor recusou os dados. Motivo: ${resultadoSol.erro || 'Token Inválido'}`);
         }
       } catch (error) {
         console.error("Falha ao conectar à API:", error);
@@ -86,13 +117,16 @@ export default function PainelAprovacao() {
       }
     };
 
-    buscarDados();
-  }, []);
+    if (token) {
+      buscarDados();
+    } else {
+      setCarregando(false);
+    }
+  }, [token]);
 
   const dadosFiltrados = dadosTabela.filter((linha) => {
     const termoLower = termoPesquisa.toLowerCase();
     return (
-      // 👇 Ajustado para pesquisar pelo novo PS em vez do ID antigo
       (linha.ps && linha.ps.toLowerCase().includes(termoLower)) ||
       (linha.solicitante && linha.solicitante.toLowerCase().includes(termoLower)) ||
       (linha.wbs && linha.wbs.toLowerCase().includes(termoLower)) ||
@@ -145,7 +179,6 @@ export default function PainelAprovacao() {
     if (!solicitacaoSendoEditada) return;
 
     try {
-      // 1. Atualização visual na tabela (Optimistic UI)
       setDadosTabela(prev => prev.map(item => {
         if (item.idOriginal === solicitacaoSendoEditada.idOriginal) {
           return { ...item, filial: dadosEdicao.filial, centro: dadosEdicao.centro, deposito: dadosEdicao.deposito };
@@ -153,10 +186,13 @@ export default function PainelAprovacao() {
         return item;
       }));
 
-      // 2. 🚀 Envio para o Banco de Dados através da nova rota
+      // 👇 Adicionado o token na edição de local (PATCH)
       const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${solicitacaoSendoEditada.idOriginal}/local`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify(dadosEdicao)
       });
 
@@ -176,9 +212,13 @@ export default function PainelAprovacao() {
     e.stopPropagation();
     if (window.confirm(`Aprovar esta solicitação?`)) {
       try {
+        // 👇 Adicionado o token na aprovação (PATCH)
         const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH', 
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` 
+          },
           body: JSON.stringify({ status: 'Em Separação' }) 
         });
         if (resposta.ok) {
@@ -199,9 +239,13 @@ export default function PainelAprovacao() {
     const motivo = window.prompt(`Motivo da recusa para esta solicitação?`);
     if (motivo) {
       try {
+        // 👇 Adicionado o token na recusa (PATCH)
         const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH', 
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` 
+          },
           body: JSON.stringify({ status: 'Recusado', motivo_recusa: motivo }) 
         });
         if (resposta.ok) {

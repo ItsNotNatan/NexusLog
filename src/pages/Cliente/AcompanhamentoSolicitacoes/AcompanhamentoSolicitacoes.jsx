@@ -86,7 +86,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [totalRegistros, setTotalRegistros] = useState(0); 
   const itensPorPagina = 10;
 
-  // 👇 Lemos o Usuário E o Token do cofre do navegador
+  // Lemos o Usuário e o Token corretamente
   const usuarioLogado = JSON.parse(localStorage.getItem('@NexusLog:user')) || {};
   const token = localStorage.getItem('@NexusLog:token') || '';
   
@@ -97,18 +97,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     ''
   ).toLowerCase().trim();
 
+  // Verifica se a role logada é Operador
   const isOperador = textoCargo.includes('operador');
-
-  // 🕵️ ALERT 1: Validação de Sessão Inicial
-  useEffect(() => {
-    const diagnosticoSessao = `🕵️ DETECTOR DE SESSÃO NEXUSLOG:\n\n` +
-      `- Perfil da página recebido: "${perfil}"\n` +
-      `- Cargo lido do LocalStorage: "${textoCargo}"\n` +
-      `- Token encontrado? ${token ? "🟢 SIM" : "🔴 NÃO"}\n` +
-      `- O sistema considera Operador? ${isOperador ? "🟢 SIM (Acesso Liberado)" : "⚪ NÃO"}\n\n` +
-      `Se os dados acima estiverem errados, o problema está no Login!`;
-    alert(diagnosticoSessao);
-  }, [perfil, textoCargo, isOperador, token]);
 
   const listaFiltros = [
     "Todos",
@@ -120,23 +110,22 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     "Reintegração",
   ];
 
-  // BUSCA DADOS DINÂMICOS NA API
+  // BUSCA DADOS DINÂMICOS NA API SEMPRE QUE A PÁGINA OU FILTROS MUDAREM
   useEffect(() => {
     const buscarDados = async () => {
       try {
         setCarregando(true);
         
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
+        
         const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}`;
 
-        // 👇 Criamos a autorização (Crachá) para o Backend nos deixar passar
         const opcoesFetch = {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         };
 
-        // 👇 Enviamos as opções com o token nas buscas de dados
         const [resSolicitacoes, resEstoque] = await Promise.all([
           fetch(urlSolicitacoes, opcoesFetch),
           fetch("http://localhost:3001/api/estoque/listar", opcoesFetch)
@@ -144,15 +133,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         const resultadoSol = await resSolicitacoes.json();
         const resultadoEst = await resEstoque.json();
-
-        // 🕵️ ALERT 2: Resumo de sincronização com o banco de dados
-        const diagnosticoBanco = `📦 RETORNO DO BANCO DE DADOS:\n\n` +
-          `- Conexão Solicitações (HTTP): ${resSolicitacoes.status} ${resSolicitacoes.statusText}\n` +
-          `- Sucesso reportado na PS: ${resultadoSol?.sucesso ? "✅ Verdadeiro" : "❌ Falso"}\n` +
-          `- Quantidade de linhas recebidas: ${resultadoSol?.dados?.length || 0}\n` +
-          `- Total absoluto no banco: ${resultadoSol?.total || 0}\n\n` +
-          `- Conexão Estoque (HTTP): ${resEstoque.status}`;
-        alert(diagnosticoBanco);
 
         if (resEstoque.ok && resultadoEst.sucesso) {
           setEstoque(resultadoEst.dados);
@@ -196,20 +176,21 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           setDadosTabela(dadosFormatados);
           setTotalRegistros(resultadoSol.total || resultadoSol.dados.length); 
         } else {
-          alert(`❌ ERRO OPERACIONAL:\nO servidor recusou a listagem.\nMotivo: ${resultadoSol.erro || 'Token Inválido ou Sem Permissão'}`);
+          console.error("Erro retornado do servidor:", resultadoSol.erro);
+          alert(`Erro Operacional: ${resultadoSol.erro || 'Falha ao buscar dados.'}`);
         }
       } catch (error) {
-        alert(`❌ FALHA CRÍTICA DE CONEXÃO:\nNão foi possível falar com a API na porta 3001.\nErro: ${error.message}`);
+        console.error("Falha ao conectar à API:", error);
+        alert(`Falha de Conexão: Verifique se o servidor está ativo. Erro: ${error.message}`);
       } finally {
         setCarregando(false);
       }
     };
 
     if (token) {
-        buscarDados();
+      buscarDados();
     } else {
-        alert("⚠️ O Token não foi encontrado. Por favor, refaça o login.");
-        setCarregando(false);
+      setCarregando(false);
     }
   }, [paginaAtual, filtroAtivo, filtroStatus, termoPesquisa, token]); 
 
@@ -218,11 +199,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
-    alert(`🚀 [AÇÃO SOLICITADA]\n\n` +
-      `- ID (UUID): ${idSolicitacao}\n` +
-      `- Novo Status Alvo: "${novoStatus}"\n\n` +
-      `Disparando requisição PATCH para o servidor...`);
-
     if (!window.confirm(`Tem certeza que deseja mudar o status para "${novoStatus}"?`)) return;
 
     let motivo = null;
@@ -232,12 +208,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
 
     try {
-      // 👇 Injetamos o Token JWT na requisição de aprovação (PATCH)
       const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/status`, {
         method: 'PATCH',
         headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
       });
@@ -254,13 +229,14 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           }
           return sol;
         }));
-        alert(`✅ SUCESSO COMPLETO!\nO servidor salvou as alterações e a tela foi atualizada.`);
+        alert(`Status atualizado para ${novoStatus} com sucesso!`);
       } else {
-        const corpoErro = await resposta.json().catch(() => ({}));
-        alert(`❌ ERRO NO SALVAMENTO:\nO servidor respondeu com status ${resposta.status}, mas recusou a alteração.\n\nDetalhe do Backend: ${corpoErro.erro || "Desconhecido"}`);
+        const erroCorpo = await resposta.json().catch(() => ({}));
+        alert(`Erro ao atualizar o status no servidor: ${erroCorpo.erro || 'Desconhecido'}`);
       }
     } catch (error) {
-      alert(`❌ ERRO DE REDE NO SALVAMENTO:\nNão deu para enviar o PATCH.\nErro: ${error.message}`);
+      console.error("Erro de conexão:", error);
+      alert("Falha de conexão com o servidor ao atualizar status.");
     }
   };
 
@@ -283,12 +259,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (!window.confirm(`Tem a certeza que deseja apagar permanentemente o ficheiro "${anexo.nome_arquivo}"?`)) return;
 
     try {
-      // 👇 Injetamos o Token JWT na requisição de remoção (DELETE)
       const resposta = await fetch(`http://localhost:3001/api/solicitacoes/anexo/${anexo.id}`, { 
-          method: "DELETE",
-          headers: { 'Authorization': `Bearer ${token}` }
+        method: "DELETE",
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      
       if (resposta.ok) {
         setDadosTabela((prev) =>
           prev.map((sol) => {
@@ -302,6 +276,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         alert("Erro ao apagar o anexo.");
       }
     } catch (error) {
+      console.error("Erro ao deletar anexo:", error);
       alert("Falha ao comunicar com o servidor.");
     }
   };
@@ -321,6 +296,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         const { error: erroUpload } = await supabase.storage.from("documentos").upload(caminhoNoStorage, arquivo);
 
         if (erroUpload) {
+          console.error("Erro ao subir arquivo para o Storage:", erroUpload);
           alert(`Falha ao anexar o ficheiro: ${arquivo.name}`);
           setCarregando(false);
           return;
@@ -334,19 +310,18 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         });
       }
 
-      // 👇 Injetamos o Token JWT na requisição de adição de anexos (POST)
-      const reply = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/anexos`, {
+      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/anexos`, {
         method: "POST",
         headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ anexos: anexosProcessados }),
       });
 
-      const dados = await reply.json();
+      const dados = await resposta.json();
 
-      if (reply.ok && dados.sucesso) {
+      if (resposta.ok && dados.sucesso) {
         alert("Sucesso! Novos anexos integrados na base de dados.");
         setAnexosNovos([]);
         setLinhaExpandida(null);
@@ -355,6 +330,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         alert(`Erro do servidor: ${dados.erro}`);
       }
     } catch (error) {
+      console.error("Erro na requisição de anexos extras:", error);
       alert("Falha ao conectar com o servidor para salvar os anexos.");
     } finally {
       setCarregando(false);
@@ -518,44 +494,51 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                         <td>{renderBadgeStatus(linha.status)}</td>
 
+                        {/* 🔒 Coluna de Ações: Bloqueada para Operador, Liberada para ADM e LIDER */}
                         {perfil === "logistica" && (
                           <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {linha.status === 'Pendente' ? (
-                              statusBloqueado ? (
-                                <div 
-                                  title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} 
-                                  style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '6px 12px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: '600' }}
-                                >
-                                  <AlertCircle size={14} /> Aguardando NF
-                                </div>
-                              ) : (
-                                <button 
-                                  className="btn-aprovar-acao" 
-                                  style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '20px', padding: '6px 16px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    lidarComMudancaStatus(linha.idOriginal || linha.id, 'Em Separação');
-                                  }}
-                                >
-                                  <RefreshCw size={14} /> Aprovar
-                                </button>
-                              )
+                            {isOperador ? (
+                              <span style={{ color: "#64748b", fontSize: "0.875rem", fontWeight: "500" }}>
+                                {linha.status}
+                              </span>
                             ) : (
-                              <select
-                                className="select-acao"
-                                value={linha.status}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value);
-                                }}
-                                style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '20px', backgroundColor: '#f8fafc', fontSize: '0.875rem', color: '#334155', outline: 'none', cursor: 'pointer' }}
-                              >
-                                <option value="Pendente" disabled>Pendente</option>
-                                <option value="Em Separação">Em Separação</option>
-                                <option value="Concluído">Concluído</option>
-                                <option value="Cancelado">Cancelado</option>
-                                <option value="Recusado">Recusado</option>
-                              </select>
+                              linha.status === 'Pendente' ? (
+                                statusBloqueado ? (
+                                  <div 
+                                    title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} 
+                                    style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '6px 12px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: '600' }}
+                                  >
+                                    <AlertCircle size={14} /> Aguardando NF
+                                  </div>
+                                ) : (
+                                  <button 
+                                    className="btn-aprovar-acao" 
+                                    style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '20px', padding: '6px 16px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      lidarComMudancaStatus(linha.idOriginal || linha.id, 'Em Separação');
+                                    }}
+                                  >
+                                    <RefreshCw size={14} /> Aprovar
+                                  </button>
+                                )
+                              ) : (
+                                <select
+                                  className="select-acao"
+                                  value={linha.status}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value);
+                                  }}
+                                  style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '20px', backgroundColor: '#f8fafc', fontSize: '0.875rem', color: '#334155', outline: 'none', cursor: 'pointer' }}
+                                >
+                                  <option value="Pendente" disabled>Pendente</option>
+                                  <option value="Em Separação">Em Separação</option>
+                                  <option value="Concluído">Concluído</option>
+                                  <option value="Cancelado">Cancelado</option>
+                                  <option value="Recusado">Recusado</option>
+                                </select>
+                              )
                             )}
                           </td>
                         )}
