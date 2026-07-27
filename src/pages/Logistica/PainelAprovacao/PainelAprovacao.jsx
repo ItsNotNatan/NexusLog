@@ -9,8 +9,8 @@ import {
   Eye, 
   Loader2,
   AlertCircle,
-  ChevronLeft, // 👈 Importado para a paginação
-  ChevronRight // 👈 Importado para a paginação
+  ChevronLeft, 
+  ChevronRight 
 } from 'lucide-react';
 
 import DetalhesSolicitacao from '../../Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao';
@@ -72,7 +72,9 @@ export default function PainelAprovacao() {
                 dataSolicitacao: item.dataSolicitacao || '-',
                 valorTotalFormatado: valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : null,
                 centro,
-                deposito: dep
+                deposito: dep,
+                // 👇 Garantindo que a filial vem para o objeto (caso não venha, usa '-')
+                filial: item.filial || '-' 
               };
             });
 
@@ -95,7 +97,9 @@ export default function PainelAprovacao() {
     return (
       linha.id.toString().toLowerCase().includes(termoLower) ||
       (linha.solicitante && linha.solicitante.toLowerCase().includes(termoLower)) ||
-      (linha.wbs && linha.wbs.toLowerCase().includes(termoLower))
+      (linha.wbs && linha.wbs.toLowerCase().includes(termoLower)) ||
+      // Permite pesquisar pelo nome da filial também!
+      (linha.filial && linha.filial.toLowerCase().includes(termoLower)) 
     );
   });
 
@@ -115,13 +119,11 @@ export default function PainelAprovacao() {
   const indexUltimoEntradas = paginaEntradas * itensPorPagina;
   const entradasPendentesPaginadas = entradasPendentes.slice(indexPrimeiroEntradas, indexUltimoEntradas);
 
-  // Reseta as páginas se o usuário digitar na pesquisa
   useEffect(() => {
     setPaginaGeral(1);
     setPaginaEntradas(1);
   }, [termoPesquisa]);
 
-  // Garante que a página retorne caso o último item da página atual seja aprovado/recusado
   useEffect(() => {
     if (paginaGeral > totalPaginasGeral) setPaginaGeral(totalPaginasGeral);
   }, [outrasPendentes.length, paginaGeral, totalPaginasGeral]);
@@ -129,7 +131,6 @@ export default function PainelAprovacao() {
   useEffect(() => {
     if (paginaEntradas > totalPaginasEntradas) setPaginaEntradas(totalPaginasEntradas);
   }, [entradasPendentes.length, paginaEntradas, totalPaginasEntradas]);
-
 
   const toggleLinha = (idUnico) => {
     setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
@@ -192,7 +193,7 @@ export default function PainelAprovacao() {
         <Search className="icone-pesquisa-dir" size={18} />
         <input 
           type="text" 
-          placeholder="Buscar por ID, WBS ou Solicitante..." 
+          placeholder="Buscar por ID, WBS, Filial ou Solicitante..." 
           value={termoPesquisa} 
           onChange={(e) => setTermoPesquisa(e.target.value)} 
         />
@@ -226,7 +227,6 @@ export default function PainelAprovacao() {
               </div>
             ) : (
               <div className="lista-solicitacoes">
-                {/* 👈 MAPEANDO OS DADOS PAGINADOS (5 ITENS) */}
                 {outrasPendentesPaginadas.map((linha) => {
                   const idUnico = `geral-${linha.idOriginal}`;
                   const isExpandida = linhaExpandida === idUnico;
@@ -246,6 +246,18 @@ export default function PainelAprovacao() {
                           <div className="item-linha-id">
                             {linha.prefixo}:{linha.id}
                             <span className="badge-tipo-lista azul">{linha.tipo}</span>
+                            
+                            {/* 👇 NOVO: BADGE DA FILIAL AQUI (Secção Amarela) */}
+                            {linha.filial && linha.filial !== '-' && (
+                              <span style={{ 
+                                marginLeft: '8px', padding: '2px 8px', backgroundColor: '#f1f5f9', 
+                                color: '#475569', borderRadius: '4px', fontSize: '0.75rem', 
+                                fontWeight: '700', border: '1px solid #cbd5e1' 
+                              }}>
+                                📍 {linha.filial}
+                              </span>
+                            )}
+
                           </div>
                           
                           <div className="item-meta-info">
@@ -291,7 +303,7 @@ export default function PainelAprovacao() {
                   );
                 })}
 
-                {/* 📄 CONTROLE DE PAGINAÇÃO: SECÇÃO AMARELA */}
+                {/* CONTROLE DE PAGINAÇÃO */}
                 {totalPaginasGeral > 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 8px 8px' }}>
                     <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
@@ -356,7 +368,6 @@ export default function PainelAprovacao() {
               </div>
             ) : (
               <div className="lista-solicitacoes">
-                {/* 👈 MAPEANDO OS DADOS PAGINADOS (5 ITENS) */}
                 {entradasPendentesPaginadas.map((linha) => {
                   const idUnico = `entrada-${linha.idOriginal}`;
                   const isExpandida = linhaExpandida === idUnico;
@@ -369,6 +380,18 @@ export default function PainelAprovacao() {
                           <div className="item-linha-id">
                             {linha.prefixo}:{linha.id}
                             <span className="badge-tipo-lista verde">Entrada</span>
+                            
+                            {/* 👇 NOVO: BADGE DA FILIAL AQUI (Secção Verde) */}
+                            {linha.filial && linha.filial !== '-' && (
+                              <span style={{ 
+                                marginLeft: '8px', padding: '2px 8px', backgroundColor: '#dcfce7', 
+                                color: '#166534', borderRadius: '4px', fontSize: '0.75rem', 
+                                fontWeight: '700', border: '1px solid #bbf7d0' 
+                              }}>
+                                🏢 {linha.filial}
+                              </span>
+                            )}
+
                           </div>
                           
                           <div className="item-meta-info">
@@ -407,7 +430,7 @@ export default function PainelAprovacao() {
                   );
                 })}
 
-                {/* 📄 CONTROLE DE PAGINAÇÃO: SECÇÃO VERDE */}
+                {/* CONTROLE DE PAGINAÇÃO */}
                 {totalPaginasEntradas > 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 8px 8px' }}>
                     <div style={{ fontSize: '0.875rem', color: '#64748b' }}>

@@ -11,11 +11,12 @@ import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal
 import { supabase } from '../../../supabaseClient';
 
 export default function EntradaMaterial() {
-  // 1. ESTADO: Dados gerais do formulário
+  // 1. ESTADO: Dados gerais do formulário (✨ Adicionado filial_id)
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
-    observacoes: ''
+    observacoes: '',
+    filial_id: '' // 👈 Novo campo para armazenar o estoque escolhido
   });
 
   // ✨ ESTADO E EFFECT: Lógica exata do RequestForm para travar o calendário
@@ -116,8 +117,9 @@ export default function EntradaMaterial() {
 
   // --- ENVIO PARA O BACKEND (NODE.JS) ---
   const handleEnviar = async () => {
-    if (!formDados.nome || !formDados.wbs) {
-      alert("Preencha o Nome e o WBS do solicitante.");
+    // ✨ Atualizado para exigir a seleção do Estoque/Filial
+    if (!formDados.nome || !formDados.wbs || !formDados.filial_id) {
+      alert("Preencha o Nome, WBS e selecione o Estoque de destino.");
       return;
     }
 
@@ -127,7 +129,6 @@ export default function EntradaMaterial() {
       return;
     }
 
-    // ✨ Verificação de datas usando a dataMinima gerada no useEffect
     const datasInvalidas = itens.some(i =>
       (i.emissaoNF && i.emissaoNF < dataMinima) ||
       (i.recebNF && i.recebNF < dataMinima) ||
@@ -192,8 +193,9 @@ export default function EntradaMaterial() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        alert(`Sucesso! Solicitação de Entrada enviada. ID: ${dados.ps_id}`);
-        setFormDados({ nome: '', wbs: '', observacoes: '' });
+        // ✨ Mudei de ps_id para dados.ps para refletir a nossa nova lógica do banco!
+        alert(`Sucesso! Solicitação de Entrada enviada.\nNúmero de acompanhamento: ${dados.ps}`);
+        setFormDados({ nome: '', wbs: '', observacoes: '', filial_id: '' });
         setItens([gerarLinhaVazia()]);
         setAnexos([]);
       } else {
@@ -217,14 +219,6 @@ export default function EntradaMaterial() {
         onClose={processador.resetarProcessador}
       />
 
-      <div className="banner-aviso banner-verde">
-        <Package size={24} />
-        <div>
-          <strong>Entrada de Material</strong>
-          <p>Preencha os dados dos itens a receber. A <strong>alocação física</strong> no armazém será definida pela equipe de Logística após a aprovação.</p>
-        </div>
-      </div>
-
       <div className="form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
@@ -243,6 +237,22 @@ export default function EntradaMaterial() {
               onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })}
             />
           </div>
+          
+          {/* ✨ NOVO DROPDOWN PARA O ESTOQUE */}
+          <div className="input-grupo">
+            <label>ESTOQUE / FILIAL *</label>
+            <select
+              className="input-campo foco-verde"
+              value={formDados.filial_id}
+              onChange={(e) => setFormDados({ ...formDados, filial_id: e.target.value })}
+            >
+              <option value="">Selecione o destino...</option>
+              <option value="BR02">BR02 — Santo André</option>
+              <option value="BR04">BR04 — Goiana</option>
+              <option value="BR06">BR06 — Betim</option>
+            </select>
+          </div>
+
           <div className="input-grupo">
             <label>WBS *</label>
             <input
