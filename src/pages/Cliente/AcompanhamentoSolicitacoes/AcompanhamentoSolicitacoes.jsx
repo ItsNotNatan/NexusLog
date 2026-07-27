@@ -83,8 +83,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   // 📄 CONTROLE DE PAGINAÇÃO REAL (No Banco de Dados)
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [totalRegistros, setTotalRegistros] = useState(0); // 👈 Precisamos saber o total real do BD
+  const [totalRegistros, setTotalRegistros] = useState(0); 
   const itensPorPagina = 10;
+
+  // 🔒 CONTROLE DE ACESSO (RBAC)
+  const usuarioLogado = JSON.parse(localStorage.getItem('usuario')) || {};
+  const isOperador = usuarioLogado.cargo?.toLowerCase() === 'operador';
 
   const listaFiltros = [
     "Todos",
@@ -102,10 +106,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       try {
         setCarregando(true);
         
-        // Mapeia o filtro de tipo para o nome correto que o banco espera
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
         
-        // 🚀 URL ATUALIZADA: Agora envia os parâmetros para o back-end carregar "de pouco em pouco"
         const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}`;
 
         const [resSolicitacoes, resEstoque] = await Promise.all([
@@ -156,7 +158,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           });
 
           setDadosTabela(dadosFormatados);
-          // 👈 O back-end precisa retornar a chave "total" (COUNT) para sabermos que existem 12 itens
           setTotalRegistros(resultadoSol.total || resultadoSol.dados.length); 
         } else {
           console.error("Erro retornado do servidor:", resultadoSol.erro);
@@ -169,14 +170,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     };
 
     buscarDados();
-  }, [paginaAtual, filtroAtivo, filtroStatus, termoPesquisa]); // 👈 O React refaz a busca se essas variáveis mudarem
+  }, [paginaAtual, filtroAtivo, filtroStatus, termoPesquisa]); 
 
-  // Se digitar na pesquisa ou clicar num filtro, reseta para a página 1
   useEffect(() => {
     setPaginaAtual(1);
   }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  // Ações de alteração de status
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
     if (!window.confirm(`Tem certeza que deseja mudar o status para "${novoStatus}"?`)) return;
 
@@ -215,14 +214,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  // KPIs (Atenção: Atualmente eles calculam com base apenas na página de 10 itens exibida)
   const kpiTotal = dadosTabela.length;
   const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
   const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
   const kpiConcluidos = dadosTabela.filter((item) => item.status === "Concluído").length;
   const kpiRecusados = dadosTabela.filter((item) => item.status === "Recusado" || item.status === "Cancelado").length;
 
-  // Total de Páginas calculado com base no total REAL do banco de dados (os 12 que você tem)
   const totalPaginas = Math.max(1, Math.ceil(totalRegistros / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
   const indexUltimoItem = paginaAtual * itensPorPagina;
@@ -372,6 +369,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
                 <th>STATUS</th>
+                {/* A coluna Ações aparece sempre no perfil logistica */}
                 {perfil === "logistica" && <th>AÇÕES</th>}
               </tr>
             </thead>
@@ -465,44 +463,53 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                         <td>{renderBadgeStatus(linha.status)}</td>
 
+                        {/* 🔒 Regra da Coluna de Ações: Ocultar inputs se for Operador */}
                         {perfil === "logistica" && (
                           <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {linha.status === 'Pendente' ? (
-                              statusBloqueado ? (
-                                <div 
-                                  title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} 
-                                  style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '6px 12px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: '600' }}
-                                >
-                                  <AlertCircle size={14} /> Aguardando NF
-                                </div>
-                              ) : (
-                                <button 
-                                  className="btn-aprovar-acao" 
-                                  style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '20px', padding: '6px 16px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    lidarComMudancaStatus(linha.idOriginal || linha.id, 'Em Separação');
-                                  }}
-                                >
-                                  <RefreshCw size={14} /> Aprovar
-                                </button>
-                              )
+                            {isOperador ? (
+                              // Se for Operador, exibe apenas um texto indicativo e sem ação
+                              <span style={{ color: "#64748b", fontSize: "0.875rem" }}>
+                                {linha.status}
+                              </span>
                             ) : (
-                              <select
-                                className="select-acao"
-                                value={linha.status}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value);
-                                }}
-                                style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '20px', backgroundColor: '#f8fafc', fontSize: '0.875rem', color: '#334155', outline: 'none', cursor: 'pointer' }}
-                              >
-                                <option value="Pendente" disabled>Pendente</option>
-                                <option value="Em Separação">Em Separação</option>
-                                <option value="Concluído">Concluído</option>
-                                <option value="Cancelado">Cancelado</option>
-                                <option value="Recusado">Recusado</option>
-                              </select>
+                              // Se não for Operador, exibe as opções normais
+                              linha.status === 'Pendente' ? (
+                                statusBloqueado ? (
+                                  <div 
+                                    title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} 
+                                    style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '6px 12px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: '600' }}
+                                  >
+                                    <AlertCircle size={14} /> Aguardando NF
+                                  </div>
+                                ) : (
+                                  <button 
+                                    className="btn-aprovar-acao" 
+                                    style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '20px', padding: '6px 16px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      lidarComMudancaStatus(linha.idOriginal || linha.id, 'Em Separação');
+                                    }}
+                                  >
+                                    <RefreshCw size={14} /> Aprovar
+                                  </button>
+                                )
+                              ) : (
+                                <select
+                                  className="select-acao"
+                                  value={linha.status}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value);
+                                  }}
+                                  style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '20px', backgroundColor: '#f8fafc', fontSize: '0.875rem', color: '#334155', outline: 'none', cursor: 'pointer' }}
+                                >
+                                  <option value="Pendente" disabled>Pendente</option>
+                                  <option value="Em Separação">Em Separação</option>
+                                  <option value="Concluído">Concluído</option>
+                                  <option value="Cancelado">Cancelado</option>
+                                  <option value="Recusado">Recusado</option>
+                                </select>
+                              )
                             )}
                           </td>
                         )}
@@ -514,9 +521,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             <DetalhesSolicitacao
                               item={linha}
                               perfil={perfil}
-                              onDeleteAnexo={(anexo) => handleDeletarAnexo(linha.idOriginal, anexo)}
+                              // 🔒 Se for operador, não permite deletar anexo
+                              onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined}
                             />
-                            {perfil === "logistica" && (
+                            
+                            {/* 🔒 Se for operador, oculta a área de anexos extras */}
+                            {perfil === "logistica" && !isOperador && (
                               <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
                                 <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
                                 <GerenciadorAnexos

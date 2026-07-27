@@ -53,15 +53,8 @@ export default function PainelAprovacao() {
           const dadosFormatados = resultadoSol.dados
             .filter(item => item.status === 'Pendente')
             .map((item) => {
-              let prefixo = 'PS';
-              if (item.tipo === 'Crossdocking') prefixo = 'CD';
-              else if (item.tipo === 'Nota Fiscal') prefixo = 'NF';
-              else if (item.tipo === 'Transferencia WBS') prefixo = 'TR';
-              else if (item.tipo === 'Reintegracao') prefixo = 'REI';
-              else if (item.tipo === 'Entrada') prefixo = 'ENT';
-
-              const idNumerico = item.id.replace(/\D/g, '');
-
+              // 👇 Toda aquela gambiarra de prefixos e limpar o ID sumiu daqui!
+              
               let valorTotal = 0;
               let centro = '-';
               let dep = '-';
@@ -73,9 +66,9 @@ export default function PainelAprovacao() {
 
               return {
                 ...item,
-                idOriginal: item.id,
-                id: idNumerico || item.id,
-                prefixo: prefixo,
+                idOriginal: item.id, // O UUID longo que o backend precisa para salvar
+                ps: item.ps || 'PS-Pendente', // 👈 Pega o PS real do banco
+                bs: item.bs || null,          // 👈 Pega o BS (se já existir)
                 dataSolicitacao: item.dataSolicitacao || '-',
                 valorTotalFormatado: valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : null,
                 centro,
@@ -99,7 +92,8 @@ export default function PainelAprovacao() {
   const dadosFiltrados = dadosTabela.filter((linha) => {
     const termoLower = termoPesquisa.toLowerCase();
     return (
-      linha.id.toString().toLowerCase().includes(termoLower) ||
+      // 👇 Ajustado para pesquisar pelo novo PS em vez do ID antigo
+      (linha.ps && linha.ps.toLowerCase().includes(termoLower)) ||
       (linha.solicitante && linha.solicitante.toLowerCase().includes(termoLower)) ||
       (linha.wbs && linha.wbs.toLowerCase().includes(termoLower)) ||
       (linha.filial && linha.filial.toLowerCase().includes(termoLower)) 
@@ -180,7 +174,7 @@ export default function PainelAprovacao() {
 
   const handleAprovar = async (e, idOriginal) => {
     e.stopPropagation();
-    if (window.confirm(`Aprovar a solicitação ${idOriginal}?`)) {
+    if (window.confirm(`Aprovar esta solicitação?`)) {
       try {
         const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH', 
@@ -202,7 +196,7 @@ export default function PainelAprovacao() {
 
   const handleRecusar = async (e, idOriginal) => {
     e.stopPropagation();
-    const motivo = window.prompt(`Motivo da recusa para ${idOriginal}?`);
+    const motivo = window.prompt(`Motivo da recusa para esta solicitação?`);
     if (motivo) {
       try {
         const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
@@ -235,7 +229,7 @@ export default function PainelAprovacao() {
         <Search className="icone-pesquisa-dir" size={18} />
         <input 
           type="text" 
-          placeholder="Buscar por ID, WBS, Filial ou Solicitante..." 
+          placeholder="Buscar por PS, WBS, Filial ou Solicitante..." 
           value={termoPesquisa} 
           onChange={(e) => setTermoPesquisa(e.target.value)} 
         />
@@ -286,7 +280,8 @@ export default function PainelAprovacao() {
                         
                         <div className="item-info-principal">
                           <div className="item-linha-id">
-                            {linha.prefixo}:{linha.id}
+                            {/* 👇 Exibindo o NOVO PS */}
+                            {linha.ps}
                             <span className="badge-tipo-lista azul">{linha.tipo}</span>
                             
                             {linha.filial && linha.filial !== '-' && (
@@ -424,7 +419,8 @@ export default function PainelAprovacao() {
                         
                         <div className="item-info-principal">
                           <div className="item-linha-id">
-                            {linha.prefixo}:{linha.id}
+                            {/* 👇 Exibindo o NOVO PS */}
+                            {linha.ps}
                             <span className="badge-tipo-lista verde">Entrada</span>
                             
                             {linha.filial && linha.filial !== '-' && (
@@ -549,7 +545,7 @@ export default function PainelAprovacao() {
             </div>
             
             <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '20px' }}>
-              Ajuste as informações de armazenamento da solicitação <strong>{solicitacaoSendoEditada?.prefixo}:{solicitacaoSendoEditada?.id}</strong>.
+              Ajuste as informações de armazenamento da solicitação <strong>{solicitacaoSendoEditada?.ps}</strong>.
             </p>
 
             <div style={{ marginBottom: '16px' }}>
