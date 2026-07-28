@@ -1,20 +1,26 @@
-import React, { useState } from 'react';
-import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText } from 'lucide-react'; // 👈 FileText importado para o ícone da NF
+import React, { useState, useContext } from 'react'; // ✨ CORREÇÃO 1: Adicionado o useContext aqui
+import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText } from 'lucide-react'; 
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 // IMPORTAÇÕES PARA OS ANEXOS FUNCIONAREM
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { supabase } from '../../../supabaseClient';
 
+// ✨ CORREÇÃO 2: Importar o AuthContext para saber a filial
+import { AuthContext } from '../../../contexts/AuthContext';
+
 import './Crossdocking.css';
 
 export default function Crossdocking() {
+  // ✨ CORREÇÃO 3: Puxamos a filial global (estoqueAtual)
+  const { estoqueAtual } = useContext(AuthContext);
+
   // 1. ESTADO: Dados gerais do formulário
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
     observacoes: '',
-    nf: '' // ✨ NOVO: Estado para guardar o número da Nota Fiscal
+    nf: '' 
   });
   
   // Estado para o tipo de saída (parcial ou total)
@@ -52,19 +58,16 @@ export default function Crossdocking() {
 
   // 2. FUNÇÃO DE ENVIO PARA O BACKEND (NODE.JS)
   const handleEnviar = async () => {
-    // ✨ NOVO: Validação agora inclui a NF
     if (!formDados.nome || !formDados.wbs || !formDados.nf || !tipoSaida) {
       alert("Por favor, preencha o Nome, WBS, Número da NF e selecione o Tipo de Saída.");
       return;
     }
 
-    // Validação da Nota Fiscal em anexo (obrigatório para Crossdocking)
     if (anexos.length === 0) {
       alert("A anexação do documento da Nota Fiscal (PDF ou XML) é obrigatória para operações de Crossdocking.");
       return;
     }
 
-    // Se for parcial, valida se preencheu os itens da tabela
     if (tipoSaida === 'parcial') {
       const temItemIncompleto = itensParciais.some(i => !i.desenhoSAP || !i.quantidade);
       if (temItemIncompleto) {
@@ -103,7 +106,6 @@ export default function Crossdocking() {
     }
     // =========================================================
 
-    // Prepara os itens para o payload (se for total, vai lista vazia; se parcial, mapeia)
     const listaItensFinais = tipoSaida === 'total' 
       ? [] 
       : itensParciais.map(i => ({
@@ -112,17 +114,18 @@ export default function Crossdocking() {
           unidade_medida_manual: i.unidade
         }));
 
-    // Prepara o pacote com o tipo correspondente para o banco de dados
     const payload = {
       solicitante: {
         nome: formDados.nome,
         wbs: formDados.wbs,
-        nf: formDados.nf, // ✨ NOVO: A NF viaja aqui para o Backend
+        nf: formDados.nf, 
         observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'}] ${formDados.observacoes}`,
-        tipo: 'Crossdocking'
+        tipo: 'Crossdocking',
+        // ✨ CORREÇÃO 4: Injetamos a filial aqui para o Backend gravar corretamente!
+        filial_origem: estoqueAtual || 'BR06'
       },
       itens: listaItensFinais,
-      anexos: anexosProcessados // Mandamos os links gerados para o backend
+      anexos: anexosProcessados 
     };
 
     try {
@@ -135,12 +138,12 @@ export default function Crossdocking() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        alert(`Sucesso! Solicitação de Crossdocking enviada. ID: ${dados.ps_id}`);
-        // Limpa os campos após o sucesso
+        // ✨ CORREÇÃO 5: Usamos dados.ps em vez de dados.ps_id, de acordo com o teu backend
+        alert(`Sucesso! Solicitação de Crossdocking enviada. ID: ${dados.ps}`);
         setFormDados({ nome: '', wbs: '', observacoes: '', nf: '' });
         setTipoSaida(null);
         setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
-        setAnexos([]); // Limpa a lista de arquivos
+        setAnexos([]); 
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
       }
@@ -192,7 +195,6 @@ export default function Crossdocking() {
             />
           </div>
           
-          {/* ✨ NOVO: Campo obrigatório do Número da Nota Fiscal */}
           <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <FileText size={14} color="#2563eb" /> NÚMERO DA NOTA FISCAL *
@@ -258,7 +260,6 @@ export default function Crossdocking() {
                 </button>
               </div>
 
-              {/* Tabela de Itens Parciais */}
               <div className="scroll-tabela-solicitacao" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '8px 16px', backgroundColor: '#f8fafc' }}>
                 <table className="tabela-solicitacao-dados" style={{ minWidth: '100%' }}>
                   <thead>

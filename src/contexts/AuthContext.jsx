@@ -5,9 +5,10 @@ export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [usuario, setUsuario] = useState(null);
+  const [token, setToken] = useState(null); // ✨ CORREÇÃO 1: Adicionamos um estado para guardar o token na memória do React
   const [loading, setLoading] = useState(true);
   
-  // 👇 ALTA: Mude de 'ESTOQUE_1' para 'BR02'
+  // Mude de 'ESTOQUE_1' para 'BR02'
   const [estoqueAtual, setEstoqueAtual] = useState('BR02');
 
   // Verifica se já existe um usuário logado ao carregar a aplicação
@@ -18,6 +19,7 @@ export const AuthProvider = ({ children }) => {
 
     if (userSalvo && tokenSalvo) {
       setUsuario(JSON.parse(userSalvo));
+      setToken(tokenSalvo); // ✨ CORREÇÃO 2: Guardamos o token carregado do localStorage no estado
     }
     
     // Se o utilizador já tinha escolhido um estoque antes, recupera essa escolha
@@ -28,16 +30,20 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  // Função de Login simulada (ajuste conforme a sua chamada à API Node.js/Supabase)
-  const login = async (dadosUsuario, token) => {
+  // Função de Login (ajuste conforme a sua chamada à API Node.js/Supabase)
+  const login = async (dadosUsuario, tokenRecebido) => {
     setUsuario(dadosUsuario);
+    setToken(tokenRecebido); // ✨ CORREÇÃO 3: Salva o token no estado durante o login
+    
     localStorage.setItem('@NexusLog:user', JSON.stringify(dadosUsuario));
-    localStorage.setItem('@NexusLog:token', token);
+    localStorage.setItem('@NexusLog:token', tokenRecebido);
   };
 
   // Função de Logout
   const logout = () => {
     setUsuario(null);
+    setToken(null); // ✨ CORREÇÃO 4: Limpa o token durante o logout
+    
     localStorage.removeItem('@NexusLog:user');
     localStorage.removeItem('@NexusLog:token');
   };
@@ -51,13 +57,14 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider 
       value={{ 
-        usuario, 
+        usuario,
+        token, // ✨ CORREÇÃO 5: Agora expomos o token para todas as outras telas usarem!
         signed: !!usuario, // Retorna true se houver usuário, false se for null
         loading, 
         login, 
         logout,
         estoqueAtual, 
-        setEstoqueAtual: mudarEstoque // Passamos a função customizada no lugar do setter padrão
+        setEstoqueAtual: mudarEstoque 
       }}
     >
       {children}
@@ -65,5 +72,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// 👇 AQUI ESTÁ A CORREÇÃO QUE FALTAVA!
+// Hook customizado para usar a Autenticação facilmente
 export const useAuth = () => useContext(AuthContext);

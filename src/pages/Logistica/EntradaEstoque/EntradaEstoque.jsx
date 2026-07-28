@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// ✅ Como deve ficar (Correção):
+import React, { useState, useEffect, useContext } from 'react';
 import './EntradaEstoque.css';
 import { 
   PackagePlus, 

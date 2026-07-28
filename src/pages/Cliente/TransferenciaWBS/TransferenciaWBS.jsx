@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import './TransferenciaWBS.css';
 import { Send, Trash2, Box } from 'lucide-react'; 
 
@@ -6,7 +6,13 @@ import GerenciadorAnexos from '../../../components/GerenciadorAnexos/Gerenciador
 import SeletorEstoqueLateral from '../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral';
 import { supabase } from '../../../supabaseClient';
 
+// 👇 1. Importamos o AuthContext para saber em qual Filial estamos
+import { AuthContext } from '../../../contexts/AuthContext';
+
 export default function TransferenciaWBS() {
+  // 👇 2. Puxamos a filial global (estoqueAtual)
+  const { estoqueAtual } = useContext(AuthContext);
+
   // --- 1. ESTADOS DO FORMULÁRIO E ITENS ---
   const [formDados, setFormDados] = useState({
     nome: '',
@@ -134,14 +140,15 @@ export default function TransferenciaWBS() {
       }
     }
 
-    // Mapeamos com base nas chaves reais do banco de dados (estoque)
+    // 👇 3. INJETAMOS A FILIAL NO PAYLOAD PARA O BACKEND ACEITAR
     const payload = {
       solicitante: {
         nome: formDados.nome,
         wbs: formDados.wbsDestino,
         observacoes: formDados.justificativa,
         entregaUrgente: formDados.entregaUrgente,
-        tipo: 'Transferencia WBS' 
+        tipo: 'Transferencia WBS',
+        filial_origem: estoqueAtual || 'BR06' // <-- A MÁGICA ESTÁ AQUI
       },
       itens: itensSelecionados.map(item => ({
         estoque_id: item.id,
@@ -164,7 +171,8 @@ export default function TransferenciaWBS() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        alert(`Sucesso! Transferência solicitada. ID: ${dados.ps_id}`);
+        // 👇 4. Correção visual: o Back-end envia "ps" e não "ps_id"
+        alert(`Sucesso! Transferência solicitada. PS Gerada: ${dados.ps}`);
         setFormDados({ nome: '', wbsDestino: '', justificativa: '', entregaUrgente: false });
         setItensSelecionados([]);
         setAnexos([]); 
@@ -179,7 +187,6 @@ export default function TransferenciaWBS() {
 
   return (
     <>
-      {/* Formulário Superior Mantido Igual */}
       <div className="form-cartao">
         <div className="form-grid">
           <div className="input-grupo">
@@ -221,7 +228,6 @@ export default function TransferenciaWBS() {
 
       <div className="transferencia-grid-inferior">
 
-        {/* 👇 O NOVO COMPONENTE ISOLADO FAZ TUDO AQUI! 👇 */}
         <SeletorEstoqueLateral 
           estoque={estoqueReal}
           carregando={carregandoEstoque}

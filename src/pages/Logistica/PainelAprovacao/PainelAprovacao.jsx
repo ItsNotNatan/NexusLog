@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import './PainelAprovacao.css';
 import { 
   Search, 
@@ -15,21 +15,23 @@ import {
   MapPin
 } from 'lucide-react';
 
+import { AuthContext } from '../../../contexts/AuthContext'; 
 import DetalhesSolicitacao from '../../Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao';
 
 export default function PainelAprovacao() {
+  const { token: tokenContexto, estoqueAtual } = useContext(AuthContext);
+  const token = tokenContexto || localStorage.getItem('token'); 
+
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]); 
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [linhaExpandida, setLinhaExpandida] = useState(null);
 
-  // 📝 ESTADOS PARA EDIÇÃO DO LOCAL
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const [solicitacaoSendoEditada, setSolicitacaoSendoEditada] = useState(null);
   const [dadosEdicao, setDadosEdicao] = useState({ filial: '', centro: '', deposito: '' });
 
-  // 📄 ESTADOS DE PAGINAÇÃO INDEPENDENTES (5 por página)
   const [paginaGeral, setPaginaGeral] = useState(1);
   const [paginaEntradas, setPaginaEntradas] = useState(1);
   const itensPorPagina = 5;
@@ -37,13 +39,63 @@ export default function PainelAprovacao() {
   useEffect(() => {
     const buscarDados = async () => {
       try {
+        setCarregando(true);
+        const cabecalhosComAuth = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+
+        const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?limit=1000&filial=${estoqueAtual || ''}&t=${Date.now()}`;
+        const urlEstoque = `http://localhost:3001/api/estoque/listar?t=${Date.now()}`;
+
         const [resSolicitacoes, resEstoque] = await Promise.all([
-          fetch('http://localhost:3001/api/solicitacoes/listar'),
-          fetch('http://localhost:3001/api/estoque/listar')
+          fetch(urlSolicitacoes, { headers: cabecalhosComAuth, cache: 'no-store' }),
+          fetch(urlEstoque, { headers: cabecalhosComAuth, cache: 'no-store' })
         ]);
 
         const resultadoSol = await resSolicitacoes.json();
         const resultadoEst = await resEstoque.json();
+
+        // =========================================================
+        // 🚨 INÍCIO DO TROUBLESHOOTING (APENAS ALERT) 🚨
+        // =========================================================
+        
+        if (resultadoSol.sucesso) {
+          const totalPedidos = resultadoSol.dados ? resultadoSol.dados.length : 0;
+          
+          let qtdPendentes = 0;
+          let qtdEntradas = 0;
+          let amostraTipos = [];
+
+          // Analisa rapidamente os dados para gerar o relatório no alert
+          if (totalPedidos > 0) {
+            resultadoSol.dados.forEach(item => {
+              if (item.status === 'Pendente') qtdPendentes++;
+              if (String(item.tipo).trim() === 'Entrada') qtdEntradas++;
+              
+              // Guarda os primeiros 3 tipos encontrados para debug
+              if (amostraTipos.length < 3 && item.tipo) {
+                amostraTipos.push(`"${item.tipo}"`);
+              }
+            });
+          }
+
+          // Constrói a mensagem visual
+          const mensagemAlerta = `🔍 DIAGNÓSTICO DO PAINEL:\n\n` +
+            `📍 Filial Ativa (estoqueAtual): ${estoqueAtual || 'NENHUMA (vazio)'}\n` +
+            `📦 Total recebido do servidor: ${totalPedidos}\n` +
+            `⏳ Total com status 'Pendente': ${qtdPendentes}\n` +
+            `📥 Total do tipo 'Entrada': ${qtdEntradas}\n\n` +
+            `Exemplos de tipos recebidos: ${amostraTipos.length > 0 ? amostraTipos.join(', ') : 'Nenhum'}`;
+            
+          alert(mensagemAlerta);
+        } else {
+          alert(`❌ ERRO NO BACKEND:\nO servidor respondeu, mas disse que não teve sucesso. Motivo: ${resultadoSol.erro || 'Desconhecido'}`);
+        }
+        
+        // =========================================================
+        // 🚨 FIM DO TROUBLESHOOTING 🚨
+        // =========================================================
 
         if (resEstoque.ok && resultadoEst.sucesso) {
           setEstoque(resultadoEst.dados);
@@ -53,12 +105,12 @@ export default function PainelAprovacao() {
           const dadosFormatados = resultadoSol.dados
             .filter(item => item.status === 'Pendente')
             .map((item) => {
-              // 👇 Toda aquela gambiarra de prefixos e limpar o ID sumiu daqui!
               
               let valorTotal = 0;
               let centro = '-';
               let dep = '-';
-              if (item.tipo === 'Entrada' && item.itens && item.itens.length > 0) {
+              
+              if (String(item.tipo).trim() === 'Entrada' && item.itens && item.itens.length > 0) {
                 valorTotal = item.itens.reduce((acc, it) => acc + (Number(it.quantidade_solicitada) * Number(it.valor_unitario_manual || 0)), 0);
                 centro = item.itens[0].centro || 'BR06';
                 dep = item.itens[0].deposito || '0020';
@@ -66,9 +118,9 @@ export default function PainelAprovacao() {
 
               return {
                 ...item,
-                idOriginal: item.id, // O UUID longo que o backend precisa para salvar
-                ps: item.ps || 'PS-Pendente', // 👈 Pega o PS real do banco
-                bs: item.bs || null,          // 👈 Pega o BS (se já existir)
+                idOriginal: item.id, 
+                ps: item.ps || 'PS-Pendente', 
+                bs: item.bs || null,          
                 dataSolicitacao: item.dataSolicitacao || '-',
                 valorTotalFormatado: valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : null,
                 centro,
@@ -80,19 +132,24 @@ export default function PainelAprovacao() {
           setDadosTabela(dadosFormatados);
         }
       } catch (error) {
-        console.error("Falha ao conectar à API:", error);
+        alert(`Falha ao conectar à API: ${error.message}`);
       } finally {
         setCarregando(false);
       }
     };
 
-    buscarDados();
-  }, []);
+    if (token) {
+      buscarDados();
+    } else {
+      setCarregando(false);
+      alert("⚠️ Utilizador não está autenticado. O token está vazio.");
+    }
+  }, [token, estoqueAtual]);
 
   const dadosFiltrados = dadosTabela.filter((linha) => {
+    if (!termoPesquisa) return true; 
     const termoLower = termoPesquisa.toLowerCase();
     return (
-      // 👇 Ajustado para pesquisar pelo novo PS em vez do ID antigo
       (linha.ps && linha.ps.toLowerCase().includes(termoLower)) ||
       (linha.solicitante && linha.solicitante.toLowerCase().includes(termoLower)) ||
       (linha.wbs && linha.wbs.toLowerCase().includes(termoLower)) ||
@@ -100,8 +157,8 @@ export default function PainelAprovacao() {
     );
   });
 
-  const entradasPendentes = dadosFiltrados.filter(item => item.tipo === 'Entrada');
-  const outrasPendentes = dadosFiltrados.filter(item => item.tipo !== 'Entrada');
+  const entradasPendentes = dadosFiltrados.filter(item => String(item.tipo).trim() === 'Entrada');
+  const outrasPendentes = dadosFiltrados.filter(item => String(item.tipo).trim() !== 'Entrada');
 
   const totalPaginasGeral = Math.max(1, Math.ceil(outrasPendentes.length / itensPorPagina));
   const indexPrimeiroGeral = (paginaGeral - 1) * itensPorPagina;
@@ -130,7 +187,6 @@ export default function PainelAprovacao() {
     setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
   };
 
-  // 🛠️ FUNÇÕES DE EDIÇÃO DO LOCAL
   const abrirModalEdicao = (linha) => {
     setSolicitacaoSendoEditada(linha);
     setDadosEdicao({
@@ -145,7 +201,6 @@ export default function PainelAprovacao() {
     if (!solicitacaoSendoEditada) return;
 
     try {
-      // 1. Atualização visual na tabela (Optimistic UI)
       setDadosTabela(prev => prev.map(item => {
         if (item.idOriginal === solicitacaoSendoEditada.idOriginal) {
           return { ...item, filial: dadosEdicao.filial, centro: dadosEdicao.centro, deposito: dadosEdicao.deposito };
@@ -153,10 +208,12 @@ export default function PainelAprovacao() {
         return item;
       }));
 
-      // 2. 🚀 Envio para o Banco de Dados através da nova rota
       const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${solicitacaoSendoEditada.idOriginal}/local`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify(dadosEdicao)
       });
 
@@ -168,7 +225,6 @@ export default function PainelAprovacao() {
       }
     } catch (error) {
       alert('Erro de conexão ao salvar as edições.');
-      console.error(error);
     }
   };
 
@@ -178,18 +234,23 @@ export default function PainelAprovacao() {
       try {
         const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH', 
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ status: 'Em Separação' }) 
         });
+        
         if (resposta.ok) {
           alert(`Solicitação aprovada!`);
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
         } else {
-          alert("Erro ao aprovar no servidor.");
+          const dadosErro = await resposta.json().catch(() => ({}));
+          alert(`Erro ao aprovar no servidor: ${dadosErro.erro || resposta.statusText}`);
         }
       } catch (error) {
-        alert("Erro de conexão.");
+        alert("Erro de conexão com o servidor.");
       }
     }
   };
@@ -201,9 +262,13 @@ export default function PainelAprovacao() {
       try {
         const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH', 
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ status: 'Recusado', motivo_recusa: motivo }) 
         });
+        
         if (resposta.ok) {
           alert(`Solicitação recusada.`);
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
@@ -242,9 +307,7 @@ export default function PainelAprovacao() {
         </div>
       ) : (
         <>
-          {/* ======================================================== */}
-          {/* SECÇÃO 1: SOLICITAÇÕES GERAIS (Amarelo)                  */}
-          {/* ======================================================== */}
+          {/* SECÇÃO 1: SOLICITAÇÕES GERAIS (Amarelo) */}
           <div className="seccao-painel tema-amarelo">
             <div className="seccao-header borda-amarela">
               <div className="seccao-titulo amarelo">
@@ -280,7 +343,6 @@ export default function PainelAprovacao() {
                         
                         <div className="item-info-principal">
                           <div className="item-linha-id">
-                            {/* 👇 Exibindo o NOVO PS */}
                             {linha.ps}
                             <span className="badge-tipo-lista azul">{linha.tipo}</span>
                             
@@ -309,7 +371,6 @@ export default function PainelAprovacao() {
 
                         <div className="item-acoes-grupo">
                           
-                          {/* Botão Editar Localização */}
                           <button className="btn-acao-lista" style={{ color: '#475569' }} onClick={() => abrirModalEdicao(linha)}>
                             <Edit2 size={16} /> Editar Local
                           </button>
@@ -344,7 +405,6 @@ export default function PainelAprovacao() {
                   );
                 })}
 
-                {/* CONTROLE DE PAGINAÇÃO */}
                 {totalPaginasGeral > 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 8px 8px' }}>
                     <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
@@ -388,9 +448,7 @@ export default function PainelAprovacao() {
             )}
           </div>
 
-          {/* ======================================================== */}
-          {/* SECÇÃO 2: ENTRADAS DE ESTOQUE (Verde)                    */}
-          {/* ======================================================== */}
+          {/* SECÇÃO 2: ENTRADAS DE ESTOQUE (Verde) */}
           <div className="seccao-painel tema-verde">
             <div className="seccao-header borda-verde">
               <div className="seccao-titulo verde">
@@ -419,7 +477,6 @@ export default function PainelAprovacao() {
                         
                         <div className="item-info-principal">
                           <div className="item-linha-id">
-                            {/* 👇 Exibindo o NOVO PS */}
                             {linha.ps}
                             <span className="badge-tipo-lista verde">Entrada</span>
                             
@@ -450,7 +507,6 @@ export default function PainelAprovacao() {
 
                         <div className="item-acoes-grupo">
                           
-                          {/* Botão Editar Localização */}
                           <button className="btn-acao-lista" style={{ color: '#475569' }} onClick={() => abrirModalEdicao(linha)}>
                             <Edit2 size={16} /> Editar Local
                           </button>
@@ -476,7 +532,6 @@ export default function PainelAprovacao() {
                   );
                 })}
 
-                {/* CONTROLE DE PAGINAÇÃO */}
                 {totalPaginasEntradas > 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 8px 8px' }}>
                     <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
@@ -522,9 +577,6 @@ export default function PainelAprovacao() {
         </>
       )}
 
-      {/* ======================================================== */}
-      {/* MODAL DE EDIÇÃO DE ESTOQUE (FILIAL/CENTRO/DEPÓSITO)      */}
-      {/* ======================================================== */}
       {modalEdicaoAberto && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
