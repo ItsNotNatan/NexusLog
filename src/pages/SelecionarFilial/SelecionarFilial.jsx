@@ -2,8 +2,11 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './SelecionarFilial.css';
 import { Building2, MapPin, ChevronRight, ArrowLeft } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function SelecionarFilial() {
+  // Puxamos a função que atualiza a variável global de filial
+  const { setEstoqueAtual } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -17,10 +20,16 @@ export default function SelecionarFilial() {
     { id: 'BR06', nome: 'BR06 — Betim', cidade: 'Betim, MG', cor: 'roxo' }
   ];
 
+  // 🛠️ NOVA FUNÇÃO: Lida com o clique e faz as duas ações necessárias
+  const handleSelecionar = (filialId) => {
+    setEstoqueAtual(filialId); // 1. Atualiza o cabeçalho e o contexto global
+    navigate(rotaDestino);     // 2. Navega para a página desejada
+  };
+
   return (
     <div className="selecionar-filial-container">
       
-      {/* NOVO: Envolvendo o botão com o max-width para manter o alinhamento */}
+      {/* Botão de voltar */}
       <div style={{ width: '100%', maxWidth: '42rem' }}>
         <button 
           className="btn-voltar-areas" 
@@ -46,8 +55,8 @@ export default function SelecionarFilial() {
           <div 
             key={filial.id} 
             className="cartao-filial"
-            // Ao clicar, navega para a rota que trouxemos na memória!
-            onClick={() => navigate(rotaDestino)}
+            // 👇 AQUI ESTÁ A MÁGICA: Agora chamamos a nossa nova função!
+            onClick={() => handleSelecionar(filial.id)}
           >
             <div className={`bloco-icone ${filial.cor === 'azul' ? 'bloco-azul' : 'bloco-roxo'}`}>
               <MapPin size={20} strokeWidth={2.5} />

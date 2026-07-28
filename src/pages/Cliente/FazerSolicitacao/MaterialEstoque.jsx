@@ -9,6 +9,9 @@ import {
   Zap
 } from "lucide-react";
 
+import { useContext } from 'react';
+import { AuthContext } from '../../../contexts/AuthContext';
+
 // NOSSOS COMPONENTES E HOOKS
 import ModalProcessamento from "../../../components/ModalProcessamento/ModalProcessamento";
 import { useProcessadorExcel } from "../../../hooks/useProcessadorExcel";
@@ -18,6 +21,9 @@ import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/Sel
 import { supabase } from "../../../supabaseClient";
 
 export default function MaterialEstoque() {
+
+  const { estoqueAtual } = useContext(AuthContext);
+
   const [formDados, setFormDados] = useState({
     nome: "",
     wbs: "",
@@ -55,7 +61,7 @@ export default function MaterialEstoque() {
         const resultado = await resposta.json();
 
         if (resposta.ok && resultado.sucesso) {
-          
+
           const itensComSaldo = resultado.dados
             .filter((item) => item.quantidade_disponivel > 0)
             .map((item) => ({
@@ -71,7 +77,7 @@ export default function MaterialEstoque() {
               vendorDescription: item.descricao_manual || item.descricao || "-",
               wbs: item.wbs_element || item.wbs || "-",
               alocacao: item.alocacao || "-",
-              isTransferencia: item.is_transferencia || false 
+              isTransferencia: item.is_transferencia || false
             }));
 
           setEstoqueDisponivel(itensComSaldo);
@@ -109,7 +115,7 @@ export default function MaterialEstoque() {
     setItensSelecionados((prev) => [
       ...prev,
       {
-        id: `manual-${Date.now()}-${index}`, 
+        id: `manual-${Date.now()}-${index}`,
         estoque_id: item.idBD || null,
         ...item,
         qtdSelecionada: 1,
@@ -136,7 +142,7 @@ export default function MaterialEstoque() {
     const itensIncompletos = itensSelecionados.some(
       (i) => !i.numPecaFabricante || !i.materialDescription || !i.qtdSelecionada
     );
-    
+
     if (itensIncompletos) {
       alert("Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela.");
       return;
@@ -166,8 +172,11 @@ export default function MaterialEstoque() {
       }
     }
 
-    const payload = {
-      solicitante: formDados,
+const payload = {
+      solicitante: {
+        ...formDados,
+        filial_origem: estoqueAtual // 👈 ADICIONA ESTA LINHA PARA O BACKEND SABER A FILIAL
+      },
       itens: itensSelecionados,
       anexos: anexosProcessados,
     };
@@ -256,10 +265,11 @@ export default function MaterialEstoque() {
             </label>
             <div className="input-wrapper-fixo">
               <MapPin size={16} className="icone-dentro-input" />
+              {/* 👇 ALTERAÇÃO AQUI: value={estoqueAtual} em vez do texto fixo */}
               <input
                 type="text"
                 className="input-campo"
-                value="BR04 — Goiana, PE"
+                value={estoqueAtual}
                 readOnly
               />
               <span className="badge-fixo">Fixo</span>
@@ -367,9 +377,9 @@ export default function MaterialEstoque() {
       </div>
 
       <div className="selecao-itens-grid">
-        
+
         {/* 👇 O NOVO COMPONENTE ISOLADO FAZ TUDO AQUI! 👇 */}
-        <SeletorEstoqueLateral 
+        <SeletorEstoqueLateral
           estoque={estoqueDisponivel}
           carregando={carregandoEstoque}
           onAdicionarItem={adicionarManualmente}

@@ -239,6 +239,7 @@ export default function EntradaMaterial() {
           </div>
           
           {/* ✨ NOVO DROPDOWN PARA O ESTOQUE */}
+{/* APAGA ESTE BLOCO INTEIRO DO TEU CÓDIGO HTML */}
           <div className="input-grupo">
             <label>ESTOQUE / FILIAL *</label>
             <select

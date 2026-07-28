@@ -17,11 +17,13 @@ import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
+import { AuthContext } from '../../../contexts/AuthContext';
 
 // Cliente do Supabase
 import { supabase } from '../../../supabaseClient';
 
 export default function EntradaEstoque() {
+  const { estoqueAtual } = useContext(AuthContext);
   // 1. ESTADO: Dados gerais do formulário
   const [formDados, setFormDados] = useState({
     nome: '',
@@ -159,11 +161,14 @@ export default function EntradaEstoque() {
       }
 
       // Mapeamos os dados finais
+// Mapeamos os dados finais
       const payload = {
         solicitante: {
           ...formDados,
-          tipo: 'Entrada'
+          tipo: 'Entrada',
+          filial_id: estoqueAtual // 👈 INJETA A FILIAL AUTOMATICAMENTE AQUI
         },
+        // ... resto do payload (itens, anexos)
         itens: itens.map(item => ({
           ...item,
           // 👇 AQUI ESTÁ A ALTERAÇÃO: Limpamos os espaços vazios da NF antes de enviar

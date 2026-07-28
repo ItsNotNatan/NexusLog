@@ -14,6 +14,9 @@ import {
   AlertCircle
 } from "lucide-react";
 
+// Adiciona esta linha junto aos outros imports no topo
+import { useContext } from 'react';
+import { AuthContext } from '../../../contexts/AuthContext';
 import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import { supabase } from "../../../supabaseClient";
@@ -71,8 +74,9 @@ const obterClasseBadgeTipo = (tipo) => {
 
 // --- COMPONENTE PRINCIPAL ---
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
+  const { estoqueAtual } = useContext(AuthContext);
   const [dadosTabela, setDadosTabela] = useState([]);
-  const [estoque, setEstoque] = useState([]); 
+  const [estoque, setEstoque] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [termoPesquisa, setTermoPesquisa] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -83,17 +87,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   // 📄 CONTROLE DE PAGINAÇÃO REAL
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [totalRegistros, setTotalRegistros] = useState(0); 
+  const [totalRegistros, setTotalRegistros] = useState(0);
   const itensPorPagina = 10;
 
   // Lemos o Usuário e o Token corretamente
   const usuarioLogado = JSON.parse(localStorage.getItem('@NexusLog:user')) || {};
   const token = localStorage.getItem('@NexusLog:token') || '';
-  
+
   const textoCargo = String(
-    usuarioLogado.cargo || 
-    usuarioLogado.perfil || 
-    usuarioLogado.user?.cargo || 
+    usuarioLogado.cargo ||
+    usuarioLogado.perfil ||
+    usuarioLogado.user?.cargo ||
     ''
   ).toLowerCase().trim();
 
@@ -114,11 +118,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const buscarDados = async () => {
       try {
         setCarregando(true);
-        
-        const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
-        
-        const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}`;
 
+        const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
+
+        // 👇 ALTERAÇÃO AQUI: Adicionamos &filial=${estoqueAtual} no final da URL
+        const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}&filial=${estoqueAtual}`;
+
+        // ... resto do código do fetch (mantém igual) ...
         const opcoesFetch = {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -168,12 +174,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataSolicitacao: item.dataSolicitacao || "-",
               dataEntrega: item.dataEntrega || "-",
               bs: item.bs || "-",
-              nfCrossdocking: item.nfCrossdocking || null 
+              nfCrossdocking: item.nfCrossdocking || null
             };
           });
 
           setDadosTabela(dadosFormatados);
-          setTotalRegistros(resultadoSol.total || resultadoSol.dados.length); 
+          setTotalRegistros(resultadoSol.total || resultadoSol.dados.length);
         } else {
           console.error("Erro retornado do servidor:", resultadoSol.erro);
           alert(`Erro Operacional: ${resultadoSol.erro || 'Falha ao buscar dados.'}`);
@@ -191,7 +197,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     } else {
       setCarregando(false);
     }
-  }, [paginaAtual, filtroAtivo, filtroStatus, termoPesquisa, token]); 
+  }, [paginaAtual, filtroAtivo, filtroStatus, termoPesquisa, token, estoqueAtual]);
 
   useEffect(() => {
     setPaginaAtual(1);
@@ -203,13 +209,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     let motivo = null;
     if (novoStatus === 'Recusado' || novoStatus === 'Cancelado') {
       motivo = window.prompt("Por favor, informe o motivo:");
-      if (!motivo) return; 
+      if (!motivo) return;
     }
 
     try {
       const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/status`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -219,11 +225,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (resposta.ok) {
         setDadosTabela(prev => prev.map(sol => {
           if (sol.idOriginal === idSolicitacao) {
-            return { 
-              ...sol, 
-              status: novoStatus, 
-              acaoValor: novoStatus, 
-              acaoTipo: novoStatus === 'Pendente' ? 'botao' : 'select' 
+            return {
+              ...sol,
+              status: novoStatus,
+              acaoValor: novoStatus,
+              acaoTipo: novoStatus === 'Pendente' ? 'botao' : 'select'
             };
           }
           return sol;
@@ -258,7 +264,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (!window.confirm(`Tem a certeza que deseja apagar permanentemente o ficheiro "${anexo.nome_arquivo}"?`)) return;
 
     try {
-      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/anexo/${anexo.id}`, { 
+      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/anexo/${anexo.id}`, {
         method: "DELETE",
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -311,7 +317,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
       const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/anexos`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -324,7 +330,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         alert("Sucesso! Novos anexos integrados na base de dados.");
         setAnexosNovos([]);
         setLinhaExpandida(null);
-        window.location.reload(); 
+        window.location.reload();
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
       }
@@ -341,8 +347,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       <header className="acompanhamento-cabecalho">
         <h1>{perfil === "logistica" ? "Painel Geral de Solicitações" : "Acompanhamento de Solicitações"}</h1>
         <p>
-          {perfil === "logistica" 
-            ? "Gerencie todas as solicitações — materiais, WBS, NFs, entradas, crossdocking e reintegrações" 
+          {perfil === "logistica"
+            ? "Gerencie todas as solicitações — materiais, WBS, NFs, entradas, crossdocking e reintegrações"
             : "Visualize todas as solicitações abertas do sistema"}
         </p>
       </header>
@@ -502,15 +508,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             ) : (
                               linha.status === 'Pendente' ? (
                                 statusBloqueado ? (
-                                  <div 
-                                    title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} 
+                                  <div
+                                    title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`}
                                     style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '6px 12px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: '600' }}
                                   >
                                     <AlertCircle size={14} /> Aguardando NF
                                   </div>
                                 ) : (
-                                  <button 
-                                    className="btn-aprovar-acao" 
+                                  <button
+                                    className="btn-aprovar-acao"
                                     style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '20px', padding: '6px 16px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -550,7 +556,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               perfil={perfil}
                               onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined}
                             />
-                            
+
                             {perfil === "logistica" && !isOperador && (
                               <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
                                 <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
@@ -587,11 +593,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
               Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosTabela.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistros)}</strong> de <strong>{totalRegistros}</strong> resultados
             </div>
-            
+
             <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button 
-                className="btn-paginacao" 
-                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} 
+              <button
+                className="btn-paginacao"
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
                 disabled={paginaAtual === 1 || carregando}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}
               >
@@ -601,7 +607,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               {Array.from({ length: totalPaginas }, (_, index) => {
                 const numeroPagina = index + 1;
                 const ehAtiva = paginaAtual === numeroPagina;
-                
+
                 return (
                   <button
                     key={numeroPagina}
@@ -609,7 +615,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                     disabled={carregando}
                     style={{
                       padding: '6px 12px',
-                      backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', 
+                      backgroundColor: ehAtiva ? '#ea580c' : '#ffffff',
                       color: ehAtiva ? '#ffffff' : '#334155',
                       border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`,
                       borderRadius: '6px',
@@ -624,9 +630,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 );
               })}
 
-              <button 
-                className="btn-paginacao" 
-                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} 
+              <button
+                className="btn-paginacao"
+                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
                 disabled={paginaAtual === totalPaginas || carregando || dadosTabela.length === 0}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || dadosTabela.length === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || dadosTabela.length === 0) ? 0.6 : 1 }}
               >
