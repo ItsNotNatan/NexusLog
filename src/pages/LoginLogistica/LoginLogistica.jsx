@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './LoginLogistica.css';
-import { Hexagon, Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
+// 👇 1. Adicionámos o ícone ArrowLeft aqui
+import { Hexagon, Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import { useAuth } from '../../contexts/AuthContext'; 
 
@@ -39,7 +40,7 @@ export default function LoginLogistica() {
         throw new Error('Acesso negado. Este portal é exclusivo para a equipe de Logística.');
       }
 
-      // CORREÇÃO APLICADA: Agora passamos o utilizador E o token para o contexto!
+      // Passamos o utilizador E o token para o contexto
       await login(data.usuario, data.token);
       
       // Redireciona o utilizador após guardar os dados com sucesso
@@ -52,10 +53,39 @@ export default function LoginLogistica() {
     }
   };
 
+  // 👇 2. Função simples para voltar à página inicial
+  const handleVoltar = () => {
+    navigate('/');
+  };
+
   return (
     <div className="login-page-wrapper">
       <div className="login-card">
         
+        {/* 👇 3. Botão de Voltar adicionado no topo do cartão */}
+        <button 
+          onClick={handleVoltar}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            background: 'none', 
+            border: 'none', 
+            color: '#64748b', 
+            cursor: 'pointer', 
+            marginBottom: '24px', 
+            fontSize: '0.875rem', 
+            fontWeight: '600',
+            padding: 0,
+            transition: 'color 0.2s'
+          }}
+          onMouseOver={(e) => e.target.style.color = '#334155'}
+          onMouseOut={(e) => e.target.style.color = '#64748b'}
+        >
+          <ArrowLeft size={18} />
+          Voltar ao Início
+        </button>
+
         <div className="login-logo-seccao">
           <div className="login-logo-icone"><Hexagon size={32} /></div>
           <h2>NexusLog</h2>

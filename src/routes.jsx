@@ -28,29 +28,23 @@ export const router = createBrowserRouter([
   { path: "/login", element: <LoginLogistica /> },
 
   // ==========================================
-  // ÁREA DO CLIENTE (AGORA PROTEGIDA!)
+  // 🟢 ÁREA DO CLIENTE (AGORA PÚBLICA / LIVRE DE LOGIN)
   // ==========================================
   {
     path: "/cliente",
-    // 🛡️ 1º Escudo do Cliente: Verifica se o utilizador está logado. 
-    // NOTA: Se os teus clientes tiverem uma "role" específica no teu sistema (ex: 'CLIENTE'), 
-    // podes adicionar allowedRoles={['CLIENTE']} tal como na logística.
-    element: <ProtectedRoute />, 
+    // 👇 MUDANÇA AQUI: Removemos o <ProtectedRoute />
+    // O utilizador entra direto no AppLayout do cliente
+    element: <AppLayout modulo="cliente" />, 
     children: [
-      {
-        element: <AppLayout modulo="cliente" />,
-        children: [
-          { path: "consulta-estoque", element: <VisaoGeralEstoque perfil="cliente" /> },
-          { path: "fazer-solicitacao", element: <FazerSolicitacao /> },
-          { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes perfil="cliente" /> },
-          { path: "rastreabilidade", element: <Traceabilly perfil="cliente" /> }
-        ]
-      }
+      { path: "consulta-estoque", element: <VisaoGeralEstoque perfil="cliente" /> },
+      { path: "fazer-solicitacao", element: <FazerSolicitacao /> },
+      { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes perfil="cliente" /> },
+      { path: "rastreabilidade", element: <Traceabilly perfil="cliente" /> }
     ]
   },
 
   // ==========================================
-  // ÁREA DA LOGÍSTICA (PROTEGIDA!)
+  // 🔴 ÁREA DA LOGÍSTICA (PROTEGIDA!)
   // ==========================================
   {
     path: "/logistica",
