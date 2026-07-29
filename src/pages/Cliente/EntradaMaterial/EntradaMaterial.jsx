@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react'; // ✨ 1. Adicionámos o useContext
 import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react';
 
 // NOSSOS COMPONENTES E HOOKS
@@ -9,14 +9,17 @@ import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal
 
 // Cliente do Supabase
 import { supabase } from '../../../supabaseClient';
+import { AuthContext } from '../../../contexts/AuthContext'; // ✨ 2. Importámos o Contexto Global
 
 export default function EntradaMaterial() {
-  // 1. ESTADO: Dados gerais do formulário
+  // ✨ 3. Puxamos a informação do armazém selecionado lá no Header
+  const { estoqueAtual } = useContext(AuthContext);
+
+  // 1. ESTADO: Dados gerais do formulário (Limpo, sem filial_id)
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
-    observacoes: '',
-    filial_id: '' // 👈 Campo que vai guardar o estoque escolhido
+    observacoes: ''
   });
 
   // ESTADO E EFFECT: Lógica exata do RequestForm para travar o calendário
@@ -117,9 +120,15 @@ export default function EntradaMaterial() {
 
   // --- ENVIO PARA O BACKEND (NODE.JS) ---
   const handleEnviar = async () => {
-    // Validação que estava a falhar (agora vai passar porque temos o campo visual)
-    if (!formDados.nome || !formDados.wbs || !formDados.filial_id) {
-      alert("Preencha o Nome, WBS e selecione o Estoque de destino.");
+    // ✨ 4. NOVA TRAVA: Verifica o cabeçalho antes de deixar enviar!
+    if (!estoqueAtual || estoqueAtual === 'TODOS') {
+      alert("Por favor, selecione em qual filial você está dando entrada (ex: BR02) lá no topo da página antes de enviar.");
+      return;
+    }
+
+    // Validação ajustada para não pedir mais o filial_id no formDados
+    if (!formDados.nome || !formDados.wbs) {
+      alert("Preencha o Nome e o WBS do solicitante.");
       return;
     }
 
@@ -170,9 +179,11 @@ export default function EntradaMaterial() {
         }
       }
 
+      // ✨ 5. O SEGREDO: Injetamos o estoqueAtual diretamente no payload!
       const payload = {
         solicitante: {
           ...formDados,
+          filial_id: estoqueAtual, // 👈 Pega a informação do cabeçalho automaticamente
           tipo: 'Entrada'
         },
         itens: itens.map(item => ({
@@ -193,8 +204,8 @@ export default function EntradaMaterial() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        alert(`Sucesso! Solicitação de Entrada enviada.\nNúmero de acompanhamento: ${dados.ps}`);
-        setFormDados({ nome: '', wbs: '', observacoes: '', filial_id: '' });
+        alert(`Sucesso! Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps}`);
+        setFormDados({ nome: '', wbs: '', observacoes: '' });
         setItens([gerarLinhaVazia()]);
         setAnexos([]);
       } else {
@@ -249,20 +260,7 @@ export default function EntradaMaterial() {
             />
           </div>
 
-          {/* ✨ NOVO CAMPO VISUAL ADICIONADO AQUI: Seleção da Filial */}
-          <div className="input-grupo">
-            <label>ESTOQUE DE DESTINO *</label>
-            <select
-              className="input-campo foco-verde"
-              value={formDados.filial_id}
-              onChange={(e) => setFormDados({ ...formDados, filial_id: e.target.value })}
-            >
-              <option value="">Selecione o Estoque...</option>
-              <option value="BR02">BR02 — Santo André (SP)</option>
-              <option value="BR04">BR04 — Goiana (PE)</option>
-              <option value="BR06">BR06 — Betim (MG)</option>
-            </select>
-          </div>
+          {/* ✨ O CAMPO VISUAL FOI REMOVIDO DAQUI! Fica um layout limpo de 2 colunas. */}
 
           <div className="input-grupo span-2">
             <label>OBSERVAÇÕES</label>
@@ -454,7 +452,7 @@ export default function EntradaMaterial() {
       </div>
 
       <BotaoAcaoGlobal
-        texto="Solicitar Entrada de Material"
+        texto="Registrar Entrada"
         icone={<Send size={16} />}
         cor="verde"
         onClick={handleEnviar}
