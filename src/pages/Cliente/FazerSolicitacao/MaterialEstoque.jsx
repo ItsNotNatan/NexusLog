@@ -123,25 +123,25 @@ export default function MaterialEstoque() {
   const handleEnviar = async () => {
     // ✨ VALIDAÇÃO 1: Campos obrigatórios do cabeçalho
     if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.dataNecessidade) {
-      showAlert("Por favor, preencha todos os campos obrigatórios do solicitante (*).", "warning");
+      showAlert("Campos Obrigatórios", "Por favor, preencha todos os campos obrigatórios do solicitante (*).", "warning");
       return;
     }
 
     // ✨ VALIDAÇÃO 2: Data retroativa
     if (formDados.dataNecessidade && formDados.dataNecessidade < dataMinima) {
-      showAlert("A Data de Necessidade não pode ser anterior ao dia de hoje. Por favor, corrija no calendário.", "warning");
+      showAlert("Data Inválida", "A Data de Necessidade não pode ser anterior ao dia de hoje. Por favor, corrija no calendário.", "warning");
       return;
     }
 
     // ✨ VALIDAÇÃO 3: Justificativa de urgência obrigatória
     if (formDados.entregaUrgente && !formDados.justificativaUrgencia.trim()) {
-      showAlert("Como marcou a entrega como Urgente, é obrigatório preencher a justificativa do atraso.", "warning");
+      showAlert("Justificativa Pendente", "Como marcou a entrega como Urgente, é obrigatório preencher a justificativa do atraso.", "warning");
       return;
     }
 
     // ✨ VALIDAÇÃO 4: Lista vazia
     if (itensSelecionados.length === 0) {
-      showAlert("Adicione pelo menos um item à solicitação.", "warning");
+      showAlert("Lista Vazia", "Adicione pelo menos um item à solicitação.", "warning");
       return;
     }
 
@@ -151,7 +151,7 @@ export default function MaterialEstoque() {
     );
 
     if (itensIncompletos) {
-      showAlert("Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela.", "warning");
+      showAlert("Itens Incompletos", "Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela.", "warning");
       return;
     }
 
@@ -166,7 +166,7 @@ export default function MaterialEstoque() {
 
         if (erroUpload) {
           console.error("Erro ao subir arquivo:", erroUpload);
-          showAlert(`Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
+          showAlert("Erro no Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
           return;
         }
 
@@ -203,9 +203,13 @@ export default function MaterialEstoque() {
 
       const dados = await resposta.json();
 
-      if (resposta.ok) {
+if (resposta.ok) {
+        // ✨ CORREÇÃO: Usamos dados.ps || dados.ps_id para garantir que pegamos o nome correto que vem da API
+        const idGerado = dados.ps || dados.ps_id;
+
         // ✨ NOTIFICAÇÃO DE SUCESSO CUSTOMIZADA
-        showAlert(`Sucesso! Solicitação criada com o ID: ${dados.ps_id}`, "success");
+        showAlert("Operação Concluída!", `Sucesso! Solicitação criada com o ID: ${idGerado}`, "success");
+        
         setFormDados({
           nome: "",
           wbs: "",
@@ -219,12 +223,12 @@ export default function MaterialEstoque() {
         setAnexos([]);
       } else {
         // ✨ ERRO DO SERVIDOR TRATADO VISUALMENTE
-        showAlert(`Erro do servidor: ${dados.erro}`, "error");
+        showAlert("Erro no Servidor", dados.erro || "Falha na comunicação com a API.", "error");
       }
     } catch (error) {
       console.error("Erro na requisição:", error);
       // ✨ ERRO DE CONEXÃO TRATADO VISUALMENTE
-      showAlert("Falha ao conectar com o servidor.", "error");
+      showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
     }
   };
 

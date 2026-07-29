@@ -10,24 +10,18 @@ import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal
 // Cliente do Supabase
 import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext'; 
-// ✨ 1. Importamos o Contexto de Alertas Global
 import { AlertContext } from '../../../contexts/AlertContext'; 
 
 export default function EntradaMaterial() {
-  // Puxamos a informação do armazém selecionado lá no Header
   const { estoqueAtual } = useContext(AuthContext);
-  
-  // ✨ 2. Consumimos a função de disparo de alertas
   const { showAlert } = useContext(AlertContext);
 
-  // ESTADO: Dados gerais do formulário
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
     observacoes: ''
   });
 
-  // ESTADO E EFFECT: Lógica para travar o calendário
   const [dataMinima, setDataMinima] = useState('');
 
   useEffect(() => {
@@ -37,7 +31,6 @@ export default function EntradaMaterial() {
     setDataMinima(localISOTime);
   }, []);
 
-  // Função auxiliar com a ordem exata das colunas + Data de Necessidade
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`,
     numPecaFabricante: '',
@@ -57,18 +50,10 @@ export default function EntradaMaterial() {
     alocacao: ''
   });
 
-  // ESTADO: Tabela dinâmica de itens
   const [itens, setItens] = useState([gerarLinhaVazia()]);
-
-  // ESTADO: Ficheiros anexados
   const [anexos, setAnexos] = useState([]);
-
-  // INICIA O MAESTRO (Hook de Processamento do Excel)
   const processador = useProcessadorExcel();
 
-  // ==========================================
-  // FUNÇÃO PRINCIPAL: UPLOAD E MAPEAMENTO DO EXCEL
-  // ==========================================
   const handleImportarExcel = async (arquivo) => {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
 
@@ -107,8 +92,8 @@ export default function EntradaMaterial() {
     if (itens.length > 1) {
       setItens(itens.filter(item => item.id !== idParaRemover));
     } else {
-      // ✨ 3. Substituição do Alerta de Tabela Vazia
-      showAlert("A solicitação precisa ter pelo menos um item.", "warning");
+      // ✨ NOVO FORMATO: Título, Mensagem, Tipo
+      showAlert("Ação Bloqueada", "A solicitação precisa ter pelo menos um item.", "warning");
     }
   };
 
@@ -124,28 +109,23 @@ export default function EntradaMaterial() {
     setAnexos(anexos.filter((_, index) => index !== indexRemover));
   };
 
-  // --- ENVIO PARA O BACKEND (NODE.JS) ---
   const handleEnviar = async () => {
-    // ✨ 4. Substituição de Alerta: Trava de filial não selecionada
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
-      showAlert("Por favor, selecione em qual filial você está dando entrada (ex: BR02) lá no topo da página antes de enviar.", "warning");
+      showAlert("Filial Inválida", "Por favor, selecione em qual filial você está dando entrada (ex: BR02) lá no topo da página antes de enviar.", "warning");
       return;
     }
 
-    // ✨ 5. Substituição de Alerta: Campos de texto obrigatórios
     if (!formDados.nome || !formDados.wbs) {
-      showAlert("Preencha o Nome e o WBS do solicitante.", "warning");
+      showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS do solicitante.", "warning");
       return;
     }
 
-    // ✨ 6. Substituição de Alerta: Itens incompletos
     const itensIncompletos = itens.some(i => !i.numPecaFabricante || !i.qtdFornecida);
     if (itensIncompletos) {
-      showAlert("Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.", "warning");
+      showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.", "warning");
       return;
     }
 
-    // ✨ 7. Substituição de Alerta: Datas Retroativas
     const datasInvalidas = itens.some(i =>
       (i.emissaoNF && i.emissaoNF < dataMinima) ||
       (i.recebNF && i.recebNF < dataMinima) ||
@@ -153,7 +133,7 @@ export default function EntradaMaterial() {
     );
 
     if (datasInvalidas) {
-      showAlert("Existem datas preenchidas que são anteriores ao dia atual. Por favor, corrija-as antes de enviar.", "warning");
+      showAlert("Data Inválida", "Existem datas preenchidas que são anteriores ao dia atual. Por favor, corrija-as antes de enviar.", "warning");
       return;
     }
 
@@ -172,8 +152,7 @@ export default function EntradaMaterial() {
 
           if (erroUpload) {
             console.error("Erro ao subir arquivo:", erroUpload);
-            // ✨ 8. Substituição de Alerta: Erro no upload
-            showAlert(`Falha ao anexar o ficheiro: ${arquivo.name}.`, "error");
+            showAlert("Erro de Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}.`, "error");
             return;
           }
 
@@ -188,7 +167,6 @@ export default function EntradaMaterial() {
         }
       }
 
-      // Injetamos o estoqueAtual diretamente no payload
       const payload = {
         solicitante: {
           ...formDados,
@@ -213,19 +191,16 @@ export default function EntradaMaterial() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        // ✨ 9. Substituição de Alerta: Sucesso!
-        showAlert(`Sucesso! Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps}`, "success");
+        showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
         setItens([gerarLinhaVazia()]);
         setAnexos([]);
       } else {
-        // ✨ 10. Substituição de Alerta: Falha da API
-        showAlert(`Erro do servidor: ${dados.erro}`, "error");
+        showAlert("Erro no Servidor", dados.erro, "error");
       }
     } catch (error) {
       console.error("Erro na requisição:", error);
-      // ✨ 11. Substituição de Alerta: Falha de conexão
-      showAlert("Falha ao conectar com o servidor. Verifique se o backend está rodando na porta 3001.", "error");
+      showAlert("Erro de Conexão", "Falha ao conectar com o servidor. Verifique se o backend está rodando na porta 3001.", "error");
     }
   };
 
