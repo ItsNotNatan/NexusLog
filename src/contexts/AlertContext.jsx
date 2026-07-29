@@ -7,9 +7,21 @@ const AlertContext = createContext();
 export const AlertProvider = ({ children }) => {
   const [alerta, setAlerta] = useState(null);
 
-  // Função mágica que vamos usar em toda a aplicação
-  const mostrarAlerta = useCallback((mensagem, tipo = 'info') => {
-    setAlerta({ mensagem, tipo });
+  // ✨ 1. Renomeámos para "showAlert" para bater certo com os formulários
+  const showAlert = useCallback((mensagem, tipo = 'info') => {
+    
+    // ✨ 2. Tradutor Automático: Converte os comandos em inglês para as tuas classes CSS
+    const mapaTipos = {
+      'success': 'sucesso',
+      'error': 'erro',
+      'warning': 'aviso',
+      'info': 'info'
+    };
+
+    // Se receber em inglês, traduz. Se já vier em português, mantém.
+    const tipoCSS = mapaTipos[tipo] || tipo;
+
+    setAlerta({ mensagem, tipo: tipoCSS });
     
     // O alerta desaparece sozinho após 4 segundos
     setTimeout(() => {
@@ -17,10 +29,13 @@ export const AlertProvider = ({ children }) => {
     }, 4000);
   }, []);
 
+  // Mantemos o mostrarAlerta como um "apelido" caso uses nalguma tela antiga
+  const mostrarAlerta = showAlert;
+
   const fecharAlerta = () => setAlerta(null);
 
   return (
-    <AlertContext.Provider value={{ mostrarAlerta }}>
+    <AlertContext.Provider value={{ showAlert, mostrarAlerta }}>
       {children}
       
       {/* Aqui a caixinha é desenhada no ecrã se houver um alerta */}
