@@ -92,7 +92,6 @@ export default function EntradaMaterial() {
     if (itens.length > 1) {
       setItens(itens.filter(item => item.id !== idParaRemover));
     } else {
-      // ✨ NOVO FORMATO: Título, Mensagem, Tipo
       showAlert("Ação Bloqueada", "A solicitação precisa ter pelo menos um item.", "warning");
     }
   };
@@ -191,7 +190,10 @@ export default function EntradaMaterial() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps}`, "success");
+        // ✨ AQUI ESTÁ A CORREÇÃO: Pegamos o ID da mesma forma segura!
+        const idGerado = dados.ps || dados.ps_id;
+        
+        showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${idGerado}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
         setItens([gerarLinhaVazia()]);
         setAnexos([]);

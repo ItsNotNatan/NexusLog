@@ -11,8 +11,9 @@ import {
   AlertCircle,
   ChevronLeft, 
   ChevronRight,
-  Edit2,
-  MapPin
+  Edit,       // ✨ NOVO ÍCONE PARA EDIÇÃO
+  Plus,       // ✨ NOVO ÍCONE PARA ADICIONAR LINHA
+  Trash2      // ✨ NOVO ÍCONE PARA REMOVER LINHA
 } from 'lucide-react';
 
 import { AuthContext } from '../../../contexts/AuthContext'; 
@@ -25,16 +26,11 @@ const obterNomeFilial = (codigo) => {
   const codLimpo = String(codigo).toUpperCase().trim();
   
   switch (codLimpo) {
-    case "BR02":
-      return "Santo André";
-    case "BR04":
-      return "Goiana";
-    case "BR06":
-      return "Betim";
-    case "TODOS":
-      return "Todas as Filiais";
-    default:
-      return codigo; 
+    case "BR02": return "Santo André";
+    case "BR04": return "Goiana";
+    case "BR06": return "Betim";
+    case "TODOS": return "Todas as Filiais";
+    default: return codigo; 
   }
 };
 
@@ -49,17 +45,17 @@ export default function PainelAprovacao() {
   const [carregando, setCarregando] = useState(true);
   const [linhaExpandida, setLinhaExpandida] = useState(null);
 
-  // --- ESTADOS DO MODAL DE EDIÇÃO ---
-  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  // ✨ --- ESTADOS DO MODAL DE EDIÇÃO DE ITENS ---
+  const [modalEdicaoItensAberto, setModalEdicaoItensAberto] = useState(false);
   const [solicitacaoSendoEditada, setSolicitacaoSendoEditada] = useState(null);
-  const [dadosEdicao, setDadosEdicao] = useState({ filial: '', centro: '', deposito: '' });
+  const [itensEdicao, setItensEdicao] = useState([]);
 
   // --- ESTADOS DE PAGINAÇÃO ---
   const [paginaGeral, setPaginaGeral] = useState(1);
   const [paginaEntradas, setPaginaEntradas] = useState(1);
   const itensPorPagina = 5;
 
-  // --- BUSCA INITIAL DOS DADOS (TOTALMENTE SILENCIOSA) ---
+  // --- BUSCA INICIAL DOS DADOS ---
   useEffect(() => {
     const buscarDados = async () => {
       try {
@@ -80,12 +76,10 @@ export default function PainelAprovacao() {
         const resultadoSol = await resSolicitacoes.json();
         const resultadoEst = await resEstoque.json();
 
-        // Armazena dados do estoque auxiliar se a resposta for positiva
         if (resEstoque.ok && resultadoEst.sucesso) {
           setEstoque(resultadoEst.dados);
         }
 
-        // Filtra e formata as solicitações pendentes para exibição
         if (resSolicitacoes.ok && resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados
             .filter(item => item.status === 'Pendente')
@@ -95,7 +89,7 @@ export default function PainelAprovacao() {
               let dep = '-';
               
               if (String(item.tipo).trim() === 'Entrada' && item.itens && item.itens.length > 0) {
-                valorTotal = item.itens.reduce((acc, it) => acc + (Number(it.quantidade_solicitada) * Number(it.valor_unitario_manual || 0)), 0);
+                valorTotal = item.itens.reduce((acc, it) => acc + (Number(it.quantidade_solicitada || it.quantidade || 0) * Number(it.valor_unitario_manual || 0)), 0);
                 centro = item.itens[0].centro || 'BR06';
                 dep = item.itens[0].deposito || '0020';
               }
@@ -129,7 +123,6 @@ export default function PainelAprovacao() {
     }
   }, [token, estoqueAtual]);
 
-  // --- FILTRAGEM E PESQUISA EM MEMÓRIA ---
   const dadosFiltrados = dadosTabela.filter((linha) => {
     if (!termoPesquisa) return true; 
     const termoLower = termoPesquisa.toLowerCase();
@@ -141,79 +134,84 @@ export default function PainelAprovacao() {
     );
   });
 
-  // Separação dos blocos visuais da tela (Pedidos Gerais vs Entradas de Estoque)
   const entradasPendentes = dadosFiltrados.filter(item => String(item.tipo).trim() === 'Entrada');
   const outrasPendentes = dadosFiltrados.filter(item => String(item.tipo).trim() !== 'Entrada');
 
-  // Cálculos de paginação para o primeiro bloco
   const totalPaginasGeral = Math.max(1, Math.ceil(outrasPendentes.length / itensPorPagina));
   const indexPrimeiroGeral = (paginaGeral - 1) * itensPorPagina;
   const indexUltimoGeral = paginaGeral * itensPorPagina;
   const outrasPendentesPaginadas = outrasPendentes.slice(indexPrimeiroGeral, indexUltimoGeral);
 
-  // Cálculos de paginação para o segundo bloco (Entradas)
   const totalPaginasEntradas = Math.max(1, Math.ceil(entradasPendentes.length / itensPorPagina));
   const indexPrimeiroEntradas = (paginaEntradas - 1) * itensPorPagina;
   const indexUltimoEntradas = paginaEntradas * itensPorPagina;
   const entradasPendentesPaginadas = entradasPendentes.slice(indexPrimeiroEntradas, indexUltimoEntradas);
 
-  // Reseta páginas caso uma nova busca aconteça
   useEffect(() => {
     setPaginaGeral(1);
     setPaginaEntradas(1);
   }, [termoPesquisa]);
 
-  useEffect(() => {
-    if (paginaGeral > totalPaginasGeral) setPaginaGeral(totalPaginasGeral);
-  }, [outrasPendentes.length, paginaGeral, totalPaginasGeral]);
-
-  useEffect(() => {
-    if (paginaEntradas > totalPaginasEntradas) setPaginaEntradas(totalPaginasEntradas);
-  }, [entradasPendentes.length, paginaEntradas, totalPaginasEntradas]);
-
   const toggleLinha = (idUnico) => {
     setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
   };
 
-  // --- CONTROLE DE EDIÇÃO DO LOCAL DE ESTOQUE ---
-  const abrirModalEdicao = (linha) => {
+  // ✨ --- LÓGICA DE EDIÇÃO DE ITENS --- ✨
+  const abrirModalEdicaoItens = (linha) => {
     setSolicitacaoSendoEditada(linha);
-    setDadosEdicao({
-      filial: linha.filial !== '-' ? linha.filial : 'BR06',
-      centro: linha.centro !== '-' ? linha.centro : 'BR06',
-      deposito: linha.deposito !== '-' ? linha.deposito : '0020'
-    });
-    setModalEdicaoAberto(true);
+    // Cria uma cópia segura dos itens atuais para edição
+    setItensEdicao(linha.itens ? JSON.parse(JSON.stringify(linha.itens)) : []);
+    setModalEdicaoItensAberto(true);
   };
 
-  const salvarEdicaoLocal = async () => {
+  const adicionarLinhaItem = () => {
+    setItensEdicao([...itensEdicao, {
+      id_temporario: `novo-${Date.now()}`,
+      numPecaFabricante: '',
+      materialDescription: '',
+      quantidade_solicitada: 1
+    }]);
+  };
+
+  const removerLinhaItem = (indexParaRemover) => {
+    setItensEdicao(itensEdicao.filter((_, index) => index !== indexParaRemover));
+  };
+
+  const atualizarCampoItem = (index, campo, valor) => {
+    const novosItens = [...itensEdicao];
+    novosItens[index][campo] = valor;
+    setItensEdicao(novosItens);
+  };
+
+  const salvarEdicaoItens = async () => {
     if (!solicitacaoSendoEditada) return;
 
     try {
-      // Otimismo na interface: Atualiza a tela antes mesmo da resposta do servidor
+      // 1. Atualização Otimista na Interface
       setDadosTabela(prev => prev.map(item => {
         if (item.idOriginal === solicitacaoSendoEditada.idOriginal) {
-          return { ...item, filial: dadosEdicao.filial, centro: dadosEdicao.centro, deposito: dadosEdicao.deposito };
+          return { ...item, itens: itensEdicao };
         }
         return item;
       }));
+      setModalEdicaoItensAberto(false); // Fecha o modal imediatamente
 
-      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${solicitacaoSendoEditada.idOriginal}/local`, {
-        method: 'PATCH',
+      // 2. Envio para a API (AJUSTA A ROTA CONFORME O TEU BACKEND)
+      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${solicitacaoSendoEditada.idOriginal}/itens`, {
+        method: 'PATCH', 
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify(dadosEdicao)
+        body: JSON.stringify({ itens: itensEdicao })
       });
 
-      if (resposta.ok) {
-        setModalEdicaoAberto(false);
-      } else {
-        console.warn("O servidor recusou a atualização dos locais de armazenamento.");
+      if (!resposta.ok) {
+        console.warn("O servidor recusou a atualização dos itens.");
+        // Opcional: Reverter a interface se a API falhar
       }
     } catch (error) {
-      console.error('Erro de rede ao tentar atualizar o local:', error);
+      console.error('Erro de rede ao tentar atualizar os itens:', error);
     }
   };
 
@@ -232,14 +230,11 @@ export default function PainelAprovacao() {
         });
         
         if (resposta.ok) {
-          // Remove silenciosamente o item aprovado da lista local
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
-        } else {
-          console.error("Erro retornado pelo servidor ao tentar aprovar.");
         }
       } catch (error) {
-        console.error("Erro de comunicação com o servidor durante a aprovação:", error);
+        console.error("Erro na aprovação:", error);
       }
     }
   };
@@ -260,14 +255,11 @@ export default function PainelAprovacao() {
         });
         
         if (resposta.ok) {
-          // Remove silenciosamente o item recusado da lista local
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
-        } else {
-          console.error("Erro retornado pelo servidor ao tentar recusar.");
         }
       } catch (error) {
-        console.error("Erro de comunicação com o servidor durante a recusa:", error);
+        console.error("Erro na recusa:", error);
       }
     }
   };
@@ -335,33 +327,19 @@ export default function PainelAprovacao() {
                           <div className="item-linha-id">
                             {linha.ps}
                             <span className="badge-tipo-lista azul">{linha.tipo}</span>
-                            
-                            {linha.filial && linha.filial !== '-' && (
-                              <span style={{ 
-                                marginLeft: '8px', padding: '2px 8px', backgroundColor: '#f1f5f9', 
-                                color: '#475569', borderRadius: '4px', fontSize: '0.75rem', 
-                                fontWeight: '700', border: '1px solid #cbd5e1' 
-                              }}>
-                                📍 {obterNomeFilial(linha.filial)}
-                              </span>
-                            )}
                           </div>
                           
                           <div className="item-meta-info">
                             WBS: <a href="#" className="link-wbs">{linha.wbs}</a> &middot;
                             {linha.itens?.length || 0} itens &middot;
-                            {linha.solicitante} &middot;
-                            {linha.dataSolicitacao}
+                            {linha.solicitante}
                           </div>
-                          
-                          {linha.observacoes && (
-                            <div className="item-obs">Obs: {linha.observacoes}</div>
-                          )}
                         </div>
 
                         <div className="item-acoes-grupo">
-                          <button className="btn-acao-lista" style={{ color: '#475569' }} onClick={() => abrirModalEdicao(linha)}>
-                            <Edit2 size={16} /> Editar Local
+                          {/* ✨ BOTÃO EDITAR ITENS */}
+                          <button className="btn-acao-lista" style={{ color: '#0369a1' }} onClick={() => abrirModalEdicaoItens(linha)}>
+                            <Edit size={16} /> Editar Itens
                           </button>
 
                           <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico)}>
@@ -370,11 +348,11 @@ export default function PainelAprovacao() {
 
                           {isCrossdocking && !nfNoEstoque ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#fef3c7', color: '#d97706', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '500', marginLeft: '12px' }}>
-                              <AlertCircle size={16} /> Aguardando NF {linha.nfCrossdocking} no estoque
+                              <AlertCircle size={16} /> Aguardando NF {linha.nfCrossdocking}
                             </div>
                           ) : (
                             <>
-                              <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, Commutators => linha.idOriginal)}>
+                              <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
                                 <X size={16} /> Recusar
                               </button>
                               <button className="btn-acao-lista btn-aprovar-solid btn-atualizado-azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
@@ -393,46 +371,6 @@ export default function PainelAprovacao() {
                     </React.Fragment>
                   );
                 })}
-
-                {totalPaginasGeral > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 8px 8px' }}>
-                    <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                      Página <strong>{paginaGeral}</strong> de <strong>{totalPaginasGeral}</strong>
-                    </div>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button 
-                        onClick={() => setPaginaGeral(p => Math.max(p - 1, 1))} 
-                        disabled={paginaGeral === 1}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaGeral === 1 ? 'not-allowed' : 'pointer', opacity: paginaGeral === 1 ? 0.6 : 1 }}
-                      >
-                        <ChevronLeft size={16} /> Anterior
-                      </button>
-
-                      {Array.from({ length: totalPaginasGeral }, (_, i) => {
-                        const num = i + 1;
-                        const ehAtiva = paginaGeral === num;
-                        return (
-                          <button
-                            key={num}
-                            onClick={() => setPaginaGeral(num)}
-                            style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: 'pointer' }}
-                          >
-                            {num}
-                          </button>
-                        );
-                      })}
-
-                      <button 
-                        onClick={() => setPaginaGeral(p => Math.min(p + 1, totalPaginasGeral))} 
-                        disabled={paginaGeral === totalPaginasGeral}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaGeral === totalPaginasGeral ? 'not-allowed' : 'pointer', opacity: paginaGeral === totalPaginasGeral ? 0.6 : 1 }}
-                      >
-                        Próxima <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -468,35 +406,19 @@ export default function PainelAprovacao() {
                           <div className="item-linha-id">
                             {linha.ps}
                             <span className="badge-tipo-lista verde">Entrada</span>
-                            
-                            {linha.filial && linha.filial !== '-' && (
-                              <span style={{ 
-                                marginLeft: '8px', padding: '2px 8px', backgroundColor: '#dcfce7', 
-                                color: '#166534', borderRadius: '4px', fontSize: '0.75rem', 
-                                fontWeight: '700', border: '1px solid #bbf7d0' 
-                              }}>
-                                🏢 {obterNomeFilial(linha.filial)}
-                              </span>
-                            )}
                           </div>
                           
                           <div className="item-meta-info">
                             WBS: <a href="#" className="link-wbs">{linha.wbs}</a> &middot;
                             {linha.itens?.length || 0} itens &middot;
-                            {linha.solicitante} &middot;
-                            Centro: {linha.centro} &middot;
-                            Dep: {linha.deposito} &middot;
-                            <span className="texto-valor-rs">{linha.valorTotalFormatado || 'R$ 0,00'}</span>
+                            {linha.solicitante}
                           </div>
-                          
-                          {linha.observacoes && (
-                            <div className="item-obs">Obs: {linha.observacoes}</div>
-                          )}
                         </div>
 
                         <div className="item-acoes-grupo">
-                          <button className="btn-acao-lista" style={{ color: '#475569' }} onClick={() => abrirModalEdicao(linha)}>
-                            <Edit2 size={16} /> Editar Local
+                          {/* ✨ BOTÃO EDITAR ITENS */}
+                          <button className="btn-acao-lista" style={{ color: '#0369a1' }} onClick={() => abrirModalEdicaoItens(linha)}>
+                            <Edit size={16} /> Editar Itens
                           </button>
 
                           <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico)}>
@@ -506,7 +428,7 @@ export default function PainelAprovacao() {
                             <X size={16} /> Recusar
                           </button>
                           <button className="btn-acao-lista btn-aprovar-solid" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
-                            <Check size={16} /> Aprovar Entrada
+                            <Check size={16} /> Aprovar
                           </button>
                         </div>
                       </div>
@@ -519,122 +441,108 @@ export default function PainelAprovacao() {
                     </React.Fragment>
                   );
                 })}
-
-                {totalPaginasEntradas > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 8px 8px' }}>
-                    <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                      Página <strong>{paginaEntradas}</strong> de <strong>{totalPaginasEntradas}</strong>
-                    </div>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button 
-                        onClick={() => setPaginaEntradas(p => Math.max(p - 1, 1))} 
-                        disabled={paginaEntradas === 1}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaEntradas === 1 ? 'not-allowed' : 'pointer', opacity: paginaEntradas === 1 ? 0.6 : 1 }}
-                      >
-                        <ChevronLeft size={16} /> Anterior
-                      </button>
-
-                      {Array.from({ length: totalPaginasEntradas }, (_, i) => {
-                        const num = i + 1;
-                        const ehAtiva = paginaEntradas === num;
-                        return (
-                          <button
-                            key={num}
-                            onClick={() => setPaginaEntradas(num)}
-                            style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#16a34a' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#16a34a' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: 'pointer' }}
-                          >
-                            {num}
-                          </button>
-                        );
-                      })}
-
-                      <button 
-                        onClick={() => setPaginaEntradas(p => Math.min(p + 1, totalPaginasEntradas))} 
-                        disabled={paginaEntradas === totalPaginasEntradas}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: paginaEntradas === totalPaginasEntradas ? 'not-allowed' : 'pointer', opacity: paginaEntradas === totalPaginasEntradas ? 0.6 : 1 }}
-                      >
-                        Próxima <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
         </>
       )}
 
-      {/* MODAL DE EDIÇÃO DE DESTINO */}
-      {modalEdicaoAberto && (
+      {/* ✨ MODAL DE EDIÇÃO DE ITENS ✨ */}
+      {modalEdicaoItensAberto && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', 
+          backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', 
           alignItems: 'center', justifyContent: 'center', zIndex: 9999
         }}>
           <div style={{
             backgroundColor: '#fff', padding: '24px', borderRadius: '12px', 
-            width: '100%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+            width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a' }}>
-                <MapPin size={20} color="#ea580c" /> Editar Destino
+                <Edit size={20} color="#0284c7" /> Editar Itens da Solicitação {solicitacaoSendoEditada?.ps}
               </h3>
-              <button onClick={() => setModalEdicaoAberto(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+              <button onClick={() => setModalEdicaoItensAberto(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
                 <X size={20} />
               </button>
             </div>
             
-            <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '20px' }}>
-              Ajuste as informações de armazenamento da solicitação <strong>{solicitacaoSendoEditada?.ps}</strong>.
-            </p>
-
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
-                Filial
-              </label>
-              <select 
-                value={dadosEdicao.filial}
-                onChange={(e) => setDadosEdicao({...dadosEdicao, filial: e.target.value})}
-                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-              >
-                <option value="BR02">Santo André</option>
-                <option value="BR04">Goiana</option>
-                <option value="BR06">Betim</option>
-              </select>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ padding: '8px', fontSize: '0.85rem', color: '#475569' }}>Part Number</th>
+                    <th style={{ padding: '8px', fontSize: '0.85rem', color: '#475569' }}>Descrição</th>
+                    <th style={{ padding: '8px', fontSize: '0.85rem', color: '#475569', width: '80px' }}>Qtd</th>
+                    <th style={{ padding: '8px', fontSize: '0.85rem', color: '#475569', width: '50px', textAlign: 'center' }}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itensEdicao.map((item, index) => (
+                    <tr key={item.id || item.id_temporario || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '8px' }}>
+                        <input 
+                          type="text" 
+                          value={item.numPecaFabricante || item.part_number || ''} 
+                          onChange={(e) => atualizarCampoItem(index, 'numPecaFabricante', e.target.value)}
+                          style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                          placeholder="PN"
+                        />
+                      </td>
+                      <td style={{ padding: '8px' }}>
+                        <input 
+                          type="text" 
+                          value={item.materialDescription || item.descricao || ''} 
+                          onChange={(e) => atualizarCampoItem(index, 'materialDescription', e.target.value)}
+                          style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                          placeholder="Descrição"
+                        />
+                      </td>
+                      <td style={{ padding: '8px' }}>
+                        <input 
+                          type="number" 
+                          value={item.quantidade_solicitada || item.quantidade || item.qtd || 1} 
+                          onChange={(e) => atualizarCampoItem(index, 'quantidade_solicitada', e.target.value)}
+                          style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                          min="1"
+                        />
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <button 
+                          onClick={() => removerLinhaItem(index)}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              {itensEdicao.length === 0 && (
+                <p style={{ textAlign: 'center', color: '#94a3b8', margin: '20px 0' }}>Nenhum item na lista.</p>
+              )}
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>Centro</label>
-                <input 
-                  type="text" 
-                  value={dadosEdicao.centro}
-                  onChange={(e) => setDadosEdicao({...dadosEdicao, centro: e.target.value})}
-                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>Depósito</label>
-                <input 
-                  type="text" 
-                  value={dadosEdicao.deposito}
-                  onChange={(e) => setDadosEdicao({...dadosEdicao, deposito: e.target.value})}
-                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                />
-              </div>
-            </div>
+            <button 
+              onClick={adicionarLinhaItem}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer', marginBottom: '24px' }}
+            >
+              <Plus size={16} /> Adicionar Linha
+            </button>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
               <button 
-                onClick={() => setModalEdicaoAberto(false)}
-                style={{ padding: '8px 16px', background: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#475569', fontWeight: '500', cursor: 'pointer' }}
+                onClick={() => setModalEdicaoItensAberto(false)}
+                style={{ padding: '8px 16px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#475569', fontWeight: '500', cursor: 'pointer' }}
               >
                 Cancelar
               </button>
               <button 
-                onClick={salvarEdicaoLocal}
-                style={{ padding: '8px 16px', background: '#ea580c', border: 'none', borderRadius: '6px', color: '#fff', fontWeight: '500', cursor: 'pointer' }}
+                onClick={salvarEdicaoItens}
+                style={{ padding: '8px 16px', background: '#0284c7', border: 'none', borderRadius: '6px', color: '#fff', fontWeight: '500', cursor: 'pointer' }}
               >
                 Salvar Alterações
               </button>
