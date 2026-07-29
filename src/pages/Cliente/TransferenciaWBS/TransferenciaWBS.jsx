@@ -6,11 +6,11 @@ import GerenciadorAnexos from '../../../components/GerenciadorAnexos/Gerenciador
 import SeletorEstoqueLateral from '../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral';
 import { supabase } from '../../../supabaseClient';
 
-// 👇 1. Importamos o AuthContext para saber em qual Filial estamos
+// Importamos o AuthContext para saber em qual Filial estamos
 import { AuthContext } from '../../../contexts/AuthContext';
 
 export default function TransferenciaWBS() {
-  // 👇 2. Puxamos a filial global (estoqueAtual)
+  // Puxamos a filial global (estoqueAtual)
   const { estoqueAtual } = useContext(AuthContext);
 
   // --- 1. ESTADOS DO FORMULÁRIO E ITENS ---
@@ -28,12 +28,20 @@ export default function TransferenciaWBS() {
   const [estoqueReal, setEstoqueReal] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
-  // --- 3. BUSCAR DADOS REAIS DO BACKEND ---
+  // --- 3. BUSCAR DADOS REAIS DO BACKEND (Filtrado por Filial Ativa) ---
   useEffect(() => {
+    // ✨ Se estiver em modo "TODOS" ou sem filial, limpa o estoque da tela e aborta
+    if (!estoqueAtual || estoqueAtual === 'TODOS') {
+      setEstoqueReal([]);
+      setCarregandoEstoque(false);
+      return;
+    }
+
     const carregarEstoque = async () => {
       try {
         setCarregandoEstoque(true);
-        const resposta = await fetch('http://localhost:3001/api/estoque/listar');
+        // ✨ Passamos a filial ativa como query parameter para o backend buscar o estoque correto
+        const resposta = await fetch(`http://localhost:3001/api/estoque/listar?filial_id=${estoqueAtual}`);
         const resultado = await resposta.json();
 
         if (resposta.ok && resultado.sucesso) {
@@ -51,28 +59,25 @@ export default function TransferenciaWBS() {
     };
 
     carregarEstoque();
-  }, []);
+    // ✨ Adicionado estoqueAtual como dependência para recarregar o estoque ao mudar de filial
+  }, [estoqueAtual]); 
 
   // --- 4. FUNÇÕES DE CÁLCULO DE SALDO ---
-  
-  // Verifica quanto de um item já foi colocado no carrinho de transferência
   const getQuantidadeJaSelecionada = (idItem) => {
     const itemNoCarrinho = itensSelecionados.find(i => i.id === idItem);
     return itemNoCarrinho ? itemNoCarrinho.qtdTransferencia : 0;
   };
 
-  // Calcula o saldo restante que deve aparecer na tela
   const getSaldoRestante = (item) => {
     return item.quantidade_disponivel - getQuantidadeJaSelecionada(item.id);
   };
 
   // --- 5. AÇÕES DO CARRINHO ---
   const adicionarItem = (itemOriginal) => {
-    // Só adiciona se o saldo restante for maior que zero e se ainda não estiver na lista
     if (getSaldoRestante(itemOriginal) > 0 && !itensSelecionados.find(i => i.id === itemOriginal.id)) {
       setItensSelecionados([
         ...itensSelecionados, 
-        { ...itemOriginal, qtdTransferencia: 1 } // Começa sempre com 1 unidade
+        { ...itemOriginal, qtdTransferencia: 1 }
       ]);
     }
   };
@@ -87,7 +92,6 @@ export default function TransferenciaWBS() {
 
     let qtdFormatada = parseInt(novaQtd) || 1;
     
-    // Trava de segurança: impede que digitem uma quantidade maior que o estoque total
     if (qtdFormatada > itemEstoque.quantidade_disponivel) {
       qtdFormatada = itemEstoque.quantidade_disponivel;
     }
@@ -102,6 +106,12 @@ export default function TransferenciaWBS() {
 
   // --- 6. ENVIO PARA O BACKEND ---
   const handleEnviar = async () => {
+    // ✨ TRAVA MÁGICA: Impede o envio se estiver na visão global "TODOS"
+    if (!estoqueAtual || estoqueAtual === 'TODOS') {
+      alert("Por favor, selecione uma filial de origem específica (ex: BR02) no topo da página antes de solicitar uma transferência.");
+      return;
+    }
+
     if (!formDados.nome || !formDados.wbsDestino) {
       alert("Preencha o Nome do Solicitante e o WBS de Destino.");
       return;
@@ -140,7 +150,7 @@ export default function TransferenciaWBS() {
       }
     }
 
-    // 👇 3. INJETAMOS A FILIAL NO PAYLOAD PARA O BACKEND ACEITAR
+    // ✨ INJEÇÃO DIRETA: Removido o '|| BR06'. O payload usa estritamente o cabeçalho.
     const payload = {
       solicitante: {
         nome: formDados.nome,
@@ -148,7 +158,7 @@ export default function TransferenciaWBS() {
         observacoes: formDados.justificativa,
         entregaUrgente: formDados.entregaUrgente,
         tipo: 'Transferencia WBS',
-        filial_origem: estoqueAtual || 'BR06' // <-- A MÁGICA ESTÁ AQUI
+        filial_origem: estoqueAtual 
       },
       itens: itensSelecionados.map(item => ({
         estoque_id: item.id,
@@ -171,7 +181,6 @@ export default function TransferenciaWBS() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        // 👇 4. Correção visual: o Back-end envia "ps" e não "ps_id"
         alert(`Sucesso! Transferência solicitada. PS Gerada: ${dados.ps}`);
         setFormDados({ nome: '', wbsDestino: '', justificativa: '', entregaUrgente: false });
         setItensSelecionados([]);

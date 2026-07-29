@@ -12,7 +12,7 @@ import {
   Zap,
   Upload,
   AlertCircle,
-  MapPin // ✨ Ícone da filial importado aqui
+  MapPin // Ícone da filial mantido aqui
 } from "lucide-react";
 
 import { useContext } from 'react';
@@ -22,6 +22,28 @@ import GerenciadorAnexos from "../../../components/GerenciadorAnexos/Gerenciador
 import { supabase } from "../../../supabaseClient";
 
 // --- FUNÇÕES AUXILIARES DE RENDERIZAÇÃO ---
+
+// ✨ NOVA FUNÇÃO: Traduz os códigos técnicos "BR" para os nomes reais das cidades
+const obterNomeFilial = (codigo) => {
+  if (!codigo) return 'N/D';
+  
+  // Convertemos para texto e limpamos espaços para evitar erros de digitação
+  const codLimpo = String(codigo).toUpperCase().trim();
+  
+  switch (codLimpo) {
+    case "BR02":
+      return "Santo André";
+    case "BR04":
+      return "Goiana";
+    case "BR06":
+      return "Betim";
+    case "TODOS":
+      return "Todas as Filiais";
+    default:
+      return codigo; // Se o backend já mandar o nome da cidade ou outro valor, exibe ele mesmo
+  }
+};
+
 const renderBadgeStatus = (status) => {
   switch (status) {
     case "Pendente":
@@ -232,7 +254,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           }
           return sol;
         }));
-        alert(`Status atualizado para ${novoStatus} com sucesso!`);
+        alert(`Status updated para ${novoStatus} com sucesso!`);
       } else {
         const erroCorpo = await resposta.json().catch(() => ({}));
         alert(`Erro ao atualizar o status no servidor: ${erroCorpo.erro || 'Desconhecido'}`);
@@ -358,7 +380,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         <div className={`kpi-card-resumo kpi-pendentes ${filtroStatus === "Pendente" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Pendente")}>
           <span>Pendentes</span><strong>{kpiPendentes}</strong>
         </div>
-        <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Separação" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Em Separação")}>
+        <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Separação" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Em Andamento")}>
           <span>Em Andamento</span><strong>{kpiAndamento}</strong>
         </div>
         <div className={`kpi-card-resumo kpi-concluidos ${filtroStatus === "Concluído" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Concluído")}>
@@ -401,7 +423,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>TIPO</th>
                 <th>ID / SOLICITANTE / WBS</th>
                 <th>Nº DO BS</th>
-                <th>FILIAL</th> {/* ✨ COLUNA ADICIONADA */}
+                <th>FILIAL</th>
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
                 <th>STATUS</th>
@@ -411,14 +433,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             <tbody>
               {carregando ? (
                 <tr>
-                  {/* ✨ colSpan ajustado para suportar a nova coluna (+1) */}
                   <td colSpan={perfil === "logistica" ? 9 : 8} style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>
                     Carregando solicitações...
                   </td>
                 </tr>
               ) : dadosTabela.length === 0 ? (
                 <tr>
-                  {/* ✨ colSpan ajustado aqui também */}
                   <td colSpan={perfil === "logistica" ? 9 : 8} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>
                     Nenhuma solicitação encontrada.
                   </td>
@@ -491,7 +511,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           )}
                         </td>
 
-                        {/* ✨ CÉLULA DA FILIAL COM DESIGN DE ETIQUETA */}
+                        {/* ✨ A MÁGICA FOI TRATADA AQUI: Convertendo BR02, BR04, BR06 para Cidades */}
                         <td>
                           <span style={{
                             display: 'inline-flex',
@@ -503,10 +523,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             borderRadius: '6px',
                             fontSize: '0.75rem',
                             fontWeight: '600',
-                            border: '1px solid #cbd5e1'
+                            border: '1px solid #cbd5e1',
+                            whiteSpace: 'nowrap' // Evita que o nome da cidade quebre em duas linhas
                           }}>
                             <MapPin size={12} />
-                            {linha.filial || linha.estoque || 'N/D'}
+                            {obterNomeFilial(linha.filial || linha.estoque)}
                           </span>
                         </td>
 
@@ -571,7 +592,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                       {isExpandida && (
                         <tr>
-                          {/* ✨ colSpan ajustado para suportar a nova coluna na área expandida */}
                           <td colSpan={perfil === "logistica" ? 9 : 8} className="td-expandida">
                             <DetalhesSolicitacao
                               item={linha}

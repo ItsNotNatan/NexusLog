@@ -18,24 +18,48 @@ import {
 import { AuthContext } from '../../../contexts/AuthContext'; 
 import DetalhesSolicitacao from '../../Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao';
 
+// FUNÇÃO AUXILIAR: Traduz os códigos brutos para os nomes reais dos galpões
+const obterNomeFilial = (codigo) => {
+  if (!codigo || codigo === '-') return 'N/D';
+  
+  const codLimpo = String(codigo).toUpperCase().trim();
+  
+  switch (codLimpo) {
+    case "BR02":
+      return "Santo André";
+    case "BR04":
+      return "Goiana";
+    case "BR06":
+      return "Betim";
+    case "TODOS":
+      return "Todas as Filiais";
+    default:
+      return codigo; 
+  }
+};
+
 export default function PainelAprovacao() {
   const { token: tokenContexto, estoqueAtual } = useContext(AuthContext);
   const token = tokenContexto || localStorage.getItem('token'); 
 
+  // --- ESTADOS DO COMPONENTE ---
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]); 
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [linhaExpandida, setLinhaExpandida] = useState(null);
 
+  // --- ESTADOS DO MODAL DE EDIÇÃO ---
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const [solicitacaoSendoEditada, setSolicitacaoSendoEditada] = useState(null);
   const [dadosEdicao, setDadosEdicao] = useState({ filial: '', centro: '', deposito: '' });
 
+  // --- ESTADOS DE PAGINAÇÃO ---
   const [paginaGeral, setPaginaGeral] = useState(1);
   const [paginaEntradas, setPaginaEntradas] = useState(1);
   const itensPorPagina = 5;
 
+  // --- BUSCA INITIAL DOS DADOS (TOTALMENTE SILENCIOSA) ---
   useEffect(() => {
     const buscarDados = async () => {
       try {
@@ -56,56 +80,16 @@ export default function PainelAprovacao() {
         const resultadoSol = await resSolicitacoes.json();
         const resultadoEst = await resEstoque.json();
 
-        // =========================================================
-        // 🚨 INÍCIO DO TROUBLESHOOTING (APENAS ALERT) 🚨
-        // =========================================================
-        
-        if (resultadoSol.sucesso) {
-          const totalPedidos = resultadoSol.dados ? resultadoSol.dados.length : 0;
-          
-          let qtdPendentes = 0;
-          let qtdEntradas = 0;
-          let amostraTipos = [];
-
-          // Analisa rapidamente os dados para gerar o relatório no alert
-          if (totalPedidos > 0) {
-            resultadoSol.dados.forEach(item => {
-              if (item.status === 'Pendente') qtdPendentes++;
-              if (String(item.tipo).trim() === 'Entrada') qtdEntradas++;
-              
-              // Guarda os primeiros 3 tipos encontrados para debug
-              if (amostraTipos.length < 3 && item.tipo) {
-                amostraTipos.push(`"${item.tipo}"`);
-              }
-            });
-          }
-
-          // Constrói a mensagem visual
-          const mensagemAlerta = `🔍 DIAGNÓSTICO DO PAINEL:\n\n` +
-            `📍 Filial Ativa (estoqueAtual): ${estoqueAtual || 'NENHUMA (vazio)'}\n` +
-            `📦 Total recebido do servidor: ${totalPedidos}\n` +
-            `⏳ Total com status 'Pendente': ${qtdPendentes}\n` +
-            `📥 Total do tipo 'Entrada': ${qtdEntradas}\n\n` +
-            `Exemplos de tipos recebidos: ${amostraTipos.length > 0 ? amostraTipos.join(', ') : 'Nenhum'}`;
-            
-          alert(mensagemAlerta);
-        } else {
-          alert(`❌ ERRO NO BACKEND:\nO servidor respondeu, mas disse que não teve sucesso. Motivo: ${resultadoSol.erro || 'Desconhecido'}`);
-        }
-        
-        // =========================================================
-        // 🚨 FIM DO TROUBLESHOOTING 🚨
-        // =========================================================
-
+        // Armazena dados do estoque auxiliar se a resposta for positiva
         if (resEstoque.ok && resultadoEst.sucesso) {
           setEstoque(resultadoEst.dados);
         }
 
+        // Filtra e formata as solicitações pendentes para exibição
         if (resSolicitacoes.ok && resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados
             .filter(item => item.status === 'Pendente')
             .map((item) => {
-              
               let valorTotal = 0;
               let centro = '-';
               let dep = '-';
@@ -120,7 +104,7 @@ export default function PainelAprovacao() {
                 ...item,
                 idOriginal: item.id, 
                 ps: item.ps || 'PS-Pendente', 
-                bs: item.bs || null,          
+                bs: item.bs || null,           
                 dataSolicitacao: item.dataSolicitacao || '-',
                 valorTotalFormatado: valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : null,
                 centro,
@@ -132,7 +116,7 @@ export default function PainelAprovacao() {
           setDadosTabela(dadosFormatados);
         }
       } catch (error) {
-        alert(`Falha ao conectar à API: ${error.message}`);
+        console.error("Falha ao conectar à API do NexusLog:", error.message);
       } finally {
         setCarregando(false);
       }
@@ -142,10 +126,10 @@ export default function PainelAprovacao() {
       buscarDados();
     } else {
       setCarregando(false);
-      alert("⚠️ Utilizador não está autenticado. O token está vazio.");
     }
   }, [token, estoqueAtual]);
 
+  // --- FILTRAGEM E PESQUISA EM MEMÓRIA ---
   const dadosFiltrados = dadosTabela.filter((linha) => {
     if (!termoPesquisa) return true; 
     const termoLower = termoPesquisa.toLowerCase();
@@ -157,19 +141,23 @@ export default function PainelAprovacao() {
     );
   });
 
+  // Separação dos blocos visuais da tela (Pedidos Gerais vs Entradas de Estoque)
   const entradasPendentes = dadosFiltrados.filter(item => String(item.tipo).trim() === 'Entrada');
   const outrasPendentes = dadosFiltrados.filter(item => String(item.tipo).trim() !== 'Entrada');
 
+  // Cálculos de paginação para o primeiro bloco
   const totalPaginasGeral = Math.max(1, Math.ceil(outrasPendentes.length / itensPorPagina));
   const indexPrimeiroGeral = (paginaGeral - 1) * itensPorPagina;
   const indexUltimoGeral = paginaGeral * itensPorPagina;
   const outrasPendentesPaginadas = outrasPendentes.slice(indexPrimeiroGeral, indexUltimoGeral);
 
+  // Cálculos de paginação para o segundo bloco (Entradas)
   const totalPaginasEntradas = Math.max(1, Math.ceil(entradasPendentes.length / itensPorPagina));
   const indexPrimeiroEntradas = (paginaEntradas - 1) * itensPorPagina;
   const indexUltimoEntradas = paginaEntradas * itensPorPagina;
   const entradasPendentesPaginadas = entradasPendentes.slice(indexPrimeiroEntradas, indexUltimoEntradas);
 
+  // Reseta páginas caso uma nova busca aconteça
   useEffect(() => {
     setPaginaGeral(1);
     setPaginaEntradas(1);
@@ -187,6 +175,7 @@ export default function PainelAprovacao() {
     setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
   };
 
+  // --- CONTROLE DE EDIÇÃO DO LOCAL DE ESTOQUE ---
   const abrirModalEdicao = (linha) => {
     setSolicitacaoSendoEditada(linha);
     setDadosEdicao({
@@ -201,6 +190,7 @@ export default function PainelAprovacao() {
     if (!solicitacaoSendoEditada) return;
 
     try {
+      // Otimismo na interface: Atualiza a tela antes mesmo da resposta do servidor
       setDadosTabela(prev => prev.map(item => {
         if (item.idOriginal === solicitacaoSendoEditada.idOriginal) {
           return { ...item, filial: dadosEdicao.filial, centro: dadosEdicao.centro, deposito: dadosEdicao.deposito };
@@ -219,15 +209,15 @@ export default function PainelAprovacao() {
 
       if (resposta.ok) {
         setModalEdicaoAberto(false);
-        alert('Local de estoque atualizado com sucesso!');
       } else {
-        alert('Aviso: Alteração visual feita, mas ocorreu um erro ao salvar no servidor.');
+        console.warn("O servidor recusou a atualização dos locais de armazenamento.");
       }
     } catch (error) {
-      alert('Erro de conexão ao salvar as edições.');
+      console.error('Erro de rede ao tentar atualizar o local:', error);
     }
   };
 
+  // --- AÇÃO DE APROVAÇÃO ---
   const handleAprovar = async (e, idOriginal) => {
     e.stopPropagation();
     if (window.confirm(`Aprovar esta solicitação?`)) {
@@ -242,19 +232,19 @@ export default function PainelAprovacao() {
         });
         
         if (resposta.ok) {
-          alert(`Solicitação aprovada!`);
+          // Remove silenciosamente o item aprovado da lista local
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
         } else {
-          const dadosErro = await resposta.json().catch(() => ({}));
-          alert(`Erro ao aprovar no servidor: ${dadosErro.erro || resposta.statusText}`);
+          console.error("Erro retornado pelo servidor ao tentar aprovar.");
         }
       } catch (error) {
-        alert("Erro de conexão com o servidor.");
+        console.error("Erro de comunicação com o servidor durante a aprovação:", error);
       }
     }
   };
 
+  // --- AÇÃO DE RECUSA ---
   const handleRecusar = async (e, idOriginal) => {
     e.stopPropagation();
     const motivo = window.prompt(`Motivo da recusa para esta solicitação?`);
@@ -270,14 +260,14 @@ export default function PainelAprovacao() {
         });
         
         if (resposta.ok) {
-          alert(`Solicitação recusada.`);
+          // Remove silenciosamente o item recusado da lista local
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
         } else {
-          alert("Erro ao recusar no servidor.");
+          console.error("Erro retornado pelo servidor ao tentar recusar.");
         }
       } catch (error) {
-        alert("Erro de conexão.");
+        console.error("Erro de comunicação com o servidor durante a recusa:", error);
       }
     }
   };
@@ -307,7 +297,7 @@ export default function PainelAprovacao() {
         </div>
       ) : (
         <>
-          {/* SECÇÃO 1: SOLICITAÇÕES GERAIS (Amarelo) */}
+          {/* SECÇÃO 1: SOLICITAÇÕES GERAIS */}
           <div className="seccao-painel tema-amarelo">
             <div className="seccao-header borda-amarela">
               <div className="seccao-titulo amarelo">
@@ -352,7 +342,7 @@ export default function PainelAprovacao() {
                                 color: '#475569', borderRadius: '4px', fontSize: '0.75rem', 
                                 fontWeight: '700', border: '1px solid #cbd5e1' 
                               }}>
-                                📍 {linha.filial}
+                                📍 {obterNomeFilial(linha.filial)}
                               </span>
                             )}
                           </div>
@@ -370,7 +360,6 @@ export default function PainelAprovacao() {
                         </div>
 
                         <div className="item-acoes-grupo">
-                          
                           <button className="btn-acao-lista" style={{ color: '#475569' }} onClick={() => abrirModalEdicao(linha)}>
                             <Edit2 size={16} /> Editar Local
                           </button>
@@ -385,10 +374,10 @@ export default function PainelAprovacao() {
                             </div>
                           ) : (
                             <>
-                              <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
+                              <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, Commutators => linha.idOriginal)}>
                                 <X size={16} /> Recusar
                               </button>
-                              <button className="btn-acao-lista btn-aprovar-solid azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
+                              <button className="btn-acao-lista btn-aprovar-solid btn-atualizado-azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
                                 <Check size={16} /> Aprovar
                               </button>
                             </>
@@ -448,7 +437,7 @@ export default function PainelAprovacao() {
             )}
           </div>
 
-          {/* SECÇÃO 2: ENTRADAS DE ESTOQUE (Verde) */}
+          {/* SECÇÃO 2: ENTRADAS DE ESTOQUE */}
           <div className="seccao-painel tema-verde">
             <div className="seccao-header borda-verde">
               <div className="seccao-titulo verde">
@@ -486,7 +475,7 @@ export default function PainelAprovacao() {
                                 color: '#166534', borderRadius: '4px', fontSize: '0.75rem', 
                                 fontWeight: '700', border: '1px solid #bbf7d0' 
                               }}>
-                                🏢 {linha.filial}
+                                🏢 {obterNomeFilial(linha.filial)}
                               </span>
                             )}
                           </div>
@@ -506,7 +495,6 @@ export default function PainelAprovacao() {
                         </div>
 
                         <div className="item-acoes-grupo">
-                          
                           <button className="btn-acao-lista" style={{ color: '#475569' }} onClick={() => abrirModalEdicao(linha)}>
                             <Edit2 size={16} /> Editar Local
                           </button>
@@ -577,6 +565,7 @@ export default function PainelAprovacao() {
         </>
       )}
 
+      {/* MODAL DE EDIÇÃO DE DESTINO */}
       {modalEdicaoAberto && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
@@ -609,9 +598,9 @@ export default function PainelAprovacao() {
                 onChange={(e) => setDadosEdicao({...dadosEdicao, filial: e.target.value})}
                 style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
               >
-                <option value="BR02">BR02 (Betim)</option>
-                <option value="BR04">BR04 (Goiás)</option>
-                <option value="BR06">BR06 (Sede)</option>
+                <option value="BR02">Santo André</option>
+                <option value="BR04">Goiana</option>
+                <option value="BR06">Betim</option>
               </select>
             </div>
 
