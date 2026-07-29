@@ -9,15 +9,12 @@ import {
   Eye, 
   Loader2,
   AlertCircle,
-  ChevronLeft, 
-  ChevronRight,
-  Edit,       // ✨ NOVO ÍCONE PARA EDIÇÃO
-  Plus,       // ✨ NOVO ÍCONE PARA ADICIONAR LINHA
-  Trash2      // ✨ NOVO ÍCONE PARA REMOVER LINHA
+  Plus,       
+  Trash2,
+  Save
 } from 'lucide-react';
 
 import { AuthContext } from '../../../contexts/AuthContext'; 
-import DetalhesSolicitacao from '../../Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao';
 
 // FUNÇÃO AUXILIAR: Traduz os códigos brutos para os nomes reais dos galpões
 const obterNomeFilial = (codigo) => {
@@ -43,10 +40,9 @@ export default function PainelAprovacao() {
   const [estoque, setEstoque] = useState([]); 
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [carregando, setCarregando] = useState(true);
+  
+  // --- ESTADOS DA LINHA EXPANDIDA (EDIÇÃO INLINE) ---
   const [linhaExpandida, setLinhaExpandida] = useState(null);
-
-  // ✨ --- ESTADOS DO MODAL DE EDIÇÃO DE ITENS ---
-  const [modalEdicaoItensAberto, setModalEdicaoItensAberto] = useState(false);
   const [solicitacaoSendoEditada, setSolicitacaoSendoEditada] = useState(null);
   const [itensEdicao, setItensEdicao] = useState([]);
 
@@ -89,7 +85,8 @@ export default function PainelAprovacao() {
               let dep = '-';
               
               if (String(item.tipo).trim() === 'Entrada' && item.itens && item.itens.length > 0) {
-                valorTotal = item.itens.reduce((acc, it) => acc + (Number(it.quantidade_solicitada || it.quantidade || 0) * Number(it.valor_unitario_manual || 0)), 0);
+                // Suporta tanto o nome 'quantidade_solicitada' quanto 'qtdFornecida'
+                valorTotal = item.itens.reduce((acc, it) => acc + (Number(it.quantidade_solicitada || it.qtdFornecida || it.quantidade || 0) * Number(it.valor_unitario_manual || 0)), 0);
                 centro = item.itens[0].centro || 'BR06';
                 dep = item.itens[0].deposito || '0020';
               }
@@ -147,29 +144,38 @@ export default function PainelAprovacao() {
   const indexUltimoEntradas = paginaEntradas * itensPorPagina;
   const entradasPendentesPaginadas = entradasPendentes.slice(indexPrimeiroEntradas, indexUltimoEntradas);
 
-  useEffect(() => {
-    setPaginaGeral(1);
-    setPaginaEntradas(1);
-  }, [termoPesquisa]);
-
-  const toggleLinha = (idUnico) => {
-    setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
+  // --- LÓGICA DE ABRIR A LINHA PARA EDIÇÃO INLINE ---
+  const toggleLinha = (idUnico, linha) => {
+    if (linhaExpandida === idUnico) {
+      setLinhaExpandida(null);
+      setSolicitacaoSendoEditada(null);
+      setItensEdicao([]);
+    } else {
+      setLinhaExpandida(idUnico);
+      setSolicitacaoSendoEditada(linha);
+      setItensEdicao(linha.itens ? JSON.parse(JSON.stringify(linha.itens)) : []);
+    }
   };
 
-  // ✨ --- LÓGICA DE EDIÇÃO DE ITENS --- ✨
-  const abrirModalEdicaoItens = (linha) => {
-    setSolicitacaoSendoEditada(linha);
-    // Cria uma cópia segura dos itens atuais para edição
-    setItensEdicao(linha.itens ? JSON.parse(JSON.stringify(linha.itens)) : []);
-    setModalEdicaoItensAberto(true);
-  };
-
+  // --- FUNÇÕES DE MANIPULAÇÃO DA TABELA INLINE ---
   const adicionarLinhaItem = () => {
     setItensEdicao([...itensEdicao, {
       id_temporario: `novo-${Date.now()}`,
       numPecaFabricante: '',
-      materialDescription: '',
-      quantidade_solicitada: 1
+      fornecedor: '',
+      qtdFornecida: 1,
+      nfEntrada: '',
+      unidadeMedida: 'Unid',
+      vendorDescription: '',
+      wbsElement: '',
+      dataNecessidade: '', 
+      emissaoNF: '',
+      recebNF: '',
+      docCompras: '',
+      poNetPrice: '',
+      centro: '',
+      deposito: '',
+      alocacao: ''
     }]);
   };
 
@@ -183,20 +189,20 @@ export default function PainelAprovacao() {
     setItensEdicao(novosItens);
   };
 
+  // --- SALVAR A EDIÇÃO ---
   const salvarEdicaoItens = async () => {
     if (!solicitacaoSendoEditada) return;
 
     try {
-      // 1. Atualização Otimista na Interface
       setDadosTabela(prev => prev.map(item => {
         if (item.idOriginal === solicitacaoSendoEditada.idOriginal) {
           return { ...item, itens: itensEdicao };
         }
         return item;
       }));
-      setModalEdicaoItensAberto(false); // Fecha o modal imediatamente
+      
+      setLinhaExpandida(null);
 
-      // 2. Envio para a API (AJUSTA A ROTA CONFORME O TEU BACKEND)
       const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${solicitacaoSendoEditada.idOriginal}/itens`, {
         method: 'PATCH', 
         headers: { 
@@ -208,14 +214,13 @@ export default function PainelAprovacao() {
 
       if (!resposta.ok) {
         console.warn("O servidor recusou a atualização dos itens.");
-        // Opcional: Reverter a interface se a API falhar
       }
     } catch (error) {
       console.error('Erro de rede ao tentar atualizar os itens:', error);
     }
   };
 
-  // --- AÇÃO DE APROVAÇÃO ---
+  // --- AÇÕES GERAIS ---
   const handleAprovar = async (e, idOriginal) => {
     e.stopPropagation();
     if (window.confirm(`Aprovar esta solicitação?`)) {
@@ -228,7 +233,6 @@ export default function PainelAprovacao() {
           },
           body: JSON.stringify({ status: 'Em Separação' }) 
         });
-        
         if (resposta.ok) {
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
@@ -239,7 +243,6 @@ export default function PainelAprovacao() {
     }
   };
 
-  // --- AÇÃO DE RECUSA ---
   const handleRecusar = async (e, idOriginal) => {
     e.stopPropagation();
     const motivo = window.prompt(`Motivo da recusa para esta solicitação?`);
@@ -253,7 +256,6 @@ export default function PainelAprovacao() {
           },
           body: JSON.stringify({ status: 'Recusado', motivo_recusa: motivo }) 
         });
-        
         if (resposta.ok) {
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
@@ -264,9 +266,134 @@ export default function PainelAprovacao() {
     }
   };
 
+  // ✨ COMPONENTE REUTILIZÁVEL: GAVETA DE EDIÇÃO COMPLETA ✨
+  const renderizarGavetaEdicao = () => (
+    <div className="gaveta-detalhes" style={{ padding: '24px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h4 style={{ margin: 0, color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <FileText size={18} color="#0284c7" /> Itens da Solicitação (Modo de Edição)
+        </h4>
+        <button 
+          onClick={adicionarLinhaItem}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: '#fff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
+        >
+          <Plus size={14} /> Adicionar Nova Linha
+        </button>
+      </div>
+
+      <div style={{ overflowX: 'auto', marginBottom: '20px', paddingBottom: '10px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2200px' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', textAlign: 'center', width: '60px' }}>AÇÕES</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>Nº PEÇA FABRICANTE</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>FORNECEDOR</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '120px' }}>QTD. FORNECIDA</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>NF DE ENTRADA</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '140px' }}>UNIDADE DE MEDIDA</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', minWidth: '200px' }}>VENDOR DESCRIPTION</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>WBS ELEMENT</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DATA DE NECESSIDADE</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>EMISSÃO NF</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>RECEB. NF</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DOCUMENTO DE COMPRAS</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>PO NET PRICE</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '100px' }}>CENTRO</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '100px' }}>DEPÓSITO</th>
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>ALOCAÇÃO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {itensEdicao.map((item, index) => (
+              <tr key={item.id || item.id_temporario || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                  <button onClick={() => removerLinhaItem(index)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }} title="Remover linha">
+                    <Trash2 size={16} />
+                  </button>
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.numPecaFabricante || item.part_number || ''} onChange={(e) => atualizarCampoItem(index, 'numPecaFabricante', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="PN" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.fornecedor || ''} onChange={(e) => atualizarCampoItem(index, 'fornecedor', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Fornecedor" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="number" value={item.qtdFornecida || item.quantidade_solicitada || item.quantidade || 1} onChange={(e) => atualizarCampoItem(index, 'qtdFornecida', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} min="1" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.nfEntrada || ''} onChange={(e) => atualizarCampoItem(index, 'nfEntrada', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="NF Entrada" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <select value={item.unidadeMedida || 'Unid'} onChange={(e) => atualizarCampoItem(index, 'unidadeMedida', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }}>
+                    <option value="Unid">Unid</option>
+                    <option value="Kg">Kg</option>
+                    <option value="Metro">Metro</option>
+                    <option value="Caixa">Caixa</option>
+                    <option value="Litro">Litro</option>
+                    <option value="NR">NR</option>
+                  </select>
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.vendorDescription || item.materialDescription || ''} onChange={(e) => atualizarCampoItem(index, 'vendorDescription', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Descrição do fornecedor" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.wbsElement || ''} onChange={(e) => atualizarCampoItem(index, 'wbsElement', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="WBS" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="date" value={item.dataNecessidade || ''} onChange={(e) => atualizarCampoItem(index, 'dataNecessidade', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="date" value={item.emissaoNF || ''} onChange={(e) => atualizarCampoItem(index, 'emissaoNF', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="date" value={item.recebNF || ''} onChange={(e) => atualizarCampoItem(index, 'recebNF', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.docCompras || ''} onChange={(e) => atualizarCampoItem(index, 'docCompras', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Doc Compras" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.poNetPrice || ''} onChange={(e) => atualizarCampoItem(index, 'poNetPrice', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="R$ 0,00" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.centro || ''} onChange={(e) => atualizarCampoItem(index, 'centro', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Centro" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.deposito || ''} onChange={(e) => atualizarCampoItem(index, 'deposito', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Depósito" />
+                </td>
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.alocacao || ''} onChange={(e) => atualizarCampoItem(index, 'alocacao', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Alocação" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        
+        {itensEdicao.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.875rem' }}>
+            Não existem itens nesta solicitação. Adicione uma nova linha.
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+        <button 
+          onClick={() => toggleLinha(linhaExpandida, solicitacaoSendoEditada)}
+          style={{ padding: '8px 16px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#475569', fontWeight: '600', cursor: 'pointer', fontSize: '0.85rem' }}
+        >
+          Cancelar
+        </button>
+        <button 
+          onClick={salvarEdicaoItens}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#0284c7', border: 'none', borderRadius: '6px', color: '#fff', fontWeight: '600', cursor: 'pointer', fontSize: '0.85rem' }}
+        >
+          <Save size={16} /> Guardar Alterações
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="dashboard-container" style={{ position: 'relative' }}>
-      
       <header className="acompanhamento-cabecalho">
         <h1>Painel de Aprovação</h1>
         <p>Analise e aprove as solicitações pendentes para dar andamento à operação.</p>
@@ -311,7 +438,6 @@ export default function PainelAprovacao() {
                 {outrasPendentesPaginadas.map((linha) => {
                   const idUnico = `geral-${linha.idOriginal}`;
                   const isExpandida = linhaExpandida === idUnico;
-                  
                   const isCrossdocking = linha.tipo === 'Crossdocking';
                   let nfNoEstoque = true; 
 
@@ -322,13 +448,11 @@ export default function PainelAprovacao() {
                   return (
                     <React.Fragment key={idUnico}>
                       <div className="item-lista-horizontal">
-                        
                         <div className="item-info-principal">
                           <div className="item-linha-id">
                             {linha.ps}
                             <span className="badge-tipo-lista azul">{linha.tipo}</span>
                           </div>
-                          
                           <div className="item-meta-info">
                             WBS: <a href="#" className="link-wbs">{linha.wbs}</a> &middot;
                             {linha.itens?.length || 0} itens &middot;
@@ -337,13 +461,8 @@ export default function PainelAprovacao() {
                         </div>
 
                         <div className="item-acoes-grupo">
-                          {/* ✨ BOTÃO EDITAR ITENS */}
-                          <button className="btn-acao-lista" style={{ color: '#0369a1' }} onClick={() => abrirModalEdicaoItens(linha)}>
-                            <Edit size={16} /> Editar Itens
-                          </button>
-
-                          <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico)}>
-                            <Eye size={16} /> Ver Itens
+                          <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico, linha)}>
+                            <Eye size={16} /> {isExpandida ? "Fechar Itens" : "Ver / Editar Itens"}
                           </button>
 
                           {isCrossdocking && !nfNoEstoque ? (
@@ -363,11 +482,8 @@ export default function PainelAprovacao() {
                         </div>
                       </div>
 
-                      {isExpandida && (
-                        <div className="gaveta-detalhes">
-                          <DetalhesSolicitacao item={linha} perfil="logistica" />
-                        </div>
-                      )}
+                      {isExpandida && renderizarGavetaEdicao()}
+                      
                     </React.Fragment>
                   );
                 })}
@@ -401,13 +517,11 @@ export default function PainelAprovacao() {
                   return (
                     <React.Fragment key={idUnico}>
                       <div className="item-lista-horizontal">
-                        
                         <div className="item-info-principal">
                           <div className="item-linha-id">
                             {linha.ps}
                             <span className="badge-tipo-lista verde">Entrada</span>
                           </div>
-                          
                           <div className="item-meta-info">
                             WBS: <a href="#" className="link-wbs">{linha.wbs}</a> &middot;
                             {linha.itens?.length || 0} itens &middot;
@@ -416,14 +530,10 @@ export default function PainelAprovacao() {
                         </div>
 
                         <div className="item-acoes-grupo">
-                          {/* ✨ BOTÃO EDITAR ITENS */}
-                          <button className="btn-acao-lista" style={{ color: '#0369a1' }} onClick={() => abrirModalEdicaoItens(linha)}>
-                            <Edit size={16} /> Editar Itens
+                          <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico, linha)}>
+                            <Eye size={16} /> {isExpandida ? "Fechar Itens" : "Ver / Editar Itens"}
                           </button>
-
-                          <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico)}>
-                            <Eye size={16} /> Ver Itens
-                          </button>
+                          
                           <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
                             <X size={16} /> Recusar
                           </button>
@@ -433,11 +543,8 @@ export default function PainelAprovacao() {
                         </div>
                       </div>
 
-                      {isExpandida && (
-                        <div className="gaveta-detalhes">
-                          <DetalhesSolicitacao item={linha} perfil="logistica" />
-                        </div>
-                      )}
+                      {isExpandida && renderizarGavetaEdicao()}
+
                     </React.Fragment>
                   );
                 })}
@@ -446,111 +553,6 @@ export default function PainelAprovacao() {
           </div>
         </>
       )}
-
-      {/* ✨ MODAL DE EDIÇÃO DE ITENS ✨ */}
-      {modalEdicaoItensAberto && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-          backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', 
-          alignItems: 'center', justifyContent: 'center', zIndex: 9999
-        }}>
-          <div style={{
-            backgroundColor: '#fff', padding: '24px', borderRadius: '12px', 
-            width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a' }}>
-                <Edit size={20} color="#0284c7" /> Editar Itens da Solicitação {solicitacaoSendoEditada?.ps}
-              </h3>
-              <button onClick={() => setModalEdicaoItensAberto(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div style={{ marginBottom: '16px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                    <th style={{ padding: '8px', fontSize: '0.85rem', color: '#475569' }}>Part Number</th>
-                    <th style={{ padding: '8px', fontSize: '0.85rem', color: '#475569' }}>Descrição</th>
-                    <th style={{ padding: '8px', fontSize: '0.85rem', color: '#475569', width: '80px' }}>Qtd</th>
-                    <th style={{ padding: '8px', fontSize: '0.85rem', color: '#475569', width: '50px', textAlign: 'center' }}>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {itensEdicao.map((item, index) => (
-                    <tr key={item.id || item.id_temporario || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px' }}>
-                        <input 
-                          type="text" 
-                          value={item.numPecaFabricante || item.part_number || ''} 
-                          onChange={(e) => atualizarCampoItem(index, 'numPecaFabricante', e.target.value)}
-                          style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                          placeholder="PN"
-                        />
-                      </td>
-                      <td style={{ padding: '8px' }}>
-                        <input 
-                          type="text" 
-                          value={item.materialDescription || item.descricao || ''} 
-                          onChange={(e) => atualizarCampoItem(index, 'materialDescription', e.target.value)}
-                          style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                          placeholder="Descrição"
-                        />
-                      </td>
-                      <td style={{ padding: '8px' }}>
-                        <input 
-                          type="number" 
-                          value={item.quantidade_solicitada || item.quantidade || item.qtd || 1} 
-                          onChange={(e) => atualizarCampoItem(index, 'quantidade_solicitada', e.target.value)}
-                          style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                          min="1"
-                        />
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        <button 
-                          onClick={() => removerLinhaItem(index)}
-                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              
-              {itensEdicao.length === 0 && (
-                <p style={{ textAlign: 'center', color: '#94a3b8', margin: '20px 0' }}>Nenhum item na lista.</p>
-              )}
-            </div>
-
-            <button 
-              onClick={adicionarLinhaItem}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer', marginBottom: '24px' }}
-            >
-              <Plus size={16} /> Adicionar Linha
-            </button>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
-              <button 
-                onClick={() => setModalEdicaoItensAberto(false)}
-                style={{ padding: '8px 16px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#475569', fontWeight: '500', cursor: 'pointer' }}
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={salvarEdicaoItens}
-                style={{ padding: '8px 16px', background: '#0284c7', border: 'none', borderRadius: '6px', color: '#fff', fontWeight: '500', cursor: 'pointer' }}
-              >
-                Salvar Alterações
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
