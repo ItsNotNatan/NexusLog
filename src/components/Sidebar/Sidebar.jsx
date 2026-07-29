@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 import {
   LayoutDashboard, ListTodo, PackagePlus, Archive, Download, FileSpreadsheet, Settings, Hexagon,
-  ClipboardEdit, Boxes, FileClock, ArrowLeft, Waypoints, ClipboardList
+  ClipboardEdit, Boxes, FileClock, ArrowLeft, Waypoints, ClipboardList, Home // 👈 Adicionámos o ícone Home aqui
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -11,7 +11,6 @@ export default function Sidebar({ modulo }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 👇 Extraímos APENAS o utilizador e depois lemos o seu cargo para evitar ecrã branco
   const { usuario } = useAuth();
   const role = usuario?.cargo; 
 
@@ -42,9 +41,7 @@ export default function Sidebar({ modulo }) {
     { path: '/logistica/configuracoes', label: 'Configurações', icon: <Settings size={20} />, roles: ['ADM'] },
   ];
 
-  // Filtra o menu da logística para mostrar apenas o que o cargo atual permite
   const menuLogisticaFiltrado = menuLogistica.filter(item => item.roles.includes(role));
-
   const menuItems = modulo === 'cliente' ? menuCliente : menuLogisticaFiltrado;
   const tituloSidebar = modulo === 'cliente' ? 'Portal do Cliente' : 'NexusLog';
 
@@ -73,13 +70,14 @@ export default function Sidebar({ modulo }) {
         </ul>
       </nav>
 
+      {/* ✨ MUDANÇA: O rodapé voltou, apontando para a Homepage e com um novo ícone! */}
       <div className="sidebar-footer">
         <button
           className="btn-voltar-sidebar"
-          onClick={() => navigate('/selecionar-filial', { state: { destinoFinal: location.pathname } })}
+          onClick={() => navigate('/')}
         >
-          <ArrowLeft size={18} />
-          Voltar a Galpões
+          <Home size={18} />
+          Página Inicial
         </button>
       </div>
     </aside>

@@ -17,13 +17,14 @@ import ModalProcessamento from "../../../components/ModalProcessamento/ModalProc
 import { useProcessadorExcel } from "../../../hooks/useProcessadorExcel";
 import ExemploExcel from "../../../components/ExemploExcel/ExemploExcel";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
-import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral"; // 👈 NOVO COMPONENTE
+import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral";
 import { supabase } from "../../../supabaseClient";
 
 export default function MaterialEstoque() {
 
   const { estoqueAtual } = useContext(AuthContext);
 
+  // 1. ESTADO: Adicionámos o campo justificativaUrgencia
   const [formDados, setFormDados] = useState({
     nome: "",
     wbs: "",
@@ -31,9 +32,9 @@ export default function MaterialEstoque() {
     dataNecessidade: "",
     observacoes: "",
     entregaUrgente: false,
+    justificativaUrgencia: "", // 👈 Novo campo
   });
 
-  // ✨ ESTADO E EFFECT: Lógica exata do RequestForm para travar o calendário
   const [dataMinima, setDataMinima] = useState("");
 
   useEffect(() => {
@@ -51,9 +52,6 @@ export default function MaterialEstoque() {
 
   const processador = useProcessadorExcel();
 
-  // =========================================================
-  // MÁGICA: BUSCAR ESTOQUE REAL DA API PARA A LISTA LATERAL
-  // =========================================================
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
@@ -61,7 +59,6 @@ export default function MaterialEstoque() {
         const resultado = await resposta.json();
 
         if (resposta.ok && resultado.sucesso) {
-
           const itensComSaldo = resultado.dados
             .filter((item) => item.quantidade_disponivel > 0)
             .map((item) => ({
@@ -134,6 +131,12 @@ export default function MaterialEstoque() {
       return;
     }
 
+    // 👈 TRAVA DE VALIDAÇÃO: Se for urgente, a justificativa é obrigatória
+    if (formDados.entregaUrgente && !formDados.justificativaUrgencia.trim()) {
+      alert("Como marcou a entrega como Urgente, é obrigatório preencher a justificativa do atraso.");
+      return;
+    }
+
     if (itensSelecionados.length === 0) {
       alert("Adicione pelo menos um item à solicitação.");
       return;
@@ -172,10 +175,17 @@ export default function MaterialEstoque() {
       }
     }
 
-const payload = {
+    // 👈 JUNTA A JUSTIFICATIVA NAS OBSERVAÇÕES
+    let observacoesFinais = formDados.observacoes;
+    if (formDados.entregaUrgente) {
+      observacoesFinais = `[URGÊNCIA/ATRASO: ${formDados.justificativaUrgencia}] ${observacoesFinais}`;
+    }
+
+    const payload = {
       solicitante: {
         ...formDados,
-        filial_origem: estoqueAtual // 👈 ADICIONA ESTA LINHA PARA O BACKEND SABER A FILIAL
+        observacoes: observacoesFinais, // Envia as observações concatenadas com a justificativa
+        filial_origem: estoqueAtual 
       },
       itens: itensSelecionados,
       anexos: anexosProcessados,
@@ -199,6 +209,7 @@ const payload = {
           dataNecessidade: "",
           observacoes: "",
           entregaUrgente: false,
+          justificativaUrgencia: "",
         });
         setItensSelecionados([]);
         setAnexos([]);
@@ -265,7 +276,6 @@ const payload = {
             </label>
             <div className="input-wrapper-fixo">
               <MapPin size={16} className="icone-dentro-input" />
-              {/* 👇 ALTERAÇÃO AQUI: value={estoqueAtual} em vez do texto fixo */}
               <input
                 type="text"
                 className="input-campo"
@@ -306,7 +316,7 @@ const payload = {
             />
           </div>
           <div className="input-grupo span-2">
-            <label>OBSERVAÇÕES</label>
+            <label>OBSERVAÇÕES GERAIS</label>
             <textarea
               className="input-campo"
               placeholder="Informações adicionais..."
@@ -324,61 +334,93 @@ const payload = {
         <div
           style={{
             display: "flex",
+            flexDirection: "column",
             alignItems: "flex-start",
-            gap: "12px",
             padding: "16px",
             border: "1px solid #cbd5e1",
             borderRadius: "8px",
             backgroundColor: "#f8fafc",
             marginTop: "20px",
+            transition: "all 0.3s ease",
           }}
         >
-          <input
-            type="checkbox"
-            id="checkbox-urgente"
-            checked={formDados.entregaUrgente}
-            onChange={(e) =>
-              setFormDados({ ...formDados, entregaUrgente: e.target.checked })
-            }
-            style={{
-              marginTop: "4px",
-              cursor: "pointer",
-              width: "16px",
-              height: "16px",
-            }}
-          />
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Zap size={16} color="#475569" />
-              <label
-                htmlFor="checkbox-urgente"
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", width: "100%" }}>
+            <input
+              type="checkbox"
+              id="checkbox-urgente"
+              checked={formDados.entregaUrgente}
+              onChange={(e) => {
+                const isChecked = e.target.checked;
+                setFormDados({ 
+                  ...formDados, 
+                  entregaUrgente: isChecked,
+                  // Limpa a justificativa se o utilizador desmarcar a caixa
+                  justificativaUrgencia: isChecked ? formDados.justificativaUrgencia : "" 
+                });
+              }}
+              style={{
+                marginTop: "4px",
+                cursor: "pointer",
+                width: "16px",
+                height: "16px",
+              }}
+            />
+            <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Zap size={16} color={formDados.entregaUrgente ? "#ef4444" : "#475569"} />
+                <label
+                  htmlFor="checkbox-urgente"
+                  style={{
+                    fontWeight: "600",
+                    color: formDados.entregaUrgente ? "#ef4444" : "#0f172a",
+                    margin: 0,
+                    cursor: "pointer",
+                    transition: "color 0.2s ease"
+                  }}
+                >
+                  Entrega Urgente / Atraso
+                </label>
+              </div>
+              <span
                 style={{
-                  fontWeight: "600",
-                  color: "#0f172a",
-                  margin: 0,
-                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  color: "#64748b",
+                  marginTop: "4px",
                 }}
               >
-                Entrega Urgente
-              </label>
+                Marcando esta opção, a solicitação entrará em fila de aprovação
+                exclusiva do Administrador.
+              </span>
+              
+              {/* 👈 RENDERIZAÇÃO CONDICIONAL DA CAIXA DE TEXTO */}
+              {formDados.entregaUrgente && (
+                <div style={{ marginTop: "16px", width: "100%", animation: "fadeIn 0.3s ease" }}>
+                  <label style={{ fontSize: "0.75rem", fontWeight: "600", color: "#ef4444", marginBottom: "6px", display: "block" }}>
+                    JUSTIFICATIVA DA URGÊNCIA *
+                  </label>
+                  <textarea
+                    className="input-campo"
+                    placeholder="Explique detalhadamente o motivo da urgência ou atraso no pedido..."
+                    rows="2"
+                    value={formDados.justificativaUrgencia}
+                    onChange={(e) =>
+                      setFormDados({ ...formDados, justificativaUrgencia: e.target.value })
+                    }
+                    style={{
+                      borderColor: "#fca5a5",
+                      backgroundColor: "#fef2f2"
+                    }}
+                  ></textarea>
+                </div>
+              )}
+
             </div>
-            <span
-              style={{
-                fontSize: "0.85rem",
-                color: "#64748b",
-                marginTop: "4px",
-              }}
-            >
-              Marcando esta opção, a solicitação entrará em fila de aprovação
-              exclusiva do Administrador.
-            </span>
           </div>
         </div>
       </div>
 
       <div className="selecao-itens-grid">
 
-        {/* 👇 O NOVO COMPONENTE ISOLADO FAZ TUDO AQUI! 👇 */}
         <SeletorEstoqueLateral
           estoque={estoqueDisponivel}
           carregando={carregandoEstoque}
@@ -757,7 +799,6 @@ const payload = {
                         />
                       </td>
                       <td style={{ padding: "8px 12px" }}>
-                        {/* 👇 MOSTRAMOS SE É TRANSFERIDO NA COLUNA ALOCAÇÃO */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <input
                             value={item.alocacao || ""}

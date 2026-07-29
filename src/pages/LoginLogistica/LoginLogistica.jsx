@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './LoginLogistica.css';
-// 👇 1. Adicionámos o ícone ArrowLeft aqui
 import { Hexagon, Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import { useAuth } from '../../contexts/AuthContext'; 
@@ -35,16 +34,14 @@ export default function LoginLogistica() {
         throw new Error(data.erro || 'Erro ao fazer login.');
       }
 
-      // Validação de segurança: apenas a equipa de logística pode entrar
       if (data.usuario.cargo !== 'ADM' && data.usuario.cargo !== 'LIDER' && data.usuario.cargo !== 'OPERADOR') {
         throw new Error('Acesso negado. Este portal é exclusivo para a equipe de Logística.');
       }
 
-      // Passamos o utilizador E o token para o contexto
       await login(data.usuario, data.token);
       
-      // Redireciona o utilizador após guardar os dados com sucesso
-      navigate('/selecionar-filial', { state: { destinoFinal: '/logistica/painel' } });
+      // ✨ MUDANÇA: Redireciona direto para o painel de logística
+      navigate('/logistica/painel');
 
     } catch (error) {
       setErro(error.message);
@@ -53,7 +50,6 @@ export default function LoginLogistica() {
     }
   };
 
-  // 👇 2. Função simples para voltar à página inicial
   const handleVoltar = () => {
     navigate('/');
   };
@@ -62,7 +58,6 @@ export default function LoginLogistica() {
     <div className="login-page-wrapper">
       <div className="login-card">
         
-        {/* 👇 3. Botão de Voltar adicionado no topo do cartão */}
         <button 
           onClick={handleVoltar}
           style={{ 

@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Search, Boxes, Loader2, MapPin, X, History, ArrowRightLeft, Filter } from 'lucide-react';
 import './VisaoGeralEstoque.css'; 
 import FiltroEstoqueModal from '../../../components/FiltroEstoqueModal/FiltroEstoqueModal';
+
+// ✨ NOVO: Importamos o AuthContext para ler a filial global selecionada
+import { AuthContext } from '../../../contexts/AuthContext';
 
 // ✨ ESTADO INICIAL PARA TODOS OS FILTROS
 const ESTADO_INICIAL_FILTROS = {
@@ -21,6 +24,9 @@ const ESTADO_INICIAL_FILTROS = {
 };
 
 export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
+  // ✨ NOVO: Consumimos a variável estoqueAtual (que guarda 'TODOS' ou 'BR02', etc.)
+  const { estoqueAtual } = useContext(AuthContext);
+
   const [dadosEstoque, setDadosEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
@@ -37,13 +43,15 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
   const tituloPagina = perfil === 'cliente' ? 'Consulta de Estoque' : 'Visão Geral do Estoque';
   const subtituloPagina = perfil === 'cliente' 
     ? 'Consulte a disponibilidade de materiais em tempo real.' 
-    : 'Painel de controle do saldo físico de todas as filiais.';
+    : 'Painel de controle do saldo físico das filiais.';
 
   useEffect(() => {
     const carregarEstoqueDoBackend = async () => {
       try {
         setCarregando(true);
-        const resposta = await fetch('http://localhost:3001/api/estoque/listar');
+        // ✨ NOVO: Enviamos o parâmetro de filial na URL da requisição
+        const url = `http://localhost:3001/api/estoque/listar?filial=${estoqueAtual}`;
+        const resposta = await fetch(url);
         const resultado = await resposta.json();
 
         if (!resposta.ok || !resultado.sucesso) {
@@ -52,7 +60,7 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
 
         const estoqueTratado = (resultado.dados || []).map((item) => ({
           id: item.id,
-          filial: item.filial_id || 'BR06',
+          filial: item.filial_id || item.filial || 'BR06',
           desenho_sap: item.desenho_sap || item.desenho_sap_manual || '—',
           part_number: item.part_number || 'Sem PN',
           descricao: item.descricao || 'Sem descrição',
@@ -78,7 +86,7 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     };
 
     carregarEstoqueDoBackend();
-  }, []);
+  }, [estoqueAtual]); // ✨ NOVO: O useEffect agora recarrega os dados se 'estoqueAtual' mudar!
 
   const handleLinhaDuploClique = async (material) => {
     setMaterialSelecionado(material);
@@ -127,10 +135,9 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     
     for (const chave in filtros) {
       if (filtros[chave]) {
-        // Se o valor do item não for igual ao valor selecionado no react-select, ele é rejeitado
         if (item[chave] !== filtros[chave].value) {
           passaFiltrosAvancados = false;
-          break; // Poupa processamento: se chumbou num filtro, não precisa verificar os outros
+          break; 
         }
       }
     }
@@ -138,7 +145,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     return passaPesquisaTexto && passaFiltrosAvancados;
   });
 
-  // Saber se a bolinha vermelha deve aparecer no botão
   const temFiltroAtivo = Object.values(filtros).some(valor => valor !== null);
 
   const limparTodosFiltros = () => {

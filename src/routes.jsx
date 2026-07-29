@@ -4,7 +4,6 @@ import { createBrowserRouter } from 'react-router-dom';
 import AppLayout from './components/Layout/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import CentralDeOperacoes from './pages/CentralOperacoes/CentralOperacoes';
-import SelecionarFilial from './pages/SelecionarFilial/SelecionarFilial';
 import LoginLogistica from './pages/LoginLogistica/LoginLogistica';
 
 // --- PÁGINAS DA LOGÍSTICA ---
@@ -24,7 +23,6 @@ import AcompanhamentoSolicitacoes from './pages/Cliente/AcompanhamentoSolicitaco
 
 export const router = createBrowserRouter([
   { path: "/", element: <CentralDeOperacoes /> },
-  { path: "/selecionar-filial", element: <SelecionarFilial /> },
   { path: "/login", element: <LoginLogistica /> },
 
   // ==========================================
@@ -32,8 +30,6 @@ export const router = createBrowserRouter([
   // ==========================================
   {
     path: "/cliente",
-    // 👇 MUDANÇA AQUI: Removemos o <ProtectedRoute />
-    // O utilizador entra direto no AppLayout do cliente
     element: <AppLayout modulo="cliente" />, 
     children: [
       { path: "consulta-estoque", element: <VisaoGeralEstoque perfil="cliente" /> },

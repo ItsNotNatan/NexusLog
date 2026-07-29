@@ -23,16 +23,16 @@ export default function CentralDeOperacoes() {
                 <div className="cartao">
                     <div className="icone-destaque-azul"><Box size={24} /></div>
                     <h2 className="cartao-titulo">Portal do Cliente</h2>
-                    <p className="cartao-descricao">Consulte estoque, faça solicitações e acompanhe seus pedidos por filial.</p>
+                    <p className="cartao-descricao">Consulte estoque, faça solicitações e acompanhe seus pedidos.</p>
                     <div className="area-tags">
                         <span className="tag">Estoque</span><span className="tag">Solicitações</span><span className="tag">Rastreabilidade</span>
                     </div>
-                    {/* Vai para a filial, mas avisa que o destino final é a rota do cliente */}
+                    {/* ✨ MUDANÇA: Vai direto para o estoque do cliente */}
                     <button
                         className="botao-acao"
-                        onClick={() => navigate('/selecionar-filial', { state: { destinoFinal: '/cliente/consulta-estoque' } })}
+                        onClick={() => navigate('/cliente/consulta-estoque')}
                     >
-                        Selecionar Filial <ArrowRight size={18} className="icone-seta" />
+                        Acessar Portal <ArrowRight size={18} className="icone-seta" />
                     </button>
                 </div>
 
@@ -45,7 +45,6 @@ export default function CentralDeOperacoes() {
                         <span className="tag">Dashboard</span><span className="tag">Aprovação de BS</span><span className="tag">Painel Geral</span>
                     </div>
 
-                    {/* 👇 CORREÇÃO: Agora manda direto para o Login! */}
                     <button
                         className="botao-acao"
                         onClick={() => navigate('/login')}
@@ -54,8 +53,6 @@ export default function CentralDeOperacoes() {
                     </button>
                 </div>
             </main>
-
-            {/* ... a secção de atalhos em baixo e rodapé mantém-se igual, omiti para não poluir ... */}
         </div>
     );
 }
