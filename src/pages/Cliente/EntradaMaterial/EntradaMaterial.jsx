@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react'; // ✨ 1. Adicionámos o useContext
+import React, { useState, useEffect, useContext } from 'react';
 import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react';
 
 // NOSSOS COMPONENTES E HOOKS
@@ -9,20 +9,25 @@ import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal
 
 // Cliente do Supabase
 import { supabase } from '../../../supabaseClient';
-import { AuthContext } from '../../../contexts/AuthContext'; // ✨ 2. Importámos o Contexto Global
+import { AuthContext } from '../../../contexts/AuthContext'; 
+// ✨ 1. Importamos o Contexto de Alertas Global
+import { AlertContext } from '../../../contexts/AlertContext'; 
 
 export default function EntradaMaterial() {
-  // ✨ 3. Puxamos a informação do armazém selecionado lá no Header
+  // Puxamos a informação do armazém selecionado lá no Header
   const { estoqueAtual } = useContext(AuthContext);
+  
+  // ✨ 2. Consumimos a função de disparo de alertas
+  const { showAlert } = useContext(AlertContext);
 
-  // 1. ESTADO: Dados gerais do formulário (Limpo, sem filial_id)
+  // ESTADO: Dados gerais do formulário
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
     observacoes: ''
   });
 
-  // ESTADO E EFFECT: Lógica exata do RequestForm para travar o calendário
+  // ESTADO E EFFECT: Lógica para travar o calendário
   const [dataMinima, setDataMinima] = useState('');
 
   useEffect(() => {
@@ -42,7 +47,7 @@ export default function EntradaMaterial() {
     unidadeMedida: 'Unid',
     vendorDescription: '',
     wbsElement: '',
-    dataNecessidade: '', // Coluna Nova
+    dataNecessidade: '', 
     emissaoNF: '',
     recebNF: '',
     docCompras: '',
@@ -52,10 +57,10 @@ export default function EntradaMaterial() {
     alocacao: ''
   });
 
-  // 2. ESTADO: Tabela dinâmica de itens
+  // ESTADO: Tabela dinâmica de itens
   const [itens, setItens] = useState([gerarLinhaVazia()]);
 
-  // 3. ESTADO: Ficheiros anexados
+  // ESTADO: Ficheiros anexados
   const [anexos, setAnexos] = useState([]);
 
   // INICIA O MAESTRO (Hook de Processamento do Excel)
@@ -102,7 +107,8 @@ export default function EntradaMaterial() {
     if (itens.length > 1) {
       setItens(itens.filter(item => item.id !== idParaRemover));
     } else {
-      alert("A solicitação precisa ter pelo menos um item.");
+      // ✨ 3. Substituição do Alerta de Tabela Vazia
+      showAlert("A solicitação precisa ter pelo menos um item.", "warning");
     }
   };
 
@@ -120,24 +126,26 @@ export default function EntradaMaterial() {
 
   // --- ENVIO PARA O BACKEND (NODE.JS) ---
   const handleEnviar = async () => {
-    // ✨ 4. NOVA TRAVA: Verifica o cabeçalho antes de deixar enviar!
+    // ✨ 4. Substituição de Alerta: Trava de filial não selecionada
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
-      alert("Por favor, selecione em qual filial você está dando entrada (ex: BR02) lá no topo da página antes de enviar.");
+      showAlert("Por favor, selecione em qual filial você está dando entrada (ex: BR02) lá no topo da página antes de enviar.", "warning");
       return;
     }
 
-    // Validação ajustada para não pedir mais o filial_id no formDados
+    // ✨ 5. Substituição de Alerta: Campos de texto obrigatórios
     if (!formDados.nome || !formDados.wbs) {
-      alert("Preencha o Nome e o WBS do solicitante.");
+      showAlert("Preencha o Nome e o WBS do solicitante.", "warning");
       return;
     }
 
+    // ✨ 6. Substituição de Alerta: Itens incompletos
     const itensIncompletos = itens.some(i => !i.numPecaFabricante || !i.qtdFornecida);
     if (itensIncompletos) {
-      alert("Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.");
+      showAlert("Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.", "warning");
       return;
     }
 
+    // ✨ 7. Substituição de Alerta: Datas Retroativas
     const datasInvalidas = itens.some(i =>
       (i.emissaoNF && i.emissaoNF < dataMinima) ||
       (i.recebNF && i.recebNF < dataMinima) ||
@@ -145,7 +153,7 @@ export default function EntradaMaterial() {
     );
 
     if (datasInvalidas) {
-      alert("Existem datas preenchidas que são anteriores ao dia atual. Por favor, corrija-as antes de enviar.");
+      showAlert("Existem datas preenchidas que são anteriores ao dia atual. Por favor, corrija-as antes de enviar.", "warning");
       return;
     }
 
@@ -164,7 +172,8 @@ export default function EntradaMaterial() {
 
           if (erroUpload) {
             console.error("Erro ao subir arquivo:", erroUpload);
-            alert(`Falha ao anexar o ficheiro: ${arquivo.name}.`);
+            // ✨ 8. Substituição de Alerta: Erro no upload
+            showAlert(`Falha ao anexar o ficheiro: ${arquivo.name}.`, "error");
             return;
           }
 
@@ -179,11 +188,11 @@ export default function EntradaMaterial() {
         }
       }
 
-      // ✨ 5. O SEGREDO: Injetamos o estoqueAtual diretamente no payload!
+      // Injetamos o estoqueAtual diretamente no payload
       const payload = {
         solicitante: {
           ...formDados,
-          filial_id: estoqueAtual, // 👈 Pega a informação do cabeçalho automaticamente
+          filial_id: estoqueAtual, 
           tipo: 'Entrada'
         },
         itens: itens.map(item => ({
@@ -204,16 +213,19 @@ export default function EntradaMaterial() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        alert(`Sucesso! Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps}`);
+        // ✨ 9. Substituição de Alerta: Sucesso!
+        showAlert(`Sucesso! Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
         setItens([gerarLinhaVazia()]);
         setAnexos([]);
       } else {
-        alert(`Erro do servidor: ${dados.erro}`);
+        // ✨ 10. Substituição de Alerta: Falha da API
+        showAlert(`Erro do servidor: ${dados.erro}`, "error");
       }
     } catch (error) {
       console.error("Erro na requisição:", error);
-      alert("Falha ao conectar com o servidor. Verifique se o backend está rodando na porta 3001.");
+      // ✨ 11. Substituição de Alerta: Falha de conexão
+      showAlert("Falha ao conectar com o servidor. Verifique se o backend está rodando na porta 3001.", "error");
     }
   };
 
@@ -259,8 +271,6 @@ export default function EntradaMaterial() {
               onChange={(e) => setFormDados({ ...formDados, wbs: e.target.value })}
             />
           </div>
-
-          {/* ✨ O CAMPO VISUAL FOI REMOVIDO DAQUI! Fica um layout limpo de 2 colunas. */}
 
           <div className="input-grupo span-2">
             <label>OBSERVAÇÕES</label>
