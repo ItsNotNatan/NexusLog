@@ -11,15 +11,15 @@ import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal
 import { supabase } from '../../../supabaseClient';
 
 export default function EntradaMaterial() {
-  // 1. ESTADO: Dados gerais do formulário (✨ Adicionado filial_id)
+  // 1. ESTADO: Dados gerais do formulário
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
     observacoes: '',
-    filial_id: '' // 👈 Novo campo para armazenar o estoque escolhido
+    filial_id: '' // 👈 Campo que vai guardar o estoque escolhido
   });
 
-  // ✨ ESTADO E EFFECT: Lógica exata do RequestForm para travar o calendário
+  // ESTADO E EFFECT: Lógica exata do RequestForm para travar o calendário
   const [dataMinima, setDataMinima] = useState('');
 
   useEffect(() => {
@@ -117,7 +117,7 @@ export default function EntradaMaterial() {
 
   // --- ENVIO PARA O BACKEND (NODE.JS) ---
   const handleEnviar = async () => {
-    // ✨ Atualizado para exigir a seleção do Estoque/Filial
+    // Validação que estava a falhar (agora vai passar porque temos o campo visual)
     if (!formDados.nome || !formDados.wbs || !formDados.filial_id) {
       alert("Preencha o Nome, WBS e selecione o Estoque de destino.");
       return;
@@ -193,7 +193,6 @@ export default function EntradaMaterial() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        // ✨ Mudei de ps_id para dados.ps para refletir a nossa nova lógica do banco!
         alert(`Sucesso! Solicitação de Entrada enviada.\nNúmero de acompanhamento: ${dados.ps}`);
         setFormDados({ nome: '', wbs: '', observacoes: '', filial_id: '' });
         setItens([gerarLinhaVazia()]);
@@ -226,6 +225,7 @@ export default function EntradaMaterial() {
             <h2>Dados do Solicitante</h2>
           </div>
         </div>
+        
         <div className="form-grid">
           <div className="input-grupo">
             <label>NOME *</label>
@@ -238,22 +238,6 @@ export default function EntradaMaterial() {
             />
           </div>
           
-          {/* ✨ NOVO DROPDOWN PARA O ESTOQUE */}
-{/* APAGA ESTE BLOCO INTEIRO DO TEU CÓDIGO HTML */}
-          <div className="input-grupo">
-            <label>ESTOQUE / FILIAL *</label>
-            <select
-              className="input-campo foco-verde"
-              value={formDados.filial_id}
-              onChange={(e) => setFormDados({ ...formDados, filial_id: e.target.value })}
-            >
-              <option value="">Selecione o destino...</option>
-              <option value="BR02">BR02 — Santo André</option>
-              <option value="BR04">BR04 — Goiana</option>
-              <option value="BR06">BR06 — Betim</option>
-            </select>
-          </div>
-
           <div className="input-grupo">
             <label>WBS *</label>
             <input
@@ -264,6 +248,22 @@ export default function EntradaMaterial() {
               onChange={(e) => setFormDados({ ...formDados, wbs: e.target.value })}
             />
           </div>
+
+          {/* ✨ NOVO CAMPO VISUAL ADICIONADO AQUI: Seleção da Filial */}
+          <div className="input-grupo">
+            <label>ESTOQUE DE DESTINO *</label>
+            <select
+              className="input-campo foco-verde"
+              value={formDados.filial_id}
+              onChange={(e) => setFormDados({ ...formDados, filial_id: e.target.value })}
+            >
+              <option value="">Selecione o Estoque...</option>
+              <option value="BR02">BR02 — Santo André (SP)</option>
+              <option value="BR04">BR04 — Goiana (PE)</option>
+              <option value="BR06">BR06 — Betim (MG)</option>
+            </select>
+          </div>
+
           <div className="input-grupo span-2">
             <label>OBSERVAÇÕES</label>
             <textarea
@@ -365,7 +365,6 @@ export default function EntradaMaterial() {
                     <input className="input-editavel-tabela link-azul-fake" value={item.wbsElement} onChange={(e) => atualizarCampo(item.id, 'wbsElement', e.target.value)} placeholder="WBS" />
                   </td>
 
-                  {/* ✨ BLOQUEIOS DE DATA */}
                   <td>
                     <input
                       type="date"

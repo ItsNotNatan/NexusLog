@@ -11,10 +11,10 @@ import {
   XCircle,
   Zap,
   Upload,
-  AlertCircle
+  AlertCircle,
+  MapPin // ✨ Ícone da filial importado aqui
 } from "lucide-react";
 
-// Adiciona esta linha junto aos outros imports no topo
 import { useContext } from 'react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
@@ -121,10 +121,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
 
-        // 👇 ALTERAÇÃO AQUI: Adicionamos &filial=${estoqueAtual} no final da URL
         const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}&filial=${estoqueAtual}`;
 
-        // ... resto do código do fetch (mantém igual) ...
         const opcoesFetch = {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -403,6 +401,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>TIPO</th>
                 <th>ID / SOLICITANTE / WBS</th>
                 <th>Nº DO BS</th>
+                <th>FILIAL</th> {/* ✨ COLUNA ADICIONADA */}
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
                 <th>STATUS</th>
@@ -412,13 +411,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             <tbody>
               {carregando ? (
                 <tr>
-                  <td colSpan={perfil === "logistica" ? 8 : 7} style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>
+                  {/* ✨ colSpan ajustado para suportar a nova coluna (+1) */}
+                  <td colSpan={perfil === "logistica" ? 9 : 8} style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>
                     Carregando solicitações...
                   </td>
                 </tr>
               ) : dadosTabela.length === 0 ? (
                 <tr>
-                  <td colSpan={perfil === "logistica" ? 8 : 7} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>
+                  {/* ✨ colSpan ajustado aqui também */}
+                  <td colSpan={perfil === "logistica" ? 9 : 8} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>
                     Nenhuma solicitação encontrada.
                   </td>
                 </tr>
@@ -489,6 +490,26 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             <span className="traco-vazio">—</span>
                           )}
                         </td>
+
+                        {/* ✨ CÉLULA DA FILIAL COM DESIGN DE ETIQUETA */}
+                        <td>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            backgroundColor: '#f1f5f9',
+                            color: '#475569',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            border: '1px solid #cbd5e1'
+                          }}>
+                            <MapPin size={12} />
+                            {linha.filial || linha.estoque || 'N/D'}
+                          </span>
+                        </td>
+
                         <td className="texto-data">{linha.dataSolicitacao}</td>
                         <td>
                           {linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? (
@@ -550,7 +571,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                       {isExpandida && (
                         <tr>
-                          <td colSpan={perfil === "logistica" ? 8 : 7} className="td-expandida">
+                          {/* ✨ colSpan ajustado para suportar a nova coluna na área expandida */}
+                          <td colSpan={perfil === "logistica" ? 9 : 8} className="td-expandida">
                             <DetalhesSolicitacao
                               item={linha}
                               perfil={perfil}

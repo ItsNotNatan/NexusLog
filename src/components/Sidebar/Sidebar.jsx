@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 import {
   LayoutDashboard, ListTodo, PackagePlus, Archive, Download, FileSpreadsheet, Settings, Hexagon,
-  ClipboardEdit, Boxes, FileClock, ArrowLeft, Waypoints, ClipboardList, Home
+  ClipboardEdit, Boxes, FileClock, Waypoints, ClipboardList, Home, Lock // ⬅️ Lock adicionado aqui!
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -11,11 +11,9 @@ export default function Sidebar({ modulo }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Puxamos o utilizador e a filial atual do contexto global
   const { usuario, estoqueAtual } = useAuth();
   const role = usuario?.cargo; 
 
-  // Menu EXCLUSIVO do Cliente
   const menuCliente = [
     { path: '/cliente/consulta-estoque', label: 'Consulta de Estoque', icon: <Boxes size={20} /> },
     { path: '/cliente/fazer-solicitacao', label: 'Fazer Solicitação', icon: <ClipboardEdit size={20} /> },
@@ -23,37 +21,33 @@ export default function Sidebar({ modulo }) {
     { path: '/cliente/rastreabilidade', label: 'Rastreabilidade', icon: <Archive size={20} /> },
   ];
 
-  // Menu da Logística atualizado
   const menuLogistica = [
-    // --- NÍVEL 1: ACESSO LIVRE (ADM, LÍDER E OPERADOR) ---
     { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/traceabilly', label: 'Rastreabilidade', icon: <Archive size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/painel', label: 'Painel Geral', icon: <ClipboardList size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/visao-geral', label: 'Visão Geral do Estoque', icon: <Boxes size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
-
-    // --- NÍVEL 2: ACESSO INTERMÉDIO (ADM E LÍDER) ---
     { path: '/logistica/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['ADM', 'LIDER'] },
     { path: '/logistica/PainelAprovacao', label: 'Painel de Aprovação', icon: <ListTodo size={20} />, roles: ['ADM', 'LIDER'] },
     { path: '/logistica/exportar', label: 'Exportar Dados (PS)', icon: <Download size={20} />, roles: ['ADM', 'LIDER'] },
     { path: '/logistica/rota-coleta', label: 'Rota de Coleta', icon: <Waypoints size={20} />, roles: ['ADM', 'LIDER'] },
-
-    // --- NÍVEL 3: ACESSO RESTRITO (SÓ ADM) ---
     { path: '/logistica/configuracoes', label: 'Configurações', icon: <Settings size={20} />, roles: ['ADM'] },
   ];
 
-  // Lógica de Filtro dos Menus
   let menuItems = [];
 
   if (modulo === 'cliente') {
-    // ✨ REGRA MALUCA APLICADA AQUI: Se o cliente selecionar "TODOS", mostramos apenas a Consulta de Estoque!
     if (estoqueAtual === 'TODOS') {
-      menuItems = menuCliente.filter(item => item.path === '/cliente/consulta-estoque');
+      menuItems = menuCliente.map(item => {
+        if (item.path !== '/cliente/consulta-estoque') {
+          return { ...item, isDisabled: true };
+        }
+        return item; 
+      });
     } else {
-      menuItems = menuCliente; // Se escolheu uma filial física (BR02, BR04, BR06), mostra tudo
+      menuItems = menuCliente; 
     }
   } else {
-    // A logística mantém o comportamento normal baseado nos cargos
     const menuLogisticaFiltrado = menuLogistica.filter(item => item.roles.includes(role));
     menuItems = menuLogisticaFiltrado;
   }
@@ -72,13 +66,26 @@ export default function Sidebar({ modulo }) {
       <nav className="sidebar-nav">
         <ul>
           {menuItems.map((item) => (
-            <li key={item.path}>
+            <li key={item.path} title={item.isDisabled ? "Selecione uma filial específica no topo para acessar" : ""}>
               <NavLink
                 to={item.path}
-                className={({ isActive }) => isActive ? "nav-item ativo" : "nav-item"}
+                className={({ isActive }) => 
+                  `nav-item ${isActive && !item.isDisabled ? "ativo" : ""} ${item.isDisabled ? "desabilitado" : ""}`
+                }
+                onClick={(e) => {
+                  if (item.isDisabled) {
+                    e.preventDefault(); 
+                  }
+                }}
               >
-                <span className="nav-icone">{item.icon}</span>
-                <span className="nav-texto">{item.label}</span>
+                <div className="nav-item-content">
+                  <span className="nav-icone">{item.icon}</span>
+                  <span className="nav-texto">{item.label}</span>
+                </div>
+                {/* ✨ REGRA DO CADEADO: Se estiver desabilitado, desenha o cadeado */}
+                {item.isDisabled && (
+                  <Lock size={16} className="icone-cadeado" />
+                )}
               </NavLink>
             </li>
           ))}
