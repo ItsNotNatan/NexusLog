@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 import {
   LayoutDashboard, ListTodo, PackagePlus, Archive, Download, FileSpreadsheet, Settings, Hexagon,
-  ClipboardEdit, Boxes, FileClock, ArrowLeft, Waypoints, ClipboardList, Home // 👈 Adicionámos o ícone Home aqui
+  ClipboardEdit, Boxes, FileClock, ArrowLeft, Waypoints, ClipboardList, Home
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -11,7 +11,8 @@ export default function Sidebar({ modulo }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { usuario } = useAuth();
+  // Puxamos o utilizador e a filial atual do contexto global
+  const { usuario, estoqueAtual } = useAuth();
   const role = usuario?.cargo; 
 
   // Menu EXCLUSIVO do Cliente
@@ -41,8 +42,22 @@ export default function Sidebar({ modulo }) {
     { path: '/logistica/configuracoes', label: 'Configurações', icon: <Settings size={20} />, roles: ['ADM'] },
   ];
 
-  const menuLogisticaFiltrado = menuLogistica.filter(item => item.roles.includes(role));
-  const menuItems = modulo === 'cliente' ? menuCliente : menuLogisticaFiltrado;
+  // Lógica de Filtro dos Menus
+  let menuItems = [];
+
+  if (modulo === 'cliente') {
+    // ✨ REGRA MALUCA APLICADA AQUI: Se o cliente selecionar "TODOS", mostramos apenas a Consulta de Estoque!
+    if (estoqueAtual === 'TODOS') {
+      menuItems = menuCliente.filter(item => item.path === '/cliente/consulta-estoque');
+    } else {
+      menuItems = menuCliente; // Se escolheu uma filial física (BR02, BR04, BR06), mostra tudo
+    }
+  } else {
+    // A logística mantém o comportamento normal baseado nos cargos
+    const menuLogisticaFiltrado = menuLogistica.filter(item => item.roles.includes(role));
+    menuItems = menuLogisticaFiltrado;
+  }
+
   const tituloSidebar = modulo === 'cliente' ? 'Portal do Cliente' : 'NexusLog';
 
   return (
@@ -70,7 +85,6 @@ export default function Sidebar({ modulo }) {
         </ul>
       </nav>
 
-      {/* ✨ MUDANÇA: O rodapé voltou, apontando para a Homepage e com um novo ícone! */}
       <div className="sidebar-footer">
         <button
           className="btn-voltar-sidebar"
