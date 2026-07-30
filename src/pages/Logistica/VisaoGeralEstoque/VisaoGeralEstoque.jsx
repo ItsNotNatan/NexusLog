@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Boxes, Loader2, MapPin, X, History, ArrowRightLeft, Filter } from 'lucide-react';
+import { Search, Boxes, Loader2, MapPin, X, History, Filter } from 'lucide-react';
 import './VisaoGeralEstoque.css'; 
 import FiltroEstoqueModal from '../../../components/FiltroEstoqueModal/FiltroEstoqueModal';
 
-// ✨ NOVO: Importamos o AuthContext para ler a filial global selecionada
+// 👇 NOVO: Importamos o teu componente de Tabela de Demandas!
+import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import { AuthContext } from '../../../contexts/AuthContext';
 
-// ✨ ESTADO INICIAL PARA TODOS OS FILTROS
 const ESTADO_INICIAL_FILTROS = {
   filial: null,
   desenho_sap: null,
@@ -24,7 +24,6 @@ const ESTADO_INICIAL_FILTROS = {
 };
 
 export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
-  // ✨ NOVO: Consumimos a variável estoqueAtual (que guarda 'TODOS' ou 'BR02', etc.)
   const { estoqueAtual } = useContext(AuthContext);
 
   const [dadosEstoque, setDadosEstoque] = useState([]);
@@ -36,7 +35,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
   const [demandasDoMaterial, setDemandasDoMaterial] = useState([]);
   const [carregandoDemandas, setCarregandoDemandas] = useState(false);
 
-  // ✨ CONTROLE DO MODAL E ESTADO DOS FILTROS
   const [modalFiltrosAberto, setModalFiltrosAberto] = useState(false);
   const [filtros, setFiltros] = useState(ESTADO_INICIAL_FILTROS);
 
@@ -49,7 +47,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     const carregarEstoqueDoBackend = async () => {
       try {
         setCarregando(true);
-        // ✨ NOVO: Enviamos o parâmetro de filial na URL da requisição
         const url = `http://localhost:3001/api/estoque/listar?filial=${estoqueAtual}`;
         const resposta = await fetch(url);
         const resultado = await resposta.json();
@@ -86,8 +83,11 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     };
 
     carregarEstoqueDoBackend();
-  }, [estoqueAtual]); // ✨ NOVO: O useEffect agora recarrega os dados se 'estoqueAtual' mudar!
+  }, [estoqueAtual]); 
 
+  // =========================================================================
+  // 🎯 AÇÃO DO DUPLO CLIQUE: Buscar e formatar para a TabelaDemandas
+  // =========================================================================
   const handleLinhaDuploClique = async (material) => {
     setMaterialSelecionado(material);
     setModalDemandasAberto(true);
@@ -98,11 +98,24 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
       const resultado = await resposta.json();
 
       if (resposta.ok && resultado.sucesso) {
-        setDemandasDoMaterial(resultado.dados || []);
+        // 👇 Mapeamos os dados que vêm da API para o formato que a TabelaDemandas exige
+        const dadosFormatados = resultado.dados.map(item => ({
+          id: `PS-${item.id || item.ps_id}`,
+          solicitante: item.solicitante,
+          wbs: item.wbs,
+          status: item.status,
+          bs: item.bs || '-',
+          criacaoBs: item.dataSolicitacao || item.criacaoBs || '-',
+          dataEntrega: item.dataEntrega || 'não definido',
+          contagem: item.contagem || '',
+          contagemStatus: item.contagemStatus || 'neutro'
+        }));
+        setDemandasDoMaterial(dadosFormatados);
       } else {
+        // Fallback didático: Caso a rota ainda não exista no backend
         setDemandasDoMaterial([
-          { id: 'PS-99821', solicitante: 'Engenharia de Campo', wbs: material.wbs, status: 'Aprovado', qtde: 5, data: '20/07/2026' },
-          { id: 'PS-99855', solicitante: 'Manutenção Preventiva', wbs: material.wbs, status: 'Em Separação', qtde: 2, data: '20/07/2026' }
+          { id: 'PS-99821', solicitante: 'Engenharia de Campo', wbs: material.wbs, status: 'Concluído', bs: 'BS-1234', criacaoBs: '18/07/2026', dataEntrega: '20/07/2026' },
+          { id: 'PS-99855', solicitante: 'Manutenção Preventiva', wbs: material.wbs, status: 'Em Separação', bs: '-', criacaoBs: '20/07/2026', dataEntrega: 'não definido' }
         ]);
       }
     } catch (error) {
@@ -119,10 +132,7 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     setMaterialSelecionado(null);
   };
 
-  // ✨ LÓGICA MESTRA DE FILTRAGEM (Avalia todos os 13 campos de uma vez)
   const dadosFiltrados = dadosEstoque.filter((item) => {
-    
-    // 1. Pesquisa por Barra de Texto Livre
     const termo = termoPesquisa.toLowerCase();
     const passaPesquisaTexto = (
       (item.part_number && item.part_number.toLowerCase().includes(termo)) ||
@@ -130,9 +140,7 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
       (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo))
     );
 
-    // 2. Loop Inteligente: Verifica todos os campos do Dropdown ativados
     let passaFiltrosAvancados = true;
-    
     for (const chave in filtros) {
       if (filtros[chave]) {
         if (item[chave] !== filtros[chave].value) {
@@ -162,7 +170,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
   return (
     <div style={{ padding: '32px', backgroundColor: '#f4f5f7', minHeight: '100vh', boxSizing: 'border-box' }}>
       
-      {/* COMPONENTE MODAL DE FILTROS */}
       <FiltroEstoqueModal 
         aberto={modalFiltrosAberto} 
         onClose={() => setModalFiltrosAberto(false)} 
@@ -294,9 +301,14 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
         </div>
       </div>
 
+      {/* ========================================================= */}
+      {/* 🪟 JANELA MODAL COM A TABELA DE DEMANDAS                  */}
+      {/* ========================================================= */}
       {modalDemandasAberto && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-          <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', width: '700px', maxWidth: '90%', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+          
+          {/* 👇 Aumentamos o tamanho do Modal (width: '1000px') para a TabelaDemandas caber bem! */}
+          <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', width: '1000px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b' }}>
@@ -317,35 +329,9 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
                 <Loader2 size={24} className="animate-spin" color="#2563eb" style={{ margin: '0 auto' }} />
                 <p style={{ color: '#64748b', marginTop: '8px', fontSize: '0.875rem' }}>Buscando demandas na base de dados...</p>
               </div>
-            ) : demandasDoMaterial.length > 0 ? (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f1f5f9' }}>
-                    <th style={{ padding: '10px', color: '#475569' }}>PS ID</th>
-                    <th style={{ padding: '10px', color: '#475569' }}>Solicitante</th>
-                    <th style={{ padding: '10px', color: '#475569' }}>WBS</th>
-                    <th style={{ padding: '10px', color: '#475569', textAlign: 'center' }}>Qtd Demanda</th>
-                    <th style={{ padding: '10px', color: '#475569', textAlign: 'center' }}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {demandasDoMaterial.map((demanda, index) => (
-                    <tr key={index} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '10px', fontWeight: '700', color: '#2563eb' }}>{demanda.id}</td>
-                      <td style={{ padding: '10px', color: '#334155' }}>{demanda.solicitante}</td>
-                      <td style={{ padding: '10px', fontFamily: 'monospace' }}>{demanda.wbs}</td>
-                      <td style={{ padding: '10px', textAlign: 'center', fontWeight: '600' }}>{demanda.qtde}</td>
-                      <td style={{ padding: '10px', textAlign: 'center' }}>
-                        <span style={{ backgroundColor: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600' }}>
-                          {demanda.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             ) : (
-              <p style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>Nenhuma demanda ou reserva em aberto para este Part Number.</p>
+              /* 👇 AQUI CHAMAMOS O COMPONENTE TabelaDemandas! Passamos o array formatado como prop "dados" */
+              <TabelaDemandas dados={demandasDoMaterial} />
             )}
             
           </div>
