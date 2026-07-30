@@ -11,7 +11,6 @@ import {
   Loader
 } from 'lucide-react';
 
-// 👇 Importamos o teu sistema de alertas globais!
 import { useAlert } from '../../../contexts/AlertContext'; 
 
 export default function Traceabilly({ perfil = 'logistica' }) {
@@ -20,7 +19,6 @@ export default function Traceabilly({ perfil = 'logistica' }) {
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
   
-  // Instanciamos o disparador de alertas
   const { mostrarAlerta } = useAlert();
 
   // 2. BUSCA DE DADOS (Executado quando a tela abre)
@@ -28,73 +26,73 @@ export default function Traceabilly({ perfil = 'logistica' }) {
     buscarHistorico();
   }, []);
 
-const buscarHistorico = async () => {
-  try {
-    setCarregando(true);
-    // Comunica com o backend para listar todas as solicitações
-    const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
-    const json = await resposta.json();
+  const buscarHistorico = async () => {
+    try {
+      setCarregando(true);
+      const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
+      const json = await resposta.json();
 
-    if (json.sucesso) {
-      let itensExtraidos = [];
+      if (json.sucesso) {
+        let itensExtraidos = [];
 
-      json.dados.forEach(solicitacao => {
-        // 👇 ETAPA 1: Regras de Negócio para Filtragem
-        // Verifica se a solicitação já foi aprovada pela logística
-        const estaAprovado = solicitacao.status === 'Em Separação' || solicitacao.status === 'Concluído';
-        
-        // Verifica se o tipo NÃO é 'Entrada'. Entradas vão só para o estoque!
-        const naoEEntrada = solicitacao.tipo !== 'Entrada';
+        json.dados.forEach(solicitacao => {
+          // 👇 ETAPA 1: Regras de Negócio para Filtragem da Solicitação
+          const estaAprovado = solicitacao.status === 'Em Separação' || solicitacao.status === 'Concluído';
+          const naoEEntrada = solicitacao.tipo !== 'Entrada';
 
-        // 👇 ETAPA 2: Aplicação da Regra
-        // Só entra na tela de Rastreabilidade se for aprovado E não for uma Entrada
-        if (estaAprovado && naoEEntrada) {
-          
-          // ETAPA 3: Formatação dos Dados
-          solicitacao.itens.forEach(item => {
-            itensExtraidos.push({
-              id: item.id,
-              partNumber: item.part_number_manual || '-',
-              descricao: item.descricao_manual || '-',
-              fornecedor: item.fornecedor || '-',
-              nfEntrada: item.nf_entrada || 'N/A',
-              bsSaida: solicitacao.bs || '-',
-              solicitacao: solicitacao.id,
-              solicitanteInicial: solicitacao.solicitante.charAt(0).toUpperCase(),
-              solicitanteNome: solicitacao.solicitante,
-              alocacao: item.alocacao || 'Padrão',
-              qtd: `${item.quantidade_solicitada} ${item.unidade_medida_manual || 'Unid'}`,
-              valor: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual}` : '-',
-              wbs: solicitacao.wbs || '-',
-              data: solicitacao.dataSolicitacao
+          // 👇 ETAPA 2: Aplicação da Regra Base
+          if (estaAprovado && naoEEntrada) {
+            
+            solicitacao.itens.forEach(item => {
+              // 👇 ETAPA 2.5: A NOVA REGRA DE RASTREABILIDADE (SALDO ZERO)
+              // Verifica se a quantidade disponível (no próprio item ou na junção com o estoque) é zero.
+              const saldoZerado = item.quantidade_disponivel === 0 || (item.estoque && item.estoque.quantidade_disponivel === 0);
+
+              // Só avança para a formatação se o saldo estiver realmente zerado
+              if (saldoZerado) {
+                // ETAPA 3: Formatação dos Dados
+                itensExtraidos.push({
+                  id: item.id,
+                  partNumber: item.part_number_manual || '-',
+                  descricao: item.descricao_manual || '-',
+                  fornecedor: item.fornecedor || '-',
+                  nfEntrada: item.nf_entrada || 'N/A',
+                  bsSaida: solicitacao.bs || '-',
+                  solicitacao: solicitacao.id,
+                  solicitanteInicial: solicitacao.solicitante.charAt(0).toUpperCase(),
+                  solicitanteNome: solicitacao.solicitante,
+                  alocacao: item.alocacao || 'Padrão',
+                  qtd: `${item.quantidade_solicitada} ${item.unidade_medida_manual || 'Unid'}`,
+                  valor: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual}` : '-',
+                  wbs: solicitacao.wbs || '-',
+                  data: solicitacao.dataSolicitacao
+                });
+              }
             });
-          });
-        }
-      });
+          }
+        });
 
-      // Atualiza a tela com os itens filtrados
-      setDadosRastreabilidade(itensExtraidos);
+        // Atualiza a tela com os itens filtrados
+        setDadosRastreabilidade(itensExtraidos);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar rastreabilidade:", error);
+      mostrarAlerta('Erro ao carregar o histórico.', 'erro');
+    } finally {
+      setCarregando(false);
     }
-  } catch (error) {
-    console.error("Erro ao buscar rastreabilidade:", error);
-    mostrarAlerta('Erro ao carregar o histórico.', 'erro');
-  } finally {
-    setCarregando(false);
-  }
-};
+  };
 
   // =========================================================================
-  // 🎯 A MÁGICA DO FRONT-END: Função para Reverter o Item ao Estoque
+  // 🎯 Função para Reverter o Item ao Estoque
   // =========================================================================
   const handleReverterItem = async (item) => {
-    // 1. Confirmação de segurança dupla
     const confirmar = window.confirm(`Deseja devolver o item ${item.partNumber} ao estoque e removê-lo do histórico de saídas?`);
     if (!confirmar) return; 
 
     try {
       setCarregando(true);
       
-      // 2. Comunicar com a rota do Back-end que criámos anteriormente
       const resposta = await fetch('http://localhost:3001/api/solicitacoes/reverter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -106,14 +104,12 @@ const buscarHistorico = async () => {
       const json = await resposta.json();
 
       if (resposta.ok && json.sucesso) {
-        // 3. Sucesso! Mostra o alerta verde e remove o item da tabela visualmente
         mostrarAlerta(`O item ${item.partNumber} retornou ao estoque principal!`, 'sucesso');
         
         setDadosRastreabilidade(dadosAtuais => 
           dadosAtuais.filter(dado => dado.id !== item.id)
         );
       } else {
-        // Se o back-end disser que algo falhou
         mostrarAlerta(`Falha ao reverter: ${json.erro}`, 'erro');
       }
     } catch (error) {
@@ -236,7 +232,6 @@ const buscarHistorico = async () => {
 
                       {perfil === 'logistica' && (
                         <td>
-                          {/* 🎯 AQUI: Ligamos a função ao clique do botão e passamos a linha inteira! */}
                           <button 
                             className="btn-reverter" 
                             title="Devolver item ao estoque"
@@ -251,7 +246,7 @@ const buscarHistorico = async () => {
                 ) : (
                   <tr>
                     <td colSpan="13" style={{ textAlign: 'center', padding: '30px', color: '#999' }}>
-                      Nenhum registo encontrado.
+                      Nenhum registo de estoque zerado encontrado.
                     </td>
                   </tr>
                 )}
