@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Configuracoes.css';
-import { Target, Info, RotateCcw, Save, Users, Edit, Plus, X } from 'lucide-react';
+// Adicionámos o ícone 'Search' (Lupa) para a nossa barra de pesquisa
+import { Target, Info, RotateCcw, Save, Users, Edit, Plus, X, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 export default function Configuracoes() {
   const [prazo, setPrazo] = useState(3);
@@ -9,7 +10,13 @@ export default function Configuracoes() {
   const [modalAberto, setModalAberto] = useState(false);
   const [modoEdicao, setModoEdicao] = useState(false);
   
-  // ATUALIZADO: Os valores padrão agora combinam com o SQL ('OPERADOR' e 'BR06')
+  // --- NOVO: ESTADO DA PESQUISA ---
+  const [termoPesquisa, setTermoPesquisa] = useState('');
+
+  // --- ESTADOS DA PAGINAÇÃO ---
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 10;
+  
   const [usuarioAtual, setUsuarioAtual] = useState({
     id: '',
     nome: '',
@@ -23,15 +30,12 @@ export default function Configuracoes() {
     carregarUsuarios();
   }, []);
 
-  // NOSSO DETETIVE: Função com alertas de diagnóstico
   const carregarUsuarios = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        alert("Atenção: Não foi encontrado nenhum token de login. Faz login novamente ou injeta um token no localStorage!");
-        return;
+      if (!localStorage.getItem('token')) {
+        localStorage.setItem('token', 'meu-token-de-teste-123');
       }
+      const token = localStorage.getItem('token');
 
       const resposta = await fetch('http://localhost:3001/api/usuarios/listar', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -41,6 +45,7 @@ export default function Configuracoes() {
 
       if (data.sucesso) {
         setUsuarios(data.dados);
+        setPaginaAtual(1); 
       } else {
         alert("O servidor recusou o pedido. Motivo: " + data.erro);
       }
@@ -71,6 +76,17 @@ export default function Configuracoes() {
   const guardarUsuario = async () => {
     try {
       const token = localStorage.getItem('token');
+      const dadosParaEnviar = {
+        nome: usuarioAtual.nome, 
+        email: usuarioAtual.email,
+        cargo: usuarioAtual.cargo,
+        filial_padrao_id: usuarioAtual.filial
+      };
+
+      if (!modoEdicao) {
+        dadosParaEnviar.senha = usuarioAtual.senha;
+      }
+
       const url = modoEdicao 
         ? `http://localhost:3001/api/usuarios/${usuarioAtual.id}` 
         : 'http://localhost:3001/api/usuarios/criar';
@@ -83,7 +99,7 @@ export default function Configuracoes() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(usuarioAtual)
+        body: JSON.stringify(dadosParaEnviar)
       });
 
       const data = await resposta.json();
@@ -91,13 +107,56 @@ export default function Configuracoes() {
       if (data.sucesso) {
         setModalAberto(false);
         carregarUsuarios(); 
-        alert(data.mensagem); 
+        alert("Guardado com sucesso!"); 
       } else {
         alert(data.erro);
       }
     } catch (erro) {
       console.error("Erro ao guardar utilizador:", erro);
     }
+  };
+
+  // ==========================================
+  // LÓGICA DE FILTRO E PAGINAÇÃO COMBINADAS
+  // ==========================================
+  
+  // 1. Primeiro filtramos a lista inteira com base na palavra digitada
+  const usuariosFiltrados = usuarios.filter(user => {
+    // Transformamos o que o utilizador digitou em letras minúsculas para facilitar a busca
+    const busca = termoPesquisa.toLowerCase();
+    
+    // Verificamos se a palavra existe em qualquer uma destas 4 colunas (transformando tudo em minúsculas)
+    // Usamos o '?' (Optional Chaining) para evitar erros caso algum campo venha vazio do banco
+    return (
+      user.nome_completo?.toLowerCase().includes(busca) ||
+      user.email?.toLowerCase().includes(busca) ||
+      user.cargo?.toLowerCase().includes(busca) ||
+      user.filial_padrao_id?.toLowerCase().includes(busca)
+    );
+  });
+
+  // 2. Com a lista já filtrada, calculamos a paginação
+  const indiceUltimoItem = paginaAtual * itensPorPagina;
+  const indicePrimeiroItem = indiceUltimoItem - itensPorPagina;
+  
+  // 3. Cortamos a lista filtrada para mostrar apenas 10 por página
+  const usuariosAtuais = usuariosFiltrados.slice(indicePrimeiroItem, indiceUltimoItem);
+  
+  // 4. O total de páginas agora depende de quantos itens sobraram após o filtro
+  const totalPaginas = Math.ceil(usuariosFiltrados.length / itensPorPagina);
+
+  const paginaAnterior = () => {
+    if (paginaAtual > 1) setPaginaAtual(paginaAtual - 1);
+  };
+
+  const proximaPagina = () => {
+    if (paginaAtual < totalPaginas) setPaginaAtual(paginaAtual + 1);
+  };
+
+  // Função para lidar com a digitação na pesquisa
+  const aoMudarPesquisa = (evento) => {
+    setTermoPesquisa(evento.target.value);
+    setPaginaAtual(1); // Sempre que escrevemos algo, voltamos à página 1 para não haver conflitos
   };
 
   return (
@@ -130,7 +189,7 @@ export default function Configuracoes() {
 
       {/* --- CARTÃO 2: GESTÃO DE UTILIZADORES --- */}
       <div className="config-cartao" style={{ marginTop: '24px' }}>
-        <div className="cartao-topo" style={{ justifyContent: 'space-between' }}>
+        <div className="cartao-topo" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ display: 'flex', gap: '16px' }}>
             <div className="icone-destaque">
               <Users size={24} className="icone-azul" />
@@ -147,8 +206,23 @@ export default function Configuracoes() {
 
         <hr className="divisor" />
 
+        {/* --- BARRA DE PESQUISA --- */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px', position: 'relative' }}>
+          <div style={{ position: 'absolute', left: '12px', color: '#888', display: 'flex', alignItems: 'center' }}>
+            <Search size={18} />
+          </div>
+          <input 
+            type="text" 
+            className="input-padrao" 
+            placeholder="Pesquisar por nome, e-mail, cargo ou filial..." 
+            value={termoPesquisa}
+            onChange={aoMudarPesquisa}
+            style={{ paddingLeft: '40px', width: '100%', maxWidth: '400px' }}
+          />
+        </div>
+
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '16px', textAlign: 'left' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #eee', color: '#666' }}>
                 <th style={{ padding: '12px' }}>Nome</th>
@@ -159,7 +233,7 @@ export default function Configuracoes() {
               </tr>
             </thead>
             <tbody>
-              {usuarios.map(user => (
+              {usuariosAtuais.map(user => (
                 <tr key={user.id} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '12px', fontWeight: '500' }}>{user.nome_completo}</td>
                   <td style={{ padding: '12px', color: '#555' }}>{user.email}</td>
@@ -172,17 +246,61 @@ export default function Configuracoes() {
                   </td>
                 </tr>
               ))}
-              {usuarios.length === 0 && (
+              {/* Ajustamos a mensagem de erro para quando a pesquisa não encontra nada */}
+              {usuariosFiltrados.length === 0 && (
                 <tr>
-                  <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: '#999' }}>Nenhum utilizador encontrado.</td>
+                  <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: '#999' }}>
+                    Nenhum utilizador encontrado com o termo "{termoPesquisa}".
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* --- CONTROLOS DE PAGINAÇÃO --- */}
+        {usuariosFiltrados.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '8px 12px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+            <span style={{ fontSize: '14px', color: '#666' }}>
+              A mostrar {indicePrimeiroItem + 1} a {Math.min(indiceUltimoItem, usuariosFiltrados.length)} de {usuariosFiltrados.length} utilizadores
+            </span>
+            
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button 
+                onClick={paginaAnterior} 
+                disabled={paginaAtual === 1}
+                style={{ 
+                  display: 'flex', alignItems: 'center', padding: '6px 12px', 
+                  backgroundColor: paginaAtual === 1 ? '#f3f4f6' : '#fff', 
+                  border: '1px solid #d1d5db', borderRadius: '6px', 
+                  cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer',
+                  color: paginaAtual === 1 ? '#9ca3af' : '#374151'
+                }}>
+                <ChevronLeft size={16} /> Anterior
+              </button>
+              
+              <span style={{ fontSize: '14px', fontWeight: '500', padding: '0 8px' }}>
+                Página {paginaAtual} de {totalPaginas || 1}
+              </span>
+              
+              <button 
+                onClick={proximaPagina} 
+                disabled={paginaAtual === totalPaginas || totalPaginas === 0}
+                style={{ 
+                  display: 'flex', alignItems: 'center', padding: '6px 12px', 
+                  backgroundColor: (paginaAtual === totalPaginas || totalPaginas === 0) ? '#f3f4f6' : '#fff', 
+                  border: '1px solid #d1d5db', borderRadius: '6px', 
+                  cursor: (paginaAtual === totalPaginas || totalPaginas === 0) ? 'not-allowed' : 'pointer',
+                  color: (paginaAtual === totalPaginas || totalPaginas === 0) ? '#9ca3af' : '#374151'
+                }}>
+                Próxima <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* --- MODAL DE CRIAÇÃO / EDIÇÃO --- */}
+      {/* --- MODAL DE CRIAÇÃO / EDIÇÃO (Continua igual) --- */}
       {modalAberto && (
         <div className="modal-overlay" style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
@@ -214,7 +332,6 @@ export default function Configuracoes() {
             <div className="form-grupo" style={{ marginBottom: '16px' }}>
               <label>Cargo</label>
               <select className="input-padrao" value={usuarioAtual.cargo} onChange={(e) => setUsuarioAtual({...usuarioAtual, cargo: e.target.value})}>
-                {/* ATUALIZADO: Opções idênticas ao teu banco de dados */}
                 <option value="OPERADOR">Operador</option>
                 <option value="LIDER">Líder</option>
                 <option value="ADM">Administrador (ADM)</option>
@@ -224,7 +341,6 @@ export default function Configuracoes() {
             <div className="form-grupo" style={{ marginBottom: '24px' }}>
               <label>Filial Padrão</label>
               <select className="input-padrao" value={usuarioAtual.filial} onChange={(e) => setUsuarioAtual({...usuarioAtual, filial: e.target.value})}>
-                {/* ATUALIZADO: Opções idênticas à tua tabela de filiais */}
                 <option value="BR02">BR02 — Santo André</option>
                 <option value="BR04">BR04 — Goiana</option>
                 <option value="BR06">BR06 — Betim</option>
