@@ -1,76 +1,82 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+// =================================================================
+// ARQUIVO: src/contexts/AuthContext.jsx
+// DESCRIÇÃO: Gestão global do estado de autenticação e filial ativa
+// =================================================================
 
-// Criando o contexto
-export const AuthContext = createContext();
+import React, { createContext, useContext, useState, useEffect } from 'react';
+
+const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
   const [usuario, setUsuario] = useState(null);
-  const [token, setToken] = useState(null); // ✨ CORREÇÃO 1: Adicionamos um estado para guardar o token na memória do React
-  const [loading, setLoading] = useState(true);
-  
-  // Mude de 'ESTOQUE_1' para 'BR02'
-  const [estoqueAtual, setEstoqueAtual] = useState('BR02');
+  const [token, setToken] = useState(null);
+  const [filialSelecionada, setFilialSelecionada] = useState('');
+  const [carregandoInicial, setCarregandoInicial] = useState(true);
 
-  // Verifica se já existe um usuário logado ao carregar a aplicação
+  // 1. RESTAURA A SESSÃO AO CARREGAR A PÁGINA
   useEffect(() => {
-    const userSalvo = localStorage.getItem('@NexusLog:user');
     const tokenSalvo = localStorage.getItem('@NexusLog:token');
-    const estoqueSalvo = localStorage.getItem('@NexusLog:estoque');
+    const usuarioSalvo = localStorage.getItem('@NexusLog:usuario');
+    const filialSalva = localStorage.getItem('@NexusLog:filialAtiva');
 
-    if (userSalvo && tokenSalvo) {
-      setUsuario(JSON.parse(userSalvo));
-      setToken(tokenSalvo); // ✨ CORREÇÃO 2: Guardamos o token carregado do localStorage no estado
+    if (tokenSalvo && usuarioSalvo) {
+      const usuarioObj = JSON.parse(usuarioSalvo);
+      setToken(tokenSalvo);
+      setUsuario(usuarioObj);
+      setFilialSelecionada(filialSalva || usuarioObj.filial || '');
     }
-    
-    // Se o utilizador já tinha escolhido um estoque antes, recupera essa escolha
-    if (estoqueSalvo) {
-      setEstoqueAtual(estoqueSalvo);
-    }
-    
-    setLoading(false);
+
+    setCarregandoInicial(false);
   }, []);
 
-  // Função de Login (ajuste conforme a sua chamada à API Node.js/Supabase)
+  // 2. FUNÇÃO DE LOGIN (Chamada pelo LoginLogistica.jsx)
   const login = async (dadosUsuario, tokenRecebido) => {
+    // Guarda o token e o utilizador no estado do React
     setUsuario(dadosUsuario);
-    setToken(tokenRecebido); // ✨ CORREÇÃO 3: Salva o token no estado durante o login
-    
-    localStorage.setItem('@NexusLog:user', JSON.stringify(dadosUsuario));
+    setToken(tokenRecebido);
+
+    // Define a filial inicial (se tiver acesso a filiais)
+    const filialInicial = dadosUsuario.filial || (dadosUsuario.filiais_acesso && dadosUsuario.filiais_acesso[0]) || '';
+    setFilialSelecionada(filialInicial);
+
+    // 🛡️ CHAVES OFICIAIS NO LOCALSTORAGE:
     localStorage.setItem('@NexusLog:token', tokenRecebido);
+    localStorage.setItem('@NexusLog:usuario', JSON.stringify(dadosUsuario));
+    localStorage.setItem('@NexusLog:filialAtiva', filialInicial);
   };
 
-  // Função de Logout
+  // 3. FUNÇÃO DE LOGOUT
   const logout = () => {
     setUsuario(null);
-    setToken(null); // ✨ CORREÇÃO 4: Limpa o token durante o logout
-    
-    localStorage.removeItem('@NexusLog:user');
+    setToken(null);
+    setFilialSelecionada('');
+
+    // Limpa todas as chaves da sessão
     localStorage.removeItem('@NexusLog:token');
+    localStorage.removeItem('@NexusLog:usuario');
+    localStorage.removeItem('@NexusLog:filialAtiva');
   };
 
-  // Função personalizada para mudar o estoque e salvar no localStorage
-  const mudarEstoque = (novoEstoque) => {
-    setEstoqueAtual(novoEstoque);
-    localStorage.setItem('@NexusLog:estoque', novoEstoque);
+  // 4. TROCAR FILIAL ATIVA
+  const MudarFilial = (novaFilialId) => {
+    setFilialSelecionada(novaFilialId);
+    localStorage.setItem('@NexusLog:filialAtiva', novaFilialId);
   };
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        usuario,
-        token, // ✨ CORREÇÃO 5: Agora expomos o token para todas as outras telas usarem!
-        signed: !!usuario, // Retorna true se houver usuário, false se for null
-        loading, 
-        login, 
-        logout,
-        estoqueAtual, 
-        setEstoqueAtual: mudarEstoque 
-      }}
-    >
+    <AuthContext.Provider value={{
+      signed: !!usuario,
+      usuario,
+      token,
+      filialSelecionada,
+      login,
+      logout,
+      MudarFilial,
+      carregandoInicial
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Hook customizado para usar a Autenticação facilmente
 export const useAuth = () => useContext(AuthContext);

@@ -1,6 +1,11 @@
+// =================================================================
+// ARQUIVO: src/pages/Configuracoes/Configuracoes.jsx
+// DESCRIÇÃO: Painel de configurações com gestão de utilizadores e JWT
+// =================================================================
+
 import React, { useState, useEffect } from 'react';
 import './Configuracoes.css';
-import { Target, Info, RotateCcw, Save, Users, Edit, Plus, X, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Target, Users, Edit, Plus, X, ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react';
 
 export default function Configuracoes() {
   // ==========================================
@@ -16,12 +21,17 @@ export default function Configuracoes() {
   const [modalAberto, setModalAberto] = useState(false);
   const [modoEdicao, setModoEdicao] = useState(false);
   
+  // Gestão da Exclusão de Utilizadores
+  const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
+  const [usuarioParaExcluir, setUsuarioParaExcluir] = useState(null);
+  const [senhaConfirmacao, setSenhaConfirmacao] = useState('');
+  
   // Estado da Pesquisa e Paginação
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 10;
   
-  // Estado do Formulário (Modal)
+  // Estado do Formulário (Modal de Criação/Edição)
   const [usuarioAtual, setUsuarioAtual] = useState({
     id: '',
     nome: '',
@@ -31,22 +41,27 @@ export default function Configuracoes() {
     filiais_acesso: ['BR06'] 
   });
 
-  // ✨ LISTA MESTRA DE FILIAIS (Usada para a lógica do "Selecionar Todas")
   const TODAS_AS_FILIAIS = ['BR02', 'BR04', 'BR06'];
 
   // ==========================================
   // 2. EFEITOS E REQUISIÇÕES (API)
   // ==========================================
   useEffect(() => {
-    carregarUsuarios();
-  }, []);
+    if (abaAtiva === 'perfis') {
+      carregarUsuarios();
+    }
+  }, [abaAtiva]);
 
+  // 🔄 BUSCAR UTILIZADORES NO BANCO
   const carregarUsuarios = async () => {
     try {
-      if (!localStorage.getItem('token')) {
-        localStorage.setItem('token', 'meu-token-de-teste-123');
+      // 🛡️ CORREÇÃO: Lendo a chave oficial definida no AuthContext
+      const token = localStorage.getItem('@NexusLog:token');
+
+      if (!token) {
+        alert("⚠️ Acesso não autorizado! Por favor, faça login novamente.");
+        return;
       }
-      const token = localStorage.getItem('token');
 
       const resposta = await fetch('http://localhost:3001/api/usuarios/listar', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -65,14 +80,16 @@ export default function Configuracoes() {
     }
   };
 
+  // 💾 SALVAR OU ATUALIZAR UTILIZADOR
   const guardarUsuario = async () => {
     try {
       if (usuarioAtual.filiais_acesso.length === 0) {
-        alert("Por favor, selecione pelo menos uma filial de acesso.");
-        return;
+        alert("⚠️ AÇÃO BLOQUEADA: Por favor, selecione pelo menos uma filial de acesso.");
+        return; 
       }
 
-      const token = localStorage.getItem('token');
+      // 🛡️ CORREÇÃO: Alterado para a chave oficial do token
+      const token = localStorage.getItem('@NexusLog:token');
       
       const dadosParaEnviar = {
         nome: usuarioAtual.nome, 
@@ -111,11 +128,45 @@ export default function Configuracoes() {
     }
   };
 
+  // 🗑️ EXCLUIR UTILIZADOR COM CONFIRMAÇÃO DE SENHA
+  const excluirUsuario = async () => {
+    if (!senhaConfirmacao) {
+      alert("Por favor, digite a sua senha para confirmar a exclusão.");
+      return;
+    }
+
+    try {
+      // 🛡️ CORREÇÃO: Alterado para a chave oficial do token
+      const token = localStorage.getItem('@NexusLog:token');
+      
+      const resposta = await fetch(`http://localhost:3001/api/usuarios/${usuarioParaExcluir.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ senha_admin: senhaConfirmacao })
+      });
+
+      const data = await resposta.json();
+
+      if (data.sucesso) {
+        alert("Utilizador excluído com sucesso!");
+        setModalExcluirAberto(false);
+        setSenhaConfirmacao('');
+        carregarUsuarios(); 
+      } else {
+        alert("Erro: " + data.erro);
+      }
+    } catch (erro) {
+      console.error("Erro ao excluir utilizador:", erro);
+      alert("Falha na conexão ao tentar excluir.");
+    }
+  };
+
   // ==========================================
   // 3. FUNÇÕES AUXILIARES
   // ==========================================
-  
-  // Função para marcar/desmarcar UMA filial específica
   const alternarFilial = (filialId) => {
     setUsuarioAtual(prev => {
       const novasFiliais = prev.filiais_acesso.includes(filialId)
@@ -126,16 +177,13 @@ export default function Configuracoes() {
     });
   };
 
-  // ✨ NOVA FUNÇÃO: Função para marcar/desmarcar TODAS as filiais de uma vez
   const alternarTodasFiliais = (marcarTodas) => {
     setUsuarioAtual(prev => ({
       ...prev,
-      // Se clicar para marcar, enviamos a lista mestra completa. Se desmarcar, enviamos lista vazia.
       filiais_acesso: marcarTodas ? [...TODAS_AS_FILIAIS] : []
     }));
   };
 
-  // ✨ AUTO CHECK: Verifica se o utilizador já tem as 3 filiais para marcar a caixa "Todas" automaticamente
   const todasSelecionadas = TODAS_AS_FILIAIS.every(filial => 
     usuarioAtual.filiais_acesso.includes(filial)
   );
@@ -157,6 +205,12 @@ export default function Configuracoes() {
       filiais_acesso: user.filiais_acesso?.length > 0 ? user.filiais_acesso : [user.filial_padrao_id]
     });
     setModalAberto(true);
+  };
+
+  const prepararExclusao = (user) => {
+    setUsuarioParaExcluir(user);
+    setSenhaConfirmacao(''); 
+    setModalExcluirAberto(true);
   };
 
   const aoMudarPesquisa = (evento) => {
@@ -201,12 +255,7 @@ export default function Configuracoes() {
         <button 
           onClick={() => setAbaAtiva('target')}
           style={{
-            background: 'none',
-            border: 'none',
-            padding: '8px 16px',
-            fontSize: '16px',
-            fontWeight: '600',
-            cursor: 'pointer',
+            background: 'none', border: 'none', padding: '8px 16px', fontSize: '16px', fontWeight: '600', cursor: 'pointer',
             color: abaAtiva === 'target' ? '#0056b3' : '#6b7280',
             borderBottom: abaAtiva === 'target' ? '3px solid #0056b3' : '3px solid transparent',
             transition: 'all 0.2s'
@@ -219,12 +268,7 @@ export default function Configuracoes() {
         <button 
           onClick={() => setAbaAtiva('perfis')}
           style={{
-            background: 'none',
-            border: 'none',
-            padding: '8px 16px',
-            fontSize: '16px',
-            fontWeight: '600',
-            cursor: 'pointer',
+            background: 'none', border: 'none', padding: '8px 16px', fontSize: '16px', fontWeight: '600', cursor: 'pointer',
             color: abaAtiva === 'perfis' ? '#0056b3' : '#6b7280',
             borderBottom: abaAtiva === 'perfis' ? '3px solid #0056b3' : '3px solid transparent',
             transition: 'all 0.2s'
@@ -235,7 +279,7 @@ export default function Configuracoes() {
         </button>
       </div>
 
-      {/* --- CONTEÚDO DA ABA 1: TARGET --- */}
+      {/* --- ABA 1: TARGET --- */}
       {abaAtiva === 'target' && (
         <div className="config-cartao">
           <div className="cartao-topo">
@@ -258,7 +302,7 @@ export default function Configuracoes() {
         </div>
       )}
 
-      {/* --- CONTEÚDO DA ABA 2: PERFIS DE UTILIZADORES --- */}
+      {/* --- ABA 2: GESTÃO DE PERFIS --- */}
       {abaAtiva === 'perfis' && (
         <div className="config-cartao">
           <div className="cartao-topo" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
@@ -278,7 +322,6 @@ export default function Configuracoes() {
 
           <hr className="divisor" />
 
-          {/* BARRA DE PESQUISA */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px', position: 'relative' }}>
             <div style={{ position: 'absolute', left: '12px', color: '#888', display: 'flex', alignItems: 'center' }}>
               <Search size={18} />
@@ -291,7 +334,6 @@ export default function Configuracoes() {
             />
           </div>
 
-          {/* TABELA DE UTILIZADORES */}
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
@@ -300,7 +342,7 @@ export default function Configuracoes() {
                   <th style={{ padding: '12px' }}>E-mail</th>
                   <th style={{ padding: '12px' }}>Cargo</th>
                   <th style={{ padding: '12px' }}>Filiais de Acesso</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Ação</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -314,9 +356,12 @@ export default function Configuracoes() {
                         ? user.filiais_acesso.join(', ') 
                         : user.filial_padrao_id}
                     </td>
-                    <td style={{ padding: '12px', textAlign: 'center' }}>
-                      <button onClick={() => abrirModalEditar(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0056b3' }}>
+                    <td style={{ padding: '12px', textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                      <button onClick={() => abrirModalEditar(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0056b3' }} title="Editar">
                         <Edit size={18} />
+                      </button>
+                      <button onClick={() => prepararExclusao(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }} title="Excluir">
+                        <Trash2 size={18} />
                       </button>
                     </td>
                   </tr>
@@ -363,7 +408,7 @@ export default function Configuracoes() {
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
         }}>
-          <div className="modal-conteudo" style={{ background: '#fff', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%' }}>
+          <div className="modal-conteudo" style={{ background: '#fff', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0 }}>{modoEdicao ? 'Editar Utilizador' : 'Novo Utilizador'}</h3>
               <button onClick={() => setModalAberto(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20}/></button>
@@ -399,15 +444,12 @@ export default function Configuracoes() {
               </select>
             </div>
 
-            {/* ✨ CHECKBOXES DAS FILIAIS COM OPÇÃO "TODAS" */}
             <div className="form-grupo" style={{ marginBottom: '24px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
                 Acesso às Filiais (Selecione 1 ou mais)
               </label>
               
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                
-                {/* BOTÃO "TODAS AS FILIAIS" - Destacado com uma cor diferente (azul clarinho) */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px 12px', backgroundColor: '#eff6ff', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: '600', color: '#1d4ed8', width: '100%' }}>
                   <input 
                     type="checkbox" 
@@ -418,42 +460,63 @@ export default function Configuracoes() {
                   Todas as Filiais
                 </label>
 
-                {/* OPÇÕES INDIVIDUAIS */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #e5e7eb', flex: '1' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={usuarioAtual.filiais_acesso.includes('BR02')}
-                    onChange={() => alternarFilial('BR02')}
-                    style={{ width: '16px', height: '16px' }}
-                  />
-                  BR02
-                </label>
-                
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #e5e7eb', flex: '1' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={usuarioAtual.filiais_acesso.includes('BR04')}
-                    onChange={() => alternarFilial('BR04')}
-                    style={{ width: '16px', height: '16px' }}
-                  />
-                  BR04
-                </label>
-                
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #e5e7eb', flex: '1' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={usuarioAtual.filiais_acesso.includes('BR06')}
-                    onChange={() => alternarFilial('BR06')}
-                    style={{ width: '16px', height: '16px' }}
-                  />
-                  BR06
-                </label>
+                {TODAS_AS_FILIAIS.map(filialId => (
+                  <label key={filialId} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #e5e7eb', flex: '1' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={usuarioAtual.filiais_acesso.includes(filialId)}
+                      onChange={() => alternarFilial(filialId)}
+                      style={{ width: '16px', height: '16px' }}
+                    />
+                    {filialId}
+                  </label>
+                ))}
               </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button className="btn-padrao" onClick={() => setModalAberto(false)}>Cancelar</button>
               <button className="btn-salvar" onClick={guardarUsuario}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL DE EXCLUSÃO COM SENHA --- */}
+      {modalExcluirAberto && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="modal-conteudo" style={{ background: '#fff', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Trash2 size={24} /> Confirmar Exclusão
+            </h3>
+            
+            <p style={{ marginBottom: '16px', color: '#4b5563' }}>
+              Tem certeza que deseja apagar o utilizador <strong>{usuarioParaExcluir?.nome_completo}</strong> permanentemente?
+            </p>
+            <p style={{ marginBottom: '12px', fontSize: '14px', fontWeight: '500' }}>
+              Por favor, insira a <strong>SUA</strong> senha de acesso para confirmar esta ação:
+            </p>
+
+            <input 
+              type="password" 
+              className="input-padrao" 
+              placeholder="Digite a sua senha"
+              value={senhaConfirmacao}
+              onChange={(e) => setSenhaConfirmacao(e.target.value)}
+              style={{ marginBottom: '24px', width: '100%' }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button className="btn-padrao" onClick={() => setModalExcluirAberto(false)}>Cancelar</button>
+              <button 
+                onClick={excluirUsuario}
+                style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+              >
+                Sim, Excluir
+              </button>
             </div>
           </div>
         </div>
