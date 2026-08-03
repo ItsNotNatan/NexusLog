@@ -6,7 +6,6 @@ export default function Configuracoes() {
   // ==========================================
   // 1. ESTADOS DA PÁGINA E ABAS
   // ==========================================
-  // NOVO: Define qual aba está selecionada. Começa mostrando a aba 'target'
   const [abaAtiva, setAbaAtiva] = useState('target'); 
 
   // Estado do Target
@@ -29,8 +28,11 @@ export default function Configuracoes() {
     email: '',
     senha: '',
     cargo: 'OPERADOR', 
-    filial: 'BR06'
+    filiais_acesso: ['BR06'] 
   });
+
+  // ✨ LISTA MESTRA DE FILIAIS (Usada para a lógica do "Selecionar Todas")
+  const TODAS_AS_FILIAIS = ['BR02', 'BR04', 'BR06'];
 
   // ==========================================
   // 2. EFEITOS E REQUISIÇÕES (API)
@@ -65,17 +67,20 @@ export default function Configuracoes() {
 
   const guardarUsuario = async () => {
     try {
+      if (usuarioAtual.filiais_acesso.length === 0) {
+        alert("Por favor, selecione pelo menos uma filial de acesso.");
+        return;
+      }
+
       const token = localStorage.getItem('token');
+      
       const dadosParaEnviar = {
         nome: usuarioAtual.nome, 
         email: usuarioAtual.email,
         cargo: usuarioAtual.cargo,
-        filial_padrao_id: usuarioAtual.filial
+        filiais_acesso: usuarioAtual.filiais_acesso,
+        senha: usuarioAtual.senha
       };
-
-      if (!modoEdicao) {
-        dadosParaEnviar.senha = usuarioAtual.senha;
-      }
 
       const url = modoEdicao 
         ? `http://localhost:3001/api/usuarios/${usuarioAtual.id}` 
@@ -109,9 +114,35 @@ export default function Configuracoes() {
   // ==========================================
   // 3. FUNÇÕES AUXILIARES
   // ==========================================
+  
+  // Função para marcar/desmarcar UMA filial específica
+  const alternarFilial = (filialId) => {
+    setUsuarioAtual(prev => {
+      const novasFiliais = prev.filiais_acesso.includes(filialId)
+        ? prev.filiais_acesso.filter(f => f !== filialId)
+        : [...prev.filiais_acesso, filialId];
+        
+      return { ...prev, filiais_acesso: novasFiliais };
+    });
+  };
+
+  // ✨ NOVA FUNÇÃO: Função para marcar/desmarcar TODAS as filiais de uma vez
+  const alternarTodasFiliais = (marcarTodas) => {
+    setUsuarioAtual(prev => ({
+      ...prev,
+      // Se clicar para marcar, enviamos a lista mestra completa. Se desmarcar, enviamos lista vazia.
+      filiais_acesso: marcarTodas ? [...TODAS_AS_FILIAIS] : []
+    }));
+  };
+
+  // ✨ AUTO CHECK: Verifica se o utilizador já tem as 3 filiais para marcar a caixa "Todas" automaticamente
+  const todasSelecionadas = TODAS_AS_FILIAIS.every(filial => 
+    usuarioAtual.filiais_acesso.includes(filial)
+  );
+
   const abrirModalNovo = () => {
     setModoEdicao(false);
-    setUsuarioAtual({ id: '', nome: '', email: '', senha: '', cargo: 'OPERADOR', filial: 'BR06' });
+    setUsuarioAtual({ id: '', nome: '', email: '', senha: '', cargo: 'OPERADOR', filiais_acesso: ['BR06'] });
     setModalAberto(true);
   };
 
@@ -121,9 +152,9 @@ export default function Configuracoes() {
       id: user.id,
       nome: user.nome_completo,
       email: user.email,
-      senha: '', 
+      senha: user.senha || '', 
       cargo: user.cargo,
-      filial: user.filial_padrao_id
+      filiais_acesso: user.filiais_acesso?.length > 0 ? user.filiais_acesso : [user.filial_padrao_id]
     });
     setModalAberto(true);
   };
@@ -136,11 +167,14 @@ export default function Configuracoes() {
   // Lógica de Filtro e Paginação
   const usuariosFiltrados = usuarios.filter(user => {
     const busca = termoPesquisa.toLowerCase();
+    const acessoFiliaisStr = user.filiais_acesso ? user.filiais_acesso.join(', ').toLowerCase() : '';
+    
     return (
       user.nome_completo?.toLowerCase().includes(busca) ||
       user.email?.toLowerCase().includes(busca) ||
       user.cargo?.toLowerCase().includes(busca) ||
-      user.filial_padrao_id?.toLowerCase().includes(busca)
+      user.filial_padrao_id?.toLowerCase().includes(busca) ||
+      acessoFiliaisStr.includes(busca)
     );
   });
 
@@ -163,7 +197,6 @@ export default function Configuracoes() {
       </header>
 
       {/* --- MENU DE ABAS --- */}
-      {/* Aqui criamos os botões para navegar. A cor muda dependendo da aba ativa. */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '2px solid #e5e7eb', paddingBottom: '8px' }}>
         <button 
           onClick={() => setAbaAtiva('target')}
@@ -203,7 +236,6 @@ export default function Configuracoes() {
       </div>
 
       {/* --- CONTEÚDO DA ABA 1: TARGET --- */}
-      {/* O símbolo && funciona assim: "Se abaAtiva for 'target', então renderiza a div abaixo" */}
       {abaAtiva === 'target' && (
         <div className="config-cartao">
           <div className="cartao-topo">
@@ -267,7 +299,7 @@ export default function Configuracoes() {
                   <th style={{ padding: '12px' }}>Nome</th>
                   <th style={{ padding: '12px' }}>E-mail</th>
                   <th style={{ padding: '12px' }}>Cargo</th>
-                  <th style={{ padding: '12px' }}>Filial Padrão</th>
+                  <th style={{ padding: '12px' }}>Filiais de Acesso</th>
                   <th style={{ padding: '12px', textAlign: 'center' }}>Ação</th>
                 </tr>
               </thead>
@@ -277,7 +309,11 @@ export default function Configuracoes() {
                     <td style={{ padding: '12px', fontWeight: '500' }}>{user.nome_completo}</td>
                     <td style={{ padding: '12px', color: '#555' }}>{user.email}</td>
                     <td style={{ padding: '12px' }}><span className={`badge-cargo ${user.cargo?.toLowerCase()}`}>{user.cargo}</span></td>
-                    <td style={{ padding: '12px' }}>{user.filial_padrao_id}</td>
+                    <td style={{ padding: '12px' }}>
+                      {user.filiais_acesso?.length > 0 
+                        ? user.filiais_acesso.join(', ') 
+                        : user.filial_padrao_id}
+                    </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       <button onClick={() => abrirModalEditar(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0056b3' }}>
                         <Edit size={18} />
@@ -321,7 +357,7 @@ export default function Configuracoes() {
         </div>
       )}
 
-      {/* --- MODAL DE CRIAÇÃO / EDIÇÃO (Independente das abas) --- */}
+      {/* --- MODAL DE CRIAÇÃO / EDIÇÃO --- */}
       {modalAberto && (
         <div className="modal-overlay" style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
@@ -343,12 +379,16 @@ export default function Configuracoes() {
               <input type="email" className="input-padrao" value={usuarioAtual.email} onChange={(e) => setUsuarioAtual({...usuarioAtual, email: e.target.value})} />
             </div>
 
-            {!modoEdicao && (
-              <div className="form-grupo" style={{ marginBottom: '16px' }}>
-                <label>Senha</label>
-                <input type="password" className="input-padrao" value={usuarioAtual.senha} onChange={(e) => setUsuarioAtual({...usuarioAtual, senha: e.target.value})} />
-              </div>
-            )}
+            <div className="form-grupo" style={{ marginBottom: '16px' }}>
+              <label>Senha de Acesso</label>
+              <input 
+                type="text" 
+                className="input-padrao" 
+                value={usuarioAtual.senha} 
+                onChange={(e) => setUsuarioAtual({...usuarioAtual, senha: e.target.value})} 
+                placeholder="Introduza a senha"
+              />
+            </div>
 
             <div className="form-grupo" style={{ marginBottom: '16px' }}>
               <label>Cargo</label>
@@ -359,13 +399,56 @@ export default function Configuracoes() {
               </select>
             </div>
 
+            {/* ✨ CHECKBOXES DAS FILIAIS COM OPÇÃO "TODAS" */}
             <div className="form-grupo" style={{ marginBottom: '24px' }}>
-              <label>Filial Padrão</label>
-              <select className="input-padrao" value={usuarioAtual.filial} onChange={(e) => setUsuarioAtual({...usuarioAtual, filial: e.target.value})}>
-                <option value="BR02">BR02 — Santo André</option>
-                <option value="BR04">BR04 — Goiana</option>
-                <option value="BR06">BR06 — Betim</option>
-              </select>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                Acesso às Filiais (Selecione 1 ou mais)
+              </label>
+              
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                
+                {/* BOTÃO "TODAS AS FILIAIS" - Destacado com uma cor diferente (azul clarinho) */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px 12px', backgroundColor: '#eff6ff', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: '600', color: '#1d4ed8', width: '100%' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={todasSelecionadas}
+                    onChange={(e) => alternarTodasFiliais(e.target.checked)}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  Todas as Filiais
+                </label>
+
+                {/* OPÇÕES INDIVIDUAIS */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #e5e7eb', flex: '1' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={usuarioAtual.filiais_acesso.includes('BR02')}
+                    onChange={() => alternarFilial('BR02')}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  BR02
+                </label>
+                
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #e5e7eb', flex: '1' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={usuarioAtual.filiais_acesso.includes('BR04')}
+                    onChange={() => alternarFilial('BR04')}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  BR04
+                </label>
+                
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px', border: '1px solid #e5e7eb', flex: '1' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={usuarioAtual.filiais_acesso.includes('BR06')}
+                    onChange={() => alternarFilial('BR06')}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  BR06
+                </label>
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
@@ -375,7 +458,6 @@ export default function Configuracoes() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
