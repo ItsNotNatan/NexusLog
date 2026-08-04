@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 
 // NOSSOS COMPONENTES E HOOKS
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
@@ -55,25 +55,28 @@ export default function EntradaMaterial() {
   const processador = useProcessadorExcel();
 
   // ==========================================
-  // ✨ LÓGICA DE PAGINAÇÃO
+  // ✨ LÓGICA DE PAGINAÇÃO E ALTURA FIXA
   // ==========================================
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 10;
+  
+  // Altura aproximada de cada linha para manter o layout estático
+  const alturaLinhaPx = 62;
 
-  // Calcula o total de páginas (se não houver itens, é 1)
   const totalPaginas = Math.max(1, Math.ceil(itens.length / itensPorPagina));
 
-  // Garante que, se apagarmos itens e a página atual ficar vazia, voltamos para a página anterior
   useEffect(() => {
     if (paginaAtual > totalPaginas) {
       setPaginaAtual(totalPaginas);
     }
   }, [itens.length, totalPaginas, paginaAtual]);
 
-  // Fatiamos a lista para obter apenas os itens da página atual
   const indexUltimoItem = paginaAtual * itensPorPagina;
   const indexPrimeiroItem = indexUltimoItem - itensPorPagina;
   const itensDaPagina = itens.slice(indexPrimeiroItem, indexUltimoItem);
+
+  // Calcula quantas linhas faltam para completar as 10 desta página
+  const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
 
   // ==========================================
   // FUNÇÕES DE MANIPULAÇÃO
@@ -104,7 +107,6 @@ export default function EntradaMaterial() {
       setItens(prev => {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
         const novaLista = [...listaLimpa, ...novosItensFormatados];
-        // Redireciona para a primeira página após importação para ver o início dos dados
         setPaginaAtual(1);
         return novaLista;
       });
@@ -114,7 +116,6 @@ export default function EntradaMaterial() {
   const adicionarLinhaEmBranco = () => {
     const novaLista = [...itens, gerarLinhaVazia()];
     setItens(novaLista);
-    // Redireciona automaticamente para a última página onde o novo item foi inserido
     setPaginaAtual(Math.ceil(novaLista.length / itensPorPagina));
   };
 
@@ -123,7 +124,6 @@ export default function EntradaMaterial() {
   };
 
   const atualizarCampo = (id, campo, novoValor) => {
-    // Atualizamos a lista original (o React repassa automaticamente para os itens fatiados na visualização)
     setItens(itens.map(item => item.id === id ? { ...item, [campo]: novoValor } : item));
   };
 
@@ -323,41 +323,60 @@ export default function EntradaMaterial() {
           </div>
         </div>
 
-        <div className="scroll-tabela-solicitacao">
-          <table className="tabela-solicitacao-dados" style={{ minWidth: '2400px' }}>
-            <thead>
-              <tr>
-                <th style={{ width: '60px', textAlign: 'center' }}>AÇÕES</th>
-                <th>Nº PEÇA FABRICANTE</th>
-                <th>FORNECEDOR</th>
-                <th style={{ width: '120px' }}>QTD. FORNECIDA</th>
-                <th>NF DE ENTRADA</th>
-                <th style={{ width: '140px' }}>UNIDADE DE MEDIDA</th>
-                <th style={{ minWidth: '200px' }}>VENDOR DESCRIPTION</th>
-                <th>WBS ELEMENT</th>
-                <th>DATA DE NECESSIDADE</th>
-                <th>EMISSÃO NF</th>
-                <th>RECEB. NF</th>
-                <th>DOCUMENTO DE COMPRAS</th>
-                <th>PO NET PRICE</th>
-                <th style={{ width: '100px' }}>CENTRO</th>
-                <th style={{ width: '100px' }}>DEPÓSITO</th>
-                <th>ALOCAÇÃO</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itens.length === 0 ? (
+        {/* ✨ CONTAINER RELATIVO: Mantém o aviso preso ao centro da visualização, flutuando sobre a tabela */}
+        <div style={{ position: 'relative' }}>
+          
+          {/* ✨ AVISO DESTACADO FLUTUANTE ABAIXO DO CABEÇALHO DA TABELA (THEAD) */}
+          {itens.length === 0 && (
+            <div style={{ 
+              position: 'absolute', 
+              top: '80px', /* Posiciona logo abaixo dos nomes das colunas */
+              left: '50%', 
+              transform: 'translateX(-50%)', 
+              zIndex: 10, /* Mantém o banner acima da grelha de linhas */
+              backgroundColor: '#fffbeb', 
+              border: '1px solid #fef3c7', 
+              borderLeft: '4px solid #f59e0b', 
+              padding: '12px 20px', 
+              borderRadius: '6px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px', 
+              color: '#b45309',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}>
+              <AlertCircle size={20} />
+              <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                Atenção: A sua lista está vazia. Clique em "Nova Linha" ou importe uma planilha para começar.
+              </span>
+            </div>
+          )}
+
+          <div className="scroll-tabela-solicitacao">
+            <table className="tabela-solicitacao-dados" style={{ minWidth: '2400px' }}>
+              <thead>
                 <tr>
-                  <td colSpan="16" style={{ textAlign: 'center', padding: '60px', color: '#94a3b8', backgroundColor: '#f8fafc' }}>
-                    <Package size={48} style={{ opacity: 0.3, margin: '0 auto 16px auto', display: 'block' }} />
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>Nenhum item adicionado.</p>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem' }}>Clique em <strong>Nova Linha</strong> ou <strong>Importar Excel</strong> para começar.</p>
-                  </td>
+                  <th style={{ width: '60px', textAlign: 'center' }}>AÇÕES</th>
+                  <th>Nº PEÇA FABRICANTE</th>
+                  <th>FORNECEDOR</th>
+                  <th style={{ width: '120px' }}>QTD. FORNECIDA</th>
+                  <th>NF DE ENTRADA</th>
+                  <th style={{ width: '140px' }}>UNIDADE DE MEDIDA</th>
+                  <th style={{ minWidth: '200px' }}>VENDOR DESCRIPTION</th>
+                  <th>WBS ELEMENT</th>
+                  <th>DATA DE NECESSIDADE</th>
+                  <th>EMISSÃO NF</th>
+                  <th>RECEB. NF</th>
+                  <th>DOCUMENTO DE COMPRAS</th>
+                  <th>PO NET PRICE</th>
+                  <th style={{ width: '100px' }}>CENTRO</th>
+                  <th style={{ width: '100px' }}>DEPÓSITO</th>
+                  <th>ALOCAÇÃO</th>
                 </tr>
-              ) : (
-                /* ✨ Desenhamos apenas os itens da página atual usando o itensDaPagina mapeado! */
-                itensDaPagina.map((item) => (
-                  <tr key={item.id}>
+              </thead>
+              <tbody>
+                {itensDaPagina.map((item) => (
+                  <tr key={item.id} style={{ height: `${alturaLinhaPx}px` }}>
                     <td style={{ textAlign: 'center' }}>
                       <button onClick={() => removerItem(item.id)} className="btn-deletar-linha">
                         <Trash2 size={16} />
@@ -391,44 +410,15 @@ export default function EntradaMaterial() {
                     <td>
                       <input className="input-editavel-tabela link-azul-fake" value={item.wbsElement} onChange={(e) => atualizarCampo(item.id, 'wbsElement', e.target.value)} placeholder="WBS" />
                     </td>
-
                     <td>
-                      <input
-                        type="date"
-                        className="input-editavel-tabela texto-cinza"
-                        value={item.dataNecessidade}
-                        min={dataMinima}
-                        onChange={(e) => atualizarCampo(item.id, 'dataNecessidade', e.target.value)}
-                        onKeyDown={(e) => e.preventDefault()}
-                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
-                        style={{ cursor: 'pointer' }}
-                      />
+                      <input type="date" className="input-editavel-tabela texto-cinza" value={item.dataNecessidade} min={dataMinima} onChange={(e) => atualizarCampo(item.id, 'dataNecessidade', e.target.value)} onKeyDown={(e) => e.preventDefault()} onClick={(e) => e.target.showPicker && e.target.showPicker()} style={{ cursor: 'pointer' }} />
                     </td>
                     <td>
-                      <input
-                        type="date"
-                        className="input-editavel-tabela texto-cinza"
-                        value={item.emissaoNF}
-                        min={dataMinima}
-                        onChange={(e) => atualizarCampo(item.id, 'emissaoNF', e.target.value)}
-                        onKeyDown={(e) => e.preventDefault()}
-                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
-                        style={{ cursor: 'pointer' }}
-                      />
+                      <input type="date" className="input-editavel-tabela texto-cinza" value={item.emissaoNF} min={dataMinima} onChange={(e) => atualizarCampo(item.id, 'emissaoNF', e.target.value)} onKeyDown={(e) => e.preventDefault()} onClick={(e) => e.target.showPicker && e.target.showPicker()} style={{ cursor: 'pointer' }} />
                     </td>
                     <td>
-                      <input
-                        type="date"
-                        className="input-editavel-tabela texto-cinza"
-                        value={item.recebNF}
-                        min={dataMinima}
-                        onChange={(e) => atualizarCampo(item.id, 'recebNF', e.target.value)}
-                        onKeyDown={(e) => e.preventDefault()}
-                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
-                        style={{ cursor: 'pointer' }}
-                      />
+                      <input type="date" className="input-editavel-tabela texto-cinza" value={item.recebNF} min={dataMinima} onChange={(e) => atualizarCampo(item.id, 'recebNF', e.target.value)} onKeyDown={(e) => e.preventDefault()} onClick={(e) => e.target.showPicker && e.target.showPicker()} style={{ cursor: 'pointer' }} />
                     </td>
-
                     <td>
                       <input className="input-editavel-tabela texto-cinza" value={item.docCompras} onChange={(e) => atualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
                     </td>
@@ -445,47 +435,54 @@ export default function EntradaMaterial() {
                       <input className="input-editavel-tabela link-azul-fake" value={item.alocacao} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+                
+                {/* Linhas fantasmas para fechar a grelha visual da tabela */}
+                {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
+                  <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
+                    <td colSpan="16" style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* ✨ BARRA DE PAGINAÇÃO ABAIXO DA TABELA */}
-        {itens.length > 0 && (
-          <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, itens.length)}</strong> de <strong>{itens.length}</strong> itens
-            </div>
-            <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button
-                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
-                disabled={paginaAtual === 1}
-                style={{ 
-                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', 
-                  backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', 
-                  fontSize: '0.875rem', fontWeight: '500', color: '#334155', 
-                  cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer', opacity: paginaAtual === 1 ? 0.6 : 1 
-                }}
-              >
-                <ChevronLeft size={16} /> Anterior
-              </button>
-
-              <button
-                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
-                disabled={paginaAtual === totalPaginas}
-                style={{ 
-                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', 
-                  backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', 
-                  fontSize: '0.875rem', fontWeight: '500', color: '#334155', 
-                  cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer', opacity: paginaAtual === totalPaginas ? 0.6 : 1 
-                }}
-              >
-                Próxima <ChevronRight size={16} />
-              </button>
-            </div>
+        {/* BARRA DE PAGINAÇÃO ABAIXO DA TABELA */}
+        <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
+          <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+            Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {itens.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, itens.length)}</strong> de <strong>{itens.length}</strong> itens
           </div>
-        )}
+          <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+              disabled={paginaAtual === 1 || itens.length === 0}
+              style={{ 
+                display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', 
+                backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', 
+                fontSize: '0.875rem', fontWeight: '500', color: '#334155', 
+                cursor: (paginaAtual === 1 || itens.length === 0) ? 'not-allowed' : 'pointer', 
+                opacity: (paginaAtual === 1 || itens.length === 0) ? 0.6 : 1 
+              }}
+            >
+              <ChevronLeft size={16} /> Anterior
+            </button>
+
+            <button
+              onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+              disabled={paginaAtual === totalPaginas || itens.length === 0}
+              style={{ 
+                display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', 
+                backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', 
+                fontSize: '0.875rem', fontWeight: '500', color: '#334155', 
+                cursor: (paginaAtual === totalPaginas || itens.length === 0) ? 'not-allowed' : 'pointer', 
+                opacity: (paginaAtual === totalPaginas || itens.length === 0) ? 0.6 : 1 
+              }}
+            >
+              Próxima <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="form-cartao">
