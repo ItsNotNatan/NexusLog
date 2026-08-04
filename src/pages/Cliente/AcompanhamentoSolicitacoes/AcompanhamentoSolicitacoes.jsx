@@ -26,10 +26,10 @@ import { supabase } from "../../../supabaseClient";
 // ✨ NOVA FUNÇÃO: Traduz os códigos técnicos "BR" para os nomes reais das cidades
 const obterNomeFilial = (codigo) => {
   if (!codigo) return 'N/D';
-  
+
   // Convertemos para texto e limpamos espaços para evitar erros de digitação
   const codLimpo = String(codigo).toUpperCase().trim();
-  
+
   switch (codLimpo) {
     case "BR02":
       return "Santo André";
@@ -112,8 +112,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [totalRegistros, setTotalRegistros] = useState(0);
   const itensPorPagina = 10;
 
-  // Lemos o Usuário e o Token corretamente
-  const usuarioLogado = JSON.parse(localStorage.getItem('@NexusLog:user')) || {};
+  // 🟢 Como deve ficar (sincronizado com o AuthContext):
+  const usuarioLogado = JSON.parse(localStorage.getItem('@NexusLog:usuario')) || {};
   const token = localStorage.getItem('@NexusLog:token') || '';
 
   const textoCargo = String(
