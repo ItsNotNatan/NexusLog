@@ -14,16 +14,26 @@ export const AuthProvider = ({ children }) => {
   const [carregandoInicial, setCarregandoInicial] = useState(true);
 
   // 1. RESTAURA A SESSÃO AO CARREGAR A PÁGINA
+// 1. RESTAURA A SESSÃO AO CARREGAR A PÁGINA
   useEffect(() => {
     const tokenSalvo = localStorage.getItem('@NexusLog:token');
     const usuarioSalvo = localStorage.getItem('@NexusLog:usuario');
     const filialSalva = localStorage.getItem('@NexusLog:filialAtiva');
 
     if (tokenSalvo && usuarioSalvo) {
-      const usuarioObj = JSON.parse(usuarioSalvo);
-      setToken(tokenSalvo);
-      setUsuario(usuarioObj);
-      setFilialSelecionada(filialSalva || usuarioObj.filial || '');
+      try {
+        // Verifica se o valor não é a string 'undefined' antes de fazer o parse
+        if (usuarioSalvo !== 'undefined') {
+          const usuarioObj = JSON.parse(usuarioSalvo);
+          setToken(tokenSalvo);
+          setUsuario(usuarioObj);
+          setFilialSelecionada(filialSalva || usuarioObj.filial || '');
+        }
+      } catch (e) {
+        console.warn("Sessão corrompida, a limpar dados.");
+        localStorage.removeItem('@NexusLog:usuario');
+        localStorage.removeItem('@NexusLog:token');
+      }
     }
 
     setCarregandoInicial(false);

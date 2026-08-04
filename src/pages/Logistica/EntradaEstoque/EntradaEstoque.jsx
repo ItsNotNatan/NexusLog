@@ -366,6 +366,7 @@ export default function EntradaEstoque() {
                   <td style={{ padding: '8px' }}>
                     <input style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} value={item.poNetPrice} onChange={(e) => atualizarCampo(item.id, 'poNetPrice', e.target.value)} placeholder="R$ 0,00" />
                   </td>
+                 {/* Substitui a partir do input "Centro" até ao final do ficheiro */}
                   <td style={{ padding: '8px' }}>
                     <input style={{ width: '60px', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.centro} onChange={(e) => atualizarCampo(item.id, 'centro', e.target.value)} placeholder="Centro" />
                   </td>
@@ -382,13 +383,12 @@ export default function EntradaEstoque() {
         </div>
       </div>
 
-      {/* --- ANEXOS --- */}
-      <div className="estoque-cartao form-cartao">
+      <div className="form-cartao">
         <div className="input-grupo">
           <label>ANEXOS (OPCIONAL - Notas Fiscais, Manuais, Fotos)</label>
-          
+
           <div style={{ marginTop: '8px' }}>
-            <CarregarArquivo 
+            <CarregarArquivo
               variante="botao"
               accept=".pdf, .jpg, .png, .xlsx"
               label="Anexar Arquivo"
@@ -412,14 +412,13 @@ export default function EntradaEstoque() {
         </div>
       </div>
 
-      {/* --- AÇÃO FINAL --- */}
-      <BotaoAcaoGlobal 
-        texto="Solicitar Entrada de Material" 
-        icone={<Send size={16} />} 
-        cor="azul" 
-        onClick={handleEnviar} 
+      <BotaoAcaoGlobal
+        texto="Registrar Entrada"
+        icone={<Send size={16} />}
+        cor="verde"
+        onClick={handleEnviar}
       />
-      
+
     </div>
   );
 }

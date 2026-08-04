@@ -112,9 +112,24 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [totalRegistros, setTotalRegistros] = useState(0);
   const itensPorPagina = 10;
 
-  // 🟢 Como deve ficar (sincronizado com o AuthContext):
-  const usuarioLogado = JSON.parse(localStorage.getItem('@NexusLog:usuario')) || {};
+  // =========================================================================
+  // 🟢 LEITURA SEGURA DO LOCALSTORAGE (Blindagem contra Tela Branca)
+  // Usamos try...catch para tentar ler e converter os dados com segurança.
+  // =========================================================================
+  let usuarioLogado = {};
+  try {
+    const dadosUsuario = localStorage.getItem('@NexusLog:usuario');
+    // Verifica se os dados existem e se não são a palavra "undefined"
+    if (dadosUsuario && dadosUsuario !== 'undefined') {
+      usuarioLogado = JSON.parse(dadosUsuario);
+    }
+  } catch (erro) {
+    // Se o JSON.parse falhar, apanha o erro aqui e avisa na consola, mas não quebra a tela!
+    console.warn('Sessão vazia ou inválida. O utilizador será tratado como público.');
+  }
+
   const token = localStorage.getItem('@NexusLog:token') || '';
+  // =========================================================================
 
   const textoCargo = String(
     usuarioLogado.cargo ||
