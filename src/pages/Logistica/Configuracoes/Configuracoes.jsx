@@ -80,7 +80,7 @@ export default function Configuracoes() {
     }
   };
 
-  // 💾 SALVAR OU ATUALIZAR UTILIZADOR
+// 💾 SALVAR OU ATUALIZAR UTILIZADOR
   const guardarUsuario = async () => {
     try {
       if (usuarioAtual.filiais_acesso.length === 0) {
@@ -88,11 +88,18 @@ export default function Configuracoes() {
         return; 
       }
 
-      // 🛡️ CORREÇÃO: Alterado para a chave oficial do token
+      // Validação de segurança para o Supabase (mínimo de 6 caracteres na criação)
+      if (!modoEdicao && usuarioAtual.senha.length < 6) {
+        alert("⚠️ A senha deve ter no mínimo 6 caracteres.");
+        return;
+      }
+
+      // 🛡️ Lendo a chave oficial definida no AuthContext
       const token = localStorage.getItem('@NexusLog:token');
       
       const dadosParaEnviar = {
         nome: usuarioAtual.nome, 
+        nome_completo: usuarioAtual.nome, // ✨ Enviamos ambos para garantir compatibilidade com o Backend
         email: usuarioAtual.email,
         cargo: usuarioAtual.cargo,
         filiais_acesso: usuarioAtual.filiais_acesso,
@@ -119,12 +126,13 @@ export default function Configuracoes() {
       if (data.sucesso) {
         setModalAberto(false);
         carregarUsuarios(); 
-        alert("Guardado com sucesso!"); 
+        alert("Utilizador guardado com sucesso!"); 
       } else {
-        alert(data.erro);
+        alert("Erro ao guardar: " + data.erro);
       }
     } catch (erro) {
       console.error("Erro ao guardar utilizador:", erro);
+      alert("Falha de conexão com o servidor.");
     }
   };
 

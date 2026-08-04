@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet } from 'lucide-react';
+import { Package, User, Plus, Send, Trash2, Paperclip, X, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // NOSSOS COMPONENTES E HOOKS
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
@@ -50,10 +50,34 @@ export default function EntradaMaterial() {
     alocacao: ''
   });
 
-  const [itens, setItens] = useState([gerarLinhaVazia()]);
+  const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
   const processador = useProcessadorExcel();
 
+  // ==========================================
+  // ✨ LÓGICA DE PAGINAÇÃO
+  // ==========================================
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 10;
+
+  // Calcula o total de páginas (se não houver itens, é 1)
+  const totalPaginas = Math.max(1, Math.ceil(itens.length / itensPorPagina));
+
+  // Garante que, se apagarmos itens e a página atual ficar vazia, voltamos para a página anterior
+  useEffect(() => {
+    if (paginaAtual > totalPaginas) {
+      setPaginaAtual(totalPaginas);
+    }
+  }, [itens.length, totalPaginas, paginaAtual]);
+
+  // Fatiamos a lista para obter apenas os itens da página atual
+  const indexUltimoItem = paginaAtual * itensPorPagina;
+  const indexPrimeiroItem = indexUltimoItem - itensPorPagina;
+  const itensDaPagina = itens.slice(indexPrimeiroItem, indexUltimoItem);
+
+  // ==========================================
+  // FUNÇÕES DE MANIPULAÇÃO
+  // ==========================================
   const handleImportarExcel = async (arquivo) => {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
 
@@ -79,24 +103,27 @@ export default function EntradaMaterial() {
 
       setItens(prev => {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
-        return [...listaLimpa, ...novosItensFormatados];
+        const novaLista = [...listaLimpa, ...novosItensFormatados];
+        // Redireciona para a primeira página após importação para ver o início dos dados
+        setPaginaAtual(1);
+        return novaLista;
       });
     }
   };
 
   const adicionarLinhaEmBranco = () => {
-    setItens([...itens, gerarLinhaVazia()]);
+    const novaLista = [...itens, gerarLinhaVazia()];
+    setItens(novaLista);
+    // Redireciona automaticamente para a última página onde o novo item foi inserido
+    setPaginaAtual(Math.ceil(novaLista.length / itensPorPagina));
   };
 
   const removerItem = (idParaRemover) => {
-    if (itens.length > 1) {
-      setItens(itens.filter(item => item.id !== idParaRemover));
-    } else {
-      showAlert("Ação Bloqueada", "A solicitação precisa ter pelo menos um item.", "warning");
-    }
+    setItens(itens.filter(item => item.id !== idParaRemover));
   };
 
   const atualizarCampo = (id, campo, novoValor) => {
+    // Atualizamos a lista original (o React repassa automaticamente para os itens fatiados na visualização)
     setItens(itens.map(item => item.id === id ? { ...item, [campo]: novoValor } : item));
   };
 
@@ -116,6 +143,11 @@ export default function EntradaMaterial() {
 
     if (!formDados.nome || !formDados.wbs) {
       showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS do solicitante.", "warning");
+      return;
+    }
+
+    if (itens.length === 0) {
+      showAlert("Lista Vazia", "Adicione pelo menos um item à tabela para dar entrada.", "warning");
       return;
     }
 
@@ -190,12 +222,12 @@ export default function EntradaMaterial() {
       const dados = await resposta.json();
 
       if (resposta.ok) {
-        // ✨ AQUI ESTÁ A CORREÇÃO: Pegamos o ID da mesma forma segura!
         const idGerado = dados.ps || dados.ps_id;
         
         showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${idGerado}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
-        setItens([gerarLinhaVazia()]);
+        setItens([]); 
+        setPaginaAtual(1);
         setAnexos([]);
       } else {
         showAlert("Erro no Servidor", dados.erro, "error");
@@ -286,7 +318,7 @@ export default function EntradaMaterial() {
             />
 
             <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 10px', borderRadius: '999px' }}>
-              {itens.length} itens
+              {itens.length} itens totais
             </span>
           </div>
         </div>
@@ -314,99 +346,146 @@ export default function EntradaMaterial() {
               </tr>
             </thead>
             <tbody>
-              {itens.map((item) => (
-                <tr key={item.id}>
-                  <td style={{ textAlign: 'center' }}>
-                    <button onClick={() => removerItem(item.id)} className="btn-deletar-linha">
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela badge-partnumber" value={item.numPecaFabricante} onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela texto-cinza-escuro" value={item.fornecedor} onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
-                  </td>
-                  <td className="qtd-solicitada-destaque">
-                    <input type="number" className="input-inline-tabela" value={item.qtdFornecida} onChange={(e) => atualizarCampo(item.id, 'qtdFornecida', e.target.value)} placeholder="0" min="1" />
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela texto-preto" value={item.nfEntrada} onChange={(e) => atualizarCampo(item.id, 'nfEntrada', e.target.value)} placeholder="NF Entrada" />
-                  </td>
-                  <td>
-                    <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
-                      <option value="Unid">Unid</option>
-                      <option value="Kg">Kg</option>
-                      <option value="Metro">Metro</option>
-                      <option value="Caixa">Caixa</option>
-                      <option value="Litro">Litro</option>
-                      <option value="NR">NR</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela texto-cinza" value={item.vendorDescription} onChange={(e) => atualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição do fornecedor" />
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela link-azul-fake" value={item.wbsElement} onChange={(e) => atualizarCampo(item.id, 'wbsElement', e.target.value)} placeholder="WBS" />
-                  </td>
-
-                  <td>
-                    <input
-                      type="date"
-                      className="input-editavel-tabela texto-cinza"
-                      value={item.dataNecessidade}
-                      min={dataMinima}
-                      onChange={(e) => atualizarCampo(item.id, 'dataNecessidade', e.target.value)}
-                      onKeyDown={(e) => e.preventDefault()}
-                      onClick={(e) => e.target.showPicker && e.target.showPicker()}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="date"
-                      className="input-editavel-tabela texto-cinza"
-                      value={item.emissaoNF}
-                      min={dataMinima}
-                      onChange={(e) => atualizarCampo(item.id, 'emissaoNF', e.target.value)}
-                      onKeyDown={(e) => e.preventDefault()}
-                      onClick={(e) => e.target.showPicker && e.target.showPicker()}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="date"
-                      className="input-editavel-tabela texto-cinza"
-                      value={item.recebNF}
-                      min={dataMinima}
-                      onChange={(e) => atualizarCampo(item.id, 'recebNF', e.target.value)}
-                      onKeyDown={(e) => e.preventDefault()}
-                      onClick={(e) => e.target.showPicker && e.target.showPicker()}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </td>
-
-                  <td>
-                    <input className="input-editavel-tabela texto-cinza" value={item.docCompras} onChange={(e) => atualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela texto-preto" value={item.poNetPrice} onChange={(e) => atualizarCampo(item.id, 'poNetPrice', e.target.value)} placeholder="R$ 0,00" />
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela texto-cinza" value={item.centro} onChange={(e) => atualizarCampo(item.id, 'centro', e.target.value)} placeholder="Centro" />
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela texto-cinza" value={item.deposito} onChange={(e) => atualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
-                  </td>
-                  <td>
-                    <input className="input-editavel-tabela link-azul-fake" value={item.alocacao} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
+              {itens.length === 0 ? (
+                <tr>
+                  <td colSpan="16" style={{ textAlign: 'center', padding: '60px', color: '#94a3b8', backgroundColor: '#f8fafc' }}>
+                    <Package size={48} style={{ opacity: 0.3, margin: '0 auto 16px auto', display: 'block' }} />
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>Nenhum item adicionado.</p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem' }}>Clique em <strong>Nova Linha</strong> ou <strong>Importar Excel</strong> para começar.</p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                /* ✨ Desenhamos apenas os itens da página atual usando o itensDaPagina mapeado! */
+                itensDaPagina.map((item) => (
+                  <tr key={item.id}>
+                    <td style={{ textAlign: 'center' }}>
+                      <button onClick={() => removerItem(item.id)} className="btn-deletar-linha">
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                    <td>
+                      <input className="input-editavel-tabela badge-partnumber" value={item.numPecaFabricante} onChange={(e) => atualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
+                    </td>
+                    <td>
+                      <input className="input-editavel-tabela texto-cinza-escuro" value={item.fornecedor} onChange={(e) => atualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
+                    </td>
+                    <td className="qtd-solicitada-destaque">
+                      <input type="number" className="input-inline-tabela" value={item.qtdFornecida} onChange={(e) => atualizarCampo(item.id, 'qtdFornecida', e.target.value)} placeholder="0" min="1" />
+                    </td>
+                    <td>
+                      <input className="input-editavel-tabela texto-preto" value={item.nfEntrada} onChange={(e) => atualizarCampo(item.id, 'nfEntrada', e.target.value)} placeholder="NF Entrada" />
+                    </td>
+                    <td>
+                      <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida} onChange={(e) => atualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
+                        <option value="Unid">Unid</option>
+                        <option value="Kg">Kg</option>
+                        <option value="Metro">Metro</option>
+                        <option value="Caixa">Caixa</option>
+                        <option value="Litro">Litro</option>
+                        <option value="NR">NR</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input className="input-editavel-tabela texto-cinza" value={item.vendorDescription} onChange={(e) => atualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição do fornecedor" />
+                    </td>
+                    <td>
+                      <input className="input-editavel-tabela link-azul-fake" value={item.wbsElement} onChange={(e) => atualizarCampo(item.id, 'wbsElement', e.target.value)} placeholder="WBS" />
+                    </td>
+
+                    <td>
+                      <input
+                        type="date"
+                        className="input-editavel-tabela texto-cinza"
+                        value={item.dataNecessidade}
+                        min={dataMinima}
+                        onChange={(e) => atualizarCampo(item.id, 'dataNecessidade', e.target.value)}
+                        onKeyDown={(e) => e.preventDefault()}
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        className="input-editavel-tabela texto-cinza"
+                        value={item.emissaoNF}
+                        min={dataMinima}
+                        onChange={(e) => atualizarCampo(item.id, 'emissaoNF', e.target.value)}
+                        onKeyDown={(e) => e.preventDefault()}
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        className="input-editavel-tabela texto-cinza"
+                        value={item.recebNF}
+                        min={dataMinima}
+                        onChange={(e) => atualizarCampo(item.id, 'recebNF', e.target.value)}
+                        onKeyDown={(e) => e.preventDefault()}
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
+
+                    <td>
+                      <input className="input-editavel-tabela texto-cinza" value={item.docCompras} onChange={(e) => atualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
+                    </td>
+                    <td>
+                      <input className="input-editavel-tabela texto-preto" value={item.poNetPrice} onChange={(e) => atualizarCampo(item.id, 'poNetPrice', e.target.value)} placeholder="R$ 0,00" />
+                    </td>
+                    <td>
+                      <input className="input-editavel-tabela texto-cinza" value={item.centro} onChange={(e) => atualizarCampo(item.id, 'centro', e.target.value)} placeholder="Centro" />
+                    </td>
+                    <td>
+                      <input className="input-editavel-tabela texto-cinza" value={item.deposito} onChange={(e) => atualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
+                    </td>
+                    <td>
+                      <input className="input-editavel-tabela link-azul-fake" value={item.alocacao} onChange={(e) => atualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* ✨ BARRA DE PAGINAÇÃO ABAIXO DA TABELA */}
+        {itens.length > 0 && (
+          <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
+            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, itens.length)}</strong> de <strong>{itens.length}</strong> itens
+            </div>
+            <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                disabled={paginaAtual === 1}
+                style={{ 
+                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', 
+                  backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', 
+                  fontSize: '0.875rem', fontWeight: '500', color: '#334155', 
+                  cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer', opacity: paginaAtual === 1 ? 0.6 : 1 
+                }}
+              >
+                <ChevronLeft size={16} /> Anterior
+              </button>
+
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+                disabled={paginaAtual === totalPaginas}
+                style={{ 
+                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', 
+                  backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', 
+                  fontSize: '0.875rem', fontWeight: '500', color: '#334155', 
+                  cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer', opacity: paginaAtual === totalPaginas ? 0.6 : 1 
+                }}
+              >
+                Próxima <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="form-cartao">

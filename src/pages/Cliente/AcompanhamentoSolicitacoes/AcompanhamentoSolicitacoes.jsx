@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import "./AcompanhamentoSolicitacoes.css";
 import {
   Search,
@@ -15,7 +15,6 @@ import {
   MapPin // Ícone da filial mantido aqui
 } from "lucide-react";
 
-import { useContext } from 'react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
@@ -119,15 +118,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   let usuarioLogado = {};
   try {
     const dadosUsuario = localStorage.getItem('@NexusLog:usuario');
-    // Verifica se os dados existem e se não são a palavra "undefined"
     if (dadosUsuario && dadosUsuario !== 'undefined') {
       usuarioLogado = JSON.parse(dadosUsuario);
     }
   } catch (erro) {
-    // Se o JSON.parse falhar, apanha o erro aqui e avisa na consola, mas não quebra a tela!
     console.warn('Sessão vazia ou inválida. O utilizador será tratado como público.');
   }
-
   const token = localStorage.getItem('@NexusLog:token') || '';
   // =========================================================================
 
@@ -539,7 +535,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             fontSize: '0.75rem',
                             fontWeight: '600',
                             border: '1px solid #cbd5e1',
-                            whiteSpace: 'nowrap' // Evita que o nome da cidade quebre em duas linhas
+                            whiteSpace: 'nowrap'
                           }}>
                             <MapPin size={12} />
                             {obterNomeFilial(linha.filial || linha.estoque)}

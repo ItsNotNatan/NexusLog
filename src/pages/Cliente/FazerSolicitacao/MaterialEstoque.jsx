@@ -67,7 +67,7 @@ export default function MaterialEstoque() {
               materialDescription: item.descricao_manual || item.descricao || "-",
               numPecaFabricante: item.part_number_manual || item.part_number || "-",
               fornecedor: item.fornecedor || "-",
-              qtdFornecida: item.quantidade_disponivel || 0,
+              qtdFornecida: item.quantidade_disponivel || 0, // 👈 Este é o nosso Saldo Máximo!
               nf: item.nf_entrada || "-",
               referencia: "-",
               unidadeMedida: item.unidade_medida_manual || item.unidade_medida || "Unid",
@@ -91,10 +91,18 @@ export default function MaterialEstoque() {
     buscarEstoqueReal();
   }, []);
 
+  // 🚀 LIMITE 1: Bloquear Excel se ultrapassar 10 itens
   const handleImportarExcel = async (arquivo) => {
     const novosItens = await processador.iniciarProcessamento(arquivo);
     if (novosItens && Array.isArray(novosItens)) {
-      setItensSelecionados((prev) => [...prev, ...novosItens]);
+      setItensSelecionados((prev) => {
+        const totalFuturo = prev.length + novosItens.length;
+        if (totalFuturo > 10) {
+          showAlert("Limite Atingido", "Você só pode adicionar no máximo 10 itens por solicitação. Os itens excedentes foram ignorados.", "warning");
+          return [...prev, ...novosItens].slice(0, 10);
+        }
+        return [...prev, ...novosItens];
+      });
     }
   };
 
@@ -102,56 +110,76 @@ export default function MaterialEstoque() {
     setItensSelecionados((prev) => prev.filter((item) => item.id !== idParaRemover));
   };
 
+  // 🚀 LIMITE 2: Não permitir que a quantidade ultrapasse o saldo do estoque
   const atualizarCampo = (id, campo, novoValor) => {
     setItensSelecionados((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [campo]: novoValor } : item))
+      prev.map((item) => {
+        if (item.id === id) {
+          if (campo === "qtdSelecionada") {
+            // Se o campo ficar vazio (apagado), deixamos vazio temporariamente para a pessoa conseguir digitar
+            let valorValidado = novoValor === '' ? '' : parseInt(novoValor, 10);
+            
+            if (valorValidado !== '') {
+              if (isNaN(valorValidado) || valorValidado < 1) valorValidado = 1;
+              // Se a pessoa tentar pedir mais do que há no estoque (qtdFornecida), forçamos o valor para o máximo!
+              if (valorValidado > item.qtdFornecida) {
+                valorValidado = item.qtdFornecida;
+              }
+            }
+            return { ...item, [campo]: valorValidado };
+          }
+          return { ...item, [campo]: novoValor };
+        }
+        return item;
+      })
     );
   };
 
+  // 🚀 LIMITE 3: Bloquear clique manual se já houver 10 itens
   const adicionarManualmente = (item, index) => {
+    if (itensSelecionados.length >= 10) {
+      showAlert("Limite Atingido", "Você atingiu o limite máximo de 10 itens para esta solicitação.", "warning");
+      return;
+    }
+
     setItensSelecionados((prev) => [
       ...prev,
       {
         id: `manual-${Date.now()}-${index}`,
         estoque_id: item.idBD || null,
         ...item,
-        qtdSelecionada: 1,
+        qtdSelecionada: 1, // Começa sempre com 1 peça ao clicar
       },
     ]);
   };
 
   const handleEnviar = async () => {
-    // ✨ VALIDAÇÃO 1: Campos obrigatórios do cabeçalho
     if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.dataNecessidade) {
       showAlert("Campos Obrigatórios", "Por favor, preencha todos os campos obrigatórios do solicitante (*).", "warning");
       return;
     }
 
-    // ✨ VALIDAÇÃO 2: Data retroativa
     if (formDados.dataNecessidade && formDados.dataNecessidade < dataMinima) {
       showAlert("Data Inválida", "A Data de Necessidade não pode ser anterior ao dia de hoje. Por favor, corrija no calendário.", "warning");
       return;
     }
 
-    // ✨ VALIDAÇÃO 3: Justificativa de urgência obrigatória
     if (formDados.entregaUrgente && !formDados.justificativaUrgencia.trim()) {
       showAlert("Justificativa Pendente", "Como marcou a entrega como Urgente, é obrigatório preencher a justificativa do atraso.", "warning");
       return;
     }
 
-    // ✨ VALIDAÇÃO 4: Lista vazia
     if (itensSelecionados.length === 0) {
       showAlert("Lista Vazia", "Adicione pelo menos um item à solicitação.", "warning");
       return;
     }
 
-    // ✨ VALIDAÇÃO 5: Itens incompletos na tabela
     const itensIncompletos = itensSelecionados.some(
       (i) => !i.numPecaFabricante || !i.materialDescription || !i.qtdSelecionada
     );
 
     if (itensIncompletos) {
-      showAlert("Itens Incompletos", "Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela.", "warning");
+      showAlert("Itens Incompletos", "Preencha os campos obrigatórios (Part Number, Descrição e Qtd) em todas as linhas da tabela. A quantidade não pode estar vazia.", "warning");
       return;
     }
 
@@ -203,11 +231,9 @@ export default function MaterialEstoque() {
 
       const dados = await resposta.json();
 
-if (resposta.ok) {
-        // ✨ CORREÇÃO: Usamos dados.ps || dados.ps_id para garantir que pegamos o nome correto que vem da API
+      if (resposta.ok) {
         const idGerado = dados.ps || dados.ps_id;
 
-        // ✨ NOTIFICAÇÃO DE SUCESSO CUSTOMIZADA
         showAlert("Operação Concluída!", `Sucesso! Solicitação criada com o ID: ${idGerado}`, "success");
         
         setFormDados({
@@ -222,12 +248,10 @@ if (resposta.ok) {
         setItensSelecionados([]);
         setAnexos([]);
       } else {
-        // ✨ ERRO DO SERVIDOR TRATADO VISUALMENTE
         showAlert("Erro no Servidor", dados.erro || "Falha na comunicação com a API.", "error");
       }
     } catch (error) {
       console.error("Erro na requisição:", error);
-      // ✨ ERRO DE CONEXÃO TRATADO VISUALMENTE
       showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
     }
   };
@@ -462,13 +486,13 @@ if (resposta.ok) {
                 color: "#1e293b",
               }}
             >
-              <Package size={18} color="#2563eb" /> Itens Selecionados
+              <Package size={18} color="#2563eb" /> Itens Selecionados (Max. 10)
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <ExemploExcel />
               <span className="badge-contador-simples">
-                {listaSegura.length} itens
+                {listaSegura.length} / 10
               </span>
             </div>
           </div>
@@ -550,6 +574,39 @@ if (resposta.ok) {
                           style={{ width: "100%", border: "none", outline: "none", color: "#334155", backgroundColor: "transparent" }}
                         />
                       </td>
+                      
+                      {/* 🚀 CÉLULA DA QUANTIDADE ATUALIZADA */}
+                      <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <input
+                            type="number"
+                            min="1"
+                            max={item.qtdFornecida || ""}
+                            value={item.qtdSelecionada !== undefined ? item.qtdSelecionada : 1}
+                            onChange={(e) =>
+                              atualizarCampo(item.id, "qtdSelecionada", e.target.value)
+                            }
+                            style={{
+                              width: "70px",
+                              border: "1px solid #a7f3d0",
+                              backgroundColor: "#ecfdf5",
+                              borderRadius: "6px",
+                              padding: "6px 8px",
+                              outline: "none",
+                              color: "#10b981",
+                              fontWeight: "700",
+                              textAlign: "center",
+                            }}
+                          />
+                          {/* 👈 Visual do limite máximo */}
+                          {item.qtdFornecida && (
+                             <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "500" }}>
+                               / {item.qtdFornecida} máx
+                             </span>
+                          )}
+                        </div>
+                      </td>
+
                       <td style={{ padding: "8px 12px" }}>
                         <input
                           value={item.numPecaFabricante || ""}
@@ -558,26 +615,6 @@ if (resposta.ok) {
                           }
                           placeholder="PN"
                           style={{ width: "100%", border: "none", outline: "none", fontWeight: "600", color: "#1e293b", backgroundColor: "transparent" }}
-                        />
-                      </td>
-                      <td style={{ padding: "8px 12px" }}>
-                        <input
-                          type="number"
-                          value={item.qtdSelecionada || 1}
-                          onChange={(e) =>
-                            atualizarCampo(item.id, "qtdSelecionada", e.target.value)
-                          }
-                          style={{
-                            width: "70px",
-                            border: "1px solid #a7f3d0",
-                            backgroundColor: "#ecfdf5",
-                            borderRadius: "6px",
-                            padding: "6px 8px",
-                            outline: "none",
-                            color: "#10b981",
-                            fontWeight: "700",
-                            textAlign: "center",
-                          }}
                         />
                       </td>
                       <td style={{ padding: "8px 12px" }}>
