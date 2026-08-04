@@ -6,11 +6,12 @@ import {
   Package,
   Send,
   Trash2,
-  Zap
+  Zap,
+  Plus, // 👈 Novo ícone
+  FileSpreadsheet // 👈 Novo ícone
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
-// ✨ IMPORTAÇÃO DO CONTEXTO DE ALERTAS
 import { AlertContext } from '../../../contexts/AlertContext';
 
 // NOSSOS COMPONENTES E HOOKS
@@ -19,11 +20,11 @@ import { useProcessadorExcel } from "../../../hooks/useProcessadorExcel";
 import ExemploExcel from "../../../components/ExemploExcel/ExemploExcel";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral";
+import CarregarArquivo from "../../../components/CarregarArquivo/CarregarArquivo"; // 👈 Faltava importar
 import { supabase } from "../../../supabaseClient";
 
 export default function MaterialEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
-  // ✨ CONSUMINDO O CONTEXTO DE ALERTAS GLOBAL
   const { showAlert } = useContext(AlertContext);
 
   const [formDados, setFormDados] = useState({
@@ -67,7 +68,7 @@ export default function MaterialEstoque() {
               materialDescription: item.descricao_manual || item.descricao || "-",
               numPecaFabricante: item.part_number_manual || item.part_number || "-",
               fornecedor: item.fornecedor || "-",
-              qtdFornecida: item.quantidade_disponivel || 0, // 👈 Este é o nosso Saldo Máximo!
+              qtdFornecida: item.quantidade_disponivel || 0,
               nf: item.nf_entrada || "-",
               referencia: "-",
               unidadeMedida: item.unidade_medida_manual || item.unidade_medida || "Unid",
@@ -91,7 +92,30 @@ export default function MaterialEstoque() {
     buscarEstoqueReal();
   }, []);
 
-  // 🚀 LIMITE 1: Bloquear Excel se ultrapassar 10 itens
+  // 🚀 LÓGICA DA "NOVA LINHA" MANUAL
+  const adicionarLinhaEmBranco = () => {
+    if (itensSelecionados.length >= 10) {
+      showAlert("Limite Atingido", "Você atingiu o limite máximo de 10 itens para esta solicitação.", "warning");
+      return;
+    }
+    setItensSelecionados((prev) => [
+      ...prev,
+      {
+        id: `vazia-${Date.now()}-${Math.random()}`,
+        estoque_id: null,
+        materialDescription: "",
+        numPecaFabricante: "",
+        qtdSelecionada: 1,
+        desenhoSAP: "",
+        fornecedor: "",
+        referencia: "",
+        unidadeMedida: "Unid",
+        wbs: "",
+        alocacao: ""
+      }
+    ]);
+  };
+
   const handleImportarExcel = async (arquivo) => {
     const novosItens = await processador.iniciarProcessamento(arquivo);
     if (novosItens && Array.isArray(novosItens)) {
@@ -110,19 +134,16 @@ export default function MaterialEstoque() {
     setItensSelecionados((prev) => prev.filter((item) => item.id !== idParaRemover));
   };
 
-  // 🚀 LIMITE 2: Não permitir que a quantidade ultrapasse o saldo do estoque
   const atualizarCampo = (id, campo, novoValor) => {
     setItensSelecionados((prev) =>
       prev.map((item) => {
         if (item.id === id) {
           if (campo === "qtdSelecionada") {
-            // Se o campo ficar vazio (apagado), deixamos vazio temporariamente para a pessoa conseguir digitar
             let valorValidado = novoValor === '' ? '' : parseInt(novoValor, 10);
             
             if (valorValidado !== '') {
               if (isNaN(valorValidado) || valorValidado < 1) valorValidado = 1;
-              // Se a pessoa tentar pedir mais do que há no estoque (qtdFornecida), forçamos o valor para o máximo!
-              if (valorValidado > item.qtdFornecida) {
+              if (item.qtdFornecida && valorValidado > item.qtdFornecida) {
                 valorValidado = item.qtdFornecida;
               }
             }
@@ -135,7 +156,6 @@ export default function MaterialEstoque() {
     );
   };
 
-  // 🚀 LIMITE 3: Bloquear clique manual se já houver 10 itens
   const adicionarManualmente = (item, index) => {
     if (itensSelecionados.length >= 10) {
       showAlert("Limite Atingido", "Você atingiu o limite máximo de 10 itens para esta solicitação.", "warning");
@@ -148,7 +168,7 @@ export default function MaterialEstoque() {
         id: `manual-${Date.now()}-${index}`,
         estoque_id: item.idBD || null,
         ...item,
-        qtdSelecionada: 1, // Começa sempre com 1 peça ao clicar
+        qtdSelecionada: 1,
       },
     ]);
   };
@@ -489,9 +509,26 @@ export default function MaterialEstoque() {
               <Package size={18} color="#2563eb" /> Itens Selecionados (Max. 10)
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {/* ✨ AQUI ESTÃO OS BOTÕES AGRUPADOS */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                onClick={adicionarLinhaEmBranco}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+              >
+                <Plus size={16} /> Nova Linha
+              </button>
+
+              <CarregarArquivo
+                variante="botao"
+                accept=".xlsx, .xls"
+                label="Importar Excel"
+                icone={<FileSpreadsheet size={16} color="#10b981" />}
+                onFileSelect={handleImportarExcel}
+              />
+
               <ExemploExcel />
-              <span className="badge-contador-simples">
+
+              <span className="badge-contador-simples" style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 10px', borderRadius: '999px' }}>
                 {listaSegura.length} / 10
               </span>
             </div>
@@ -575,7 +612,6 @@ export default function MaterialEstoque() {
                         />
                       </td>
                       
-                      {/* 🚀 CÉLULA DA QUANTIDADE ATUALIZADA */}
                       <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <input
@@ -598,7 +634,6 @@ export default function MaterialEstoque() {
                               textAlign: "center",
                             }}
                           />
-                          {/* 👈 Visual do limite máximo */}
                           {item.qtdFornecida && (
                              <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "500" }}>
                                / {item.qtdFornecida} máx

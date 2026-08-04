@@ -11,8 +11,9 @@ export default function ExemploExcel() {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Modelo SAP');
 
-      // 2. Define os nomes das colunas com a tua nova lista
+      // 2. Define os nomes das colunas com a tua nova lista (Desenho SAP no início)
       const colunas = [
+        'Desenho SAP', // 👈 Nova coluna adicionada aqui no topo!
         'Nº peça fabricante',
         'FORNECEDOR',
         'Qtd.fornecida',
@@ -45,8 +46,9 @@ export default function ExemploExcel() {
       });
       linhaCabecalho.height = 25;
 
-      // 4. Adiciona uma linha de exemplo preenchida para guiar o utilizador (Mapeada para as novas colunas)
+      // 4. Adiciona uma linha de exemplo preenchida para guiar o utilizador
       worksheet.addRow({
+        'Desenho SAP': 'DS-778899', // 👈 Exemplo para a nova coluna adicionado aqui!
         'Nº peça fabricante': 'PN-12345',
         'FORNECEDOR': 'Fornecedor A',
         'Qtd.fornecida': 10,

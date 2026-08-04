@@ -39,8 +39,8 @@
 /* ========================================================================== */
 
 .tipos-container {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr)); /* 👈 A VERDADEIRA MÁGICA: minmax(0, 1fr) espreme as 7 colunas à força para caberem na tela! */
+  display: grid; /* 👈 Mudamos de 'inline' para 'grid' */
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); /* 👈 A mágica que distribui os cartões igualmente */
   gap: 12px;
   margin-bottom: 24px;
   width: 100%;
