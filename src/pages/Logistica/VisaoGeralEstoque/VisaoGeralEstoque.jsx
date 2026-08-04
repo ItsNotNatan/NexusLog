@@ -3,7 +3,7 @@ import { Search, Boxes, Loader2, MapPin, X, History, Filter } from 'lucide-react
 import './VisaoGeralEstoque.css'; 
 import FiltroEstoqueModal from '../../../components/FiltroEstoqueModal/FiltroEstoqueModal';
 
-// 👇 NOVO: Importamos o teu componente de Tabela de Demandas!
+// 👇 Importamos o teu componente de Tabela de Demandas!
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import { AuthContext } from '../../../contexts/AuthContext';
 
@@ -98,7 +98,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
       const resultado = await resposta.json();
 
       if (resposta.ok && resultado.sucesso) {
-        // 👇 Mapeamos os dados que vêm da API para o formato que a TabelaDemandas exige
         const dadosFormatados = resultado.dados.map(item => ({
           id: `PS-${item.id || item.ps_id}`,
           solicitante: item.solicitante,
@@ -112,7 +111,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
         }));
         setDemandasDoMaterial(dadosFormatados);
       } else {
-        // Fallback didático: Caso a rota ainda não exista no backend
         setDemandasDoMaterial([
           { id: 'PS-99821', solicitante: 'Engenharia de Campo', wbs: material.wbs, status: 'Concluído', bs: 'BS-1234', criacaoBs: '18/07/2026', dataEntrega: '20/07/2026' },
           { id: 'PS-99855', solicitante: 'Manutenção Preventiva', wbs: material.wbs, status: 'Em Separação', bs: '-', criacaoBs: '20/07/2026', dataEntrega: 'não definido' }
@@ -307,7 +305,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
       {modalDemandasAberto && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
           
-          {/* 👇 Aumentamos o tamanho do Modal (width: '1000px') para a TabelaDemandas caber bem! */}
           <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', width: '1000px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
@@ -321,7 +318,8 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
             </div>
 
             <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '0.875rem', color: '#334155' }}>
-              <strong>Item Selecionado:</strong> {materialSelecionado?.part_number} — {materialSelecionado?.descricao}
+              {/* ✨ AQUI: O Desenho SAP agora aparece no cabeçalho do item selecionado! */}
+              <strong>Item Selecionado:</strong> {materialSelecionado?.desenho_sap !== '—' ? `SAP: ${materialSelecionado?.desenho_sap} | ` : ''} PN: {materialSelecionado?.part_number} — {materialSelecionado?.descricao}
             </div>
 
             {carregandoDemandas ? (
@@ -330,7 +328,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
                 <p style={{ color: '#64748b', marginTop: '8px', fontSize: '0.875rem' }}>Buscando demandas na base de dados...</p>
               </div>
             ) : (
-              /* 👇 AQUI CHAMAMOS O COMPONENTE TabelaDemandas! Passamos o array formatado como prop "dados" */
               <TabelaDemandas dados={demandasDoMaterial} />
             )}
             
