@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/components/Header/Header.jsx
-// DESCRIÇÃO: Cabeçalho global com controle de filiais por utilizador
+// DESCRIÇÃO: Cabeçalho global com controle de filiais por utilizador (Protegido contra tela branca)
 // =================================================================
 
 import React, { useContext, useEffect } from 'react';
@@ -15,31 +15,27 @@ const NOME_FILIAIS = {
     'BR06': 'BR06 — Betim (MG)'
 };
 
-// Definimos o total de filiais do sistema para a nossa regra
 const TOTAL_FILIAIS_SISTEMA = 3;
 
 const Header = ({ modulo }) => {
     const { usuario, logout, estoqueAtual, setEstoqueAtual } = useContext(AuthContext);
 
-    // Extraímos as filiais permitidas do utilizador logado
-    const filiaisPermitidas = usuario?.filiais_acesso?.length > 0 
+    // 🛡️ BLINDAGEM: Garantimos um array vazio caso usuario ou filiais_acesso sejam nulos/undefined
+    const filiaisPermitidas = Array.isArray(usuario?.filiais_acesso) && usuario.filiais_acesso.length > 0
         ? usuario.filiais_acesso 
         : (usuario?.filial ? [usuario.filial] : []);
 
     // A opção "Todas" só é verdadeira se ele tiver as 3 (ou mais) filiais
     const temAcessoATodas = filiaisPermitidas.length >= TOTAL_FILIAIS_SISTEMA;
 
-    // 🛡️ BOA PRÁTICA: Criamos uma string estática para monitorizar mudanças no array de acessos
+    // String estática para monitorizar mudanças no array de acessos
     const filiaisPermitidasString = filiaisPermitidas.join(',');
 
     // ✨ AUTO-CORREÇÃO DE SEGURANÇA
-    // Sempre que o utilizador mudar ou a filial selecionada não for permitida, o sistema corrige a rota
     useEffect(() => {
         if (usuario && filiaisPermitidas.length > 0) {
-            // Verifica se a filial atual está na lista dele OU se é "TODOS" e ele tem acesso total
             const podeAcessarAtual = filiaisPermitidas.includes(estoqueAtual) || (estoqueAtual === 'TODOS' && temAcessoATodas);
             
-            // Se ele não puder aceder à opção atual, forçamos para a primeira válida da sua lista
             if (!podeAcessarAtual) {
                 setEstoqueAtual(filiaisPermitidas[0]);
             }
@@ -63,18 +59,16 @@ const Header = ({ modulo }) => {
 
                     <select
                         id="seletor-estoque"
-                        value={estoqueAtual}
+                        value={estoqueAtual || 'TODOS'}
                         onChange={(e) => setEstoqueAtual(e.target.value)}
                     >
                         {/* SE FOR UM UTILIZADOR DA LOGÍSTICA LOGADO */}
                         {usuario ? (
                             <>
-                                {/* A opção "Todas" só aparece se ele for ADM/Líder com acesso total */}
                                 {temAcessoATodas && (
                                     <option value="TODOS">Todas as Filiais</option>
                                 )}
                                 
-                                {/* Percorre a lista de acessos do utilizador e constrói o menu */}
                                 {filiaisPermitidas.map(filial => (
                                     <option key={filial} value={filial}>
                                         {NOME_FILIAIS[filial] || filial}
@@ -82,7 +76,7 @@ const Header = ({ modulo }) => {
                                 ))}
                             </>
                         ) : (
-                            /* SE FOR O CLIENTE (ACESSO PÚBLICO) - Mantém as opções fixas */
+                            /* SE FOR O CLIENTE (ACESSO PÚBLICO) */
                             <>
                                 <option value="TODOS">Todas as Filiais</option>
                                 <option value="BR02">BR02 — Santo André (SP)</option>
