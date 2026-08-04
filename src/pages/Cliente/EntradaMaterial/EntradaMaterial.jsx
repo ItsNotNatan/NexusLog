@@ -6,6 +6,7 @@ import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
+import ExemploExcel from '../../../components/ExemploExcel/ExemploExcel'; // ✨ AQUI: Importação do botão de exemplo
 
 // Cliente do Supabase
 import { supabase } from '../../../supabaseClient';
@@ -316,6 +317,9 @@ export default function EntradaMaterial() {
               icone={<FileSpreadsheet size={16} color="#10b981" />}
               onFileSelect={handleImportarExcel}
             />
+
+            {/* ✨ AQUI: O botão Exemplo Excel foi adicionado ao grupo */}
+            <ExemploExcel /> 
 
             <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 10px', borderRadius: '999px' }}>
               {itens.length} itens totais

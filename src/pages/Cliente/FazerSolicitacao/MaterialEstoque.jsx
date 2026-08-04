@@ -7,8 +7,8 @@ import {
   Send,
   Trash2,
   Zap,
-  Plus, // 👈 Novo ícone
-  FileSpreadsheet // 👈 Novo ícone
+  Plus, 
+  FileSpreadsheet 
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -20,7 +20,7 @@ import { useProcessadorExcel } from "../../../hooks/useProcessadorExcel";
 import ExemploExcel from "../../../components/ExemploExcel/ExemploExcel";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral";
-import CarregarArquivo from "../../../components/CarregarArquivo/CarregarArquivo"; // 👈 Faltava importar
+import CarregarArquivo from "../../../components/CarregarArquivo/CarregarArquivo"; 
 import { supabase } from "../../../supabaseClient";
 
 export default function MaterialEstoque() {
@@ -509,7 +509,6 @@ export default function MaterialEstoque() {
               <Package size={18} color="#2563eb" /> Itens Selecionados (Max. 10)
             </div>
 
-            {/* ✨ AQUI ESTÃO OS BOTÕES AGRUPADOS */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <button
                 onClick={adicionarLinhaEmBranco}
@@ -570,10 +569,12 @@ export default function MaterialEstoque() {
                 <thead>
                   <tr>
                     <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", width: "50px" }}></th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>MATERIAL DESCRIPTION</th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>Nº PEÇA FABRICANTE</th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>QTD. SOLICITADA</th>
+                    {/* 👈 CABEÇALHOS REORGANIZADOS: DESENHO SAP ESTÁ AQUI COMO O PRIMEIRO */}
                     <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>DESENHO SAP</th>
+                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>Nº PEÇA FABRICANTE</th>
+                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>MATERIAL DESCRIPTION</th>
+                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>QTD. SOLICITADA</th>
+                    
                     <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>FORNECEDOR</th>
                     <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>REFERÊNCIA</th>
                     <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>UNIDADE</th>
@@ -601,6 +602,43 @@ export default function MaterialEstoque() {
                           <Trash2 size={16} />
                         </button>
                       </td>
+
+                      {/* 👈 CAMPOS REORGANIZADOS: DESENHO SAP ESTÁ AQUI */}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          value={item.desenhoSAP || ""}
+                          onChange={(e) =>
+                            atualizarCampo(item.id, "desenhoSAP", e.target.value)
+                          }
+                          placeholder="SAP"
+                          style={{
+                            backgroundColor: "#eff6ff",
+                            color: "#2563eb",
+                            padding: "6px 12px",
+                            borderRadius: "999px",
+                            border: "1px solid #bfdbfe",
+                            fontWeight: "600",
+                            fontFamily: "monospace",
+                            width: "100%",
+                            outline: "none",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </td>
+
+                      {/* 👈 PART NUMBER (Nº PEÇA FABRICANTE) */}
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          value={item.numPecaFabricante || ""}
+                          onChange={(e) =>
+                            atualizarCampo(item.id, "numPecaFabricante", e.target.value)
+                          }
+                          placeholder="PN"
+                          style={{ width: "100%", border: "none", outline: "none", fontWeight: "600", color: "#1e293b", backgroundColor: "transparent" }}
+                        />
+                      </td>
+
+                      {/* 👈 DESCRIÇÃO */}
                       <td style={{ minWidth: "220px", padding: "8px 12px" }}>
                         <input
                           value={item.materialDescription || ""}
@@ -612,6 +650,7 @@ export default function MaterialEstoque() {
                         />
                       </td>
                       
+                      {/* 👈 QUANTIDADE */}
                       <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <input
@@ -642,37 +681,6 @@ export default function MaterialEstoque() {
                         </div>
                       </td>
 
-                      <td style={{ padding: "8px 12px" }}>
-                        <input
-                          value={item.numPecaFabricante || ""}
-                          onChange={(e) =>
-                            atualizarCampo(item.id, "numPecaFabricante", e.target.value)
-                          }
-                          placeholder="PN"
-                          style={{ width: "100%", border: "none", outline: "none", fontWeight: "600", color: "#1e293b", backgroundColor: "transparent" }}
-                        />
-                      </td>
-                      <td style={{ padding: "8px 12px" }}>
-                        <input
-                          value={item.desenhoSAP || ""}
-                          onChange={(e) =>
-                            atualizarCampo(item.id, "desenhoSAP", e.target.value)
-                          }
-                          placeholder="SAP"
-                          style={{
-                            backgroundColor: "#eff6ff",
-                            color: "#2563eb",
-                            padding: "6px 12px",
-                            borderRadius: "999px",
-                            border: "1px solid #bfdbfe",
-                            fontWeight: "600",
-                            fontFamily: "monospace",
-                            width: "100%",
-                            outline: "none",
-                            boxSizing: "border-box",
-                          }}
-                        />
-                      </td>
                       <td style={{ padding: "8px 12px" }}>
                         <input
                           value={item.fornecedor || ""}
