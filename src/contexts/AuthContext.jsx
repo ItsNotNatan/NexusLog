@@ -5,16 +5,18 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const AuthContext = createContext({});
+// 🐛 CORREÇÃO 1: Adicionado o "export" para que os outros componentes consigam importar o contexto sem quebrar a app.
+export const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
   const [usuario, setUsuario] = useState(null);
   const [token, setToken] = useState(null);
-  const [filialSelecionada, setFilialSelecionada] = useState('');
+  
+  // 🐛 CORREÇÃO 2: Renomeámos para "estoqueAtual" para bater certo com o Header e as restantes Páginas.
+  const [estoqueAtual, setEstoqueAtual] = useState('');
   const [carregandoInicial, setCarregandoInicial] = useState(true);
 
   // 1. RESTAURA A SESSÃO AO CARREGAR A PÁGINA
-// 1. RESTAURA A SESSÃO AO CARREGAR A PÁGINA
   useEffect(() => {
     const tokenSalvo = localStorage.getItem('@NexusLog:token');
     const usuarioSalvo = localStorage.getItem('@NexusLog:usuario');
@@ -27,7 +29,7 @@ export const AuthProvider = ({ children }) => {
           const usuarioObj = JSON.parse(usuarioSalvo);
           setToken(tokenSalvo);
           setUsuario(usuarioObj);
-          setFilialSelecionada(filialSalva || usuarioObj.filial || '');
+          setEstoqueAtual(filialSalva || usuarioObj.filial || '');
         }
       } catch (e) {
         console.warn("Sessão corrompida, a limpar dados.");
@@ -39,17 +41,14 @@ export const AuthProvider = ({ children }) => {
     setCarregandoInicial(false);
   }, []);
 
-  // 2. FUNÇÃO DE LOGIN (Chamada pelo LoginLogistica.jsx)
+  // 2. FUNÇÃO DE LOGIN
   const login = async (dadosUsuario, tokenRecebido) => {
-    // Guarda o token e o utilizador no estado do React
     setUsuario(dadosUsuario);
     setToken(tokenRecebido);
 
-    // Define a filial inicial (se tiver acesso a filiais)
     const filialInicial = dadosUsuario.filial || (dadosUsuario.filiais_acesso && dadosUsuario.filiais_acesso[0]) || '';
-    setFilialSelecionada(filialInicial);
+    setEstoqueAtual(filialInicial);
 
-    // 🛡️ CHAVES OFICIAIS NO LOCALSTORAGE:
     localStorage.setItem('@NexusLog:token', tokenRecebido);
     localStorage.setItem('@NexusLog:usuario', JSON.stringify(dadosUsuario));
     localStorage.setItem('@NexusLog:filialAtiva', filialInicial);
@@ -59,29 +58,29 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUsuario(null);
     setToken(null);
-    setFilialSelecionada('');
+    setEstoqueAtual('');
 
-    // Limpa todas as chaves da sessão
     localStorage.removeItem('@NexusLog:token');
     localStorage.removeItem('@NexusLog:usuario');
     localStorage.removeItem('@NexusLog:filialAtiva');
   };
 
-  // 4. TROCAR FILIAL ATIVA
+  // 4. TROCAR FILIAL ATIVA (Guarda no estado e no navegador)
   const MudarFilial = (novaFilialId) => {
-    setFilialSelecionada(novaFilialId);
+    setEstoqueAtual(novaFilialId);
     localStorage.setItem('@NexusLog:filialAtiva', novaFilialId);
   };
 
+  // 🐛 CORREÇÃO 3: Agora fornecemos os nomes exatos que os teus componentes estão à espera.
   return (
     <AuthContext.Provider value={{
       signed: !!usuario,
       usuario,
       token,
-      filialSelecionada,
+      estoqueAtual,                  // Disponibiliza o nome correto para as páginas
+      setEstoqueAtual: MudarFilial,  // Aponta para a função que atualiza o State E o LocalStorage!
       login,
       logout,
-      MudarFilial,
       carregandoInicial
     }}>
       {children}
