@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { User, Send, Paperclip, X } from 'lucide-react';
 
-// NOSSOS COMPONENTES E HOOKS
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; // ✨ AQUI
+import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; 
 
-// Cliente do Supabase
 import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext'; 
 import { AlertContext } from '../../../contexts/AlertContext'; 
+
+// ✨ CONSTANTE DE LIMITE PARA O CLIENTE
+const LIMITE_CLIENTE = 20;
 
 export default function EntradaMaterial() {
   const { estoqueAtual } = useContext(AuthContext);
@@ -62,12 +63,32 @@ export default function EntradaMaterial() {
 
       setItens(prev => {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
-        return [...listaLimpa, ...novosItensFormatados];
+        const novaLista = [...listaLimpa, ...novosItensFormatados];
+        
+        // ✨ LÓGICA DE PROTEÇÃO DE EXCEL: Corta o array se exceder o limite
+        if (novaLista.length > LIMITE_CLIENTE) {
+          showAlert(
+            "Limite de Linhas Excedido", 
+            `A planilha contém mais itens do que o limite permitido de ${LIMITE_CLIENTE}. Apenas as primeiras ${LIMITE_CLIENTE} linhas foram importadas.`, 
+            "warning"
+          );
+          return novaLista.slice(0, LIMITE_CLIENTE);
+        }
+        
+        return novaLista;
       });
     }
   };
 
-  const adicionarLinhaEmBranco = () => setItens([...itens, gerarLinhaVazia()]);
+  const adicionarLinhaEmBranco = () => {
+    // ✨ LÓGICA DE PROTEÇÃO DO BOTÃO
+    if (itens.length < LIMITE_CLIENTE) {
+      setItens([...itens, gerarLinhaVazia()]);
+    } else {
+      showAlert("Limite Atingido", `O limite máximo é de ${LIMITE_CLIENTE} itens por solicitação.`, "warning");
+    }
+  };
+
   const removerItem = (idParaRemover) => setItens(itens.filter(item => item.id !== idParaRemover));
   const atualizarCampo = (id, campo, novoValor) => setItens(itens.map(item => item.id === id ? { ...item, [campo]: novoValor } : item));
   const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
@@ -155,12 +176,12 @@ export default function EntradaMaterial() {
         </div>
       </div>
 
-      {/* ✨ MAGIA ACONTECENDO AQUI: Tabela Componentizada */}
       <TabelaInsercaoItens 
         itens={itens}
         dataMinima={dataMinima}
         mostrarDataNecessidade={true}
         mostrarExemploExcel={true}
+        limiteLinhas={LIMITE_CLIENTE} // ✨ AQUI: Passamos a trava de limite (20) para a tabela!
         onAtualizarCampo={atualizarCampo}
         onRemoverItem={removerItem}
         onAdicionarLinha={adicionarLinhaEmBranco}

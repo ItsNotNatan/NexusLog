@@ -337,5 +337,5 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     </div>
   );
 }
-
+ 
 const estiloHeader = { padding: '14px 16px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' };

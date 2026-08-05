@@ -13,7 +13,7 @@ export default function TabelaInsercaoItens({
   dataMinima = '',
   mostrarDataNecessidade = false,
   mostrarExemploExcel = false,
-  limiteLinhas = 20, // ✨ NOVA PROP: Recebe o limite de linhas (padrão é 20)
+  limiteLinhas = 20, // Prop que recebe o limite dinamicamente
   onAtualizarCampo,
   onRemoverItem,
   onAdicionarLinha,
@@ -37,21 +37,39 @@ export default function TabelaInsercaoItens({
 
   const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
 
-  // ✨ LÓGICA DE LIMITE: Verifica se atingiu o máximo
+  // Lógica de limite
   const limiteAtingido = itens.length >= limiteLinhas;
 
   return (
     <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="form-header" style={{ padding: '20px 24px', margin: 0, borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
-        <div className="form-header-esquerda">
-          <div className="form-header-icone verde-quadrado" style={{ width: '28px', height: '28px' }}>
+      <div className="form-header" style={{ padding: '20px 24px', margin: 0, borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        
+        <div className="form-header-esquerda" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="form-header-icone verde-quadrado" style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#dcfce7', color: '#16a34a', borderRadius: '6px' }}>
             <Package size={16} />
           </div>
-          <h2 style={{ fontSize: '1rem' }}>Itens para Entrada</h2>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 style={{ fontSize: '1rem', margin: 0, color: '#1e293b' }}>Itens para Entrada</h2>
+            
+            {/* ✨ AQUI ESTÁ A NOVIDADE: A etiqueta (badge) dinâmica ao lado do título */}
+            <span style={{ 
+              fontSize: '0.7rem', 
+              fontWeight: '600', 
+              backgroundColor: '#e0f2fe', 
+              color: '#0284c7', 
+              padding: '2px 8px', 
+              borderRadius: '999px',
+              border: '1px solid #bae6fd',
+              display: 'inline-flex',
+              alignItems: 'center'
+            }}>
+              Máx: {limiteLinhas}
+            </span>
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* ✨ BOTÃO NOVA LINHA: Fica desativado e opaco se o limite for atingido */}
           <button
             onClick={onAdicionarLinha}
             disabled={limiteAtingido}
@@ -77,7 +95,6 @@ export default function TabelaInsercaoItens({
 
           {mostrarExemploExcel && <ExemploExcel />}
 
-          {/* ✨ CONTADOR: Agora mostra X / MAX itens */}
           <span style={{ 
             fontSize: '0.75rem', fontWeight: '500', 
             color: limiteAtingido ? '#b91c1c' : '#64748b', 

@@ -1,17 +1,16 @@
 import React, { useState, useContext } from 'react';
 import './EntradaEstoque.css';
-import { User, Send, Paperclip, X } from 'lucide-react';
+import { User, Send, Paperclip, X, Info } from 'lucide-react';
 
-// NOSSOS COMPONENTES E HOOKS
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
 import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; // ✨ AQUI
+import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; 
 import { AuthContext } from '../../../contexts/AuthContext';
-
-// Cliente do Supabase
 import { supabase } from '../../../supabaseClient';
+
+const LIMITE_LOGISTICA = 60;
 
 export default function EntradaEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
@@ -24,7 +23,9 @@ export default function EntradaEstoque() {
     id: `linha-vazia-${Date.now()}-${Math.random()}`, numPecaFabricante: '', fornecedor: '', qtdFornecida: 1, nfEntrada: '', unidadeMedida: 'Unid', vendorDescription: '', wbsElement: '', emissaoNF: '', recebNF: '', docCompras: '', poNetPrice: '', centro: '', deposito: '', alocacao: ''
   });
 
-  const [itens, setItens] = useState([gerarLinhaVazia()]);
+  // ✨ ALTERAÇÃO 1: Começamos com um array completamente vazio em vez de [gerarLinhaVazia()]
+  const [itens, setItens] = useState([]);
+  
   const [anexos, setAnexos] = useState([]);
   const processador = useProcessadorExcel();
 
@@ -51,22 +52,33 @@ export default function EntradaEstoque() {
 
       setItens(prev => {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
-        return [...listaLimpa, ...novosItensFormatados];
+        const novaLista = [...listaLimpa, ...novosItensFormatados];
+
+        if (novaLista.length > LIMITE_LOGISTICA) {
+          alert(`AVISO: A planilha contém mais itens do que o limite permitido de ${LIMITE_LOGISTICA}. Apenas as primeiras ${LIMITE_LOGISTICA} linhas foram importadas.`);
+          return novaLista.slice(0, LIMITE_LOGISTICA);
+        }
+
+        return novaLista;
       });
     }
   };
 
-  const adicionarLinhaEmBranco = () => setItens([...itens, gerarLinhaVazia()]);
+  const adicionarLinhaEmBranco = () => {
+    if (itens.length < LIMITE_LOGISTICA) {
+      setItens([...itens, gerarLinhaVazia()]);
+    } else {
+      alert(`Limite máximo de ${LIMITE_LOGISTICA} itens atingido.`);
+    }
+  };
+
   const atualizarCampo = (id, campo, novoValor) => setItens(itens.map(item => item.id === id ? { ...item, [campo]: novoValor } : item));
   const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
   const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
   
+  // ✨ ALTERAÇÃO 2: Removido o bloqueio que impedia deixar a tabela com 0 itens
   const removerItem = (idParaRemover) => {
-    if (itens.length > 1) {
-      setItens(itens.filter(item => item.id !== idParaRemover));
-    } else {
-      alert("A solicitação precisa ter pelo menos um item.");
-    }
+    setItens(itens.filter(item => item.id !== idParaRemover));
   };
 
   const handleEnviar = async () => {
@@ -74,6 +86,13 @@ export default function EntradaEstoque() {
       alert("Preencha o Nome e o WBS do solicitante.");
       return;
     }
+    
+    // ✨ ALTERAÇÃO 3: Adicionada validação para não permitir envio com 0 itens
+    if (itens.length === 0) {
+      alert("Adicione pelo menos um item à tabela para registar a entrada.");
+      return;
+    }
+
     if (itens.some(i => !i.numPecaFabricante || !i.qtdFornecida)) {
       alert("Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.");
       return;
@@ -118,7 +137,8 @@ export default function EntradaEstoque() {
       if (resposta.ok) {
         alert(`Sucesso! Solicitação de Entrada gerada no sistema. ID: ${dados.ps_id}`);
         setFormDados({ nome: '', wbs: '', observacoes: '' });
-        setItens([gerarLinhaVazia()]);
+        // ✨ ALTERAÇÃO 4: Após o sucesso, esvaziamos a tabela em vez de gerar uma linha vazia
+        setItens([]);
         setAnexos([]);
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
@@ -135,6 +155,7 @@ export default function EntradaEstoque() {
       <header className="estoque-cabecalho">
         <h1>Entrada de Estoque</h1>
         <p>Cadastro detalhado de itens — Back-Office Logística</p>
+        
       </header>
 
       <div className="estoque-cartao form-cartao">
@@ -151,11 +172,11 @@ export default function EntradaEstoque() {
         </div>
       </div>
 
-      {/* ✨ MAGIA ACONTECENDO AQUI: Tabela Componentizada */}
       <TabelaInsercaoItens 
         itens={itens}
-        mostrarDataNecessidade={false} // 👈 Oculta a Data de Necessidade na logística
+        mostrarDataNecessidade={false}
         mostrarExemploExcel={false}
+        limiteLinhas={LIMITE_LOGISTICA} 
         onAtualizarCampo={atualizarCampo}
         onRemoverItem={removerItem}
         onAdicionarLinha={adicionarLinhaEmBranco}
