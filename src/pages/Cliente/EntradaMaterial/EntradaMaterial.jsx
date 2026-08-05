@@ -39,27 +39,33 @@ export default function EntradaMaterial() {
   const [anexos, setAnexos] = useState([]);
   const processador = useProcessadorExcel();
 
-  const handleImportarExcel = async (arquivo) => {
-    const itensProcessados = await processador.iniciarProcessamento(arquivo);
-    if (itensProcessados && Array.isArray(itensProcessados)) {
-      const novosItensFormatados = itensProcessados.map((item, index) => ({
-        id: `excel-${Date.now()}-${index}`,
-        numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
-        fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
-        qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
-        nfEntrada: item['NF DE ENTRADA'] || '',
-        unidadeMedida: item['Unidade de medida'] || item.unidadeMedida || 'Unid',
-        vendorDescription: item['Vendor Description'] || item.vendorDescription || '',
-        wbsElement: item['WBS Element'] || item.wbs || '',
-        dataNecessidade: item['Data de Necessidade'] || item.dataNecessidade || '', 
-        emissaoNF: item['EMISSÃO NF'] || item.emissaoNF || '',
-        recebNF: item['RECEB. NF'] || item.recebNF || '',
-        docCompras: item['Documento de compras'] || item.docCompras || '',
-        poNetPrice: item['PO Net Price'] || item.poNetPrice || '',
-        centro: item['Centro'] || item.centro || '',
-        deposito: item['Depósito'] || item.deposito || '',
-        alocacao: item['Alocação'] || item.alocacao || ''
-      }));
+const handleImportarExcel = async (arquivo) => {
+  const itensProcessados = await processador.iniciarProcessamento(arquivo);
+  if (itensProcessados && Array.isArray(itensProcessados)) {
+    const novosItensFormatados = itensProcessados.map((item, index) => ({
+      id: `excel-${Date.now()}-${index}`,
+      
+      // 👇 ADICIONA ESTA LINHA AQUI PARA PUXAR A COLUNA DO EXCEL
+      desenhoSAP: item['Desenho SAP'] || item.desenhoSAP || '', 
+      
+      numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
+      fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
+      qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
+      nfEntrada: item['NF DE ENTRADA'] || '',
+      unidadeMedida: item['Unidade de medida'] || item.unidadeMedida || 'Unid',
+      vendorDescription: item['Vendor Description'] || item.vendorDescription || '',
+      wbsElement: item['WBS Element'] || item.wbs || '',
+      dataNecessidade: item['Data de Necessidade'] || item.dataNecessidade || '', 
+      emissaoNF: item['EMISSÃO NF'] || item.emissaoNF || '',
+      recebNF: item['RECEB. NF'] || item.recebNF || '',
+      docCompras: item['Documento de compras'] || item.docCompras || '',
+      poNetPrice: item['PO Net Price'] || item.poNetPrice || '',
+      centro: item['Centro'] || item.centro || '',
+      deposito: item['Depósito'] || item.deposito || '',
+      alocacao: item['Alocação'] || item.alocacao || ''
+    }));
+
+    // ... (o resto da função continua igual)
 
       setItens(prev => {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');

@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 export const processarExcelComProgresso = (file, onProgress) => {
   return new Promise((resolve, reject) => {
     onProgress({ fase: 'Lendo arquivo...', progresso: 10 });
-    
+
     const reader = new FileReader();
 
     reader.onload = (e) => {
@@ -14,10 +14,10 @@ export const processarExcelComProgresso = (file, onProgress) => {
         onProgress({ fase: 'Abrindo planilha...', progresso: 30 });
         const data = e.target.result;
         const workbook = XLSX.read(data, { type: 'binary' });
-        
+
         const sheetName = workbook.SheetNames[1] || workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        
+
         onProgress({ fase: 'Convertendo dados...', progresso: 50 });
         const json = XLSX.utils.sheet_to_json(worksheet, { defval: "", blankrows: false });
 
@@ -25,18 +25,22 @@ export const processarExcelComProgresso = (file, onProgress) => {
         const itensValidos = [];
         const ignorados = [];
         const erros = [];
-        
+
         let linhaAtual = 0;
         const tamanhoLote = 500; // Processa 500 linhas por vez
 
+        // Função recursiva para processar em lotes (evita travar a UI)
         // Função recursiva para processar em lotes (evita travar a UI)
         const processarLote = () => {
           const limite = Math.min(linhaAtual + tamanhoLote, totalLinhas);
           for (let i = linhaAtual; i < limite; i++) {
             const linha = json[i];
-            
-            // Regra de Validação
-            if (!linha['Nº peça fabricante'] && !linha['DESENHO SAP'] && !linha['Material Description']) {
+
+            // 👇 1. Criamos uma variável que tenta ler de várias formas
+            const desenho = linha['Desenho SAP'] || linha['DESENHO SAP'] || linha['Desenho sap'] || '-';
+
+            // 👇 2. Atualizamos a regra de validação para usar a nossa variável 'desenho'
+            if (!linha['Nº peça fabricante'] && desenho === '-' && !linha['Material Description']) {
               ignorados.push(`Linha ${i + 2}: Vazia ou sem identificador principal.`);
               continue;
             }
@@ -45,15 +49,18 @@ export const processarExcelComProgresso = (file, onProgress) => {
               const qtd = Number(linha['Qtd.fornecida']) || 1;
               itensValidos.push({
                 id: `excel-${Date.now()}-${i}`,
-                desenhoSAP: linha['DESENHO SAP'] || '-',
+
+                // 👇 3. Passamos o valor correto que extraímos lá em cima
+                desenhoSAP: desenho,
+
                 materialDescription: linha['Material Description'] || 'Sem descrição',
                 numPecaFabricante: linha['Nº peça fabricante'] || '-',
-                fornecedor: linha['Fornecedor'] || '-',
+                fornecedor: linha['Fornecedor'] || linha['FORNECEDOR'] || '-', // (Aproveitei para proteger o fornecedor também!)
                 qtdSelecionada: qtd,
                 referencia: linha['Referência'] || '-',
                 unidadeMedida: linha['Unidade de medida'] || '-',
                 vendorDescription: linha['Vendor Description'] || '-',
-                wbs: linha['WBS'] || '-',
+                wbs: linha['WBS Element'] || linha['WBS'] || '-', // (Protegido com base no cabeçalho que me mandou antes)
                 emissaoNF: linha['EMISSÃO NF'] || '-',
                 recebNF: linha['RECEB. NF'] || '-',
                 docCompras: linha['Documento de compras'] || '-',
@@ -68,14 +75,14 @@ export const processarExcelComProgresso = (file, onProgress) => {
           }
 
           linhaAtual = limite;
-          
+
           // Calcula a percentagem visual (de 50% a 100% durante o mapeamento)
           const progressoCalculado = 50 + Math.floor((linhaAtual / totalLinhas) * 50);
-          onProgress({ 
-            fase: `Processando linha ${linhaAtual} de ${totalLinhas}...`, 
-            progresso: progressoCalculado 
+          onProgress({
+            fase: `Processando linha ${linhaAtual} de ${totalLinhas}...`,
+            progresso: progressoCalculado
           });
-          
+
           if (linhaAtual < totalLinhas) {
             // Agenda o próximo lote deixando o navegador respirar (renderizar a barra)
             setTimeout(processarLote, 10);
@@ -111,6 +118,6 @@ export const processarExcelComProgresso = (file, onProgress) => {
  */
 export const lerRelatorioSAP = async (file) => {
   // Chamamos a função principal passando uma função vazia para o onProgress
-  const resultado = await processarExcelComProgresso(file, () => {});
+  const resultado = await processarExcelComProgresso(file, () => { });
   return resultado.itens;
 };
