@@ -8,7 +8,7 @@ import {
   Trash2,
   Zap,
   Plus, 
-  FileSpreadsheet 
+  FileSpreadsheet
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -94,8 +94,8 @@ export default function MaterialEstoque() {
 
   // 🚀 LÓGICA DA "NOVA LINHA" MANUAL
   const adicionarLinhaEmBranco = () => {
-    if (itensSelecionados.length >= 10) {
-      showAlert("Limite Atingido", "Você atingiu o limite máximo de 10 itens para esta solicitação.", "warning");
+    if (itensSelecionados.length >= 25) {
+      showAlert("Limite Atingido", "Você atingiu o limite máximo de 25 itens para esta solicitação.", "warning");
       return;
     }
     setItensSelecionados((prev) => [
@@ -109,6 +109,7 @@ export default function MaterialEstoque() {
         desenhoSAP: "",
         fornecedor: "",
         referencia: "",
+        nf: "",
         unidadeMedida: "Unid",
         wbs: "",
         alocacao: ""
@@ -121,9 +122,9 @@ export default function MaterialEstoque() {
     if (novosItens && Array.isArray(novosItens)) {
       setItensSelecionados((prev) => {
         const totalFuturo = prev.length + novosItens.length;
-        if (totalFuturo > 10) {
-          showAlert("Limite Atingido", "Você só pode adicionar no máximo 10 itens por solicitação. Os itens excedentes foram ignorados.", "warning");
-          return [...prev, ...novosItens].slice(0, 10);
+        if (totalFuturo > 25) {
+          showAlert("Limite Atingido", "Você só pode adicionar no máximo 25 itens por solicitação. Os itens excedentes foram ignorados.", "warning");
+          return [...prev, ...novosItens].slice(0, 25);
         }
         return [...prev, ...novosItens];
       });
@@ -157,8 +158,8 @@ export default function MaterialEstoque() {
   };
 
   const adicionarManualmente = (item, index) => {
-    if (itensSelecionados.length >= 10) {
-      showAlert("Limite Atingido", "Você atingiu o limite máximo de 10 itens para esta solicitação.", "warning");
+    if (itensSelecionados.length >= 25) {
+      showAlert("Limite Atingido", "Você atingiu o limite máximo de 25 itens para esta solicitação.", "warning");
       return;
     }
 
@@ -471,7 +472,17 @@ export default function MaterialEstoque() {
         </div>
       </div>
 
-      <div className="selecao-itens-grid">
+      {/* 🚀 AQUI ESTÁ A FIX: Estilos Inline garantindo o Layout lado a lado */}
+      <div 
+        className="selecao-itens-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "350px minmax(0, 1fr)",
+          gap: "24px",
+          marginTop: "24px",
+          alignItems: "start"
+        }}
+      >
         <SeletorEstoqueLateral
           estoque={estoqueDisponivel}
           carregando={carregandoEstoque}
@@ -482,11 +493,12 @@ export default function MaterialEstoque() {
           className="painel-lista"
           style={{
             backgroundColor: "#ffffff",
-            borderRadius: "12px",
+            borderRadius: "8px",
             border: "1px solid #e2e8f0",
             overflow: "hidden",
           }}
         >
+          {/* CABEÇALHO IDÊNTICO À IMAGEM */}
           <div
             className="painel-lista-header"
             style={{
@@ -494,41 +506,42 @@ export default function MaterialEstoque() {
               justifyContent: "space-between",
               alignItems: "center",
               padding: "16px 20px",
-              borderBottom: "1px solid #f1f5f9",
+              borderBottom: "1px solid #e2e8f0",
             }}
           >
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                gap: "10px",
                 fontWeight: "600",
-                color: "#1e293b",
+                color: "#0f172a",
+                fontSize: "1.1rem"
               }}
             >
-              <Package size={18} color="#2563eb" /> Itens Selecionados (Max. 10)
+              <Package size={20} color="#3b82f6" /> Itens Selecionados
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <button
                 onClick={adicionarLinhaEmBranco}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
               >
-                <Plus size={16} /> Nova Linha
+                <Plus size={14} /> Nova Linha
               </button>
 
               <CarregarArquivo
                 variante="botao"
                 accept=".xlsx, .xls"
                 label="Importar Excel"
-                icone={<FileSpreadsheet size={16} color="#10b981" />}
+                icone={<FileSpreadsheet size={14} color="#10b981" />}
                 onFileSelect={handleImportarExcel}
               />
 
               <ExemploExcel />
 
-              <span className="badge-contador-simples" style={{ fontSize: '0.75rem', fontWeight: '500', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 10px', borderRadius: '999px' }}>
-                {listaSegura.length} / 10
+              <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#64748b', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '4px 12px', borderRadius: '16px' }}>
+                {listaSegura.length} / 25
               </span>
             </div>
           </div>
@@ -561,25 +574,21 @@ export default function MaterialEstoque() {
                 className="tabela-solicitacao-dados"
                 style={{
                   width: "100%",
-                  minWidth: "1300px",
+                  minWidth: "1200px",
                   borderCollapse: "collapse",
                   textAlign: "left",
                 }}
               >
                 <thead>
-                  <tr>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", width: "50px" }}></th>
-                    {/* 👈 CABEÇALHOS REORGANIZADOS: DESENHO SAP ESTÁ AQUI COMO O PRIMEIRO */}
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>DESENHO SAP</th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>Nº PEÇA FABRICANTE</th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>MATERIAL DESCRIPTION</th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>QTD. SOLICITADA</th>
-                    
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>FORNECEDOR</th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>REFERÊNCIA</th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>UNIDADE</th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>WBS</th>
-                    <th style={{ padding: "12px 16px", fontSize: "0.75rem", color: "#64748b", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>ALOCAÇÃO</th>
+                  <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
+                    <th style={{ padding: "12px", width: "40px" }}></th>
+                    <th style={{ padding: "12px", fontSize: "0.75rem", color: "#2563eb", fontWeight: "700" }}>DESENHO SAP</th>
+                    <th style={{ padding: "12px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>PART NUMBER</th>
+                    <th style={{ padding: "12px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>DESCRIÇÃO</th>
+                    <th style={{ padding: "12px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>QTD</th>
+                    <th style={{ padding: "12px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>NF ENTRADA</th>
+                    <th style={{ padding: "12px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>ALOCAÇÃO</th>
+                    <th style={{ padding: "12px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>WBS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -594,17 +603,18 @@ export default function MaterialEstoque() {
                           style={{
                             background: "none",
                             border: "none",
-                            color: "#ef4444",
+                            color: "#94a3b8",
                             cursor: "pointer",
-                            padding: "4px",
+                            transition: "color 0.2s"
                           }}
+                          onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}
                         >
                           <Trash2 size={16} />
                         </button>
                       </td>
 
-                      {/* 👈 CAMPOS REORGANIZADOS: DESENHO SAP ESTÁ AQUI */}
-                      <td style={{ padding: "8px 12px" }}>
+                      <td style={{ backgroundColor: '#eff6ff', padding: "12px" }}>
                         <input
                           value={item.desenhoSAP || ""}
                           onChange={(e) =>
@@ -612,46 +622,58 @@ export default function MaterialEstoque() {
                           }
                           placeholder="SAP"
                           style={{
-                            backgroundColor: "#eff6ff",
-                            color: "#2563eb",
-                            padding: "6px 12px",
-                            borderRadius: "999px",
-                            border: "1px solid #bfdbfe",
-                            fontWeight: "600",
-                            fontFamily: "monospace",
                             width: "100%",
+                            border: "none",
                             outline: "none",
-                            boxSizing: "border-box",
+                            backgroundColor: "transparent",
+                            color: "#2563eb",
+                            fontWeight: "700",
+                            fontFamily: "monospace",
+                            fontSize: "0.85rem",
                           }}
                         />
                       </td>
 
-                      {/* 👈 PART NUMBER (Nº PEÇA FABRICANTE) */}
-                      <td style={{ padding: "8px 12px" }}>
+                      <td style={{ padding: "12px" }}>
                         <input
                           value={item.numPecaFabricante || ""}
                           onChange={(e) =>
                             atualizarCampo(item.id, "numPecaFabricante", e.target.value)
                           }
                           placeholder="PN"
-                          style={{ width: "100%", border: "none", outline: "none", fontWeight: "600", color: "#1e293b", backgroundColor: "transparent" }}
+                          style={{ 
+                            width: "100%", 
+                            border: "none", 
+                            outline: "none", 
+                            fontWeight: "500", 
+                            color: "#1e293b", 
+                            backgroundColor: "transparent",
+                            fontFamily: "monospace", 
+                            fontSize: "0.85rem" 
+                          }}
                         />
                       </td>
 
-                      {/* 👈 DESCRIÇÃO */}
-                      <td style={{ minWidth: "220px", padding: "8px 12px" }}>
+                      <td style={{ minWidth: "220px", padding: "12px" }}>
                         <input
                           value={item.materialDescription || ""}
                           onChange={(e) =>
                             atualizarCampo(item.id, "materialDescription", e.target.value)
                           }
-                          placeholder="Descrição do item"
-                          style={{ width: "100%", border: "none", outline: "none", color: "#334155", backgroundColor: "transparent" }}
+                          placeholder="Descrição"
+                          style={{ 
+                            width: "100%", 
+                            border: "none", 
+                            outline: "none", 
+                            color: "#475569", 
+                            backgroundColor: "transparent",
+                            fontSize: "0.85rem", 
+                            textTransform: "uppercase"
+                          }}
                         />
                       </td>
                       
-                      {/* 👈 QUANTIDADE */}
-                      <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                      <td style={{ padding: "12px", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <input
                             type="number"
@@ -662,74 +684,59 @@ export default function MaterialEstoque() {
                               atualizarCampo(item.id, "qtdSelecionada", e.target.value)
                             }
                             style={{
-                              width: "70px",
-                              border: "1px solid #a7f3d0",
-                              backgroundColor: "#ecfdf5",
-                              borderRadius: "6px",
-                              padding: "6px 8px",
+                              width: "60px",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "4px",
+                              padding: "4px 8px",
                               outline: "none",
-                              color: "#10b981",
-                              fontWeight: "700",
-                              textAlign: "center",
+                              color: "#0f172a",
+                              textAlign: "center"
                             }}
                           />
                           {item.qtdFornecida && (
                              <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "500" }}>
-                               / {item.qtdFornecida} máx
+                               / {item.qtdFornecida}
                              </span>
                           )}
                         </div>
                       </td>
 
-                      <td style={{ padding: "8px 12px" }}>
+                      <td style={{ padding: "12px" }}>
                         <input
-                          value={item.fornecedor || ""}
+                          value={item.nf || ""}
                           onChange={(e) =>
-                            atualizarCampo(item.id, "fornecedor", e.target.value)
+                            atualizarCampo(item.id, "nf", e.target.value)
                           }
-                          placeholder="Fornecedor"
-                          style={{ width: "100%", border: "none", outline: "none", color: "#475569", backgroundColor: "transparent" }}
+                          placeholder="NF..."
+                          style={{ 
+                            width: "130px", 
+                            border: "none", 
+                            outline: "none", 
+                            color: "#475569", 
+                            backgroundColor: "transparent",
+                            fontSize: "0.75rem", 
+                            fontFamily: "monospace"
+                          }}
                         />
                       </td>
-                      <td style={{ padding: "8px 12px" }}>
-                        <input
-                          value={item.referencia || ""}
-                          onChange={(e) =>
-                            atualizarCampo(item.id, "referencia", e.target.value)
-                          }
-                          placeholder="Ref"
-                          style={{ width: "100%", border: "none", outline: "none", color: "#64748b", backgroundColor: "transparent" }}
-                        />
-                      </td>
-                      <td style={{ padding: "8px 12px" }}>
-                        <input
-                          value={item.unidadeMedida || ""}
-                          onChange={(e) =>
-                            atualizarCampo(item.id, "unidadeMedida", e.target.value)
-                          }
-                          placeholder="Unid"
-                          style={{ width: "60px", border: "none", outline: "none", color: "#475569", backgroundColor: "transparent" }}
-                        />
-                      </td>
-                      <td style={{ padding: "8px 12px" }}>
-                        <input
-                          value={item.wbs || ""}
-                          onChange={(e) =>
-                            atualizarCampo(item.id, "wbs", e.target.value)
-                          }
-                          placeholder="WBS"
-                          style={{ width: "100%", border: "none", outline: "none", color: "#475569", backgroundColor: "transparent" }}
-                        />
-                      </td>
-                      <td style={{ padding: "8px 12px" }}>
+
+                      <td style={{ padding: "12px" }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <input
                             value={item.alocacao || ""}
                             onChange={(e) =>
                               atualizarCampo(item.id, "alocacao", e.target.value)
                             }
-                            placeholder="Alocação"
-                            style={{ width: "100%", border: "none", outline: "none", color: "#2563eb", fontFamily: "monospace", fontWeight: "600", backgroundColor: "transparent" }}
+                            placeholder="Aloc..."
+                            style={{ 
+                              width: "100%", 
+                              border: "none", 
+                              outline: "none", 
+                              color: "#2563eb", 
+                              fontFamily: "monospace", 
+                              fontSize: "0.85rem", 
+                              backgroundColor: "transparent" 
+                            }}
                           />
                           {item.isTransferencia && (
                             <span style={{ fontSize: '0.65rem', color: '#ca8a04', fontWeight: 'bold' }}>
@@ -737,6 +744,25 @@ export default function MaterialEstoque() {
                             </span>
                           )}
                         </div>
+                      </td>
+
+                      <td style={{ padding: "12px" }}>
+                        <input
+                          value={item.wbs || ""}
+                          onChange={(e) =>
+                            atualizarCampo(item.id, "wbs", e.target.value)
+                          }
+                          placeholder="WBS..."
+                          style={{ 
+                            width: "100%", 
+                            border: "none", 
+                            outline: "none", 
+                            color: "#64748b", 
+                            fontFamily: "monospace", 
+                            fontSize: "0.75rem", 
+                            backgroundColor: "transparent" 
+                          }}
+                        />
                       </td>
                     </tr>
                   ))}
