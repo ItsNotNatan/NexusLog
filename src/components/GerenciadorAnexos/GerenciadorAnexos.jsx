@@ -4,13 +4,15 @@ import CarregarArquivo from '../CarregarArquivo/CarregarArquivo';
 
 export default function GerenciadorAnexos({ anexos, setAnexos, titulo = "ANEXOS (OPCIONAL)" }) {
   
+  // Função executada quando o CarregarArquivo nos entrega um novo documento
   const handleAnexar = (arquivo) => {
-    // Adiciona o novo ficheiro à lista existente
+    // Pega em todos os anexos antigos (...anexos) e junta o novo arquivo no final
     setAnexos([...anexos, arquivo]);
   };
 
+  // Função executada quando clicamos no 'X' de um ficheiro
   const removerAnexo = (indexRemover) => {
-    // Remove o ficheiro em que clicámos no 'X'
+    // O filter vai criar uma nova lista, ignorando o ficheiro que tem a mesma posição (index) que queremos apagar
     setAnexos(anexos.filter((_, index) => index !== indexRemover));
   };
 
@@ -22,17 +24,20 @@ export default function GerenciadorAnexos({ anexos, setAnexos, titulo = "ANEXOS 
         </span>
       </div>
 
+      {/* Componente responsável pelo botão de Upload real */}
       <CarregarArquivo 
         variante="botao"
         accept=".pdf, .jpg, .jpeg, .png, .xlsx, .csv"
         label="Adicionar Arquivo"
         icone={<Paperclip size={16} />}
-        onFileSelect={handleAnexar}
+        onFileSelect={handleAnexar} // Quando o ficheiro é escolhido, chama a nossa função
       />
 
-      {/* Lista de Ficheiros Selecionados */}
+      {/* Só mostra esta secção se a lista de anexos tiver 1 ou mais ficheiros */}
       {anexos.length > 0 && (
         <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          
+          {/* Percorre cada arquivo na lista para criar a sua caixinha visual */}
           {anexos.map((arquivo, index) => (
             <div 
               key={index} 
@@ -43,11 +48,13 @@ export default function GerenciadorAnexos({ anexos, setAnexos, titulo = "ANEXOS 
               }}
             >
               <span style={{ fontSize: '0.85rem', color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {arquivo.name}
+                {arquivo.name} {/* Mostra o nome do ficheiro */}
               </span>
+              
+              {/* Botão de apagar ficheiro */}
               <button 
                 onClick={() => removerAnexo(index)} 
-                type="button"
+                type="button" // type="button" evita que submeta formulários acidentalmente
                 style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', marginLeft: '12px' }}
               >
                 <X size={16} />

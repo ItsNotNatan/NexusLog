@@ -12,8 +12,7 @@ export default function TabelaInsercaoItens({
   itens,
   dataMinima = '',
   mostrarDataNecessidade = false,
-  mostrarExemploExcel = false,
-  limiteLinhas = 20, // Prop que recebe o limite dinamicamente
+  limiteLinhas = 20, 
   onAtualizarCampo,
   onRemoverItem,
   onAdicionarLinha,
@@ -52,7 +51,6 @@ export default function TabelaInsercaoItens({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h2 style={{ fontSize: '1rem', margin: 0, color: '#1e293b' }}>Itens para Entrada</h2>
             
-            {/* ✨ AQUI ESTÁ A NOVIDADE: A etiqueta (badge) dinâmica ao lado do título */}
             <span style={{ 
               fontSize: '0.7rem', 
               fontWeight: '600', 
@@ -93,7 +91,7 @@ export default function TabelaInsercaoItens({
             onFileSelect={onImportarExcel}
           />
 
-          {mostrarExemploExcel && <ExemploExcel />}
+          <ExemploExcel />
 
           <span style={{ 
             fontSize: '0.75rem', fontWeight: '500', 
@@ -123,10 +121,13 @@ export default function TabelaInsercaoItens({
         )}
 
         <div className="scroll-tabela-solicitacao" style={{ overflowX: 'auto', width: '100%' }}>
-          <table className="tabela-solicitacao-dados" style={{ minWidth: mostrarDataNecessidade ? '2400px' : '2200px', width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          {/* Aumentei ligeiramente o minWidth para acomodar a nova coluna */}
+          <table className="tabela-solicitacao-dados" style={{ minWidth: mostrarDataNecessidade ? '2600px' : '2400px', width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr>
                 <th style={{ width: '60px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
+                {/* ✨ NOVA COLUNA: DESENHO SAP */}
+                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESENHO SAP</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>Nº PEÇA FABRICANTE</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR</th>
                 <th style={{ width: '120px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>QTD. FORNECIDA</th>
@@ -152,6 +153,12 @@ export default function TabelaInsercaoItens({
                       <Trash2 size={16} />
                     </button>
                   </td>
+                  
+                  {/* ✨ NOVO INPUT: DESENHO SAP */}
+                  <td style={{ padding: '8px' }}>
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.desenhoSAP || ''} onChange={(e) => onAtualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="Desenho SAP" />
+                  </td>
+
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela badge-partnumber" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', fontWeight: '600' }} value={item.numPecaFabricante} onChange={(e) => onAtualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
                   </td>
@@ -213,7 +220,8 @@ export default function TabelaInsercaoItens({
               
               {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
                 <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
-                  <td colSpan={mostrarDataNecessidade ? 16 : 15} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
+                  {/* ✨ AJUSTE COLSPAN: De 16/15 passou para 17/16 devido à nova coluna */}
+                  <td colSpan={mostrarDataNecessidade ? 17 : 16} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
                 </tr>
               ))}
             </tbody>
