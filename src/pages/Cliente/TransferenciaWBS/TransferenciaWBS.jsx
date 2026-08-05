@@ -162,11 +162,12 @@ export default function TransferenciaWBS() {
       },
       itens: itensSelecionados.map(item => ({
         estoque_id: item.id,
-        numPecaFabricante: item.part_number,
-        materialDescription: item.descricao,
+        desenhoSAP: item.desenho_sap || item.desenhoSAP || '-', // 👈 INCLUÍDO AQUI
+        numPecaFabricante: item.part_number || item.numPecaFabricante || '-',
+        materialDescription: item.descricao || item.materialDescription || '-',
         qtd: item.qtdTransferencia,
-        wbsOrigem: item.wbs,
-        alocacao: item.alocacao 
+        wbsOrigem: item.wbs || item.wbs_element || '-',
+        alocacao: item.alocacao || '-'
       })),
       anexos: anexosProcessados 
     };
@@ -263,9 +264,13 @@ export default function TransferenciaWBS() {
                 <div key={`selecionado-${item.id}`} className="item-lista" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
                   
                   <div style={{ flex: 1 }}>
-                    <div style={{ marginBottom: '6px' }}><span className="badge-sap" style={{ fontSize: '0.75rem', padding: '4px 12px' }}>{item.desenho_sap}</span></div>
-                    <div className="item-lista-pn" style={{ marginBottom: '4px' }}>{item.part_number}</div>
-                    <div className="item-lista-desc">{item.descricao}</div>
+                    <div style={{ marginBottom: '6px' }}>
+                      <span className="badge-sap" style={{ fontSize: '0.75rem', padding: '4px 12px' }}>
+                        {item.desenho_sap || item.desenhoSAP || 'S/ SAP'}
+                      </span>
+                    </div>
+                    <div className="item-lista-pn" style={{ marginBottom: '4px' }}>{item.part_number || item.numPecaFabricante}</div>
+                    <div className="item-lista-desc">{item.descricao || item.materialDescription}</div>
                     
                     <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>QTD:</label>
