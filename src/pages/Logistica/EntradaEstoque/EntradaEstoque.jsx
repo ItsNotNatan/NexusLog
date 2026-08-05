@@ -34,6 +34,8 @@ export default function EntradaEstoque() {
     if (itensProcessados && Array.isArray(itensProcessados)) {
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
+        // 👇 CORREÇÃO: Adicionado o mapeamento do Desenho SAP
+        desenhoSAP: item.desenhoSAP || '',
         numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
         fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
         qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
@@ -123,7 +125,8 @@ export default function EntradaEstoque() {
           ...item,
           nfEntrada: item.nfEntrada ? item.nfEntrada.trim() : '', 
           qtd: item.qtdFornecida,
-          desenhoSAP: '-', 
+          // 👇 CORREÇÃO: Atualizado para pegar o desenhoSAP do item e não forçar um traço '-'
+          desenhoSAP: item.desenhoSAP || '-', 
           materialDescription: item.vendorDescription || 'Sem descrição'
         })),
         anexos: anexosProcessados 

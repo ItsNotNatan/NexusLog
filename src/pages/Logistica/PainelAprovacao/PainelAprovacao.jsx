@@ -9,7 +9,7 @@ import {
   Eye, 
   Loader2,
   AlertCircle,
-  Plus,       
+  Plus,        
   Trash2,
   Save
 } from 'lucide-react';
@@ -161,6 +161,7 @@ export default function PainelAprovacao() {
   const adicionarLinhaItem = () => {
     setItensEdicao([...itensEdicao, {
       id_temporario: `novo-${Date.now()}`,
+      desenhoSAP: '', // 👈 ADICIONADO AQUI
       numPecaFabricante: '',
       fornecedor: '',
       qtdFornecida: 1,
@@ -286,6 +287,10 @@ export default function PainelAprovacao() {
           <thead>
             <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
               <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', textAlign: 'center', width: '60px' }}>AÇÕES</th>
+              
+              {/* 👈 ADICIONADO O CABEÇALHO DO DESENHO SAP AQUI */}
+              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DESENHO SAP</th>
+              
               <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>Nº PEÇA FABRICANTE</th>
               <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>FORNECEDOR</th>
               <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '120px' }}>QTD. FORNECIDA</th>
@@ -311,6 +316,12 @@ export default function PainelAprovacao() {
                     <Trash2 size={16} />
                   </button>
                 </td>
+                
+                {/* 👈 ADICIONADA A CÉLULA COM INPUT DO DESENHO SAP AQUI */}
+                <td style={{ padding: '6px 8px' }}>
+                  <input type="text" value={item.desenhoSAP || item.desenho_sap_manual || item.desenho_sap || ''} onChange={(e) => atualizarCampoItem(index, 'desenhoSAP', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Desenho SAP" />
+                </td>
+
                 <td style={{ padding: '6px 8px' }}>
                   <input type="text" value={item.numPecaFabricante || item.part_number || ''} onChange={(e) => atualizarCampoItem(index, 'numPecaFabricante', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="PN" />
                 </td>
