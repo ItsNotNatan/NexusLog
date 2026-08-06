@@ -3,9 +3,13 @@ import { Search, Boxes, Loader2, MapPin, X, History, Filter } from 'lucide-react
 import './VisaoGeralEstoque.css'; 
 import FiltroEstoqueModal from '../../../components/FiltroEstoqueModal/FiltroEstoqueModal';
 
-// 👇 Importamos o teu componente de Tabela de Demandas!
+// Componentes e Contextos
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import { AuthContext } from '../../../contexts/AuthContext';
+
+// 1. IMPORTAÇÃO DA FUNÇÃO CENTRALIZADA DE API
+// O apiFetch adiciona o token JWT e adapta a URL base (.env ou localhost) automaticamente
+import { apiFetch } from '../../../services/api';
 
 const ESTADO_INICIAL_FILTROS = {
   filial: null,
@@ -43,17 +47,17 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     ? 'Consulte a disponibilidade de materiais em tempo real.' 
     : 'Painel de controle do saldo físico das filiais.';
 
+  // =========================================================================
+  // 🔄 CARREGAMENTO DO ESTOQUE DADOS DO BACKEND
+  // =========================================================================
   useEffect(() => {
     const carregarEstoqueDoBackend = async () => {
       try {
         setCarregando(true);
-        const url = `http://localhost:3001/api/estoque/listar?filial=${estoqueAtual}`;
-        const resposta = await fetch(url);
-        const resultado = await resposta.json();
-
-        if (!resposta.ok || !resultado.sucesso) {
-          throw new Error(resultado.erro || 'Falha ao buscar dados do servidor.');
-        }
+        
+        // 2. REFATORAÇÃO DO GET DE ESTOQUE
+        // Trocamos o fetch nativo e o endereço estático pelo apiFetch
+        const resultado = await apiFetch(`/estoque/listar?filial=${estoqueAtual}`);
 
         const estoqueTratado = (resultado.dados || []).map((item) => ({
           id: item.id,
@@ -94,10 +98,10 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     setCarregandoDemandas(true);
 
     try {
-      const resposta = await fetch(`http://localhost:3001/api/demandas/material/${material.part_number}`);
-      const resultado = await resposta.json();
+      // 3. REFATORAÇÃO DO GET DE DEMANDAS
+      const resultado = await apiFetch(`/demandas/material/${material.part_number}`);
 
-      if (resposta.ok && resultado.sucesso) {
+      if (resultado.sucesso) {
         const dadosFormatados = resultado.dados.map(item => ({
           id: `PS-${item.id || item.ps_id}`,
           solicitante: item.solicitante,
@@ -117,7 +121,7 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
         ]);
       }
     } catch (error) {
-      console.error("Erro ao buscar demandas associadas:", error);
+      console.error("Erro ao buscar demandas associadas:", error.message);
       setDemandasDoMaterial([]);
     } finally {
       setCarregandoDemandas(false);
@@ -300,7 +304,7 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
       </div>
 
       {/* ========================================================= */}
-      {/* 🪟 JANELA MODAL COM A TABELA DE DEMANDAS                  */}
+      {/* 🪟 JANELA MODAL COM A TABELA DE DEMANDAS                   */}
       {/* ========================================================= */}
       {modalDemandasAberto && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
@@ -318,7 +322,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
             </div>
 
             <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '0.875rem', color: '#334155' }}>
-              {/* ✨ AQUI: O Desenho SAP agora aparece no cabeçalho do item selecionado! */}
               <strong>Item Selecionado:</strong> {materialSelecionado?.desenho_sap !== '—' ? `SAP: ${materialSelecionado?.desenho_sap} | ` : ''} PN: {materialSelecionado?.part_number} — {materialSelecionado?.descricao}
             </div>
 
@@ -337,5 +340,5 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     </div>
   );
 }
- 
+
 const estiloHeader = { padding: '14px 16px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' };

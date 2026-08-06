@@ -2,24 +2,28 @@ import React, { useState } from 'react';
 import { FileSpreadsheet, Download, RefreshCw, CheckCircle, FileText } from 'lucide-react';
 import './FormatacaoSAP.css';
 
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA DE API
+// O apiFetch gerencia o token JWT e adapta a URL base (.env ou localhost) automaticamente
+import { apiFetch } from '../../../services/api';
+
 export default function FormatacaoSAP() {
   const [carregando, setCarregando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
   const [dadosSAP, setDadosSAP] = useState([]);
 
-  const token = localStorage.getItem('@NexusLog:token') || '';
-
+  // =========================================================================
+  // 🔄 CARREGAMENTO E FORMATAÇÃO DOS DADOS PARA O PADRÃO SAP
+  // =========================================================================
   const carregarEDatarmatarSAP = async () => {
     try {
       setCarregando(true);
       setSucesso(false);
 
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar?status=Conclu%C3%ADdo', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const resultado = await resposta.json();
+      // 2. REFATORAÇÃO DO FETCH
+      // O apiFetch busca o token no localStorage, adiciona os headers e faz o parse do JSON automaticamente
+      const resultado = await apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo');
 
-      if (resposta.ok && resultado.sucesso) {
+      if (resultado.sucesso) {
         // Formata os dados no padrao de colunas do SAP usando PL
         const dadosFormatados = resultado.dados.map((sol) => ({
           DOCUMENTO_SAP: sol.id,
@@ -38,13 +42,16 @@ export default function FormatacaoSAP() {
         alert('Erro ao carregar dados concluídos para formatação SAP.');
       }
     } catch (error) {
-      console.error('Erro na integração SAP:', error);
+      console.error('Erro na integração SAP:', error.message);
       alert('Falha na comunicação com o servidor.');
     } finally {
       setCarregando(false);
     }
   };
 
+  // =========================================================================
+  // 📥 EXPORTAÇÃO DO ARQUIVO CSV
+  // =========================================================================
   const exportarCSV = () => {
     if (dadosSAP.length === 0) return;
 

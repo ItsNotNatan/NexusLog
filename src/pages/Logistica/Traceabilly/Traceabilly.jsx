@@ -13,6 +13,10 @@ import {
 
 import { useAlert } from '../../../contexts/AlertContext'; 
 
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
+// O apiFetch inclui o token JWT automaticamente e alterna entre Localhost e Vercel
+import { apiFetch } from '../../../services/api';
+
 export default function Traceabilly({ perfil = 'logistica' }) {
   // 1. ESTADOS DO COMPONENTE
   const [dadosRastreabilidade, setDadosRastreabilidade] = useState([]);
@@ -29,8 +33,10 @@ export default function Traceabilly({ perfil = 'logistica' }) {
   const buscarHistorico = async () => {
     try {
       setCarregando(true);
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
-      const json = await resposta.json();
+
+      // 2. REFATORAÇÃO DO GET DE SOLICITAÇÕES
+      // Trocamos o fetch estático e a conversão manual de JSON pelo apiFetch
+      const json = await apiFetch('/solicitacoes/listar');
 
       if (json.sucesso) {
         let itensExtraidos = [];
@@ -59,8 +65,8 @@ export default function Traceabilly({ perfil = 'logistica' }) {
                   nfEntrada: item.nf_entrada || 'N/A',
                   bsSaida: solicitacao.bs || '-',
                   solicitacao: solicitacao.id,
-                  solicitanteInicial: solicitacao.solicitante.charAt(0).toUpperCase(),
-                  solicitanteNome: solicitacao.solicitante,
+                  solicitanteInicial: solicitacao.solicitante ? solicitacao.solicitante.charAt(0).toUpperCase() : 'U',
+                  solicitanteNome: solicitacao.solicitante || 'Não identificado',
                   alocacao: item.alocacao || 'Padrão',
                   qtd: `${item.quantidade_solicitada} ${item.unidade_medida_manual || 'Unid'}`,
                   valor: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual}` : '-',
@@ -76,8 +82,8 @@ export default function Traceabilly({ perfil = 'logistica' }) {
         setDadosRastreabilidade(itensExtraidos);
       }
     } catch (error) {
-      console.error("Erro ao buscar rastreabilidade:", error);
-      mostrarAlerta('Erro ao carregar o histórico.', 'erro');
+      console.error("Erro ao buscar rastreabilidade:", error.message);
+      if (mostrarAlerta) mostrarAlerta('Erro ao carregar o histórico.', 'erro');
     } finally {
       setCarregando(false);
     }
@@ -93,28 +99,26 @@ export default function Traceabilly({ perfil = 'logistica' }) {
     try {
       setCarregando(true);
       
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/reverter', {
+      // 3. REFATORAÇÃO DO POST DE REVERSÃO
+      const json = await apiFetch('/solicitacoes/reverter', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id_item: item.id
         })
       });
 
-      const json = await resposta.json();
-
-      if (resposta.ok && json.sucesso) {
-        mostrarAlerta(`O item ${item.partNumber} retornou ao estoque principal!`, 'sucesso');
+      if (json.sucesso) {
+        if (mostrarAlerta) mostrarAlerta(`O item ${item.partNumber} retornou ao estoque principal!`, 'sucesso');
         
         setDadosRastreabilidade(dadosAtuais => 
           dadosAtuais.filter(dado => dado.id !== item.id)
         );
       } else {
-        mostrarAlerta(`Falha ao reverter: ${json.erro}`, 'erro');
+        if (mostrarAlerta) mostrarAlerta(`Falha ao reverter: ${json.erro}`, 'erro');
       }
     } catch (error) {
-      console.error("Erro na reversão:", error);
-      mostrarAlerta('Falha de conexão com o servidor.', 'erro');
+      console.error("Erro na reversão:", error.message);
+      if (mostrarAlerta) mostrarAlerta('Falha de conexão com o servidor.', 'erro');
     } finally {
       setCarregando(false);
     }

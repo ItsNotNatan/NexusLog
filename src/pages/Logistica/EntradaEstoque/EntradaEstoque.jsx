@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import './EntradaEstoque.css';
 import { User, Send, Paperclip, X, Info } from 'lucide-react';
 
@@ -9,6 +9,10 @@ import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal
 import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; 
 import { AuthContext } from '../../../contexts/AuthContext';
 import { supabase } from '../../../supabaseClient';
+
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
+// O apiFetch cuida de chavear a URL base (.env ou localhost) e injetar cabeçalhos automaticamente
+import { apiFetch } from '../../../services/api';
 
 const LIMITE_LOGISTICA = 60;
 
@@ -23,7 +27,6 @@ export default function EntradaEstoque() {
     id: `linha-vazia-${Date.now()}-${Math.random()}`, numPecaFabricante: '', fornecedor: '', qtdFornecida: 1, nfEntrada: '', unidadeMedida: 'Unid', vendorDescription: '', wbsElement: '', emissaoNF: '', recebNF: '', docCompras: '', poNetPrice: '', centro: '', deposito: '', alocacao: ''
   });
 
-  // ✨ ALTERAÇÃO 1: Começamos com um array completamente vazio em vez de [gerarLinhaVazia()]
   const [itens, setItens] = useState([]);
   
   const [anexos, setAnexos] = useState([]);
@@ -34,7 +37,6 @@ export default function EntradaEstoque() {
     if (itensProcessados && Array.isArray(itensProcessados)) {
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        // 👇 CORREÇÃO: Adicionado o mapeamento do Desenho SAP
         desenhoSAP: item.desenhoSAP || '',
         numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
         fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
@@ -78,7 +80,6 @@ export default function EntradaEstoque() {
   const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
   const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
   
-  // ✨ ALTERAÇÃO 2: Removido o bloqueio que impedia deixar a tabela com 0 itens
   const removerItem = (idParaRemover) => {
     setItens(itens.filter(item => item.id !== idParaRemover));
   };
@@ -89,7 +90,6 @@ export default function EntradaEstoque() {
       return;
     }
     
-    // ✨ ALTERAÇÃO 3: Adicionada validação para não permitir envio com 0 itens
     if (itens.length === 0) {
       alert("Adicione pelo menos um item à tabela para registar a entrada.");
       return;
@@ -125,29 +125,30 @@ export default function EntradaEstoque() {
           ...item,
           nfEntrada: item.nfEntrada ? item.nfEntrada.trim() : '', 
           qtd: item.qtdFornecida,
-          // 👇 CORREÇÃO: Atualizado para pegar o desenhoSAP do item e não forçar um traço '-'
           desenhoSAP: item.desenhoSAP || '-', 
           materialDescription: item.vendorDescription || 'Sem descrição'
         })),
         anexos: anexosProcessados 
       };
 
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/entrada', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      // 2. REFATORAÇÃO DO FETCH
+      // Trocamos o fetch nativo e a conversão manual de JSON pelo apiFetch
+      const dados = await apiFetch('/solicitacoes/entrada', {
+        method: 'POST',
+        body: JSON.stringify(payload)
       });
-      const dados = await resposta.json();
 
-      if (resposta.ok) {
-        alert(`Sucesso! Solicitação de Entrada gerada no sistema. ID: ${dados.ps_id}`);
+      if (dados.sucesso || dados.ps_id) {
+        alert(`Sucesso! Solicitação de Entrada gerada no sistema. ID: ${dados.ps_id || dados.ps}`);
         setFormDados({ nome: '', wbs: '', observacoes: '' });
-        // ✨ ALTERAÇÃO 4: Após o sucesso, esvaziamos a tabela em vez de gerar uma linha vazia
         setItens([]);
         setAnexos([]);
       } else {
         alert(`Erro do servidor: ${dados.erro}`);
       }
     } catch (error) {
-      alert("Falha ao conectar com o servidor. Verifique se o backend está rodando na porta 3001.");
+      // Captura erros de rede ou exceções lançadas pela função utilitária
+      alert(`Falha ao conectar com o servidor. Motivo: ${error.message}`);
     }
   };
 
@@ -158,7 +159,6 @@ export default function EntradaEstoque() {
       <header className="estoque-cabecalho">
         <h1>Entrada de Estoque</h1>
         <p>Cadastro detalhado de itens — Back-Office Logística</p>
-        
       </header>
 
       <div className="estoque-cartao form-cartao">

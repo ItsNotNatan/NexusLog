@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Search, X, History, Loader } from 'lucide-react';
 
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
+// Trazemos o apiFetch para garantir que a URL base (Vercel ou localhost) é aplicada automaticamente.
+import { apiFetch } from '../../services/api';
+
 export default function TabelaDemandas({ dados = [] }) {
   const [modalAberto, setModalAberto] = useState(false);
   const [itemSelecionado, setItemSelecionado] = useState(null);
@@ -10,16 +14,21 @@ export default function TabelaDemandas({ dados = [] }) {
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [filtoStatus, setFiltoStatus] = useState('Todos os Status');
 
+  // ==========================================
+  // AÇÃO: Duplo clique para abrir histórico
+  // ==========================================
   const handleDuploClique = async (linha) => {
     setItemSelecionado(linha);
     setModalAberto(true);
     setCarregandoHistorico(true);
 
     try {
-      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${linha.id}/anexos`); 
-      const resultado = await resposta.json();
+      // 2. REFATORAÇÃO DO FETCH
+      // Substituímos o fetch nativo e a conversão de JSON pelo apiFetch.
+      const resultado = await apiFetch(`/solicitacoes/${linha.id}/anexos`);
       
-      if (resposta.ok && resultado.sucesso) {
+      // Apenas verificamos a regra de negócio do servidor
+      if (resultado.sucesso) {
         setHistoricoItem(resultado.dados || []);
       } else {
         console.warn("Rota real não encontrada ou sem dados. Usando dados seguros de simulação.");
@@ -29,7 +38,8 @@ export default function TabelaDemandas({ dados = [] }) {
         ]);
       }
     } catch (error) {
-      console.error("Erro ao buscar histórico real:", error);
+      // Erros de rede são apanhados aqui de forma limpa
+      console.error("Erro ao buscar histórico real:", error.message);
       setHistoricoItem([]);
     } finally {
       setCarregandoHistorico(false);

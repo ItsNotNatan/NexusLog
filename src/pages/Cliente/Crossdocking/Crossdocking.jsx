@@ -1,21 +1,22 @@
-import React, { useState, useContext } from 'react'; // ✨ CORREÇÃO 1: Adicionado o useContext aqui
+import React, { useState, useContext } from 'react'; 
 import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText } from 'lucide-react'; 
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 // IMPORTAÇÕES PARA OS ANEXOS FUNCIONAREM
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { supabase } from '../../../supabaseClient';
-
-// ✨ CORREÇÃO 2: Importar o AuthContext para saber a filial
 import { AuthContext } from '../../../contexts/AuthContext';
+
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
+// O apiFetch vai cuidar de enviar os dados para o Vercel ou Localhost automaticamente
+import { apiFetch } from '../../../services/api';
 
 import './Crossdocking.css';
 
 export default function Crossdocking() {
-  // ✨ CORREÇÃO 3: Puxamos a filial global (estoqueAtual)
   const { estoqueAtual } = useContext(AuthContext);
 
-  // 1. ESTADO: Dados gerais do formulário
+  // ESTADOS DO FORMULÁRIO
   const [formDados, setFormDados] = useState({
     nome: '',
     wbs: '',
@@ -23,15 +24,12 @@ export default function Crossdocking() {
     nf: '' 
   });
   
-  // Estado para o tipo de saída (parcial ou total)
   const [tipoSaida, setTipoSaida] = useState(null);
 
-  // Estado para controlar as linhas da tabela de Saída Parcial
   const [itensParciais, setItensParciais] = useState([
     { id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }
   ]);
 
-  // ESTADO PARA OS ARQUIVOS DA NOTA FISCAL
   const [anexos, setAnexos] = useState([]);
 
   // --- FUNÇÕES DA TABELA PARCIAL ---
@@ -56,7 +54,7 @@ export default function Crossdocking() {
     ));
   };
 
-  // 2. FUNÇÃO DE ENVIO PARA O BACKEND (NODE.JS)
+  // --- FUNÇÃO DE ENVIO PARA O BACKEND ---
   const handleEnviar = async () => {
     if (!formDados.nome || !formDados.wbs || !formDados.nf || !tipoSaida) {
       alert("Por favor, preencha o Nome, WBS, Número da NF e selecione o Tipo de Saída.");
@@ -76,9 +74,7 @@ export default function Crossdocking() {
       }
     }
 
-    // =========================================================
     // LÓGICA DE UPLOAD DE IMAGENS PARA O SUPABASE STORAGE
-    // =========================================================
     const anexosProcessados = [];
     for (const arquivo of anexos) {
       const extensao = arquivo.name.split('.').pop();
@@ -104,7 +100,6 @@ export default function Crossdocking() {
         url_arquivo: linkPublico.publicUrl
       });
     }
-    // =========================================================
 
     const listaItensFinais = tipoSaida === 'total' 
       ? [] 
@@ -121,7 +116,6 @@ export default function Crossdocking() {
         nf: formDados.nf, 
         observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'}] ${formDados.observacoes}`,
         tipo: 'Crossdocking',
-        // ✨ CORREÇÃO 4: Injetamos a filial aqui para o Backend gravar corretamente!
         filial_origem: estoqueAtual || 'BR06'
       },
       itens: listaItensFinais,
@@ -129,16 +123,15 @@ export default function Crossdocking() {
     };
 
     try {
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/crossdocking', {
+      // 2. REFATORAÇÃO DO FETCH
+      // Trocamos o código longo pela chamada simples à nossa API centralizada
+      const dados = await apiFetch('/solicitacoes/crossdocking', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      const dados = await resposta.json();
-
-      if (resposta.ok) {
-        // ✨ CORREÇÃO 5: Usamos dados.ps em vez de dados.ps_id, de acordo com o teu backend
+      // Apenas validamos se a regra de negócio do backend retornou sucesso
+      if (dados.sucesso || dados.ps) {
         alert(`Sucesso! Solicitação de Crossdocking enviada. ID: ${dados.ps}`);
         setFormDados({ nome: '', wbs: '', observacoes: '', nf: '' });
         setTipoSaida(null);
@@ -148,7 +141,8 @@ export default function Crossdocking() {
         alert(`Erro do servidor: ${dados.erro}`);
       }
     } catch (error) {
-      console.error("Erro na requisição:", error);
+      // Se houver problemas de rede, o erro gerado no apiFetch é exibido aqui
+      console.error("Erro na requisição:", error.message);
       alert("Falha ao conectar com o servidor. Verifique se o backend está rodando.");
     }
   };
@@ -242,9 +236,6 @@ export default function Crossdocking() {
             </div>
           </div>
 
-          {/* ========================================================
-             RENDERIZAÇÃO CONDICIONAL: TABELA DE SAÍDA PARCIAL
-             ======================================================== */}
           {tipoSaida === 'parcial' && (
             <div style={{ marginTop: '16px', animation: 'fadeIn 0.2s ease-in-out' }}>
               

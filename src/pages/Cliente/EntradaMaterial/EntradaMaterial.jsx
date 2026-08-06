@@ -11,6 +11,9 @@ import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { AlertContext } from '../../../contexts/AlertContext';
 
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
+import { apiFetch } from '../../../services/api';
+
 // ✨ CONSTANTE DE LIMITE PARA O CLIENTE
 const LIMITE_CLIENTE = 20;
 
@@ -64,8 +67,6 @@ export default function EntradaMaterial() {
         deposito: item['Depósito'] || item.deposito || '',
         alocacao: item['Alocação'] || item.alocacao || ''
       }));
-
-      // ... (o resto da função continua igual)
 
       setItens(prev => {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
@@ -150,12 +151,15 @@ export default function EntradaMaterial() {
         anexos: anexosProcessados
       };
 
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/entrada', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      // 2. REFATORAÇÃO DO FETCH
+      // Utilizamos o apiFetch. A URL ajusta-se dinamicamente (Vercel ou localhost).
+      const dados = await apiFetch('/solicitacoes/entrada', {
+        method: 'POST',
+        body: JSON.stringify(payload)
       });
-      const dados = await resposta.json();
 
-      if (resposta.ok) {
+      // Avaliamos apenas as regras de negócio de retorno (sucesso)
+      if (dados.sucesso || dados.ps || dados.ps_id) {
         showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps || dados.ps_id}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
         setItens([]);
@@ -164,6 +168,7 @@ export default function EntradaMaterial() {
         showAlert("Erro no Servidor", dados.erro, "error");
       }
     } catch (error) {
+      // Captura global de erros processada pelo apiFetch ou exceções locais
       showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
     }
   };

@@ -3,16 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import './LoginLogistica.css';
 import { Hexagon, Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-import { useAuth } from '../../contexts/AuthContext'; 
+import { useAuth } from '../../contexts/AuthContext';
+
+// 1. IMPORTAÇÃO DA NOVA FUNÇÃO
+// Trazemos a função apiFetch que criaste para centralizar as requisições
+import { apiFetch } from '../../services/api';
 
 export default function LoginLogistica() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  const [carregando, setCarregando] = useState(false); 
+  const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
-  
+
   const navigate = useNavigate();
-  const { login } = useAuth(); 
+  const { login } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -20,30 +24,33 @@ export default function LoginLogistica() {
     setErro('');
 
     try {
-      const resposta = await fetch('http://localhost:3001/api/auth/login', {
+      // 2. UTILIZAÇÃO DO APIFETCH
+      // Em vez de usar o 'fetch' nativo com 'localhost:3001', passamos apenas a rota final.
+      // O 'apiFetch' já cuida da URL base (Vercel ou Localhost) e transforma a resposta em JSON.
+      const data = await apiFetch('/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ email, senha }),
       });
 
-      const data = await resposta.json();
-
-      if (!resposta.ok || !data.sucesso) {
+      // 3. VALIDAÇÃO DE NEGÓCIO
+      // O apiFetch já verifica erros de servidor (ex: 500, 404), 
+      // mas verificamos também se a API indicou "sucesso: false" nas regras de negócio.
+      if (!data.sucesso) {
         throw new Error(data.erro || 'Erro ao fazer login.');
       }
 
+      // 4. VALIDAÇÃO DE CARGO
+      // Garante que clientes ou utilizadores não autorizados não entram no painel de logística.
       if (data.usuario.cargo !== 'ADM' && data.usuario.cargo !== 'LIDER' && data.usuario.cargo !== 'OPERADOR') {
         throw new Error('Acesso negado. Este portal é exclusivo para a equipe de Logística.');
       }
 
+      // 5. LOGIN E REDIRECIONAMENTO
       await login(data.usuario, data.token);
-      
-      // ✨ MUDANÇA: Redireciona direto para o painel de logística
       navigate('/logistica/painel');
 
     } catch (error) {
+      // Captura qualquer erro lançado acima ou dentro do apiFetch e mostra no ecrã.
       setErro(error.message);
     } finally {
       setCarregando(false);
@@ -57,19 +64,19 @@ export default function LoginLogistica() {
   return (
     <div className="login-page-wrapper">
       <div className="login-card">
-        
-        <button 
+
+        <button
           onClick={handleVoltar}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px', 
-            background: 'none', 
-            border: 'none', 
-            color: '#64748b', 
-            cursor: 'pointer', 
-            marginBottom: '24px', 
-            fontSize: '0.875rem', 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'none',
+            border: 'none',
+            color: '#64748b',
+            cursor: 'pointer',
+            marginBottom: '24px',
+            fontSize: '0.875rem',
             fontWeight: '600',
             padding: 0,
             transition: 'color 0.2s'

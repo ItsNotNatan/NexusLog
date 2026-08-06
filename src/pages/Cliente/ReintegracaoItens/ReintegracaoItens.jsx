@@ -3,6 +3,10 @@ import { User, RefreshCcw, Search, Send } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import './ReintegracaoItens.css';
 
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
+// Trazemos o apiFetch para gerir a comunicação com o servidor de forma inteligente.
+import { apiFetch } from '../../../services/api';
+
 const listaDePl = [
   { id: '10976', solicitante: 'TESTE', wbs: 'WBS-PRJ-2024-001', itens: 4, status: 'Em Separação' },
   { id: '10975', solicitante: 'RASDAS', wbs: 'WBS-PRJ-2024-001', itens: 2, status: 'Em Separação' },
@@ -33,15 +37,17 @@ export default function ReintegracaoItens() {
     };
 
     try {
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/reintegracao', {
+      // 2. REFATORAÇÃO DO FETCH
+      // Substituímos o fetch nativo pelo apiFetch. Ele já aplica a URL correta, 
+      // adiciona os cabeçalhos de JSON e os tokens de segurança.
+      const dados = await apiFetch('/solicitacoes/reintegracao', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      const dados = await resposta.json();
-
-      if (resposta.ok) {
+      // A validação de sucesso de rede (resposta.ok) já é feita dentro da apiFetch.
+      // Aqui só validamos a lógica de negócio.
+      if (dados.sucesso || dados.ps_id || dados.pl_id) {
         alert(`Sucesso! Reintegração solicitada. ID: ${dados.ps_id || dados.pl_id}`);
         setNome('');
         setPlSelecionada(null);
@@ -50,7 +56,8 @@ export default function ReintegracaoItens() {
         alert(`Erro do servidor: ${dados.erro}`);
       }
     } catch (error) {
-      console.error("Erro na requisição:", error);
+      // Qualquer erro de rede ou lançado pela apiFetch cai diretamente aqui.
+      console.error("Erro na requisição:", error.message);
       alert("Falha ao conectar com o servidor.");
     }
   };

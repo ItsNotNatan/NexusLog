@@ -23,6 +23,9 @@ import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/Sel
 import CarregarArquivo from "../../../components/CarregarArquivo/CarregarArquivo"; 
 import { supabase } from "../../../supabaseClient";
 
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
+import { apiFetch } from '../../../services/api';
+
 export default function MaterialEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useContext(AlertContext);
@@ -56,10 +59,11 @@ export default function MaterialEstoque() {
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
-        const resposta = await fetch("http://localhost:3001/api/estoque/listar");
-        const resultado = await resposta.json();
+        // 2. REFATORAÇÃO DO GET DE ESTOQUE
+        // O apiFetch trata a URL base dinamicamente (Vercel ou localhost)
+        const resultado = await apiFetch("/estoque/listar");
 
-        if (resposta.ok && resultado.sucesso) {
+        if (resultado.sucesso) {
           const itensComSaldo = resultado.dados
             .filter((item) => item.quantidade_disponivel > 0)
             .map((item) => ({
@@ -83,7 +87,7 @@ export default function MaterialEstoque() {
           console.error("Erro retornado do servidor:", resultado.erro);
         }
       } catch (error) {
-        console.error("Falha ao buscar dados do estoque:", error);
+        console.error("Falha ao buscar dados do estoque:", error.message);
       } finally {
         setCarregandoEstoque(false);
       }
@@ -92,7 +96,6 @@ export default function MaterialEstoque() {
     buscarEstoqueReal();
   }, []);
 
-  // 🚀 LÓGICA DA "NOVA LINHA" MANUAL
   const adicionarLinhaEmBranco = () => {
     if (itensSelecionados.length >= 25) {
       showAlert("Limite Atingido", "Você atingiu o limite máximo de 25 itens para esta solicitação.", "warning");
@@ -244,15 +247,13 @@ export default function MaterialEstoque() {
     };
 
     try {
-      const resposta = await fetch("http://localhost:3001/api/solicitacoes/material", {
+      // 3. REFATORAÇÃO DO POST DE SOLICITAÇÃO DE MATERIAL
+      const dados = await apiFetch("/solicitacoes/material", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      const dados = await resposta.json();
-
-      if (resposta.ok) {
+      if (dados.sucesso || dados.ps || dados.ps_id) {
         const idGerado = dados.ps || dados.ps_id;
 
         showAlert("Operação Concluída!", `Sucesso! Solicitação criada com o ID: ${idGerado}`, "success");
@@ -272,7 +273,7 @@ export default function MaterialEstoque() {
         showAlert("Erro no Servidor", dados.erro || "Falha na comunicação com a API.", "error");
       }
     } catch (error) {
-      console.error("Erro na requisição:", error);
+      console.error("Erro na requisição:", error.message);
       showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
     }
   };
@@ -472,7 +473,6 @@ export default function MaterialEstoque() {
         </div>
       </div>
 
-      {/* 🚀 AQUI ESTÁ A FIX: Estilos Inline garantindo o Layout lado a lado */}
       <div 
         className="selecao-itens-grid"
         style={{
@@ -498,7 +498,6 @@ export default function MaterialEstoque() {
             overflow: "hidden",
           }}
         >
-          {/* CABEÇALHO IDÊNTICO À IMAGEM */}
           <div
             className="painel-lista-header"
             style={{

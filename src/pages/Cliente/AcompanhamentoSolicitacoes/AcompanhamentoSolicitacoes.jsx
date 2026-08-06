@@ -20,6 +20,9 @@ import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import { supabase } from "../../../supabaseClient";
 
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
+import { apiFetch } from '../../../services/api';
+
 const obterNomeFilial = (codigo) => {
   if (!codigo) return 'N/D';
 
@@ -142,27 +145,21 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
 
-        const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}&filial=${estoqueAtual}`;
+        // Limpamos o prefixo local e chamamos diretamente o endpoint
+        const urlSolicitacoes = `/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}&filial=${estoqueAtual}`;
 
-        const opcoesFetch = {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        };
-
-        const [resSolicitacoes, resEstoque] = await Promise.all([
-          fetch(urlSolicitacoes, opcoesFetch),
-          fetch("http://localhost:3001/api/estoque/listar", opcoesFetch)
+        // 2. REFATORAÇÃO DE FETCHES PARALELOS
+        // O apiFetch retorna o JSON diretamente, dispensando a necessidade de await response.json()
+        const [resultadoSol, resultadoEst] = await Promise.all([
+          apiFetch(urlSolicitacoes),
+          apiFetch("/estoque/listar")
         ]);
 
-        const resultadoSol = await resSolicitacoes.json();
-        const resultadoEst = await resEstoque.json();
-
-        if (resEstoque.ok && resultadoEst.sucesso) {
+        if (resultadoEst.sucesso) {
           setEstoque(resultadoEst.dados);
         }
 
-        if (resSolicitacoes.ok && resultadoSol.sucesso) {
+        if (resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados.map((item) => {
             let prefixo = "PL";
             if (item.tipo === "Crossdocking") prefixo = "CD";
@@ -232,16 +229,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
 
     try {
-      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/status`, {
+      // 3. REFATORAÇÃO DE PATCH
+      const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/status`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
       });
 
-      if (resposta.ok) {
+      if (dados.sucesso) {
         setDadosTabela(prev => prev.map(sol => {
           if (sol.idOriginal === idSolicitacao) {
             return {
@@ -255,8 +249,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         }));
         alert(`Status atualizado para ${novoStatus} com sucesso!`);
       } else {
-        const erroCorpo = await resposta.json().catch(() => ({}));
-        alert(`Erro ao atualizar o status no servidor: ${erroCorpo.erro || 'Desconhecido'}`);
+        alert(`Erro ao atualizar o status no servidor: ${dados.erro || 'Desconhecido'}`);
       }
     } catch (error) {
       console.error("Erro de conexão:", error);
@@ -283,11 +276,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (!window.confirm(`Tem a certeza que deseja apagar permanentemente o ficheiro "${anexo.nome_arquivo}"?`)) return;
 
     try {
-      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/anexo/${anexo.id}`, {
-        method: "DELETE",
-        headers: { 'Authorization': `Bearer ${token}` }
+      // 4. REFATORAÇÃO DE DELETE
+      const dados = await apiFetch(`/solicitacoes/anexo/${anexo.id}`, {
+        method: "DELETE"
       });
-      if (resposta.ok) {
+
+      if (dados.sucesso) {
         setDadosTabela((prev) =>
           prev.map((sol) => {
             if (sol.idOriginal === idSolicitacao) {
@@ -334,21 +328,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         });
       }
 
-      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/anexos`, {
+      // 5. REFATORAÇÃO DE POST
+      const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/anexos`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
         body: JSON.stringify({ anexos: anexosProcessados }),
       });
 
-      const dados = await resposta.json();
-
-      if (resposta.ok && dados.sucesso) {
+      if (dados.sucesso) {
         alert("Sucesso! Novos anexos integrados na base de dados.");
         setAnexosNovos([]);
         setLinhaExpandida(null);
+        // Atualizamos a página para refletir as mudanças no front-end
         window.location.reload();
       } else {
         alert(`Erro do servidor: ${dados.erro}`);

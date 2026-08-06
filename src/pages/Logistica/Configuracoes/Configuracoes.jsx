@@ -7,6 +7,9 @@ import React, { useState, useEffect } from 'react';
 import './Configuracoes.css';
 import { Target, Users, Edit, Plus, X, ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react';
 
+// 1. IMPORTAMOS A NOSSA FUNÇÃO CENTRALIZADA
+import { apiFetch } from '../../../services/api';
+
 export default function Configuracoes() {
   // ==========================================
   // 1. ESTADOS DA PÁGINA E ABAS
@@ -55,19 +58,9 @@ export default function Configuracoes() {
   // 🔄 BUSCAR UTILIZADORES NO BANCO
   const carregarUsuarios = async () => {
     try {
-      // 🛡️ CORREÇÃO: Lendo a chave oficial definida no AuthContext
-      const token = localStorage.getItem('@NexusLog:token');
-
-      if (!token) {
-        alert("⚠️ Acesso não autorizado! Por favor, faça login novamente.");
-        return;
-      }
-
-      const resposta = await fetch('http://localhost:3001/api/usuarios/listar', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      const data = await resposta.json();
+      // 2. REFATORAÇÃO DO FETCH
+      // O apiFetch já busca o token e injeta no cabeçalho. Adeus código repetido!
+      const data = await apiFetch('/usuarios/listar');
 
       if (data.sucesso) {
         setUsuarios(data.dados);
@@ -80,7 +73,7 @@ export default function Configuracoes() {
     }
   };
 
-// 💾 SALVAR OU ATUALIZAR UTILIZADOR
+  // 💾 SALVAR OU ATUALIZAR UTILIZADOR
   const guardarUsuario = async () => {
     try {
       if (usuarioAtual.filiais_acesso.length === 0) {
@@ -88,40 +81,28 @@ export default function Configuracoes() {
         return; 
       }
 
-      // Validação de segurança para o Supabase (mínimo de 6 caracteres na criação)
       if (!modoEdicao && usuarioAtual.senha.length < 6) {
         alert("⚠️ A senha deve ter no mínimo 6 caracteres.");
         return;
       }
-
-      // 🛡️ Lendo a chave oficial definida no AuthContext
-      const token = localStorage.getItem('@NexusLog:token');
       
       const dadosParaEnviar = {
         nome: usuarioAtual.nome, 
-        nome_completo: usuarioAtual.nome, // ✨ Enviamos ambos para garantir compatibilidade com o Backend
+        nome_completo: usuarioAtual.nome, 
         email: usuarioAtual.email,
         cargo: usuarioAtual.cargo,
         filiais_acesso: usuarioAtual.filiais_acesso,
         senha: usuarioAtual.senha
       };
 
-      const url = modoEdicao 
-        ? `http://localhost:3001/api/usuarios/${usuarioAtual.id}` 
-        : 'http://localhost:3001/api/usuarios/criar';
-      
+      const endpoint = modoEdicao ? `/usuarios/${usuarioAtual.id}` : '/usuarios/criar';
       const metodo = modoEdicao ? 'PATCH' : 'POST';
 
-      const resposta = await fetch(url, {
+      // 3. REFATORAÇÃO DO FETCH DE CRIAÇÃO/EDIÇÃO
+      const data = await apiFetch(endpoint, {
         method: metodo,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify(dadosParaEnviar)
       });
-
-      const data = await resposta.json();
 
       if (data.sucesso) {
         setModalAberto(false);
@@ -144,19 +125,11 @@ export default function Configuracoes() {
     }
 
     try {
-      // 🛡️ CORREÇÃO: Alterado para a chave oficial do token
-      const token = localStorage.getItem('@NexusLog:token');
-      
-      const resposta = await fetch(`http://localhost:3001/api/usuarios/${usuarioParaExcluir.id}`, {
+      // 4. REFATORAÇÃO DO FETCH DE EXCLUSÃO
+      const data = await apiFetch(`/usuarios/${usuarioParaExcluir.id}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ senha_admin: senhaConfirmacao })
       });
-
-      const data = await resposta.json();
 
       if (data.sucesso) {
         alert("Utilizador excluído com sucesso!");

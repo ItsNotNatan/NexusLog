@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 
+// 1. IMPORTAMOS A NOSSA FUNÇÃO MÁGICA
+import { apiFetch } from '../../../services/api';
+
 export default function Dashboard() {
   const [dadosTabela, setDadosTabela] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -16,10 +19,13 @@ export default function Dashboard() {
   useEffect(() => {
     const buscarDados = async () => {
       try {
-        const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
-        const resultado = await resposta.json();
+        // 2. CAÇADA AO LOCALHOST RESOLVIDA
+        // Trocamos o fetch nativo pela apiFetch.
+        // Ela já trata a URL base, os erros de rede e injeta o Token de segurança!
+        const resultado = await apiFetch('/solicitacoes/listar');
 
-        if (resposta.ok && resultado.sucesso) {
+        // Como o apiFetch já verifica se a resposta foi "ok", só precisamos validar a regra de negócio
+        if (resultado.sucesso) {
           const dadosFormatados = resultado.dados.map((item) => ({
             id: `PS:${item.id.replace(/\D/g, '') || item.id}`,
             solicitante: item.solicitante,
@@ -33,7 +39,8 @@ export default function Dashboard() {
           setDadosTabela(dadosFormatados);
         }
       } catch (error) {
-        console.error("Erro ao carregar os dados do Dashboard:", error);
+        // O apiFetch lança um erro formatado caso algo corra mal, que é capturado aqui
+        console.error("Erro ao carregar os dados do Dashboard:", error.message);
       } finally {
         setCarregando(false);
       }

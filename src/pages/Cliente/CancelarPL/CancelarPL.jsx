@@ -3,6 +3,10 @@ import { AlertTriangle, XCircle, Search, Loader2 } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import './CancelarPL.css';
 
+// 1. IMPORTAÇÃO DA FUNÇÃO MÁGICA
+// Trazemos a nossa função centralizada que já sabe se estamos no localhost ou no Vercel.
+import { apiFetch } from '../../../services/api';
+
 export default function CancelarPL() {
   const [listaDePl, setListaDePl] = useState([]);
   const [pesquisa, setPesquisa] = useState('');
@@ -12,13 +16,18 @@ export default function CancelarPL() {
   const [nomeSolicitante, setNomeSolicitante] = useState('');
   const [justificativa, setJustificativa] = useState('');
 
+  // ==========================================
+  // EFEITO: Buscar a lista de PLs
+  // ==========================================
   useEffect(() => {
     const buscarSolicitacoes = async () => {
       try {
-        const resposta = await fetch('http://localhost:3001/api/solicitacoes/listar');
-        const resultado = await resposta.json();
+        // 2. REFATORAÇÃO DO GET
+        // Substituímos o fetch longo por uma chamada simples ao apiFetch
+        const resultado = await apiFetch('/solicitacoes/listar');
 
-        if (resposta.ok && resultado.sucesso) {
+        // Como a apiFetch já trata os erros de rede, validamos apenas a regra de negócio
+        if (resultado.sucesso) {
           const plFormatadas = resultado.dados
             .filter(item => item.status !== 'Cancelado' && item.status !== 'Concluído' && item.status !== 'Recusado')
             .map(item => ({
@@ -35,7 +44,8 @@ export default function CancelarPL() {
           console.error("Erro retornado do servidor:", resultado.erro);
         }
       } catch (error) {
-        console.error("Falha ao buscar PL do banco:", error);
+        // A apiFetch atira erros limpos que capturamos aqui
+        console.error("Falha ao buscar PL do banco:", error.message);
       } finally {
         setCarregando(false);
       }
@@ -44,6 +54,9 @@ export default function CancelarPL() {
     buscarSolicitacoes();
   }, []);
 
+  // ==========================================
+  // AÇÃO: Enviar pedido de cancelamento
+  // ==========================================
   const handleEnviar = async () => {
     if (!plSelecionada) {
       alert("Por favor, selecione uma PL na lista para prosseguir com o cancelamento.");
@@ -68,15 +81,15 @@ export default function CancelarPL() {
     };
 
     try {
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/cancelamento', {
+      // 3. REFATORAÇÃO DO POST
+      // Não precisamos enviar os headers manualmente, a apiFetch já envia 'application/json'
+      const dados = await apiFetch('/solicitacoes/cancelamento', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      const dados = await resposta.json();
-
-      if (resposta.ok) {
+      // Se não atirou erro no try/catch, validamos a resposta
+      if (dados.sucesso || dados.ps_id || dados.pl_id) {
         alert(`Sucesso! Solicitação de Cancelamento registrada sob o ID: ${dados.ps_id || dados.pl_id}`);
         setListaDePl(prev => prev.filter(p => p.id !== plSelecionada));
         setPlSelecionada(null);
@@ -88,7 +101,7 @@ export default function CancelarPL() {
       }
     } catch (error) {
       console.error("Erro na requisição:", error);
-      alert("Falha ao conectar com o servidor backend. Verifique se a API está rodando na porta 3001.");
+      alert("Falha ao conectar com o servidor backend. O erro foi documentado na consola.");
     }
   };
 

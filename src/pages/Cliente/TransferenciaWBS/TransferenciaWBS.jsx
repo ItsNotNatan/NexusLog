@@ -9,6 +9,10 @@ import { supabase } from '../../../supabaseClient';
 // Importamos o AuthContext para saber em qual Filial estamos
 import { AuthContext } from '../../../contexts/AuthContext';
 
+// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
+// O apiFetch vai cuidar de todas as requisições de forma dinâmica
+import { apiFetch } from '../../../services/api';
+
 export default function TransferenciaWBS() {
   // Puxamos a filial global (estoqueAtual)
   const { estoqueAtual } = useContext(AuthContext);
@@ -30,7 +34,6 @@ export default function TransferenciaWBS() {
 
   // --- 3. BUSCAR DADOS REAIS DO BACKEND (Filtrado por Filial Ativa) ---
   useEffect(() => {
-    // ✨ Se estiver em modo "TODOS" ou sem filial, limpa o estoque da tela e aborta
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       setEstoqueReal([]);
       setCarregandoEstoque(false);
@@ -40,11 +43,12 @@ export default function TransferenciaWBS() {
     const carregarEstoque = async () => {
       try {
         setCarregandoEstoque(true);
-        // ✨ Passamos a filial ativa como query parameter para o backend buscar o estoque correto
-        const resposta = await fetch(`http://localhost:3001/api/estoque/listar?filial_id=${estoqueAtual}`);
-        const resultado = await resposta.json();
+        
+        // 2. REFATORAÇÃO DO GET DE ESTOQUE
+        // Chamada limpa apenas com a rota e o query parameter.
+        const resultado = await apiFetch(`/estoque/listar?filial_id=${estoqueAtual}`);
 
-        if (resposta.ok && resultado.sucesso) {
+        if (resultado.sucesso) {
           // Filtra apenas itens que tenham saldo maior que zero
           const itensComSaldo = resultado.dados.filter(item => item.quantidade_disponivel > 0);
           setEstoqueReal(itensComSaldo);
@@ -52,14 +56,14 @@ export default function TransferenciaWBS() {
           console.error("Erro ao buscar estoque:", resultado.erro);
         }
       } catch (error) {
-        console.error("Falha de conexão ao buscar estoque:", error);
+        // Erros de rede capturados e geridos pela apiFetch
+        console.error("Falha de conexão ao buscar estoque:", error.message);
       } finally {
         setCarregandoEstoque(false);
       }
     };
 
     carregarEstoque();
-    // ✨ Adicionado estoqueAtual como dependência para recarregar o estoque ao mudar de filial
   }, [estoqueAtual]); 
 
   // --- 4. FUNÇÕES DE CÁLCULO DE SALDO ---
@@ -106,7 +110,6 @@ export default function TransferenciaWBS() {
 
   // --- 6. ENVIO PARA O BACKEND ---
   const handleEnviar = async () => {
-    // ✨ TRAVA MÁGICA: Impede o envio se estiver na visão global "TODOS"
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       alert("Por favor, selecione uma filial de origem específica (ex: BR02) no topo da página antes de solicitar uma transferência.");
       return;
@@ -150,7 +153,6 @@ export default function TransferenciaWBS() {
       }
     }
 
-    // ✨ INJEÇÃO DIRETA: Removido o '|| BR06'. O payload usa estritamente o cabeçalho.
     const payload = {
       solicitante: {
         nome: formDados.nome,
@@ -162,7 +164,7 @@ export default function TransferenciaWBS() {
       },
       itens: itensSelecionados.map(item => ({
         estoque_id: item.id,
-        desenhoSAP: item.desenho_sap || item.desenhoSAP || '-', // 👈 INCLUÍDO AQUI
+        desenhoSAP: item.desenho_sap || item.desenhoSAP || '-', 
         numPecaFabricante: item.part_number || item.numPecaFabricante || '-',
         materialDescription: item.descricao || item.materialDescription || '-',
         qtd: item.qtdTransferencia,
@@ -173,15 +175,14 @@ export default function TransferenciaWBS() {
     };
 
     try {
-      const resposta = await fetch('http://localhost:3001/api/solicitacoes/transferencia', {
+      // 3. REFATORAÇÃO DO POST DE TRANSFERÊNCIA
+      // Requisição limpa usando apiFetch. Sem headers manuais.
+      const dados = await apiFetch('/solicitacoes/transferencia', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      const dados = await resposta.json();
-
-      if (resposta.ok) {
+      if (dados.sucesso || dados.ps) {
         alert(`Sucesso! Transferência solicitada. PS Gerada: ${dados.ps}`);
         setFormDados({ nome: '', wbsDestino: '', justificativa: '', entregaUrgente: false });
         setItensSelecionados([]);
@@ -190,7 +191,7 @@ export default function TransferenciaWBS() {
         alert(`Erro do servidor: ${dados.erro}`);
       }
     } catch (error) {
-      console.error("Erro na requisição:", error);
+      console.error("Erro na requisição:", error.message);
       alert("Falha ao conectar com o servidor.");
     }
   };

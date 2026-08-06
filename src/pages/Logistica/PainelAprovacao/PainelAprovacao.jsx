@@ -16,6 +16,10 @@ import {
 
 import { AuthContext } from '../../../contexts/AuthContext';
 
+// 1. IMPORTAÇÃO DA FUNÇÃO CENTRALIZADA DE API
+// O apiFetch adiciona o token JWT e chaveia entre Localhost e Vercel automaticamente
+import { apiFetch } from '../../../services/api';
+
 // FUNÇÃO AUXILIAR: Traduz os códigos brutos para os nomes reais dos galpões
 const obterNomeFilial = (codigo) => {
   if (!codigo || codigo === '-') return 'N/D';
@@ -32,8 +36,7 @@ const obterNomeFilial = (codigo) => {
 };
 
 export default function PainelAprovacao() {
-  const { token: tokenContexto, estoqueAtual } = useContext(AuthContext);
-  const token = tokenContexto || localStorage.getItem('token');
+  const { estoqueAtual } = useContext(AuthContext);
 
   // --- ESTADOS DO COMPONENTE ---
   const [dadosTabela, setDadosTabela] = useState([]);
@@ -56,27 +59,22 @@ export default function PainelAprovacao() {
     const buscarDados = async () => {
       try {
         setCarregando(true);
-        const cabecalhosComAuth = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        };
 
-        const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?limit=1000&filial=${estoqueAtual || ''}&t=${Date.now()}`;
-        const urlEstoque = `http://localhost:3001/api/estoque/listar?t=${Date.now()}`;
+        const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual || ''}&t=${Date.now()}`;
+        const urlEstoque = `/estoque/listar?t=${Date.now()}`;
 
-        const [resSolicitacoes, resEstoque] = await Promise.all([
-          fetch(urlSolicitacoes, { headers: cabecalhosComAuth, cache: 'no-store' }),
-          fetch(urlEstoque, { headers: cabecalhosComAuth, cache: 'no-store' })
+        // 2. REFATORAÇÃO DO PROMISE.ALL COM APIFETCH
+        // O apiFetch já faz o parse de JSON e injeta os cabeçalhos de autenticação
+        const [resultadoSol, resultadoEst] = await Promise.all([
+          apiFetch(urlSolicitacoes),
+          apiFetch(urlEstoque)
         ]);
 
-        const resultadoSol = await resSolicitacoes.json();
-        const resultadoEst = await resEstoque.json();
-
-        if (resEstoque.ok && resultadoEst.sucesso) {
+        if (resultadoEst.sucesso) {
           setEstoque(resultadoEst.dados);
         }
 
-        if (resSolicitacoes.ok && resultadoSol.sucesso) {
+        if (resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados
             .filter(item => item.status === 'Pendente')
             .map((item) => {
@@ -85,7 +83,6 @@ export default function PainelAprovacao() {
               let dep = '-';
 
               if (String(item.tipo).trim() === 'Entrada' && item.itens && item.itens.length > 0) {
-                // Suporta tanto o nome 'quantidade_solicitada' quanto 'qtdFornecida'
                 valorTotal = item.itens.reduce((acc, it) => acc + (Number(it.quantidade_solicitada || it.qtdFornecida || it.quantidade || 0) * Number(it.valor_unitario_manual || 0)), 0);
                 centro = item.itens[0].centro || 'BR06';
                 dep = item.itens[0].deposito || '0020';
@@ -95,7 +92,7 @@ export default function PainelAprovacao() {
                 ...item,
                 idOriginal: item.id,
                 ps: item.ps || 'PS-Pendente',
-                pl: item.pl || item.bs || null, // 👈 MAPEAR PARA PL
+                pl: item.pl || item.bs || null,
                 dataSolicitacao: item.dataSolicitacao || '-',
                 valorTotalFormatado: valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : null,
                 centro,
@@ -113,12 +110,8 @@ export default function PainelAprovacao() {
       }
     };
 
-    if (token) {
-      buscarDados();
-    } else {
-      setCarregando(false);
-    }
-  }, [token, estoqueAtual]);
+    buscarDados();
+  }, [estoqueAtual]);
 
   const dadosFiltrados = dadosTabela.filter((linha) => {
     if (!termoPesquisa) return true;
@@ -194,7 +187,6 @@ export default function PainelAprovacao() {
   const salvarEdicaoItens = async () => {
     if (!solicitacaoSendoEditada) return;
 
-    // ✨ CORREÇÃO: Mapear as variáveis React para os nomes reais das colunas no Banco de Dados
     const itensParaEnviar = itensEdicao.map(i => ({
       ...i,
       desenho_sap_manual: i.desenhoSAP || i.desenho_sap_manual || i.desenho_sap || '-',
@@ -212,21 +204,17 @@ export default function PainelAprovacao() {
 
       setLinhaExpandida(null);
 
-      // Enviamos a variável "itensParaEnviar" com as chaves corrigidas para o Banco
-      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${solicitacaoSendoEditada.idOriginal}/itens`, {
+      // 3. REFATORAÇÃO DO SALVAR ITENS (PATCH)
+      const resposta = await apiFetch(`/solicitacoes/${solicitacaoSendoEditada.idOriginal}/itens`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ itens: itensParaEnviar })
       });
 
-      if (!resposta.ok) {
+      if (!resposta.sucesso) {
         console.warn("O servidor recusou a atualização dos itens.");
       }
     } catch (error) {
-      console.error('Erro de rede ao tentar atualizar os itens:', error);
+      console.error('Erro de rede ao tentar atualizar os itens:', error.message);
     }
   };
 
@@ -235,20 +223,18 @@ export default function PainelAprovacao() {
     e.stopPropagation();
     if (window.confirm(`Aprovar esta solicitação?`)) {
       try {
-        const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
+        // 4. REFATORAÇÃO DO APROVAR (PATCH)
+        const resposta = await apiFetch(`/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
           body: JSON.stringify({ status: 'Em Separação' })
         });
-        if (resposta.ok) {
+
+        if (resposta.sucesso) {
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
         }
       } catch (error) {
-        console.error("Erro na aprovação:", error);
+        console.error("Erro na aprovação:", error.message);
       }
     }
   };
@@ -258,25 +244,23 @@ export default function PainelAprovacao() {
     const motivo = window.prompt(`Motivo da recusa para esta solicitação?`);
     if (motivo) {
       try {
-        const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idOriginal}/status`, {
+        // 5. REFATORAÇÃO DO RECUSAR (PATCH)
+        const resposta = await apiFetch(`/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
           body: JSON.stringify({ status: 'Recusado', motivo_recusa: motivo })
         });
-        if (resposta.ok) {
+
+        if (resposta.sucesso) {
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
         }
       } catch (error) {
-        console.error("Erro na recusa:", error);
+        console.error("Erro na recusa:", error.message);
       }
     }
   };
 
-  // ✨ COMPONENTE REUTILIZÁVEL: GAVETA DE EDIÇÃO COMPLETA ✨
+  // GAVETA DE EDIÇÃO COMPLETA
   const renderizarGavetaEdicao = () => (
     <div className="gaveta-detalhes" style={{ padding: '24px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -489,7 +473,6 @@ export default function PainelAprovacao() {
                                 <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
                                   <X size={16} /> Recusar
                                 </button>
-                                {/* 👈 CORRIGIDO: Classe atualizada para azul em vez de btn-atualizado-azul */}
                                 <button className="btn-acao-lista btn-aprovar-solid azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
                                   <Check size={16} /> Aprovar
                                 </button>
@@ -505,7 +488,6 @@ export default function PainelAprovacao() {
                   })}
                 </div>
 
-                {/* 👈 INCLUÍDO: Paginação Secção 1 */}
                 {totalPaginasGeral > 1 && (
                   <div className="paginacao-container">
                     <button
@@ -589,7 +571,6 @@ export default function PainelAprovacao() {
                   })}
                 </div>
 
-                {/* 👈 INCLUÍDO: Paginação Secção 2 */}
                 {totalPaginasEntradas > 1 && (
                   <div className="paginacao-container">
                     <button
