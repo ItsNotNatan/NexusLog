@@ -4,7 +4,7 @@
 // =================================================================
 
 // Lê a URL do Render configurada no painel ou usa o localhost como fallback local
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://https://backend-zcrj.onrender.com/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem('@NexusLog:token');
