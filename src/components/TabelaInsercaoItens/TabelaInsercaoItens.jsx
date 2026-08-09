@@ -8,6 +8,9 @@ import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, Aler
 import CarregarArquivo from '../CarregarArquivo/CarregarArquivo';
 import ExemploExcel from '../ExemploExcel/ExemploExcel';
 
+// ✨ IMPORTAÇÃO DO NOSSO NOVO COMPONENTE DE SCROLL
+import ScrollDuplo from '../ScrollDuplo/ScrollDuplo';
+
 export default function TabelaInsercaoItens({
   itens,
   dataMinima = '',
@@ -120,13 +123,13 @@ export default function TabelaInsercaoItens({
           </div>
         )}
 
-        <div className="scroll-tabela-solicitacao" style={{ overflowX: 'auto', width: '100%' }}>
+        {/* ✨ AQUI ESTÁ A MAGIA: Envelopámos a tabela com o nosso novo componente ScrollDuplo */}
+        <ScrollDuplo larguraConteudo={mostrarDataNecessidade ? '2600px' : '2400px'}>
           {/* Aumentei ligeiramente o minWidth para acomodar a nova coluna */}
           <table className="tabela-solicitacao-dados" style={{ minWidth: mostrarDataNecessidade ? '2600px' : '2400px', width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr>
                 <th style={{ width: '60px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
-                {/* ✨ NOVA COLUNA: DESENHO SAP */}
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESENHO SAP</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>Nº PEÇA FABRICANTE</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR</th>
@@ -154,7 +157,6 @@ export default function TabelaInsercaoItens({
                     </button>
                   </td>
                   
-                  {/* ✨ NOVO INPUT: DESENHO SAP */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.desenhoSAP || ''} onChange={(e) => onAtualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="Desenho SAP" />
                   </td>
@@ -220,13 +222,12 @@ export default function TabelaInsercaoItens({
               
               {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
                 <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
-                  {/* ✨ AJUSTE COLSPAN: De 16/15 passou para 17/16 devido à nova coluna */}
                   <td colSpan={mostrarDataNecessidade ? 17 : 16} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollDuplo>
       </div>
 
       <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>

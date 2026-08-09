@@ -1,19 +1,13 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
+// DESCRIÇÃO: Tabela de acompanhamento. Inclui a regra de negócio real PS vs PL.
+// =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
-  Search,
-  ChevronRight,
-  ChevronLeft,
-  GitBranch,
-  FileText,
-  RefreshCw,
-  CheckCircle2,
-  XCircle,
-  Zap,
-  Upload,
-  AlertCircle,
-  MapPin
+  Search, ChevronRight, ChevronLeft, GitBranch, FileText,
+  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -23,6 +17,7 @@ import GerenciadorAnexos from "../../../components/GerenciadorAnexos/Gerenciador
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
 
+// --- FUNÇÕES AUXILIARES ---
 const obterNomeFilial = (codigo) => {
   if (!codigo) return 'N/D';
   const codLimpo = String(codigo).toUpperCase().trim();
@@ -78,20 +73,19 @@ const obterClasseBadgeTipo = (tipo) => {
   }
 };
 
+// --- COMPONENTE PRINCIPAL ---
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
-  // ✨ 1. PUXAR A FILIAL E O ESTADO DE CARREGAMENTO
   const { estoqueAtual, carregandoInicial } = useContext(AuthContext);
   const { showAlert, showConfirm } = useAlert(); 
   const navigate = useNavigate();
 
-  // ✨ 2. A TRAVA DE SEGURANÇA EXCLUSIVA PARA O CLIENTE
+  // 1. Proteção de Rotas para o Cliente
   useEffect(() => {
-    // Só toma decisões DEPOIS que a aplicação estiver estável
     if (!carregandoInicial) {
       if (perfil === 'cliente' && estoqueAtual === 'TODOS') {
         showAlert(
           "Ação Restrita", 
-          "Para visualizar o acompanhamento, selecione uma filial específica no topo da página. Redirecionando...", 
+          "Para visualizar o acompanhamento, selecione uma filial específica no topo da página.", 
           "warning"
         );
         navigate('/cliente/consulta-estoque');
@@ -99,20 +93,21 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   }, [estoqueAtual, perfil, navigate, showAlert, carregandoInicial]);
 
+  // Estados
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [termoPesquisa, setTermoPesquisa] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState("Todos");
-
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
-
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [totalRegistros, setTotalRegistros] = useState(0);
+  
   const itensPorPagina = 10;
 
+  // Verificação de utilizador logado
   let usuarioLogado = {};
   try {
     const dadosUsuario = localStorage.getItem('@NexusLog:usuario');
@@ -123,27 +118,20 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     console.warn('Sessão vazia ou inválida. O utilizador será tratado como público.');
   }
   const token = localStorage.getItem('@NexusLog:token') || '';
-
-  const textoCargo = String(
-    usuarioLogado.cargo ||
-    usuarioLogado.perfil ||
-    usuarioLogado.user?.cargo ||
-    ''
-  ).toLowerCase().trim();
-
+  const textoCargo = String(usuarioLogado.cargo || '').toLowerCase().trim();
   const isOperador = textoCargo.includes('operador');
 
   const listaFiltros = [
     "Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração",
   ];
 
+  // 2. Busca de Dados
   useEffect(() => {
     if (perfil === 'cliente' && estoqueAtual === 'TODOS') return;
 
     const buscarDados = async () => {
       try {
         setCarregando(true);
-
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
         const urlSolicitacoes = `/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}&filial=${estoqueAtual}`;
 
@@ -158,7 +146,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         if (resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados.map((item) => {
-            let prefixo = "PL";
+            
+            // ✨ REGRA DE NEGÓCIO 1: O ID de acompanhamento nasce e morre com o seu prefixo
+            let prefixo = "PS"; 
             if (item.tipo === "Crossdocking") prefixo = "CD";
             else if (item.tipo === "Nota Fiscal") prefixo = "NF";
             else if (item.tipo === "Transferencia WBS") prefixo = "TR";
@@ -166,9 +156,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             else if (item.tipo === "Entrada") prefixo = "EN";
 
             const idNumerico = item.id.replace(/\D/g, "");
-
             let acaoTipo = "select";
             let acaoValor = item.status;
+
+            // ✨ REGRA DE NEGÓCIO 2: Entradas concluem na aprovação, o resto vai para Separação
+            let statusDestinoAprovacao = item.tipo === "Entrada" ? "Concluído" : "Em Separação";
 
             if (item.status === "Pendente") {
               acaoTipo = "botao";
@@ -177,16 +169,23 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               acaoValor = "Em Separação";
             }
 
+            // ✨ REGRA DE NEGÓCIO 3: O PL só existe se o status NÃO for Pendente
+            let numeroPL = "-";
+            if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
+                numeroPL = item.pl || item.bs || "Gerando...";
+            }
+
             return {
               ...item,
               idOriginal: item.id,
               id: idNumerico || item.id,
               prefixo: prefixo,
+              statusDestinoAprovacao: statusDestinoAprovacao, // Passado para o botão aprovar
               acaoTipo: acaoTipo,
               acaoValor: acaoValor,
               dataSolicitacao: item.dataSolicitacao || "-",
               dataEntrega: item.dataEntrega || "-",
-              pl: item.pl || item.bs || "-",
+              pl: numeroPL, 
               nfCrossdocking: item.nfCrossdocking || null
             };
           });
@@ -194,11 +193,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           setDadosTabela(dadosFormatados);
           setTotalRegistros(resultadoSol.total || resultadoSol.dados.length);
         } else {
-          console.error("Erro retornado do servidor:", resultadoSol.erro);
           showAlert("Erro Operacional", resultadoSol.erro || 'Falha ao buscar dados.', "error");
         }
       } catch (error) {
-        console.error("Falha ao conectar à API:", error);
         showAlert("Falha de Conexão", `Verifique se o servidor está ativo. Erro: ${error.message}`, "error");
       } finally {
         setCarregando(false);
@@ -216,6 +213,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     setPaginaAtual(1);
   }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
+  // 3. Mudança de Status
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
     const confirmar = await showConfirm("Alterar Status", `Tem certeza que deseja mudar o status para "${novoStatus}"?`, "warning", "Sim, Mudar");
     if (!confirmar) return;
@@ -235,10 +233,18 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (dados.sucesso) {
         setDadosTabela(prev => prev.map(sol => {
           if (sol.idOriginal === idSolicitacao) {
+            
+            // ✨ SIMULAÇÃO VISUAL DO PL: Se aprovou, mostra um PL provisório na coluna certa
+            let novoPl = sol.pl;
+            if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && (sol.pl === '-' || sol.pl === 'Gerando...')) {
+               novoPl = `PL-${sol.id}`; 
+            }
+
             return {
               ...sol,
               status: novoStatus,
               acaoValor: novoStatus,
+              pl: novoStatus === 'Pendente' || novoStatus === 'Recusado' || novoStatus === 'Cancelado' ? '-' : novoPl,
               acaoTipo: novoStatus === 'Pendente' ? 'botao' : 'select'
             };
           }
@@ -249,7 +255,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         showAlert("Erro de Servidor", `Erro ao atualizar o status: ${dados.erro || 'Desconhecido'}`, "error");
       }
     } catch (error) {
-      console.error("Erro de conexão:", error);
       showAlert("Falha de Conexão", "Não foi possível ligar ao servidor ao atualizar o status.", "error");
     }
   };
@@ -270,28 +275,20 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   };
 
   const handleDeletarAnexo = async (idSolicitacao, anexo) => {
-    const confirmar = await showConfirm("Excluir Anexo", `Tem a certeza que deseja apagar permanentemente o ficheiro "${anexo.nome_arquivo}"?`, "error", "Sim, Apagar");
+    const confirmar = await showConfirm("Excluir Anexo", `Tem a certeza que deseja apagar o ficheiro "${anexo.nome_arquivo}"?`, "error", "Sim, Apagar");
     if (!confirmar) return;
 
     try {
-      const dados = await apiFetch(`/solicitacoes/anexo/${anexo.id}`, {
-        method: "DELETE"
-      });
-
+      const dados = await apiFetch(`/solicitacoes/anexo/${anexo.id}`, { method: "DELETE" });
       if (dados.sucesso) {
-        setDadosTabela((prev) =>
-          prev.map((sol) => {
-            if (sol.idOriginal === idSolicitacao) {
-              return { ...sol, anexos: sol.anexos.filter((a) => a.id !== anexo.id) };
-            }
+        setDadosTabela((prev) => prev.map((sol) => {
+            if (sol.idOriginal === idSolicitacao) return { ...sol, anexos: sol.anexos.filter((a) => a.id !== anexo.id) };
             return sol;
-          })
-        );
+        }));
       } else {
         showAlert("Erro", "Não foi possível apagar o anexo.", "error");
       }
     } catch (error) {
-      console.error("Erro ao deletar anexo:", error);
       showAlert("Erro de Conexão", "Falha ao comunicar com o servidor.", "error");
     }
   };
@@ -311,7 +308,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         const { error: erroUpload } = await supabase.storage.from("documentos").upload(caminhoNoStorage, arquivo);
 
         if (erroUpload) {
-          console.error("Erro ao subir arquivo para o Storage:", erroUpload);
           showAlert("Erro no Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
           setCarregando(false);
           return;
@@ -339,18 +335,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         showAlert("Erro do Servidor", dados.erro, "error");
       }
     } catch (error) {
-      console.error("Erro na requisição de anexos extras:", error);
-      showAlert("Erro de Conexão", "Falha ao conectar com o servidor para salvar os anexos.", "error");
+      showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
     } finally {
       setCarregando(false);
     }
   };
 
-  // ✨ 3. PROTEÇÃO DE RENDERIZAÇÃO
   if (carregandoInicial || (perfil === 'cliente' && estoqueAtual === 'TODOS')) {
     return null;
   }
 
+  // 4. Renderização
   return (
     <div className="acompanhamento-wrapper">
       <header className="acompanhamento-cabecalho">
@@ -410,7 +405,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               <tr>
                 <th className="col-chevron"></th>
                 <th>TIPO</th>
-                <th>ID / SOLICITANTE / WBS</th>
+                <th>ID GERAL (PS) / SOLICITANTE</th>
                 <th>Nº DA PL</th>
                 <th>FILIAL</th>
                 <th>DATA CRIAÇÃO</th>
@@ -476,8 +471,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            {/* AQUI É A COLUNA DO ID GERAL QUE NUNCA MUDA */}
                             <span style={{ fontSize: "0.875rem", fontWeight: "700", color: "#1e293b" }}>
-                              {linha.prefixo || "PL"}:{linha.id}
+                              {linha.prefixo}:{linha.id}
                             </span>
                             <span style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "uppercase" }}>
                               {linha.solicitante}
@@ -491,6 +487,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
 
                         <td>
+                          {/* AQUI É A COLUNA EXCLUSIVA DO PL */}
                           {linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
                             <span className="badge-pl">
                               <FileText size={14} /> {linha.pl}
@@ -542,7 +539,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                     style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '20px', padding: '6px 16px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      lidarComMudancaStatus(linha.idOriginal || linha.id, 'Em Separação');
+                                      // ✨ UTILIZAMOS A VARIÁVEL INTELIGENTE PARA APROVAR
+                                      lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao);
                                     }}
                                   >
                                     <RefreshCw size={14} /> Aprovar

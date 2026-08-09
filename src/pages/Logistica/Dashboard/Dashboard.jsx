@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Logistica/Dashboard/Dashboard.jsx
+// DESCRIÇÃO: Dashboard de Operações com a regra de negócio de prefixos corrigida
+// =================================================================
 import React, { useState, useEffect } from 'react';
 import './Dashboard.css';
 import { 
@@ -6,40 +10,52 @@ import {
   FileText, Download, Loader2 
 } from 'lucide-react';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
-
-// 1. IMPORTAMOS A NOSSA FUNÇÃO MÁGICA
 import { apiFetch } from '../../../services/api';
 
 export default function Dashboard() {
   const [dadosTabela, setDadosTabela] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  
   const [tempoAtual, setTempoAtual] = useState(new Date());
 
+  // 1. Busca de Dados e Formatação
   useEffect(() => {
     const buscarDados = async () => {
       try {
-        // 2. CAÇADA AO LOCALHOST RESOLVIDA
-        // Trocamos o fetch nativo pela apiFetch.
-        // Ela já trata a URL base, os erros de rede e injeta o Token de segurança!
         const resultado = await apiFetch('/solicitacoes/listar');
 
-        // Como o apiFetch já verifica se a resposta foi "ok", só precisamos validar a regra de negócio
         if (resultado.sucesso) {
-          const dadosFormatados = resultado.dados.map((item) => ({
-            id: `PS:${item.id.replace(/\D/g, '') || item.id}`,
-            solicitante: item.solicitante,
-            wbs: item.wbs,
-            status: item.status,
-            pl: item.pl || item.bs || '-',
-            criacaoPl: item.dataSolicitacao,
-            dataEntrega: item.dataEntrega || 'não definido'
-          }));
+          const dadosFormatados = resultado.dados.map((item) => {
+            
+            // ✨ AQUI ESTÁ A CORREÇÃO: Aplicamos a mesma regra de prefixos do Acompanhamento
+            let prefixo = "PS"; 
+            if (item.tipo === "Crossdocking") prefixo = "CD";
+            else if (item.tipo === "Nota Fiscal") prefixo = "NF";
+            else if (item.tipo === "Transferencia WBS") prefixo = "TR";
+            else if (item.tipo === "Reintegracao") prefixo = "REI";
+            else if (item.tipo === "Entrada") prefixo = "EN";
+
+            const idLimpo = item.id.replace(/\D/g, '') || item.id;
+
+            // ✨ REGRA DO PL: Só exibe se não estiver pendente/cancelado
+            let numeroPL = "-";
+            if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
+                numeroPL = item.pl || item.bs || "-";
+            }
+
+            return {
+              id: `${prefixo}:${idLimpo}`,
+              solicitante: item.solicitante,
+              wbs: item.wbs,
+              status: item.status,
+              pl: numeroPL,
+              criacaoPl: item.dataSolicitacao,
+              dataEntrega: item.dataEntrega || 'não definido'
+            };
+          });
           
           setDadosTabela(dadosFormatados);
         }
       } catch (error) {
-        // O apiFetch lança um erro formatado caso algo corra mal, que é capturado aqui
         console.error("Erro ao carregar os dados do Dashboard:", error.message);
       } finally {
         setCarregando(false);
@@ -49,6 +65,7 @@ export default function Dashboard() {
     buscarDados();
   }, []);
 
+  // 2. Lógica de Cronómetro (Atualiza a cada segundo)
   useEffect(() => {
     const intervalo = setInterval(() => {
       setTempoAtual(new Date());
@@ -134,7 +151,7 @@ export default function Dashboard() {
             <div className="icon-wrapper icon-blue"><ClipboardList size={20} /></div>
           </div>
           <p className="card-value value-blue">{carregando ? '-' : dadosTabela.length}</p>
-          <p className="card-description">Total de PS no período</p>
+          <p className="card-description">Total de pedidos no período</p>
         </div>
 
         <div className="stat-card">
