@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './FazerSolicitacao.css';
 
@@ -20,9 +20,31 @@ import Crossdocking from '../Crossdocking/Crossdocking';
 import ReintegracaoItens from '../ReintegracaoItens/ReintegracaoItens';
 import CancelarPL from '../CancelarPL/CancelarPL';
 
+import { AuthContext } from '../../../contexts/AuthContext';
+import { useAlert } from '../../../contexts/AlertContext';
+
 export default function FazerSolicitacao() {
   const [tipoAtivo, setTipoAtivo] = useState('material');
   const navigate = useNavigate();
+
+  // ✨ 1. PUXAR A FILIAL E O ESTADO DE CARREGAMENTO
+  const { estoqueAtual, carregandoInicial } = useContext(AuthContext);
+  const { showAlert } = useAlert();
+
+  // ✨ 2. O OBSERVADOR MÁGICO (AGORA BLINDADO)
+  useEffect(() => {
+    // Só toma decisões DEPOIS que a aplicação estiver com os dados lidos
+    if (!carregandoInicial) {
+      if (estoqueAtual === 'TODOS') {
+        showAlert(
+          "Ação Restrita", 
+          "Para realizar solicitações ou transferências, selecione uma filial específica no topo. Redirecionando...", 
+          "warning"
+        );
+        navigate('/cliente/consulta-estoque');
+      }
+    }
+  }, [estoqueAtual, navigate, showAlert, carregandoInicial]);
 
   const tiposSolicitacao = [
     { id: 'material', titulo: 'Material de Estoque', desc: 'Retirada de itens do almoxarifado', icone: <Boxes size={20} /> },
@@ -33,6 +55,12 @@ export default function FazerSolicitacao() {
     { id: 'reintegracao', titulo: 'Reintegração de Itens', desc: 'Devolver material ao estoque', icone: <RefreshCcw size={20} />, cor: 'laranja' },
     { id: 'cancelar', titulo: 'Cancelar PL', desc: 'Cancelar Packing List emitido', icone: <XCircle size={20} />, cor: 'vermelho' }
   ];
+
+  // ✨ 3. PROTEÇÃO DE RENDERIZAÇÃO
+  // Esconde o ecrã enquanto carrega os dados ou enquanto está a viajar para outra página
+  if (carregandoInicial || estoqueAtual === 'TODOS') {
+    return null; 
+  }
 
   return (
     <div className="solicitacao-wrapper">

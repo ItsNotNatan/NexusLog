@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
   Search,
@@ -16,29 +17,21 @@ import {
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
+import { useAlert } from '../../../contexts/AlertContext'; 
 import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import { supabase } from "../../../supabaseClient";
-
-// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
 import { apiFetch } from '../../../services/api';
 
 const obterNomeFilial = (codigo) => {
   if (!codigo) return 'N/D';
-
   const codLimpo = String(codigo).toUpperCase().trim();
-
   switch (codLimpo) {
-    case "BR02":
-      return "Santo André";
-    case "BR04":
-      return "Goiana";
-    case "BR06":
-      return "Betim";
-    case "TODOS":
-      return "Todas as Filiais";
-    default:
-      return codigo;
+    case "BR02": return "Santo André";
+    case "BR04": return "Goiana";
+    case "BR06": return "Betim";
+    case "TODOS": return "Todas as Filiais";
+    default: return codigo;
   }
 };
 
@@ -73,27 +66,39 @@ const renderBadgeStatus = (status) => {
 const obterClasseBadgeTipo = (tipo) => {
   switch (tipo) {
     case "Transfer. WBS":
-    case "Transferencia WBS":
-      return "badge-tipo-amarelo";
-    case "Nota Fiscal":
-      return "badge-tipo-roxo";
-    case "Entrada":
-      return "badge-tipo-verde";
-    case "Crossdocking":
-      return "badge-tipo-ciano";
+    case "Transferencia WBS": return "badge-tipo-amarelo";
+    case "Nota Fiscal": return "badge-tipo-roxo";
+    case "Entrada": return "badge-tipo-verde";
+    case "Crossdocking": return "badge-tipo-ciano";
     case "Reintegração":
-    case "Reintegracao":
-      return "badge-tipo-laranja";
-    case "Cancelado":
-      return "badge-tipo-vermelho";
+    case "Reintegracao": return "badge-tipo-laranja";
+    case "Cancelado": return "badge-tipo-vermelho";
     case "Material":
-    default:
-      return "badge-tipo-azul";
+    default: return "badge-tipo-azul";
   }
 };
 
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
-  const { estoqueAtual } = useContext(AuthContext);
+  // ✨ 1. PUXAR A FILIAL E O ESTADO DE CARREGAMENTO
+  const { estoqueAtual, carregandoInicial } = useContext(AuthContext);
+  const { showAlert, showConfirm } = useAlert(); 
+  const navigate = useNavigate();
+
+  // ✨ 2. A TRAVA DE SEGURANÇA EXCLUSIVA PARA O CLIENTE
+  useEffect(() => {
+    // Só toma decisões DEPOIS que a aplicação estiver estável
+    if (!carregandoInicial) {
+      if (perfil === 'cliente' && estoqueAtual === 'TODOS') {
+        showAlert(
+          "Ação Restrita", 
+          "Para visualizar o acompanhamento, selecione uma filial específica no topo da página. Redirecionando...", 
+          "warning"
+        );
+        navigate('/cliente/consulta-estoque');
+      }
+    }
+  }, [estoqueAtual, perfil, navigate, showAlert, carregandoInicial]);
+
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
@@ -129,27 +134,19 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const isOperador = textoCargo.includes('operador');
 
   const listaFiltros = [
-    "Todos",
-    "Material",
-    "Transfer. WBS",
-    "Nota Fiscal",
-    "Entrada",
-    "Crossdocking",
-    "Reintegração",
+    "Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração",
   ];
 
   useEffect(() => {
+    if (perfil === 'cliente' && estoqueAtual === 'TODOS') return;
+
     const buscarDados = async () => {
       try {
         setCarregando(true);
 
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
-
-        // Limpamos o prefixo local e chamamos diretamente o endpoint
         const urlSolicitacoes = `/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}&filial=${estoqueAtual}`;
 
-        // 2. REFATORAÇÃO DE FETCHES PARALELOS
-        // O apiFetch retorna o JSON diretamente, dispensando a necessidade de await response.json()
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
           apiFetch("/estoque/listar")
@@ -198,11 +195,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           setTotalRegistros(resultadoSol.total || resultadoSol.dados.length);
         } else {
           console.error("Erro retornado do servidor:", resultadoSol.erro);
-          alert(`Erro Operacional: ${resultadoSol.erro || 'Falha ao buscar dados.'}`);
+          showAlert("Erro Operacional", resultadoSol.erro || 'Falha ao buscar dados.', "error");
         }
       } catch (error) {
         console.error("Falha ao conectar à API:", error);
-        alert(`Falha de Conexão: Verifique se o servidor está ativo. Erro: ${error.message}`);
+        showAlert("Falha de Conexão", `Verifique se o servidor está ativo. Erro: ${error.message}`, "error");
       } finally {
         setCarregando(false);
       }
@@ -213,23 +210,23 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     } else {
       setCarregando(false);
     }
-  }, [paginaAtual, filtroAtivo, filtroStatus, termoPesquisa, token, estoqueAtual]);
+  }, [paginaAtual, filtroAtivo, filtroStatus, termoPesquisa, token, estoqueAtual, showAlert, perfil]);
 
   useEffect(() => {
     setPaginaAtual(1);
   }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
-    if (!window.confirm(`Tem certeza que deseja mudar o status para "${novoStatus}"?`)) return;
+    const confirmar = await showConfirm("Alterar Status", `Tem certeza que deseja mudar o status para "${novoStatus}"?`, "warning", "Sim, Mudar");
+    if (!confirmar) return;
 
     let motivo = null;
     if (novoStatus === 'Recusado' || novoStatus === 'Cancelado') {
-      motivo = window.prompt("Por favor, informe o motivo:");
+      motivo = window.prompt("Por favor, informe o motivo da recusa:");
       if (!motivo) return;
     }
 
     try {
-      // 3. REFATORAÇÃO DE PATCH
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
@@ -247,13 +244,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           }
           return sol;
         }));
-        alert(`Status atualizado para ${novoStatus} com sucesso!`);
+        showAlert("Status Atualizado", `A solicitação foi atualizada para ${novoStatus} com sucesso!`, "success");
       } else {
-        alert(`Erro ao atualizar o status no servidor: ${dados.erro || 'Desconhecido'}`);
+        showAlert("Erro de Servidor", `Erro ao atualizar o status: ${dados.erro || 'Desconhecido'}`, "error");
       }
     } catch (error) {
       console.error("Erro de conexão:", error);
-      alert("Falha de conexão com o servidor ao atualizar status.");
+      showAlert("Falha de Conexão", "Não foi possível ligar ao servidor ao atualizar o status.", "error");
     }
   };
 
@@ -273,10 +270,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   };
 
   const handleDeletarAnexo = async (idSolicitacao, anexo) => {
-    if (!window.confirm(`Tem a certeza que deseja apagar permanentemente o ficheiro "${anexo.nome_arquivo}"?`)) return;
+    const confirmar = await showConfirm("Excluir Anexo", `Tem a certeza que deseja apagar permanentemente o ficheiro "${anexo.nome_arquivo}"?`, "error", "Sim, Apagar");
+    if (!confirmar) return;
 
     try {
-      // 4. REFATORAÇÃO DE DELETE
       const dados = await apiFetch(`/solicitacoes/anexo/${anexo.id}`, {
         method: "DELETE"
       });
@@ -291,11 +288,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           })
         );
       } else {
-        alert("Erro ao apagar o anexo.");
+        showAlert("Erro", "Não foi possível apagar o anexo.", "error");
       }
     } catch (error) {
       console.error("Erro ao deletar anexo:", error);
-      alert("Falha ao comunicar com o servidor.");
+      showAlert("Erro de Conexão", "Falha ao comunicar com o servidor.", "error");
     }
   };
 
@@ -315,7 +312,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         if (erroUpload) {
           console.error("Erro ao subir arquivo para o Storage:", erroUpload);
-          alert(`Falha ao anexar o ficheiro: ${arquivo.name}`);
+          showAlert("Erro no Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
           setCarregando(false);
           return;
         }
@@ -328,28 +325,31 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         });
       }
 
-      // 5. REFATORAÇÃO DE POST
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/anexos`, {
         method: "POST",
         body: JSON.stringify({ anexos: anexosProcessados }),
       });
 
       if (dados.sucesso) {
-        alert("Sucesso! Novos anexos integrados na base de dados.");
+        showAlert("Sucesso!", "Novos anexos integrados na base de dados com sucesso.", "success");
         setAnexosNovos([]);
         setLinhaExpandida(null);
-        // Atualizamos a página para refletir as mudanças no front-end
         window.location.reload();
       } else {
-        alert(`Erro do servidor: ${dados.erro}`);
+        showAlert("Erro do Servidor", dados.erro, "error");
       }
     } catch (error) {
       console.error("Erro na requisição de anexos extras:", error);
-      alert("Falha ao conectar com o servidor para salvar os anexos.");
+      showAlert("Erro de Conexão", "Falha ao conectar com o servidor para salvar os anexos.", "error");
     } finally {
       setCarregando(false);
     }
   };
+
+  // ✨ 3. PROTEÇÃO DE RENDERIZAÇÃO
+  if (carregandoInicial || (perfil === 'cliente' && estoqueAtual === 'TODOS')) {
+    return null;
+  }
 
   return (
     <div className="acompanhamento-wrapper">
@@ -502,17 +502,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                         <td>
                           <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            backgroundColor: '#f1f5f9',
-                            color: '#475569',
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            fontWeight: '600',
-                            border: '1px solid #cbd5e1',
-                            whiteSpace: 'nowrap'
+                            display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9',
+                            color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem',
+                            fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap'
                           }}>
                             <MapPin size={12} />
                             {obterNomeFilial(linha.filial || linha.estoque)}

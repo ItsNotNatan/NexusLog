@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from "react-router-dom";
 import './Traceabilly.css'; 
 import { 
   Archive, 
@@ -13,20 +14,37 @@ import {
 
 import { useAlert } from '../../../contexts/AlertContext'; 
 import { AuthContext } from '../../../contexts/AuthContext'; 
-
 import { apiFetch } from '../../../services/api';
 
 export default function Traceabilly({ perfil = 'logistica' }) {
-  const { estoqueAtual } = useContext(AuthContext); 
+  // ✨ 1. PUXAR A FILIAL E O ESTADO DE CARREGAMENTO
+  const { estoqueAtual, carregandoInicial } = useContext(AuthContext); 
+  const { showAlert, showConfirm } = useAlert();
+  const navigate = useNavigate();
+
+  // ✨ 2. O OBSERVADOR MÁGICO (AGORA BLINDADO)
+  useEffect(() => {
+    // Só toma decisões DEPOIS que a aplicação estiver estável
+    if (!carregandoInicial) {
+      if (perfil === 'cliente' && estoqueAtual === 'TODOS') {
+        showAlert(
+          "Ação Restrita", 
+          "Para acessar a Rastreabilidade, selecione uma filial específica no topo da página. Redirecionando...", 
+          "warning"
+        );
+        navigate('/cliente/consulta-estoque');
+      }
+    }
+  }, [estoqueAtual, perfil, navigate, showAlert, carregandoInicial]);
+
   const [dadosRastreabilidade, setDadosRastreabilidade] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
-  
-  const { mostrarAlerta } = useAlert();
 
   useEffect(() => {
+    if (perfil === 'cliente' && estoqueAtual === 'TODOS') return;
     buscarHistorico();
-  }, [estoqueAtual]); 
+  }, [estoqueAtual, perfil]); 
 
   const buscarHistorico = async () => {
     try {
@@ -49,7 +67,6 @@ export default function Traceabilly({ perfil = 'logistica' }) {
             solicitacao.itens.forEach(item => {
               itensExtraidos.push({
                 id: item.id,
-                // ✨ 1. CAPTURAMOS O TIPO AQUI!
                 tipo: solicitacao.tipo,
                 partNumber: item.part_number_manual || item.part_number || '-',
                 descricao: item.descricao_manual || item.descricao || '-',
@@ -73,14 +90,20 @@ export default function Traceabilly({ perfil = 'logistica' }) {
       }
     } catch (error) {
       console.error("Erro ao buscar rastreabilidade:", error.message);
-      if (mostrarAlerta) mostrarAlerta('Erro ao carregar o histórico de rastreabilidade.', 'error');
+      showAlert("Erro", "Erro ao carregar o histórico de rastreabilidade.", "error");
     } finally {
       setCarregando(false);
     }
   };
 
   const handleReverterItem = async (item) => {
-    const confirmar = window.confirm(`Deseja devolver o item ${item.partNumber} ao estoque e removê-lo do histórico de saídas?`);
+    const confirmar = await showConfirm(
+      "Devolver Item", 
+      `Deseja devolver o item ${item.partNumber} ao estoque e removê-lo do histórico de saídas?`, 
+      "warning", 
+      "Sim, Devolver"
+    );
+    
     if (!confirmar) return; 
 
     try {
@@ -94,17 +117,17 @@ export default function Traceabilly({ perfil = 'logistica' }) {
       });
 
       if (json.sucesso) {
-        if (mostrarAlerta) mostrarAlerta(`O item ${item.partNumber} retornou ao estoque principal!`, 'success');
+        showAlert("Sucesso!", `O item ${item.partNumber} retornou ao estoque principal!`, "success");
         
         setDadosRastreabilidade(dadosAtuais => 
           dadosAtuais.filter(dado => dado.id !== item.id)
         );
       } else {
-        if (mostrarAlerta) mostrarAlerta(`Falha ao reverter: ${json.erro}`, 'error');
+        showAlert("Erro na Reversão", `Falha ao reverter: ${json.erro}`, "error");
       }
     } catch (error) {
       console.error("Erro na reversão:", error.message);
-      if (mostrarAlerta) mostrarAlerta('Falha de conexão com o servidor.', 'error');
+      showAlert("Falha de Conexão", "Falha de conexão com o servidor.", "error");
     } finally {
       setCarregando(false);
     }
@@ -115,9 +138,14 @@ export default function Traceabilly({ perfil = 'logistica' }) {
     item.descricao.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
     item.solicitanteNome.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
     item.solicitacao.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
-    // Permite pesquisar digitando "transferencia"
     item.tipo.toLowerCase().includes(termoPesquisa.toLowerCase()) 
   );
+
+  // ✨ 3. PROTEÇÃO DE RENDERIZAÇÃO
+  // Esconde o ecrã enquanto carrega os dados ou enquanto está a viajar para outra página
+  if (carregandoInicial || (perfil === 'cliente' && estoqueAtual === 'TODOS')) {
+    return null;
+  }
 
   return (
     <div className="traceabilly-wrapper">
@@ -189,7 +217,6 @@ export default function Traceabilly({ perfil = 'logistica' }) {
               <tbody>
                 {dadosFiltrados.length > 0 ? (
                   dadosFiltrados.map((linha, index) => {
-                    // ✨ 2. VERIFICAMOS SE É TRANSFERÊNCIA PARA PINTAR DE AMARELO!
                     const isTransferencia = linha.tipo === 'Transferencia WBS';
 
                     return (
@@ -199,7 +226,6 @@ export default function Traceabilly({ perfil = 'logistica' }) {
                       >
                         <td className="fonte-forte">
                           {linha.partNumber}
-                          {/* Pequeno aviso visual extra para ficar ainda mais claro */}
                           {isTransferencia && (
                             <div style={{ fontSize: '0.65rem', color: '#ca8a04', marginTop: '4px', fontWeight: 'bold' }}>
                               (TRANSFERÊNCIA)
