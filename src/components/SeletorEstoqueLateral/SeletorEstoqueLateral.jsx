@@ -1,10 +1,13 @@
+// =================================================================
+// ARQUIVO: src/components/SeletorEstoqueLateral/SeletorEstoqueLateral.jsx
+// DESCRIÇÃO: Seletor lateral de estoque, filtrando pela filial ativa no Header.
+// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
-// ✨ IMPORTA O CONTEXTO PARA SABER QUAL FILIAL ESTÁ SELECIONADA LÁ EM CIMA
 import { AuthContext } from '../../contexts/AuthContext';
 
 export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionarItem, itensSelecionados = [], bloquearTransferidos = false }) {
-  // Lê a filial do menu do cabeçalho
+  // 1. Obter a filial atualmente selecionada no Header
   const { estoqueAtual } = useContext(AuthContext);
 
   const [busca, setBusca] = useState('');
@@ -14,14 +17,16 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
   const [hoverId, setHoverId] = useState(null);
   const [copiadoId, setCopiadoId] = useState(null);
 
+  // 2. Filtragem principal do estoque
   const estoqueFiltrado = estoque?.filter(item => {
-    // ✨ REGRA 1: Filtra o estoque pela filial escolhida lá no topo (se não for "TODOS")
+    // REGRA 1: Filtro por Filial
+    // Se a filial no Header não for "TODOS", verifica se a filial do item corresponde.
     const filialItem = item.filial_id || item.filial || item.filial_origem_id;
     if (estoqueAtual && estoqueAtual !== 'TODOS' && filialItem && filialItem !== estoqueAtual) {
-      return false; // Esconde se for de outra filial
+      return false; 
     }
 
-    // ✨ REGRA 2: Esconde os que já estão no carrinho
+    // REGRA 2: Esconder itens já selecionados no carrinho
     const idDoItem = item.idBD || item.id;
     const jaEstaSelecionado = itensSelecionados.some(selecionado => 
       selecionado.estoque_id === idDoItem || 
@@ -30,7 +35,7 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
     );
     if (jaEstaSelecionado) return false;
 
-    // ✨ REGRA 3: Filtro de texto da barra de pesquisa
+    // REGRA 3: Filtro de pesquisa por texto
     const termo = busca.toLowerCase();
     return (
       (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
@@ -42,12 +47,14 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
     );
   }) || [];
 
+  // Reset da página quando a busca ou a filial mudam
   useEffect(() => {
     setPaginaAtual(1);
-  }, [busca, estoqueAtual]); // Reinicia a página se mudar a pesquisa ou a filial
+  }, [busca, estoqueAtual]);
 
   const totalPaginas = Math.ceil(estoqueFiltrado.length / itensPorPagina) || 1;
   
+  // Garantir que a página atual não excede o limite após filtragem
   useEffect(() => {
     if (paginaAtual > totalPaginas) {
       setPaginaAtual(totalPaginas);
@@ -60,9 +67,13 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
   const copiarParaAreaTransferencia = (e, texto, idUnico) => {
     e.stopPropagation(); 
     if (!texto || texto === "SEM SAP") return;
+
     navigator.clipboard.writeText(texto);
     setCopiadoId(idUnico);
-    setTimeout(() => setCopiadoId(null), 2000);
+
+    setTimeout(() => {
+      setCopiadoId(null);
+    }, 2000);
   };
 
   return (
@@ -107,7 +118,7 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
           <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px' }}>
             <AlertCircle size={36} style={{ opacity: 0.4, margin: '0 auto 12px auto' }} />
             <p style={{ fontSize: '0.85rem', margin: 0 }}>
-              {estoque?.length > 0 ? "Nenhum material encontrado para esta filial ou busca." : "Nenhum material no estoque."}
+              {estoque?.length > 0 ? "Todos os itens encontrados já estão na lista ou não pertencem a esta filial." : "Nenhum material encontrado."}
             </p>
           </div>
         ) : (
@@ -128,9 +139,13 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
               <div 
                 key={idUnicoItem} 
                 style={{ 
-                  padding: '16px', borderBottom: `1px solid ${corBorda}`, 
-                  backgroundColor: corFundo, display: 'flex', flexDirection: 'column', 
-                  alignItems: 'flex-start', transition: 'background-color 0.2s'
+                  padding: '16px', 
+                  borderBottom: `1px solid ${corBorda}`, 
+                  backgroundColor: corFundo, 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'flex-start',
+                  transition: 'background-color 0.2s'
                 }}
               >
                 {isTransferido && (
@@ -140,6 +155,7 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                  
                   <div 
                     onMouseEnter={() => setHoverId(idUnicoItem)}
                     onMouseLeave={() => setHoverId(null)}
@@ -151,6 +167,7 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
                       fontWeight: '700', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '8px'
                     }}>
                       {textoSAP}
+                      
                       {temSAP && (isHovered || isCopied) && (
                         <button
                           onClick={(e) => copiarParaAreaTransferencia(e, textoSAP, idUnicoItem)}
@@ -171,8 +188,12 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
                     onClick={() => !botaoBloqueado && onAdicionarItem(item, index)}
                     disabled={botaoBloqueado}
                     style={{ 
-                      background: 'none', border: 'none', cursor: botaoBloqueado ? 'not-allowed' : 'pointer', 
-                      color: botaoBloqueado ? '#cbd5e1' : '#2563eb', padding: '4px', display: 'flex' 
+                      background: 'none', 
+                      border: 'none', 
+                      cursor: botaoBloqueado ? 'not-allowed' : 'pointer', 
+                      color: botaoBloqueado ? '#cbd5e1' : '#2563eb', 
+                      padding: '4px', 
+                      display: 'flex' 
                     }}
                     title={botaoBloqueado ? "Material já transferido não pode ser transferido de novo" : "Adicionar Item"}
                   >
