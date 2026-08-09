@@ -5,31 +5,32 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-// 🐛 CORREÇÃO 1: Adicionado o "export" para que os outros componentes consigam importar o contexto sem quebrar a app.
 export const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
   const [usuario, setUsuario] = useState(null);
   const [token, setToken] = useState(null);
-  
-  // 🐛 CORREÇÃO 2: Renomeámos para "estoqueAtual" para bater certo com o Header e as restantes Páginas.
   const [estoqueAtual, setEstoqueAtual] = useState('');
   const [carregandoInicial, setCarregandoInicial] = useState(true);
 
-  // 1. RESTAURA A SESSÃO AO CARREGAR A PÁGINA
+  // 1. RESTAURA A SESSÃO AO CARREGAR A PÁGINA (F5)
   useEffect(() => {
     const tokenSalvo = localStorage.getItem('@NexusLog:token');
     const usuarioSalvo = localStorage.getItem('@NexusLog:usuario');
     const filialSalva = localStorage.getItem('@NexusLog:filialAtiva');
 
+    // ✨ A CORREÇÃO ESTÁ AQUI:
+    // Lemos a filial do navegador para TODOS (clientes públicos e funcionários).
+    // Se não houver nenhuma guardada no navegador, forçamos o 'TODOS' por padrão.
+    setEstoqueAtual(filialSalva || 'TODOS');
+
+    // Recupera os dados do utilizador apenas se houver login
     if (tokenSalvo && usuarioSalvo) {
       try {
-        // Verifica se o valor não é a string 'undefined' antes de fazer o parse
         if (usuarioSalvo !== 'undefined') {
           const usuarioObj = JSON.parse(usuarioSalvo);
           setToken(tokenSalvo);
           setUsuario(usuarioObj);
-          setEstoqueAtual(filialSalva || usuarioObj.filial || '');
         }
       } catch (e) {
         console.warn("Sessão corrompida, a limpar dados.");
@@ -58,7 +59,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUsuario(null);
     setToken(null);
-    setEstoqueAtual('');
+    // ✨ Ao sair, garantimos que volta para a visão de cliente restrita
+    setEstoqueAtual('TODOS'); 
 
     localStorage.removeItem('@NexusLog:token');
     localStorage.removeItem('@NexusLog:usuario');
@@ -71,14 +73,13 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('@NexusLog:filialAtiva', novaFilialId);
   };
 
-  // 🐛 CORREÇÃO 3: Agora fornecemos os nomes exatos que os teus componentes estão à espera.
   return (
     <AuthContext.Provider value={{
       signed: !!usuario,
       usuario,
       token,
-      estoqueAtual,                  // Disponibiliza o nome correto para as páginas
-      setEstoqueAtual: MudarFilial,  // Aponta para a função que atualiza o State E o LocalStorage!
+      estoqueAtual,                  
+      setEstoqueAtual: MudarFilial,  
       login,
       logout,
       carregandoInicial

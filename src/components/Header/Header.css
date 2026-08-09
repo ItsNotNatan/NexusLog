@@ -1,6 +1,10 @@
+/* =================================================================
+   ARQUIVO: src/components/Header/Header.css
+   ================================================================= */
+
 .app-header {
   display: flex;
-  justify-content: space-between; /* 👈 Alterado para separar a esquerda da direita */
+  justify-content: space-between; 
   align-items: center;
   padding: 16px 24px;
   background-color: #ffffff;
@@ -8,6 +12,7 @@
   height: 70px;
   box-sizing: border-box;
 }
+/* Podes apagar o position: sticky, top: 0 e z-index: 50 que tínhamos posto aqui antes */
 
 /* LADO ESQUERDO */
 .header-left {
@@ -99,4 +104,3 @@
   background-color: #fee2e2;
   border-color: #fca5a5;
 }
-

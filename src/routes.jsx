@@ -6,6 +6,9 @@ import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import CentralDeOperacoes from './pages/CentralOperacoes/CentralOperacoes';
 import LoginLogistica from './pages/LoginLogistica/LoginLogistica';
 
+// 🛡️ NOVO: Importação do nosso guardião de rotas para a Área do Cliente
+import RequerFilialEspecifica from './components/RequerFilialEspecifica/RequerFilialEspecifica';
+
 // --- PÁGINAS DA LOGÍSTICA ---
 import Dashboard from './pages/Logistica/Dashboard/Dashboard';
 import PainelAprovacao from './pages/Logistica/PainelAprovacao/PainelAprovacao';
@@ -32,10 +35,18 @@ export const router = createBrowserRouter([
     path: "/cliente",
     element: <AppLayout modulo="cliente" />, 
     children: [
+      // 1. ROTA LIVRE: A consulta de estoque permite a visualização de "TODOS"
       { path: "consulta-estoque", element: <VisaoGeralEstoque perfil="cliente" /> },
-      { path: "fazer-solicitacao", element: <FazerSolicitacao /> },
-      { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes perfil="cliente" /> },
-      { path: "rastreabilidade", element: <Traceabilly perfil="cliente" /> }
+      
+      // 2. ROTAS RESTRITAS: O nosso guardião envolve as páginas que exigem uma filial específica
+      {
+        element: <RequerFilialEspecifica />,
+        children: [
+          { path: "fazer-solicitacao", element: <FazerSolicitacao /> },
+          { path: "acompanhamento-solicitacoes", element: <AcompanhamentoSolicitacoes perfil="cliente" /> },
+          { path: "rastreabilidade", element: <Traceabilly perfil="cliente" /> }
+        ]
+      }
     ]
   },
 

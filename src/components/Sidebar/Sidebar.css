@@ -3,16 +3,17 @@
    ========================================= */
 .sidebar-container {
   width: 260px;
+  min-width: 260px; /* ✨ DOCUMENTAÇÃO: Garante que a barra terá pelo menos 260px */
+  flex-shrink: 0;   /* ✨ DOCUMENTAÇÃO: Esta é a magia! Proíbe o Flexbox de esmagar a barra quando as tabelas são muito grandes */
   height: 100vh;
   background-color: #ffffff;
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 0;
+  position: relative; /* ✨ DOCUMENTAÇÃO: Alterado de sticky para relative para funcionar em harmonia com o novo AppLayout */
   font-family: system-ui, -apple-system, sans-serif;
   box-sizing: border-box;
-  overflow-x: hidden; /* ✨ Trava qualquer rolagem horizontal na sidebar inteira */
+  overflow-x: hidden; /* Trava qualquer rolagem horizontal na sidebar inteira */
 }
 
 .sidebar-logo {
@@ -48,7 +49,7 @@
   padding: 0 16px;
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden; /* ✨ Garante que a área de scroll interno também não vaze para os lados */
+  overflow-x: hidden; /* Garante que a área de scroll interno não vaze para os lados */
 }
 
 .sidebar-nav ul {
@@ -68,14 +69,14 @@
   justify-content: space-between; /* Empurra o cadeado para a direita */
   width: 100%;
   padding: 12px 16px;
-  box-sizing: border-box; /* ✨ Mantém o botão rigorosamente dentro do limite da tela */
+  box-sizing: border-box; /* Mantém o botão rigorosamente dentro do limite da tela */
   text-decoration: none;
   border-radius: 8px;
   color: #64748b;
   font-size: 0.875rem;
   font-weight: 500;
   transition: all 0.2s ease;
-  overflow: hidden; /* ✨ Esconde o que tentar vazar */
+  overflow: hidden; /* Esconde o que tentar vazar */
 }
 
 /* Agrupa o ícone principal e o texto à esquerda */
@@ -83,7 +84,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0; /* ✨ Permite que o texto encolha sem quebrar o layout */
+  min-width: 0; /* Permite que o texto encolha sem quebrar o layout */
   flex: 1;
 }
 
@@ -129,7 +130,7 @@
   gap: 12px;
   width: 100%;
   padding: 12px 16px;
-  box-sizing: border-box; /* ✨ Evita que o botão vaze no rodapé */
+  box-sizing: border-box; /* Evita que o botão vaze no rodapé */
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
