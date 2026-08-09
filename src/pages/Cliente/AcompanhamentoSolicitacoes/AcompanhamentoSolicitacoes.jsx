@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
-// DESCRIÇÃO: Tabela de acompanhamento. Inclui a regra de negócio real PS vs PL.
+// DESCRIÇÃO: Tabela de acompanhamento com a regra visual ajustada (PL vazio mostra "-")
 // =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
@@ -79,7 +79,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const { showAlert, showConfirm } = useAlert(); 
   const navigate = useNavigate();
 
-  // 1. Proteção de Rotas para o Cliente
+  // Proteção de Rotas para o Cliente
   useEffect(() => {
     if (!carregandoInicial) {
       if (perfil === 'cliente' && estoqueAtual === 'TODOS') {
@@ -125,7 +125,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     "Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração",
   ];
 
-  // 2. Busca de Dados
+  // Busca de Dados
   useEffect(() => {
     if (perfil === 'cliente' && estoqueAtual === 'TODOS') return;
 
@@ -147,7 +147,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         if (resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados.map((item) => {
             
-            // ✨ REGRA DE NEGÓCIO 1: O ID de acompanhamento nasce e morre com o seu prefixo
+            // O ID de acompanhamento nasce e morre com o seu prefixo
             let prefixo = "PS"; 
             if (item.tipo === "Crossdocking") prefixo = "CD";
             else if (item.tipo === "Nota Fiscal") prefixo = "NF";
@@ -159,7 +159,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             let acaoTipo = "select";
             let acaoValor = item.status;
 
-            // ✨ REGRA DE NEGÓCIO 2: Entradas concluem na aprovação, o resto vai para Separação
+            // Entradas concluem na aprovação, o resto vai para Separação
             let statusDestinoAprovacao = item.tipo === "Entrada" ? "Concluído" : "Em Separação";
 
             if (item.status === "Pendente") {
@@ -169,10 +169,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               acaoValor = "Em Separação";
             }
 
-            // ✨ REGRA DE NEGÓCIO 3: O PL só existe se o status NÃO for Pendente
+            // ✨ CORREÇÃO AQUI: Removemos o "Gerando..." - se não houver PL no banco, é um "-" e pronto.
             let numeroPL = "-";
             if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
-                numeroPL = item.pl || item.bs || "Gerando...";
+                numeroPL = item.pl || item.bs || "-";
             }
 
             return {
@@ -180,7 +180,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               idOriginal: item.id,
               id: idNumerico || item.id,
               prefixo: prefixo,
-              statusDestinoAprovacao: statusDestinoAprovacao, // Passado para o botão aprovar
+              statusDestinoAprovacao: statusDestinoAprovacao, 
               acaoTipo: acaoTipo,
               acaoValor: acaoValor,
               dataSolicitacao: item.dataSolicitacao || "-",
@@ -213,7 +213,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     setPaginaAtual(1);
   }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  // 3. Mudança de Status
+  // Mudança de Status
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
     const confirmar = await showConfirm("Alterar Status", `Tem certeza que deseja mudar o status para "${novoStatus}"?`, "warning", "Sim, Mudar");
     if (!confirmar) return;
@@ -234,9 +234,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         setDadosTabela(prev => prev.map(sol => {
           if (sol.idOriginal === idSolicitacao) {
             
-            // ✨ SIMULAÇÃO VISUAL DO PL: Se aprovou, mostra um PL provisório na coluna certa
+            // ✨ CORREÇÃO AQUI: Mantemos a simulação visual limpa
             let novoPl = sol.pl;
-            if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && (sol.pl === '-' || sol.pl === 'Gerando...')) {
+            if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && sol.pl === '-') {
                novoPl = `PL-${sol.id}`; 
             }
 
@@ -539,7 +539,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                     style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '20px', padding: '6px 16px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      // ✨ UTILIZAMOS A VARIÁVEL INTELIGENTE PARA APROVAR
                                       lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao);
                                     }}
                                   >
