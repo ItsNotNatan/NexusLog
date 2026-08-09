@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Logistica/VisaoGeralEstoque/VisaoGeralEstoque.jsx
+// DESCRIÇÃO: Visão Geral de Estoque (Com Rota de Histórico Corrigida)
+// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import { Search, Boxes, Loader2, MapPin, X, History, Filter } from 'lucide-react';
 import './VisaoGeralEstoque.css'; 
@@ -92,7 +96,7 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     setCarregandoDemandas(true);
 
     try {
-      // ✨ CORREÇÃO: Utilizando a Impressão Digital (material.id) na Rota Nova!
+      // ✨ CORREÇÃO AQUI: Agora usamos o material.id e o caminho correto na API!
       const resultado = await apiFetch(`/solicitacoes/demandas/estoque/${material.id}`);
 
       if (resultado.sucesso) {
@@ -294,9 +298,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* 🪟 JANELA MODAL COM A TABELA DE DEMANDAS                  */}
-      {/* ========================================================= */}
       {modalDemandasAberto && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
           
