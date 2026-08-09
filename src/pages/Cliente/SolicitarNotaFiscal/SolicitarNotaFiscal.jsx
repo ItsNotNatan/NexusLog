@@ -1,224 +1,224 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { User, Send, Paperclip, X } from 'lucide-react';
-
-import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
-import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
-import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
+import React, { useState } from 'react';
+import { User, FileText, Paperclip, Send } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens';
 
+// IMPORTAÇÕES DA NOVA MAGIA (Formatação, Anexos e Banco de Dados)
+import { formatarDinheiroTempoReal } from '../../../utils/formatadores';
+import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { supabase } from '../../../supabaseClient';
-import { AuthContext } from '../../../contexts/AuthContext';
-import { AlertContext } from '../../../contexts/AlertContext';
 
 // 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
 import { apiFetch } from '../../../services/api';
 
-// CONSTANTE DE LIMITE PARA O CLIENTE
-const LIMITE_CLIENTE = 20;
+// ✨ 1. IMPORTAÇÃO DO CONTEXTO DE ALERTAS
+import { useAlert } from '../../../contexts/AlertContext';
 
-export default function EntradaMaterial() {
-  const { estoqueAtual } = useContext(AuthContext);
-  const { showAlert } = useContext(AlertContext);
+export default function SolicitarNotaFiscal() {
+  
+  // ✨ 2. INICIALIZAÇÃO DO HOOK DE ALERTAS
+  const { showAlert } = useAlert();
 
+  // ESTADO PARA CONTROLAR OS DADOS DO FORMULÁRIO
   const [formDados, setFormDados] = useState({
-    nome: '', wbs: '', observacoes: ''
+    nome: '',
+    wbs: '',
+    valorEstimado: '',
+    descricao: '',
+    observacoes: ''
   });
 
-  const [dataMinima, setDataMinima] = useState('');
-
-  useEffect(() => {
-    const hoje = new Date();
-    const timezoneOffset = hoje.getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(hoje.getTime() - timezoneOffset)).toISOString().split('T')[0];
-    setDataMinima(localISOTime);
-  }, []);
-
-  const gerarLinhaVazia = () => ({
-    id: `linha-vazia-${Date.now()}-${Math.random()}`, numPecaFabricante: '', fornecedor: '', qtdFornecida: 1, nfEntrada: '', unidadeMedida: 'Unid', vendorDescription: '', wbsElement: '', dataNecessidade: '', emissaoNF: '', recebNF: '', docCompras: '', poNetPrice: '', centro: '', deposito: '', alocacao: ''
-  });
-
-  const [itens, setItens] = useState([]);
+  // ESTADO: Onde o nosso componente vai guardar os ficheiros
   const [anexos, setAnexos] = useState([]);
-  const processador = useProcessadorExcel();
 
-  const handleImportarExcel = async (arquivo) => {
-    const itensProcessados = await processador.iniciarProcessamento(arquivo);
-    if (itensProcessados && Array.isArray(itensProcessados)) {
-      const novosItensFormatados = itensProcessados.map((item, index) => ({
-        id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: item['Desenho SAP'] || item.desenhoSAP || '',
-        numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
-        fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
-        qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
-        nfEntrada: item['NF DE ENTRADA'] || '',
-        unidadeMedida: item['Unidade de medida'] || item.unidadeMedida || 'Unid',
-        vendorDescription: item['Vendor Description'] || item.vendorDescription || '',
-        wbsElement: item['WBS Element'] || item.wbs || '',
-        dataNecessidade: item['Data de Necessidade'] || item.dataNecessidade || '',
-        emissaoNF: item['EMISSÃO NF'] || item.emissaoNF || '',
-        recebNF: item['RECEB. NF'] || item.recebNF || '',
-        docCompras: item['Documento de compras'] || item.docCompras || '',
-        poNetPrice: item['PO Net Price'] || item.poNetPrice || '',
-        centro: item['Centro'] || item.centro || '',
-        deposito: item['Depósito'] || item.deposito || '',
-        alocacao: item['Alocação'] || item.alocacao || ''
-      }));
+  // --- FUNÇÃO DE ENVIO PARA O BACKEND ---
+  const handleEnviar = async () => {
+    // ✨ 3. ALERTA DE VALIDAÇÃO (Aviso/Warning)
+    if (!formDados.nome || !formDados.wbs || !formDados.descricao) {
+      showAlert("Campos Obrigatórios", "Por favor, preencha os campos obrigatórios (*).", "warning");
+      return;
+    }
 
-      setItens(prev => {
-        const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
-        const novaLista = [...listaLimpa, ...novosItensFormatados];
+    // LÓGICA DE UPLOAD DE IMAGENS PARA O SUPABASE STORAGE
+    const anexosProcessados = [];
+    if (anexos.length > 0) {
+      for (const arquivo of anexos) {
+        const extensao = arquivo.name.split('.').pop();
+        const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
+        const caminhoNoStorage = `uploads/${nomeUnico}`;
 
-        if (novaLista.length > LIMITE_CLIENTE) {
-          showAlert(
-            "Limite de Linhas Excedido",
-            `A planilha contém mais itens do que o limite permitido de ${LIMITE_CLIENTE}. Apenas as primeiras ${LIMITE_CLIENTE} linhas foram importadas.`,
-            "warning"
-          );
-          return novaLista.slice(0, LIMITE_CLIENTE);
+        // Faz o upload para o bucket 'documentos'
+        const { error: erroUpload } = await supabase.storage
+          .from('documentos')
+          .upload(caminhoNoStorage, arquivo);
+
+        if (erroUpload) {
+          console.error("Erro ao subir arquivo:", erroUpload);
+          // ✨ 4. ALERTA DE ERRO DE UPLOAD
+          showAlert("Erro no Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
+          return; 
         }
 
-        return novaLista;
-      });
-    }
-  };
+        // Pega o Link Público
+        const { data: linkPublico } = supabase.storage
+          .from('documentos')
+          .getPublicUrl(caminhoNoStorage);
 
-  const adicionarLinhaEmBranco = () => {
-    if (itens.length < LIMITE_CLIENTE) {
-      setItens([...itens, gerarLinhaVazia()]);
-    } else {
-      showAlert("Limite Atingido", `O limite máximo é de ${LIMITE_CLIENTE} itens por solicitação.`, "warning");
+        anexosProcessados.push({
+          nome_arquivo: arquivo.name,
+          url_arquivo: linkPublico.publicUrl
+        });
+      }
     }
-  };
 
-  const removerItem = (idParaRemover) => setItens(itens.filter(item => item.id !== idParaRemover));
-  const atualizarCampo = (id, campo, novoValor) => setItens(itens.map(item => item.id === id ? { ...item, [campo]: novoValor } : item));
-  const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
-  const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
-
-  const handleEnviar = async () => {
-    if (!estoqueAtual || estoqueAtual === 'TODOS') {
-      showAlert("Filial Inválida", "Por favor, selecione em qual filial você está dando entrada (ex: BR02) lá no topo da página antes de enviar.", "warning");
-      return;
-    }
-    if (!formDados.nome || !formDados.wbs) {
-      showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS do solicitante.", "warning");
-      return;
-    }
-    if (itens.length === 0) {
-      showAlert("Lista Vazia", "Adicione pelo menos um item à tabela para dar entrada.", "warning");
-      return;
-    }
-    if (itens.some(i => !i.numPecaFabricante || !i.qtdFornecida)) {
-      showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.", "warning");
-      return;
-    }
-    if (itens.some(i => (i.emissaoNF && i.emissaoNF < dataMinima) || (i.recebNF && i.recebNF < dataMinima) || (i.dataNecessidade && i.dataNecessidade < dataMinima))) {
-      showAlert("Data Inválida", "Existem datas preenchidas que são anteriores ao dia atual. Por favor, corrija-as antes de enviar.", "warning");
-      return;
-    }
+    // Monta o payload final
+    const payload = {
+      solicitante: {
+        nome: formDados.nome,
+        wbs: formDados.wbs,
+        valorEstimado: formDados.valorEstimado,
+        descricao: formDados.descricao,
+        observacoes: formDados.observacoes,
+        tipo: 'Nota Fiscal'
+      },
+      anexos: anexosProcessados 
+    };
 
     try {
-      const anexosProcessados = [];
-      if (anexos.length > 0) {
-        for (const arquivo of anexos) {
-          const extensao = arquivo.name.split('.').pop();
-          const caminhoNoStorage = `uploads/${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
-          const { error: erroUpload } = await supabase.storage.from('documentos').upload(caminhoNoStorage, arquivo);
-
-          if (erroUpload) {
-            showAlert("Erro de Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}.`, "error");
-            return;
-          }
-          const { data: linkPublico } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
-          anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
-        }
-      }
-
-      const payload = {
-        solicitante: { ...formDados, filial_id: estoqueAtual, tipo: 'Entrada' },
-        itens: itens.map(item => ({
-          ...item,
-          qtd: item.qtdFornecida,
-          desenhoSAP: item.desenhoSAP || '-', 
-          materialDescription: item.vendorDescription || 'Sem descrição'
-        })),
-        anexos: anexosProcessados
-      };
-
       // 2. REFATORAÇÃO DO FETCH
-      // Substituímos o código manual pela chamada limpa ao apiFetch
-      const dados = await apiFetch('/solicitacoes/entrada', {
-        method: 'POST', 
+      // Substituímos o código longo pela chamada simples à API centralizada
+      const dados = await apiFetch('/solicitacoes/nota-fiscal', {
+        method: 'POST',
         body: JSON.stringify(payload)
       });
 
-      // Validação da regra de negócio do servidor
-      if (dados.sucesso || dados.ps || dados.ps_id) {
-        showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps || dados.ps_id}`, "success");
-        setFormDados({ nome: '', wbs: '', observacoes: '' });
-        setItens([]);
-        setAnexos([]);
+      // Validamos a regra de negócio do backend
+      if (dados.sucesso || dados.ps_id) {
+        // ✨ 5. ALERTA DE SUCESSO
+        showAlert("Sucesso!", `Solicitação de NF enviada. ID: ${dados.ps_id || dados.ps}`, "success");
+        
+        // Limpa os campos após o sucesso
+        setFormDados({ nome: '', wbs: '', valorEstimado: '', descricao: '', observacoes: '' });
+        setAnexos([]); // Limpa a lista de anexos
       } else {
-        showAlert("Erro no Servidor", dados.erro, "error");
+        // ✨ 6. ALERTA DE ERRO DE REGRA DE NEGÓCIO
+        showAlert("Erro do Servidor", dados.erro, "error");
       }
     } catch (error) {
-      showAlert("Erro de Conexão", "Falha ao conectar com o servidor. O erro foi registado na consola.", "error");
-      console.error(error.message);
+      // Erros de rede ou do servidor são geridos e apresentados aqui
+      console.error("Erro na requisição:", error.message);
+      // ✨ 7. ALERTA DE ERRO DE CONEXÃO
+      showAlert("Falha de Conexão", "Não foi possível ligar ao servidor. Verifica a tua internet.", "error");
     }
   };
 
   return (
-    <div className="entrada-container">
-      <ModalProcessamento estaProcessando={processador.estaProcessando} concluido={processador.concluido} estadoProgresso={processador.estadoProgresso} resultado={processador.resultado} erroFatal={processador.erroFatal} onClose={processador.resetarProcessador} />
-
-      <div className="form-cartao">
-        <div className="form-header">
-          <div className="form-header-esquerda">
-            <div className="form-header-icone verde-claro"><User size={18} /></div>
-            <h2>Dados do Solicitante</h2>
-          </div>
-        </div>
-
-        <div className="form-grid">
-          <div className="input-grupo"><label>NOME *</label><input type="text" className="input-campo foco-verde" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} /></div>
-          <div className="input-grupo"><label>WBS *</label><input type="text" className="input-campo foco-verde" placeholder="Ex: WBS-PRJ-2024-001" value={formDados.wbs} onChange={(e) => setFormDados({ ...formDados, wbs: e.target.value })} /></div>
-          <div className="input-grupo span-2"><label>OBSERVAÇÕES</label><textarea className="input-campo foco-verde" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea></div>
-        </div>
-      </div>
-
-      <TabelaInsercaoItens
-        itens={itens}
-        dataMinima={dataMinima}
-        mostrarDataNecessidade={true}
-        mostrarExemploExcel={true}
-        limiteLinhas={LIMITE_CLIENTE} 
-        onAtualizarCampo={atualizarCampo}
-        onRemoverItem={removerItem}
-        onAdicionarLinha={adicionarLinhaEmBranco}
-        onImportarExcel={handleImportarExcel}
-      />
-
-      <div className="form-cartao">
-        <div className="input-grupo">
-          <label>ANEXOS (OPCIONAL - Notas Fiscais, Manuais, Fotos)</label>
-          <div style={{ marginTop: '8px' }}>
-            <CarregarArquivo variante="botao" accept=".pdf, .jpg, .png, .xlsx" label="Anexar Arquivo" icone={<Paperclip size={16} />} onFileSelect={handleAnexar} />
-          </div>
-          {anexos.length > 0 && (
-            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {anexos.map((arquivo, index) => (
-                <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', width: 'fit-content', minWidth: '300px' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#334155' }}>{arquivo.name}</span>
-                  <button onClick={() => removerAnexo(index)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={16} /></button>
-                </div>
-              ))}
+    <div className="nf-container">
+      <div className="nf-grid-superior">
+        
+        {/* CARTÃO: DADOS DO SOLICITANTE */}
+        <div className="form-cartao" style={{ marginBottom: 0 }}>
+          <div className="form-header">
+            <div className="form-header-esquerda">
+              <div className="form-header-icone roxo-claro"><User size={18} /></div>
+              <h2>Dados do Solicitante</h2>
             </div>
-          )}
+          </div>
+          <div className="form-grid coluna-unica">
+            <div className="input-grupo">
+              <label>NOME *</label>
+              <input 
+                type="text" 
+                className="input-campo foco-roxo" 
+                placeholder="Seu nome completo" 
+                value={formDados.nome}
+                onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })}
+              />
+            </div>
+            <div className="input-grupo">
+              <label>WBS / CENTRO DE CUSTO *</label>
+              <input 
+                type="text" 
+                className="input-campo foco-roxo" 
+                placeholder="Ex: WBS-PRJ-2024-001" 
+                value={formDados.wbs}
+                onChange={(e) => setFormDados({ ...formDados, wbs: e.target.value })}
+              />
+            </div>
+            
+            {/* CAMPO DE VALOR ESTIMADO (COM FORMATAÇÃO EM TEMPO REAL) */}
+            <div className="input-grupo">
+              <label>VALOR ESTIMADO (R$)</label>
+              <input 
+                type="text" 
+                className="input-campo foco-roxo" 
+                placeholder="R$ 0,00" 
+                value={formDados.valorEstimado}
+                onChange={(e) => {
+                  const valorDigitado = e.target.value;
+                  const valorFormatado = formatarDinheiroTempoReal(valorDigitado);
+                  setFormDados({ ...formDados, valorEstimado: valorFormatado });
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* CARTÃO: DETALHES DA NOTA FISCAL */}
+        <div className="form-cartao flex-coluna" style={{ marginBottom: 0 }}>
+          <div className="form-header">
+            <div className="form-header-esquerda">
+              <div className="form-header-icone roxo-claro"><FileText size={18} /></div>
+              <h2>Detalhes da Nota Fiscal</h2>
+            </div>
+          </div>
+          <div className="form-grid coluna-unica flex-1">
+            <div className="input-grupo flex-1">
+              <label>DESCRIÇÃO / MOTIVO *</label>
+              <textarea 
+                className="input-campo foco-roxo flex-1" 
+                placeholder="Descreva o motivo..." 
+                style={{ minHeight: '120px' }}
+                value={formDados.descricao}
+                onChange={(e) => setFormDados({ ...formDados, descricao: e.target.value })}
+              ></textarea>
+            </div>
+            <div className="input-grupo mt-4">
+              <label>OBSERVAÇÕES</label>
+              <input 
+                type="text" 
+                className="input-campo foco-roxo" 
+                placeholder="Info adicional..." 
+                value={formDados.observacoes}
+                onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      <BotaoAcaoGlobal texto="Registrar Entrada" icone={<Send size={16} />} cor="verde" onClick={handleEnviar} />
+      {/* CARTÃO: ANEXOS */}
+      <div className="form-cartao">
+        <div className="form-header" style={{ marginBottom: '0px' }}>
+          <div className="form-header-esquerda">
+            <div className="form-header-icone cinza redondo"><Paperclip size={18} /></div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <h2 style={{ fontSize: '1rem', marginBottom: '2px' }}>Anexos</h2>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>NFs, documentos ou arquivos de suporte</span>
+            </div>
+          </div>
+        </div>
+        
+        <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} titulo="" />
+        
+      </div>
+
+      <BotaoAcaoGlobal 
+        texto="Enviar Solicitação de NF" 
+        icone={<Send size={16} />} 
+        cor="roxo" 
+        onClick={handleEnviar} 
+      />
+      
     </div>
   );
 }

@@ -8,13 +8,18 @@ import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext';
 
 // 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
-// O apiFetch vai cuidar de enviar os dados para o Vercel ou Localhost automaticamente
 import { apiFetch } from '../../../services/api';
+
+// ✨ 1. IMPORTAÇÃO DO CONTEXTO DE ALERTAS
+import { useAlert } from '../../../contexts/AlertContext';
 
 import './Crossdocking.css';
 
 export default function Crossdocking() {
   const { estoqueAtual } = useContext(AuthContext);
+
+  // ✨ 2. INICIALIZAÇÃO DO HOOK DE ALERTAS
+  const { showAlert } = useAlert();
 
   // ESTADOS DO FORMULÁRIO
   const [formDados, setFormDados] = useState({
@@ -44,7 +49,8 @@ export default function Crossdocking() {
     if (itensParciais.length > 1) {
       setItensParciais(itensParciais.filter(item => item.id !== id));
     } else {
-      alert("Para Saída Parcial, adicione pelo menos 1 item.");
+      // ✨ 3. ALERTA DE VALIDAÇÃO (Mínimo de itens)
+      showAlert("Atenção", "Para Saída Parcial, deve manter pelo menos 1 item na lista.", "warning");
     }
   };
 
@@ -56,20 +62,23 @@ export default function Crossdocking() {
 
   // --- FUNÇÃO DE ENVIO PARA O BACKEND ---
   const handleEnviar = async () => {
+    // ✨ 4. ALERTA DE VALIDAÇÃO (Campos principais)
     if (!formDados.nome || !formDados.wbs || !formDados.nf || !tipoSaida) {
-      alert("Por favor, preencha o Nome, WBS, Número da NF e selecione o Tipo de Saída.");
+      showAlert("Campos Obrigatórios", "Por favor, preencha o Nome, WBS, Número da NF e selecione o Tipo de Saída.", "warning");
       return;
     }
 
+    // ✨ 5. ALERTA DE VALIDAÇÃO (Anexos Obrigatórios)
     if (anexos.length === 0) {
-      alert("A anexação do documento da Nota Fiscal (PDF ou XML) é obrigatória para operações de Crossdocking.");
+      showAlert("Anexo Obrigatório", "A anexação do documento da Nota Fiscal (PDF ou imagem) é obrigatória para operações de Crossdocking.", "warning");
       return;
     }
 
+    // ✨ 6. ALERTA DE VALIDAÇÃO (Itens parciais incompletos)
     if (tipoSaida === 'parcial') {
       const temItemIncompleto = itensParciais.some(i => !i.desenhoSAP || !i.quantidade);
       if (temItemIncompleto) {
-        alert("Preencha o Desenho SAP e a Quantidade em todas as linhas da Saída Parcial.");
+        showAlert("Itens Incompletos", "Preencha o Desenho SAP e a Quantidade em todas as linhas da Saída Parcial.", "warning");
         return;
       }
     }
@@ -87,7 +96,8 @@ export default function Crossdocking() {
 
       if (erroUpload) {
         console.error("Erro ao subir arquivo:", erroUpload);
-        alert(`Falha ao anexar o ficheiro: ${arquivo.name}`);
+        // ✨ 7. ALERTA DE ERRO (Upload Falhou)
+        showAlert("Erro no Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
         return; 
       }
 
@@ -124,7 +134,6 @@ export default function Crossdocking() {
 
     try {
       // 2. REFATORAÇÃO DO FETCH
-      // Trocamos o código longo pela chamada simples à nossa API centralizada
       const dados = await apiFetch('/solicitacoes/crossdocking', {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -132,18 +141,21 @@ export default function Crossdocking() {
 
       // Apenas validamos se a regra de negócio do backend retornou sucesso
       if (dados.sucesso || dados.ps) {
-        alert(`Sucesso! Solicitação de Crossdocking enviada. ID: ${dados.ps}`);
+        // ✨ 8. ALERTA DE SUCESSO!
+        showAlert("Sucesso!", `Solicitação de Crossdocking enviada com sucesso. ID: ${dados.ps}`, "success");
+        
         setFormDados({ nome: '', wbs: '', observacoes: '', nf: '' });
         setTipoSaida(null);
         setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
         setAnexos([]); 
       } else {
-        alert(`Erro do servidor: ${dados.erro}`);
+        // ✨ 9. ALERTA DE ERRO DO SERVIDOR!
+        showAlert("Erro do Servidor", dados.erro, "error");
       }
     } catch (error) {
-      // Se houver problemas de rede, o erro gerado no apiFetch é exibido aqui
+      // ✨ 10. ALERTA DE ERRO DE CONEXÃO!
       console.error("Erro na requisição:", error.message);
-      alert("Falha ao conectar com o servidor. Verifique se o backend está rodando.");
+      showAlert("Falha de Conexão", "Não foi possível ligar ao servidor. Verifica a tua internet.", "error");
     }
   };
 

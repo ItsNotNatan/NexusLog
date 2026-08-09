@@ -1,49 +1,59 @@
 import React, { useState, useEffect } from 'react';
-// 1. ADICIONADO: Importamos os ícones Copy e Check
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
 
-export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionarItem }) {
+// 1. Recebemos a nova propriedade: bloquearTransferidos (padrão é falso para não afetar outras páginas)
+export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionarItem, itensSelecionados = [], bloquearTransferidos = false }) {
   const [busca, setBusca] = useState('');
   
-  // Lógica de paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 5;
 
-  // 2. NOVOS ESTADOS PARA O EFEITO DE COPIAR E HOVER
   const [hoverId, setHoverId] = useState(null);
   const [copiadoId, setCopiadoId] = useState(null);
 
   const estoqueFiltrado = estoque?.filter(item => {
+    const idDoItem = item.idBD || item.id;
+    const jaEstaSelecionado = itensSelecionados.some(selecionado => 
+      selecionado.estoque_id === idDoItem || 
+      selecionado.id === idDoItem || 
+      selecionado.idBD === idDoItem
+    );
+
+    if (jaEstaSelecionado) return false;
+
     const termo = busca.toLowerCase();
     return (
       (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
       (item.materialDescription && item.materialDescription.toLowerCase().includes(termo)) ||
       (item.numPecaFabricante && item.numPecaFabricante.toLowerCase().includes(termo)) ||
-      (item.wbs && item.wbs.toLowerCase().includes(termo))
+      (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
+      (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
+      (item.part_number && item.part_number.toLowerCase().includes(termo))
     );
   }) || [];
 
-  // Volta para a página 1 sempre que o termo de busca mudar
   useEffect(() => {
     setPaginaAtual(1);
   }, [busca]);
 
   const totalPaginas = Math.ceil(estoqueFiltrado.length / itensPorPagina) || 1;
-  const indexInicio = (paginaAtual - 1) * itensPorPagina;
+  
+  useEffect(() => {
+    if (paginaAtual > totalPaginas) {
+      setPaginaAtual(totalPaginas);
+    }
+  }, [estoqueFiltrado.length, totalPaginas, paginaAtual]);
+
+  const indexInicio = (Math.max(1, paginaAtual) - 1) * itensPorPagina;
   const itensPaginados = estoqueFiltrado.slice(indexInicio, indexInicio + itensPorPagina);
 
-  // 3. FUNÇÃO QUE COPIA O TEXTO
   const copiarParaAreaTransferencia = (e, texto, idUnico) => {
-    e.stopPropagation(); // Impede que o clique acione outras funções do item
+    e.stopPropagation(); 
     if (!texto || texto === "SEM SAP") return;
 
-    // Comando nativo do navegador para copiar texto
     navigator.clipboard.writeText(texto);
-    
-    // Atualiza o estado para mostrar o ícone de Check verde
     setCopiadoId(idUnico);
 
-    // Esconde o Check e volta ao ícone de Copiar após 2 segundos
     setTimeout(() => {
       setCopiadoId(null);
     }, 2000);
@@ -71,14 +81,9 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             style={{ 
-              width: '100%', 
-              padding: '8px 12px 8px 36px', 
-              borderRadius: '8px', 
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0', 
-              outline: 'none', 
-              fontSize: '0.85rem', 
-              boxSizing: 'border-box'
+              width: '100%', padding: '8px 12px 8px 36px', borderRadius: '8px', 
+              backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', outline: 'none', 
+              fontSize: '0.85rem', boxSizing: 'border-box'
             }}
           />
         </div>
@@ -95,100 +100,112 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
         ) : estoqueFiltrado.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px' }}>
             <AlertCircle size={36} style={{ opacity: 0.4, margin: '0 auto 12px auto' }} />
-            <p style={{ fontSize: '0.85rem', margin: 0 }}>Nenhum material encontrado.</p>
+            <p style={{ fontSize: '0.85rem', margin: 0 }}>
+              {estoque?.length > 0 ? "Todos os itens encontrados já estão na lista." : "Nenhum material encontrado."}
+            </p>
           </div>
         ) : (
           itensPaginados.map((item, index) => {
-            // Cria um ID seguro e único para garantir que o hover afeta apenas a linha correta
-            const idUnicoItem = item.idBD || `linha-${index}`;
+            const idUnicoItem = item.idBD || item.id || `linha-${index}`;
             const isHovered = hoverId === idUnicoItem;
             const isCopied = copiadoId === idUnicoItem;
-            const textoSAP = item.desenhoSAP && item.desenhoSAP !== "-" ? item.desenhoSAP : "SEM SAP";
-            const temSAP = textoSAP !== "SEM SAP";
+            const textoSAP = item.desenhoSAP || item.desenho_sap || "SEM SAP";
+            const temSAP = textoSAP !== "SEM SAP" && textoSAP !== "-";
+            
+            const isTransferido = item.is_transferencia || item.isTransferencia;
+            const corFundo = isTransferido ? '#fefce8' : 'transparent';
+            const corBorda = isTransferido ? '#fef08a' : '#e2e8f0';
+
+            // ✨ LÓGICA DE BLOQUEIO: É transferência E o componente pai mandou bloquear?
+            const botaoBloqueado = bloquearTransferidos && isTransferido;
 
             return (
               <div 
                 key={idUnicoItem} 
-                style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+                style={{ 
+                  padding: '16px', 
+                  borderBottom: `1px solid ${corBorda}`, 
+                  backgroundColor: corFundo, 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'flex-start',
+                  transition: 'background-color 0.2s'
+                }}
               >
-                {/* SAP Pill + Plus Button */}
+                {isTransferido && (
+                  <span style={{ fontSize: '0.65rem', color: '#ca8a04', fontWeight: '700', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>
+                    ★ Material de Transferência
+                  </span>
+                )}
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                   
-                  {/* 4. ÁREA DA PÍLULA DO SAP (COM EFEITOS DE RATO) */}
                   <div 
                     onMouseEnter={() => setHoverId(idUnicoItem)}
                     onMouseLeave={() => setHoverId(null)}
                     style={{ display: 'flex', alignItems: 'center' }}
                   >
                     <span style={{ 
-                      backgroundColor: '#eff6ff', 
-                      border: '1px solid #bfdbfe',
-                      color: '#2563eb', 
-                      padding: '4px 16px', 
-                      borderRadius: '999px', 
-                      fontSize: '0.9rem', 
-                      fontWeight: '700', 
-                      fontFamily: 'monospace',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      transition: 'all 0.2s'
+                      backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb', 
+                      padding: '4px 16px', borderRadius: '999px', fontSize: '0.9rem', 
+                      fontWeight: '700', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '8px'
                     }}>
                       {textoSAP}
                       
-                      {/* Mostrar o ícone de Copiar ou Check apenas se tiver um SAP válido e o rato estiver por cima (ou tiver acabado de copiar) */}
                       {temSAP && (isHovered || isCopied) && (
                         <button
                           onClick={(e) => copiarParaAreaTransferencia(e, textoSAP, idUnicoItem)}
                           style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: 0,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            color: isCopied ? '#10b981' : '#3b82f6', // Fica verde ao copiar
+                            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', color: isCopied ? '#10b981' : '#3b82f6',
                             transition: 'color 0.2s',
                           }}
                           title="Copiar Desenho SAP"
                         >
-                          {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                          {isCopied ? <Check size={14} strokeWidth={3} /> : <Copy size={14} />}
                         </button>
                       )}
                     </span>
                   </div>
 
+                  {/* ✨ BOTÃO COM BLOQUEIO CONDICIONAL ✨ */}
                   <button
-                    onClick={() => onAdicionarItem(item, index)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', padding: '4px', display: 'flex' }}
-                    title="Adicionar Item"
+                    onClick={() => !botaoBloqueado && onAdicionarItem(item, index)}
+                    disabled={botaoBloqueado}
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      cursor: botaoBloqueado ? 'not-allowed' : 'pointer', 
+                      color: botaoBloqueado ? '#cbd5e1' : '#2563eb', 
+                      padding: '4px', 
+                      display: 'flex' 
+                    }}
+                    title={botaoBloqueado ? "Material já transferido não pode ser transferido de novo" : "Adicionar Item"}
                   >
                     <Plus size={20} strokeWidth={2} />
                   </button>
                 </div>
 
-                {/* Part Number */}
-                <div style={{ marginTop: '12px', fontSize: '0.9rem', color: '#475569', fontFamily: 'monospace' }}>
-                  {item.numPecaFabricante !== "-" ? item.numPecaFabricante : "S/N Fabricante"}
+                <div style={{ marginTop: '12px', fontSize: '0.9rem', color: '#475569', fontWeight: '600', fontFamily: 'monospace' }}>
+                  {item.part_number || item.numPecaFabricante || "S/N Fabricante"}
                 </div>
 
-                {/* NF Pill */}
-                {item.nf && item.nf !== "-" && (
+                {(item.nf || item.nf_entrada) && (item.nf !== "-" && item.nf_entrada !== "-") && (
                   <div style={{ marginTop: '8px' }}>
-                    <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', color: '#334155', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                      NF: {item.nf}
+                    <span style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#334155', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                      NF: {item.nf || item.nf_entrada}
                     </span>
                   </div>
                 )}
 
-                {/* Descrição */}
                 <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase' }}>
-                  {item.materialDescription}
+                  {item.descricao || item.materialDescription}
                 </div>
                 
-                {/* Saldo e Alocação */}
                 <div style={{ display: 'flex', gap: '12px', fontSize: '0.9rem', fontFamily: 'monospace', marginTop: '8px' }}>
-                  <span style={{ color: '#10b981', fontWeight: '600' }}>Saldo: {item.qtdFornecida} {item.unidadeMedida || 'NR'}</span>
+                  <span style={{ color: '#10b981', fontWeight: '600' }}>
+                    Saldo: {item.quantidade_disponivel || item.qtdFornecida} {item.unidade_medida || item.unidadeMedida || 'Unid'}
+                  </span>
                   {item.alocacao && item.alocacao !== "-" && (
                     <span style={{ color: '#2563eb' }}>{item.alocacao}</span>
                   )}
@@ -202,27 +219,18 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
       {/* 📌 CONTROLES DE PAGINAÇÃO */}
       {!carregando && estoqueFiltrado.length > 0 && (
         <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          padding: '12px 16px', 
-          borderTop: '1px solid #e2e8f0',
-          backgroundColor: '#f8fafc'
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+          padding: '12px 16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc'
         }}>
           <button 
             onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
-            disabled={paginaAtual === 1}
+            disabled={paginaAtual <= 1}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '6px',
-              backgroundColor: paginaAtual === 1 ? 'transparent' : '#ffffff',
-              border: paginaAtual === 1 ? '1px solid transparent' : '1px solid #cbd5e1',
-              borderRadius: '6px',
-              color: paginaAtual === 1 ? '#cbd5e1' : '#475569',
-              cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s'
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px',
+              backgroundColor: paginaAtual <= 1 ? 'transparent' : '#ffffff',
+              border: paginaAtual <= 1 ? '1px solid transparent' : '1px solid #cbd5e1',
+              borderRadius: '6px', color: paginaAtual <= 1 ? '#cbd5e1' : '#475569',
+              cursor: paginaAtual <= 1 ? 'not-allowed' : 'pointer'
             }}
           >
             <ChevronLeft size={18} />
@@ -234,18 +242,13 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
 
           <button 
             onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
-            disabled={paginaAtual === totalPaginas}
+            disabled={paginaAtual >= totalPaginas}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '6px',
-              backgroundColor: paginaAtual === totalPaginas ? 'transparent' : '#ffffff',
-              border: paginaAtual === totalPaginas ? '1px solid transparent' : '1px solid #cbd5e1',
-              borderRadius: '6px',
-              color: paginaAtual === totalPaginas ? '#cbd5e1' : '#475569',
-              cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s'
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px',
+              backgroundColor: paginaAtual >= totalPaginas ? 'transparent' : '#ffffff',
+              border: paginaAtual >= totalPaginas ? '1px solid transparent' : '1px solid #cbd5e1',
+              borderRadius: '6px', color: paginaAtual >= totalPaginas ? '#cbd5e1' : '#475569',
+              cursor: paginaAtual >= totalPaginas ? 'not-allowed' : 'pointer'
             }}
           >
             <ChevronRight size={18} />

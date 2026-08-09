@@ -93,7 +93,7 @@ export default function MaterialEstoque() {
         if (item.id === id) {
           if (campo === "qtdSelecionada") {
             let valorValidado = novoValor === '' ? '' : parseInt(novoValor, 10);
-            
+
             if (valorValidado !== '') {
               if (isNaN(valorValidado) || valorValidado < 1) valorValidado = 1;
               if (item.qtdFornecida && valorValidado > item.qtdFornecida) {
@@ -114,7 +114,7 @@ export default function MaterialEstoque() {
       showAlert("Limite Atingido", "Atingiu o limite máximo de 25 itens para esta solicitação.", "warning");
       return;
     }
-    
+
     // Verifica se o item já foi adicionado
     const itemJaExiste = itensSelecionados.some(i => i.estoque_id === item.idBD);
     if (itemJaExiste) {
@@ -196,7 +196,7 @@ export default function MaterialEstoque() {
       solicitante: {
         ...formDados,
         observacoes: observacoesFinais,
-        filial_origem: estoqueAtual 
+        filial_origem: estoqueAtual
       },
       itens: itensSelecionados,
       anexos: anexosProcessados,
@@ -212,7 +212,7 @@ export default function MaterialEstoque() {
         const idGerado = dados.ps || dados.ps_id;
 
         showAlert("Operação Concluída!", `Sucesso! Solicitação criada com o ID: ${idGerado}`, "success");
-        
+
         setFormDados({
           nome: "",
           wbs: "",
@@ -353,10 +353,10 @@ export default function MaterialEstoque() {
               checked={formDados.entregaUrgente}
               onChange={(e) => {
                 const isChecked = e.target.checked;
-                setFormDados({ 
-                  ...formDados, 
+                setFormDados({
+                  ...formDados,
                   entregaUrgente: isChecked,
-                  justificativaUrgencia: isChecked ? formDados.justificativaUrgencia : "" 
+                  justificativaUrgencia: isChecked ? formDados.justificativaUrgencia : ""
                 });
               }}
               style={{
@@ -392,7 +392,7 @@ export default function MaterialEstoque() {
                 Marcando esta opção, a solicitação entrará em fila de aprovação
                 exclusiva do Administrador.
               </span>
-              
+
               {formDados.entregaUrgente && (
                 <div style={{ marginTop: "16px", width: "100%", animation: "fadeIn 0.3s ease" }}>
                   <label style={{ fontSize: "0.75rem", fontWeight: "600", color: "#ef4444", marginBottom: "6px", display: "block" }}>
@@ -419,7 +419,7 @@ export default function MaterialEstoque() {
         </div>
       </div>
 
-      <div 
+      <div
         className="selecao-itens-grid"
         style={{
           display: "grid",
@@ -433,6 +433,7 @@ export default function MaterialEstoque() {
           estoque={estoqueDisponivel}
           carregando={carregandoEstoque}
           onAdicionarItem={adicionarItemDoEstoque}
+          itensSelecionados={listaSegura} // 👈 ADICIONAR ISTO!
         />
 
         <div
@@ -570,15 +571,15 @@ export default function MaterialEstoque() {
                           }
                           placeholder="PN"
                           readOnly
-                          style={{ 
-                            width: "100%", 
-                            border: "none", 
-                            outline: "none", 
-                            fontWeight: "500", 
-                            color: "#1e293b", 
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            outline: "none",
+                            fontWeight: "500",
+                            color: "#1e293b",
                             backgroundColor: "transparent",
-                            fontFamily: "monospace", 
-                            fontSize: "0.85rem" 
+                            fontFamily: "monospace",
+                            fontSize: "0.85rem"
                           }}
                         />
                       </td>
@@ -591,18 +592,18 @@ export default function MaterialEstoque() {
                           }
                           placeholder="Descrição"
                           readOnly
-                          style={{ 
-                            width: "100%", 
-                            border: "none", 
-                            outline: "none", 
-                            color: "#475569", 
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            outline: "none",
+                            color: "#475569",
                             backgroundColor: "transparent",
-                            fontSize: "0.85rem", 
+                            fontSize: "0.85rem",
                             textTransform: "uppercase"
                           }}
                         />
                       </td>
-                      
+
                       <td style={{ padding: "12px", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <input
@@ -624,9 +625,9 @@ export default function MaterialEstoque() {
                             }}
                           />
                           {item.qtdFornecida && (
-                             <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "500" }}>
-                               / {item.qtdFornecida}
-                             </span>
+                            <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "500" }}>
+                              / {item.qtdFornecida}
+                            </span>
                           )}
                         </div>
                       </td>
@@ -639,13 +640,13 @@ export default function MaterialEstoque() {
                           }
                           placeholder="NF..."
                           readOnly
-                          style={{ 
-                            width: "130px", 
-                            border: "none", 
-                            outline: "none", 
-                            color: "#475569", 
+                          style={{
+                            width: "130px",
+                            border: "none",
+                            outline: "none",
+                            color: "#475569",
                             backgroundColor: "transparent",
-                            fontSize: "0.75rem", 
+                            fontSize: "0.75rem",
                             fontFamily: "monospace"
                           }}
                         />
@@ -660,14 +661,14 @@ export default function MaterialEstoque() {
                             }
                             placeholder="Aloc..."
                             readOnly
-                            style={{ 
-                              width: "100%", 
-                              border: "none", 
-                              outline: "none", 
-                              color: "#2563eb", 
-                              fontFamily: "monospace", 
-                              fontSize: "0.85rem", 
-                              backgroundColor: "transparent" 
+                            style={{
+                              width: "100%",
+                              border: "none",
+                              outline: "none",
+                              color: "#2563eb",
+                              fontFamily: "monospace",
+                              fontSize: "0.85rem",
+                              backgroundColor: "transparent"
                             }}
                           />
                           {item.isTransferencia && (
@@ -686,14 +687,14 @@ export default function MaterialEstoque() {
                           }
                           placeholder="WBS..."
                           readOnly
-                          style={{ 
-                            width: "100%", 
-                            border: "none", 
-                            outline: "none", 
-                            color: "#64748b", 
-                            fontFamily: "monospace", 
-                            fontSize: "0.75rem", 
-                            backgroundColor: "transparent" 
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            outline: "none",
+                            color: "#64748b",
+                            fontFamily: "monospace",
+                            fontSize: "0.75rem",
+                            backgroundColor: "transparent"
                           }}
                         />
                       </td>

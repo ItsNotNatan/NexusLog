@@ -5,19 +5,18 @@ import { Send, Trash2, Box } from 'lucide-react';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import SeletorEstoqueLateral from '../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral';
 import { supabase } from '../../../supabaseClient';
-
-// Importamos o AuthContext para saber em qual Filial estamos
 import { AuthContext } from '../../../contexts/AuthContext';
-
-// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
-// O apiFetch vai cuidar de todas as requisições de forma dinâmica
 import { apiFetch } from '../../../services/api';
 
+// ✨ 1. IMPORTAÇÃO DO CONTEXTO DE ALERTAS
+import { useAlert } from '../../../contexts/AlertContext'; 
+
 export default function TransferenciaWBS() {
-  // Puxamos a filial global (estoqueAtual)
   const { estoqueAtual } = useContext(AuthContext);
 
-  // --- 1. ESTADOS DO FORMULÁRIO E ITENS ---
+  // ✨ 2. INICIALIZAÇÃO DO HOOK DE ALERTAS
+  const { showAlert } = useAlert();
+
   const [formDados, setFormDados] = useState({
     nome: '',
     wbsDestino: '',
@@ -27,12 +26,9 @@ export default function TransferenciaWBS() {
 
   const [itensSelecionados, setItensSelecionados] = useState([]);
   const [anexos, setAnexos] = useState([]);
-
-  // --- 2. ESTADOS PARA O ESTOQUE REAL ---
   const [estoqueReal, setEstoqueReal] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
-  // --- 3. BUSCAR DADOS REAIS DO BACKEND (Filtrado por Filial Ativa) ---
   useEffect(() => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       setEstoqueReal([]);
@@ -43,20 +39,15 @@ export default function TransferenciaWBS() {
     const carregarEstoque = async () => {
       try {
         setCarregandoEstoque(true);
-        
-        // 2. REFATORAÇÃO DO GET DE ESTOQUE
-        // Chamada limpa apenas com a rota e o query parameter.
         const resultado = await apiFetch(`/estoque/listar?filial_id=${estoqueAtual}`);
 
         if (resultado.sucesso) {
-          // Filtra apenas itens que tenham saldo maior que zero
           const itensComSaldo = resultado.dados.filter(item => item.quantidade_disponivel > 0);
           setEstoqueReal(itensComSaldo);
         } else {
           console.error("Erro ao buscar estoque:", resultado.erro);
         }
       } catch (error) {
-        // Erros de rede capturados e geridos pela apiFetch
         console.error("Falha de conexão ao buscar estoque:", error.message);
       } finally {
         setCarregandoEstoque(false);
@@ -66,7 +57,6 @@ export default function TransferenciaWBS() {
     carregarEstoque();
   }, [estoqueAtual]); 
 
-  // --- 4. FUNÇÕES DE CÁLCULO DE SALDO ---
   const getQuantidadeJaSelecionada = (idItem) => {
     const itemNoCarrinho = itensSelecionados.find(i => i.id === idItem);
     return itemNoCarrinho ? itemNoCarrinho.qtdTransferencia : 0;
@@ -76,7 +66,6 @@ export default function TransferenciaWBS() {
     return item.quantidade_disponivel - getQuantidadeJaSelecionada(item.id);
   };
 
-  // --- 5. AÇÕES DO CARRINHO ---
   const adicionarItem = (itemOriginal) => {
     if (getSaldoRestante(itemOriginal) > 0 && !itensSelecionados.find(i => i.id === itemOriginal.id)) {
       setItensSelecionados([
@@ -108,20 +97,20 @@ export default function TransferenciaWBS() {
     ));
   };
 
-  // --- 6. ENVIO PARA O BACKEND ---
   const handleEnviar = async () => {
+    // ✨ 3. SUBSTITUIÇÃO DOS ALERTAS NATIVOS PELO SHOWALERT
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
-      alert("Por favor, selecione uma filial de origem específica (ex: BR02) no topo da página antes de solicitar uma transferência.");
+      showAlert("Atenção", "Por favor, selecione uma filial de origem específica (ex: BR02) no topo da página antes de solicitar uma transferência.", "warning");
       return;
     }
 
     if (!formDados.nome || !formDados.wbsDestino) {
-      alert("Preencha o Nome do Solicitante e o WBS de Destino.");
+      showAlert("Campos Obrigatórios", "Preencha o Nome do Solicitante e o WBS de Destino.", "warning");
       return;
     }
 
     if (itensSelecionados.length === 0) {
-      alert("Selecione pelo menos um item para transferir.");
+      showAlert("Carrinho Vazio", "Selecione pelo menos um item para transferir.", "warning");
       return;
     }
 
@@ -138,7 +127,7 @@ export default function TransferenciaWBS() {
 
         if (erroUpload) {
           console.error("Erro ao subir arquivo:", erroUpload);
-          alert(`Falha ao anexar o ficheiro: ${arquivo.name}`);
+          showAlert("Falha no Anexo", `Não foi possível anexar o ficheiro: ${arquivo.name}`, "error");
           return; 
         }
 
@@ -175,24 +164,26 @@ export default function TransferenciaWBS() {
     };
 
     try {
-      // 3. REFATORAÇÃO DO POST DE TRANSFERÊNCIA
-      // Requisição limpa usando apiFetch. Sem headers manuais.
       const dados = await apiFetch('/solicitacoes/transferencia', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
 
       if (dados.sucesso || dados.ps) {
-        alert(`Sucesso! Transferência solicitada. PS Gerada: ${dados.ps}`);
+        // ✨ ALERTA DE SUCESSO!
+        showAlert("Sucesso!", `Transferência solicitada com sucesso. PS Gerada: ${dados.ps}`, "success");
+        
         setFormDados({ nome: '', wbsDestino: '', justificativa: '', entregaUrgente: false });
         setItensSelecionados([]);
         setAnexos([]); 
       } else {
-        alert(`Erro do servidor: ${dados.erro}`);
+        // ✨ ALERTA DE ERRO DO SERVIDOR!
+        showAlert("Erro do Servidor", dados.erro, "error");
       }
     } catch (error) {
       console.error("Erro na requisição:", error.message);
-      alert("Falha ao conectar com o servidor.");
+      // ✨ ALERTA DE ERRO DE CONEXÃO!
+      showAlert("Falha de Conexão", "Não foi possível ligar ao servidor. Verifica a tua internet.", "error");
     }
   };
 
@@ -243,10 +234,10 @@ export default function TransferenciaWBS() {
           estoque={estoqueReal}
           carregando={carregandoEstoque}
           onAdicionarItem={adicionarItem}
-          calcularSaldo={getSaldoRestante}
+          itensSelecionados={itensSelecionados} 
+          bloquearTransferidos={true} 
         />
 
-        {/* COLUNA DIREITA: ITENS SELECIONADOS */}
         <div className="coluna-cartao">
           <div className="coluna-direita-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', fontWeight: '700', color: '#1e293b' }}>
