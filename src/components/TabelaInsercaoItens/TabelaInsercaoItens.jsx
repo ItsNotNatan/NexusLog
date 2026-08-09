@@ -1,14 +1,12 @@
 // =================================================================
 // ARQUIVO: src/components/TabelaInsercaoItens/TabelaInsercaoItens.jsx
-// DESCRIÇÃO: Tabela componentizada com paginação para entrada de itens
+// DESCRIÇÃO: Tabela componentizada para entrada de itens com a coluna Referência
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 
 import CarregarArquivo from '../CarregarArquivo/CarregarArquivo';
 import ExemploExcel from '../ExemploExcel/ExemploExcel';
-
-// ✨ IMPORTAÇÃO DO NOSSO NOVO COMPONENTE DE SCROLL
 import ScrollDuplo from '../ScrollDuplo/ScrollDuplo';
 
 export default function TabelaInsercaoItens({
@@ -39,8 +37,8 @@ export default function TabelaInsercaoItens({
 
   const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
 
-  // Lógica de limite
   const limiteAtingido = itens.length >= limiteLinhas;
+  const larguraMinimaTabela = mostrarDataNecessidade ? '2750px' : '2550px';
 
   return (
     <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
@@ -123,16 +121,16 @@ export default function TabelaInsercaoItens({
           </div>
         )}
 
-        {/* ✨ AQUI ESTÁ A MAGIA: Envelopámos a tabela com o nosso novo componente ScrollDuplo */}
-        <ScrollDuplo larguraConteudo={mostrarDataNecessidade ? '2600px' : '2400px'}>
-          {/* Aumentei ligeiramente o minWidth para acomodar a nova coluna */}
-          <table className="tabela-solicitacao-dados" style={{ minWidth: mostrarDataNecessidade ? '2600px' : '2400px', width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <ScrollDuplo larguraConteudo={larguraMinimaTabela}>
+          <table className="tabela-solicitacao-dados" style={{ minWidth: larguraMinimaTabela, width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr>
                 <th style={{ width: '60px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESENHO SAP</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>Nº PEÇA FABRICANTE</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR</th>
+                {/* ✨ NOVA COLUNA DE CABEÇALHO */}
+                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ width: '120px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>QTD. FORNECIDA</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NF DE ENTRADA</th>
                 <th style={{ width: '140px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>UNIDADE DE MEDIDA</th>
@@ -167,6 +165,12 @@ export default function TabelaInsercaoItens({
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                   </td>
+
+                  {/* ✨ NOVO INPUT DE REFERÊNCIA */}
+                  <td style={{ padding: '8px' }}>
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.referencia || ''} onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Referência" />
+                  </td>
+
                   <td className="qtd-solicitada-destaque" style={{ padding: '8px', textAlign: 'center' }}>
                     <input type="number" className="input-inline-tabela" style={{ width: '60px', padding: '4px 8px', border: '1px solid transparent', borderRadius: '4px', color: '#2563eb', fontWeight: '700', textAlign: 'center', backgroundColor: '#eff6ff', outline: 'none' }} value={item.qtdFornecida} onChange={(e) => onAtualizarCampo(item.id, 'qtdFornecida', e.target.value)} placeholder="0" min="1" />
                   </td>
@@ -222,7 +226,8 @@ export default function TabelaInsercaoItens({
               
               {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
                 <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
-                  <td colSpan={mostrarDataNecessidade ? 17 : 16} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
+                  {/* ✨ COLSPAN ATUALIZADO (18 com data de necessidade, 17 sem) */}
+                  <td colSpan={mostrarDataNecessidade ? 18 : 17} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
                 </tr>
               ))}
             </tbody>

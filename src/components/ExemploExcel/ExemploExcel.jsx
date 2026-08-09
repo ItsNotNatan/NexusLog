@@ -7,15 +7,15 @@ import './ExemploExcel.css';
 export default function ExemploExcel() {
   const baixarModelo = async () => {
     try {
-      // 1. Cria a estrutura do Excel
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Modelo SAP');
 
-      // 2. Define os nomes das colunas com a tua nova lista (Desenho SAP no início)
+      // ✨ COLUNAS ATUALIZADAS (Com Desenho SAP e Referência)
       const colunas = [
-        'Desenho SAP', // 👈 Nova coluna adicionada aqui no topo!
+        'Desenho SAP',
         'Nº peça fabricante',
         'FORNECEDOR',
+        'REFERÊNCIA', // ✨ Nova coluna adicionada
         'Qtd.fornecida',
         'NF DE ENTRADA',
         'Unidade de medida',
@@ -30,13 +30,11 @@ export default function ExemploExcel() {
         'Alocação'
       ];
 
-      // Aplica as colunas na planilha com uma largura padrão de 20
       worksheet.columns = colunas.map(col => ({ header: col, key: col, width: 20 }));
 
-      // 3. Estiliza o cabeçalho (Fundo azul, texto branco e negrito)
       const linhaCabecalho = worksheet.getRow(1);
       linhaCabecalho.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } }; // Azul NexusLog
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
         cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.border = {
@@ -46,11 +44,12 @@ export default function ExemploExcel() {
       });
       linhaCabecalho.height = 25;
 
-      // 4. Adiciona uma linha de exemplo preenchida para guiar o utilizador
+      // ✨ EXEMPLO PREENCHIDO COM A NOVA COLUNA
       worksheet.addRow({
-        'Desenho SAP': 'DS-778899', // 👈 Exemplo para a nova coluna adicionado aqui!
+        'Desenho SAP': 'DS-778899',
         'Nº peça fabricante': 'PN-12345',
         'FORNECEDOR': 'Fornecedor A',
+        'REFERÊNCIA': 'REF-9988', // ✨ Exemplo de referência
         'Qtd.fornecida': 10,
         'NF DE ENTRADA': 'NF-001',
         'Unidade de medida': 'Unid',
@@ -65,7 +64,6 @@ export default function ExemploExcel() {
         'Alocação': 'A-01'
       });
 
-      // 5. Gera o ficheiro e faz o download
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, "Modelo_Importacao_SAP.xlsx");

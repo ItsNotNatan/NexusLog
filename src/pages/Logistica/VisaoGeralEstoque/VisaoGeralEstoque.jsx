@@ -3,12 +3,8 @@ import { Search, Boxes, Loader2, MapPin, X, History, Filter } from 'lucide-react
 import './VisaoGeralEstoque.css'; 
 import FiltroEstoqueModal from '../../../components/FiltroEstoqueModal/FiltroEstoqueModal';
 
-// Componentes e Contextos
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import { AuthContext } from '../../../contexts/AuthContext';
-
-// 1. IMPORTAÇÃO DA FUNÇÃO CENTRALIZADA DE API
-// O apiFetch adiciona o token JWT e adapta a URL base (.env ou localhost) automaticamente
 import { apiFetch } from '../../../services/api';
 
 const ESTADO_INICIAL_FILTROS = {
@@ -55,8 +51,6 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
       try {
         setCarregando(true);
         
-        // 2. REFATORAÇÃO DO GET DE ESTOQUE
-        // Trocamos o fetch nativo e o endereço estático pelo apiFetch
         const resultado = await apiFetch(`/estoque/listar?filial=${estoqueAtual}`);
 
         const estoqueTratado = (resultado.dados || []).map((item) => ({
@@ -98,27 +92,24 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
     setCarregandoDemandas(true);
 
     try {
-      // 3. REFATORAÇÃO DO GET DE DEMANDAS
       const resultado = await apiFetch(`/demandas/material/${material.part_number}`);
 
       if (resultado.sucesso) {
+        // ✨ CORREÇÃO AQUI: Mapear exatamente as propriedades que o Backend já nos envia perfeitamente formatadas!
         const dadosFormatados = resultado.dados.map(item => ({
-          id: `PS-${item.id || item.ps_id}`,
+          id: item.id, // O Backend já envia "PS-XXXXX"
           solicitante: item.solicitante,
           wbs: item.wbs,
           status: item.status,
-          bs: item.bs || '-',
-          criacaoBs: item.dataSolicitacao || item.criacaoBs || '-',
+          pl: item.pl || '-', // Atualizado de "bs" para "pl"
+          criacaoPl: item.criacaoPl || '-', // Atualizado de "criacaoBs" para "criacaoPl"
           dataEntrega: item.dataEntrega || 'não definido',
           contagem: item.contagem || '',
           contagemStatus: item.contagemStatus || 'neutro'
         }));
         setDemandasDoMaterial(dadosFormatados);
       } else {
-        setDemandasDoMaterial([
-          { id: 'PS-99821', solicitante: 'Engenharia de Campo', wbs: material.wbs, status: 'Concluído', bs: 'BS-1234', criacaoBs: '18/07/2026', dataEntrega: '20/07/2026' },
-          { id: 'PS-99855', solicitante: 'Manutenção Preventiva', wbs: material.wbs, status: 'Em Separação', bs: '-', criacaoBs: '20/07/2026', dataEntrega: 'não definido' }
-        ]);
+        setDemandasDoMaterial([]);
       }
     } catch (error) {
       console.error("Erro ao buscar demandas associadas:", error.message);
@@ -304,7 +295,7 @@ export default function VisaoGeralEstoque({ perfil = 'logistica' }) {
       </div>
 
       {/* ========================================================= */}
-      {/* 🪟 JANELA MODAL COM A TABELA DE DEMANDAS                   */}
+      {/* 🪟 JANELA MODAL COM A TABELA DE DEMANDAS                  */}
       {/* ========================================================= */}
       {modalDemandasAberto && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>

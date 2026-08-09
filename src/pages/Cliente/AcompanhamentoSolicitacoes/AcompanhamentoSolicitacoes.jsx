@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
-// DESCRIÇÃO: Tabela de acompanhamento com a regra visual ajustada (PL vazio mostra "-")
+// DESCRIÇÃO: Tabela de acompanhamento (Prefixo PS unificado para todos os tipos)
 // =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
@@ -147,19 +147,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         if (resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados.map((item) => {
             
-            // O ID de acompanhamento nasce e morre com o seu prefixo
+            // ✨ CORREÇÃO: O prefixo é agora universalmente 'PS' para todos os tipos!
             let prefixo = "PS"; 
-            if (item.tipo === "Crossdocking") prefixo = "CD";
-            else if (item.tipo === "Nota Fiscal") prefixo = "NF";
-            else if (item.tipo === "Transferencia WBS") prefixo = "TR";
-            else if (item.tipo === "Reintegracao") prefixo = "REI";
-            else if (item.tipo === "Entrada") prefixo = "EN";
 
             const idNumerico = item.id.replace(/\D/g, "");
             let acaoTipo = "select";
             let acaoValor = item.status;
 
-            // Entradas concluem na aprovação, o resto vai para Separação
             let statusDestinoAprovacao = item.tipo === "Entrada" ? "Concluído" : "Em Separação";
 
             if (item.status === "Pendente") {
@@ -169,7 +163,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               acaoValor = "Em Separação";
             }
 
-            // ✨ CORREÇÃO AQUI: Removemos o "Gerando..." - se não houver PL no banco, é um "-" e pronto.
             let numeroPL = "-";
             if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
                 numeroPL = item.pl || item.bs || "-";
@@ -234,17 +227,18 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         setDadosTabela(prev => prev.map(sol => {
           if (sol.idOriginal === idSolicitacao) {
             
-            // ✨ CORREÇÃO AQUI: Mantemos a simulação visual limpa
             let novoPl = sol.pl;
-            if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && sol.pl === '-') {
-               novoPl = `PL-${sol.id}`; 
+            if (dados.numeroPL) {
+              novoPl = `PL #${dados.numeroPL}`;
+            } else if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && sol.pl === '-') {
+              novoPl = `PL-${sol.id}`; 
             }
 
             return {
               ...sol,
               status: novoStatus,
               acaoValor: novoStatus,
-              pl: novoStatus === 'Pendente' || novoStatus === 'Recusado' || novoStatus === 'Cancelado' ? '-' : novoPl,
+              pl: (novoStatus === 'Pendente' || novoStatus === 'Recusado' || novoStatus === 'Cancelado') ? '-' : novoPl,
               acaoTipo: novoStatus === 'Pendente' ? 'botao' : 'select'
             };
           }
@@ -345,7 +339,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     return null;
   }
 
-  // 4. Renderização
   return (
     <div className="acompanhamento-wrapper">
       <header className="acompanhamento-cabecalho">
@@ -404,8 +397,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             <thead>
               <tr>
                 <th className="col-chevron"></th>
-                <th>TIPO</th>
-                <th>ID GERAL (PS) / SOLICITANTE</th>
+                <th>TIPO / ID (PS)</th>
+                <th>SOLICITANTE / WBS</th>
                 <th>Nº DA PL</th>
                 <th>FILIAL</th>
                 <th>DATA CRIAÇÃO</th>
@@ -466,16 +459,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               )}
                               {linha.tipo}
                             </span>
+                            
+                            <span style={{ fontSize: "0.875rem", fontWeight: "700", color: "#1e293b", marginTop: "4px", display: "block", fontFamily: "monospace" }}>
+                              {linha.prefixo}:{linha.id}
+                            </span>
                           </div>
                         </td>
 
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                            {/* AQUI É A COLUNA DO ID GERAL QUE NUNCA MUDA */}
-                            <span style={{ fontSize: "0.875rem", fontWeight: "700", color: "#1e293b" }}>
-                              {linha.prefixo}:{linha.id}
-                            </span>
-                            <span style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "uppercase" }}>
+                            <span style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "uppercase", fontWeight: "600" }}>
                               {linha.solicitante}
                             </span>
                             {linha.wbs && (
@@ -487,7 +480,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
 
                         <td>
-                          {/* AQUI É A COLUNA EXCLUSIVA DO PL */}
                           {linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
                             <span className="badge-pl">
                               <FileText size={14} /> {linha.pl}
@@ -610,7 +602,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
           <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
             <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosTabela.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistros)}</strong> de <strong>{totalRegistros}</strong> resultados
+              Página <strong>{paginaAtual}</strong> de <strong>{totalRegistros ? totalPaginas : 1}</strong> &middot; Exibindo {dadosTabela.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistros)}</strong> de <strong>{totalRegistros}</strong> resultados
             </div>
 
             <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

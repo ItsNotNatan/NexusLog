@@ -10,11 +10,8 @@ import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaI
 import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { AlertContext } from '../../../contexts/AlertContext';
-
-// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
 import { apiFetch } from '../../../services/api';
 
-// ✨ CONSTANTE DE LIMITE PARA O CLIENTE
 const LIMITE_CLIENTE = 20;
 
 export default function EntradaMaterial() {
@@ -35,7 +32,24 @@ export default function EntradaMaterial() {
   }, []);
 
   const gerarLinhaVazia = () => ({
-    id: `linha-vazia-${Date.now()}-${Math.random()}`, numPecaFabricante: '', fornecedor: '', qtdFornecida: 1, nfEntrada: '', unidadeMedida: 'Unid', vendorDescription: '', wbsElement: '', dataNecessidade: '', emissaoNF: '', recebNF: '', docCompras: '', poNetPrice: '', centro: '', deposito: '', alocacao: ''
+    id: `linha-vazia-${Date.now()}-${Math.random()}`,
+    desenhoSAP: '',
+    numPecaFabricante: '',
+    fornecedor: '',
+    referencia: '', // ✨ Campo adicionado na linha vazia
+    qtdFornecida: 1,
+    nfEntrada: '',
+    unidadeMedida: 'Unid',
+    vendorDescription: '',
+    wbsElement: '',
+    dataNecessidade: '',
+    emissaoNF: '',
+    recebNF: '',
+    docCompras: '',
+    poNetPrice: '',
+    centro: '',
+    deposito: '',
+    alocacao: ''
   });
 
   const [itens, setItens] = useState([]);
@@ -47,12 +61,13 @@ export default function EntradaMaterial() {
     if (itensProcessados && Array.isArray(itensProcessados)) {
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-
-        // 👇 ADICIONA ESTA LINHA AQUI PARA PUXAR A COLUNA DO EXCEL
         desenhoSAP: item['Desenho SAP'] || item.desenhoSAP || '',
-
         numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
         fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
+        
+        // ✨ LEITURA DA REFERÊNCIA NO EXCEL IMPORTADO
+        referencia: item['REFERÊNCIA'] || item['Referência'] || item.referencia || '',
+        
         qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
         nfEntrada: item['NF DE ENTRADA'] || '',
         unidadeMedida: item['Unidade de medida'] || item.unidadeMedida || 'Unid',
@@ -72,7 +87,6 @@ export default function EntradaMaterial() {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
         const novaLista = [...listaLimpa, ...novosItensFormatados];
 
-        // ✨ LÓGICA DE PROTEÇÃO DE EXCEL: Corta o array se exceder o limite
         if (novaLista.length > LIMITE_CLIENTE) {
           showAlert(
             "Limite de Linhas Excedido",
@@ -88,7 +102,6 @@ export default function EntradaMaterial() {
   };
 
   const adicionarLinhaEmBranco = () => {
-    // ✨ LÓGICA DE PROTEÇÃO DO BOTÃO
     if (itens.length < LIMITE_CLIENTE) {
       setItens([...itens, gerarLinhaVazia()]);
     } else {
@@ -103,7 +116,7 @@ export default function EntradaMaterial() {
 
   const handleEnviar = async () => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
-      showAlert("Filial Inválida", "Por favor, selecione em qual filial você está dando entrada (ex: BR02) lá no topo da página antes de enviar.", "warning");
+      showAlert("Filial Inválida", "Por favor, selecione em qual filial você está dando entrada lá no topo da página antes de enviar.", "warning");
       return;
     }
     if (!formDados.nome || !formDados.wbs) {
@@ -116,10 +129,6 @@ export default function EntradaMaterial() {
     }
     if (itens.some(i => !i.numPecaFabricante || !i.qtdFornecida)) {
       showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.", "warning");
-      return;
-    }
-    if (itens.some(i => (i.emissaoNF && i.emissaoNF < dataMinima) || (i.recebNF && i.recebNF < dataMinima) || (i.dataNecessidade && i.dataNecessidade < dataMinima))) {
-      showAlert("Data Inválida", "Existem datas preenchidas que são anteriores ao dia atual. Por favor, corrija-as antes de enviar.", "warning");
       return;
     }
 
@@ -145,20 +154,18 @@ export default function EntradaMaterial() {
         itens: itens.map(item => ({
           ...item,
           qtd: item.qtdFornecida,
-          desenhoSAP: item.desenhoSAP || '-', // ✨ CORREÇÃO: Agora puxa o valor real do input
+          desenhoSAP: item.desenhoSAP || '-',
+          referencia: item.referencia || null, // ✨ ENVIO DO CAMPO REFERÊNCIA PARA A API
           materialDescription: item.vendorDescription || 'Sem descrição'
         })),
         anexos: anexosProcessados
       };
 
-      // 2. REFATORAÇÃO DO FETCH
-      // Utilizamos o apiFetch. A URL ajusta-se dinamicamente (Vercel ou localhost).
       const dados = await apiFetch('/solicitacoes/entrada', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
 
-      // Avaliamos apenas as regras de negócio de retorno (sucesso)
       if (dados.sucesso || dados.ps || dados.ps_id) {
         showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps || dados.ps_id}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
@@ -168,7 +175,6 @@ export default function EntradaMaterial() {
         showAlert("Erro no Servidor", dados.erro, "error");
       }
     } catch (error) {
-      // Captura global de erros processada pelo apiFetch ou exceções locais
       showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
     }
   };
@@ -197,7 +203,7 @@ export default function EntradaMaterial() {
         dataMinima={dataMinima}
         mostrarDataNecessidade={true}
         mostrarExemploExcel={true}
-        limiteLinhas={LIMITE_CLIENTE} // ✨ AQUI: Passamos a trava de limite (20) para a tabela!
+        limiteLinhas={LIMITE_CLIENTE}
         onAtualizarCampo={atualizarCampo}
         onRemoverItem={removerItem}
         onAdicionarLinha={adicionarLinhaEmBranco}

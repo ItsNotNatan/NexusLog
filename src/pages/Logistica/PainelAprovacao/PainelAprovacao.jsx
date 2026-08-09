@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Logistica/PainelAprovacao/PainelAprovacao.jsx
+// DESCRIÇÃO: Painel de Aprovação integrado com o AlertContext global
+// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './PainelAprovacao.css';
 import {
@@ -15,9 +19,10 @@ import {
 } from 'lucide-react';
 
 import { AuthContext } from '../../../contexts/AuthContext';
+// ✨ IMPORTAÇÃO DO HOOK DE ALERTAS GLOBAIS
+import { useAlert } from '../../../contexts/AlertContext';
 
 // 1. IMPORTAÇÃO DA FUNÇÃO CENTRALIZADA DE API
-// O apiFetch adiciona o token JWT e chaveia entre Localhost e Vercel automaticamente
 import { apiFetch } from '../../../services/api';
 
 // FUNÇÃO AUXILIAR: Traduz os códigos brutos para os nomes reais dos galpões
@@ -37,6 +42,8 @@ const obterNomeFilial = (codigo) => {
 
 export default function PainelAprovacao() {
   const { estoqueAtual } = useContext(AuthContext);
+  // ✨ INICIALIZAÇÃO DOS ALERTAS GLOBAIS
+  const { showAlert, showConfirm } = useAlert();
 
   // --- ESTADOS DO COMPONENTE ---
   const [dadosTabela, setDadosTabela] = useState([]);
@@ -63,8 +70,6 @@ export default function PainelAprovacao() {
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual || ''}&t=${Date.now()}`;
         const urlEstoque = `/estoque/listar?t=${Date.now()}`;
 
-        // 2. REFATORAÇÃO DO PROMISE.ALL COM APIFETCH
-        // O apiFetch já faz o parse de JSON e injeta os cabeçalhos de autenticação
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
           apiFetch(urlEstoque)
@@ -105,6 +110,7 @@ export default function PainelAprovacao() {
         }
       } catch (error) {
         console.error("Falha ao conectar à API do NexusLog:", error.message);
+        showAlert("Erro de Conexão", "Não foi possível carregar as solicitações do servidor.", "error");
       } finally {
         setCarregando(false);
       }
@@ -195,35 +201,44 @@ export default function PainelAprovacao() {
     }));
 
     try {
-      setDadosTabela(prev => prev.map(item => {
-        if (item.idOriginal === solicitacaoSendoEditada.idOriginal) {
-          return { ...item, itens: itensEdicao };
-        }
-        return item;
-      }));
-
-      setLinhaExpandida(null);
-
-      // 3. REFATORAÇÃO DO SALVAR ITENS (PATCH)
       const resposta = await apiFetch(`/solicitacoes/${solicitacaoSendoEditada.idOriginal}/itens`, {
         method: 'PATCH',
         body: JSON.stringify({ itens: itensParaEnviar })
       });
 
-      if (!resposta.sucesso) {
-        console.warn("O servidor recusou a atualização dos itens.");
+      if (resposta.sucesso) {
+        setDadosTabela(prev => prev.map(item => {
+          if (item.idOriginal === solicitacaoSendoEditada.idOriginal) {
+            return { ...item, itens: itensEdicao };
+          }
+          return item;
+        }));
+
+        setLinhaExpandida(null);
+        showAlert("Sucesso!", "Os itens da solicitação foram salvos com sucesso.", "success");
+      } else {
+        showAlert("Erro", resposta.erro || "O servidor recusou a atualização dos itens.", "error");
       }
     } catch (error) {
       console.error('Erro de rede ao tentar atualizar os itens:', error.message);
+      showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
     }
   };
 
-  // --- AÇÕES GERAIS ---
+  // --- AÇÃO DE APROVAR ---
   const handleAprovar = async (e, idOriginal) => {
     e.stopPropagation();
-    if (window.confirm(`Aprovar esta solicitação?`)) {
+
+    // ✨ CONFIRMAÇÃO COM O ALERTCONTEXT
+    const confirmado = await showConfirm(
+      "Aprovar Solicitação",
+      "Tem certeza que deseja aprovar esta solicitação?",
+      "warning",
+      "Sim, Aprovar"
+    );
+
+    if (confirmado) {
       try {
-        // 4. REFATORAÇÃO DO APROVAR (PATCH)
         const resposta = await apiFetch(`/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH',
           body: JSON.stringify({ status: 'Em Separação' })
@@ -232,19 +247,25 @@ export default function PainelAprovacao() {
         if (resposta.sucesso) {
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
+          // ✨ ALERT DE SUCESSO
+          showAlert("Solicitação Aprovada", "A solicitação foi aprovada e enviada para separação com sucesso!", "success");
+        } else {
+          showAlert("Erro no Servidor", resposta.erro || "Não foi possível aprovar a solicitação.", "error");
         }
       } catch (error) {
         console.error("Erro na aprovação:", error.message);
+        showAlert("Erro de Conexão", "Falha de comunicação com o servidor.", "error");
       }
     }
   };
 
+  // --- AÇÃO DE RECUSAR ---
   const handleRecusar = async (e, idOriginal) => {
     e.stopPropagation();
+    
     const motivo = window.prompt(`Motivo da recusa para esta solicitação?`);
     if (motivo) {
       try {
-        // 5. REFATORAÇÃO DO RECUSAR (PATCH)
         const resposta = await apiFetch(`/solicitacoes/${idOriginal}/status`, {
           method: 'PATCH',
           body: JSON.stringify({ status: 'Recusado', motivo_recusa: motivo })
@@ -253,9 +274,14 @@ export default function PainelAprovacao() {
         if (resposta.sucesso) {
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
+          // ✨ ALERT DE INFORMAÇÃO/RECUSA
+          showAlert("Solicitação Recusada", "A solicitação foi recusada com sucesso.", "info");
+        } else {
+          showAlert("Erro no Servidor", resposta.erro || "Não foi possível recusar a solicitação.", "error");
         }
       } catch (error) {
         console.error("Erro na recusa:", error.message);
+        showAlert("Erro de Conexão", "Falha de comunicação com o servidor.", "error");
       }
     }
   };
