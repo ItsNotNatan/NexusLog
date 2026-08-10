@@ -1,7 +1,12 @@
+/* ========================================================================== */
+/* ARQUIVO: RotaColeta.css                                                    */
+/* DESCRIÇÃO: Estilos ajustados ao novo design visual da Rota de Coleta       */
+/* ========================================================================== */
+
 /* CONTAINER GERAL */
 .rota-coleta-wrapper {
   padding: 32px;
-  background-color: #f4f5f7;
+  background-color: #f8fafc;
   font-family: system-ui, -apple-system, sans-serif;
   color: #334155;
   min-height: 100vh;
@@ -23,14 +28,14 @@
 }
 
 .rota-cabecalho h1 {
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 700;
   color: #1e293b;
   margin: 0 0 8px 0;
 }
 
 .rota-cabecalho p {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: #64748b;
   margin: 0;
 }
@@ -40,40 +45,39 @@
 /* ========================================= */
 .rota-grid {
   display: grid;
-  grid-template-columns: 400px 1fr;
+  grid-template-columns: 380px 1fr;
   gap: 24px;
   align-items: start;
 }
 
-/* PAINEL ESQUERDO (Seleção) */
+/* ========================================= */
+/* PAINEL ESQUERDO (Lista de PLs)            */
+/* ========================================= */
 .painel-selecao {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  background-color: #f8fafc;
   display: flex;
   flex-direction: column;
-  height: 650px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-  overflow: hidden;
+  height: calc(100vh - 160px);
+  min-height: 600px;
 }
 
 .banner-info-azul {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 16px;
-  padding: 10px 16px;
+  padding: 12px 16px;
   background-color: #eff6ff;
   border: 1px solid #bfdbfe;
   border-radius: 8px;
   color: #2563eb;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 16px;
 }
 
-.pesquisa-bs-wrapper {
+.pesquisa-pl-wrapper {
   position: relative;
-  margin: 0 16px 16px 16px;
+  margin-bottom: 16px;
 }
 
 .pesquisa-icone {
@@ -86,53 +90,70 @@
 
 .pesquisa-input {
   width: 100%;
-  padding: 10px 12px 10px 40px;
-  background-color: #f8fafc;
+  padding: 10px 12px 10px 36px;
+  background-color: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 0.875rem;
   color: #334155;
   outline: none;
   box-sizing: border-box;
-  transition: all 0.2s;
 }
 
 .pesquisa-input:focus {
   border-color: #93c5fd;
-  background-color: #ffffff;
 }
 
 .selecionar-todos-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e2e8f0;
-  font-size: 0.875rem;
-  color: #475569;
+  padding-bottom: 12px;
+  font-size: 0.85rem;
+  color: #64748b;
 }
 
 .checkbox-personalizado {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   cursor: pointer;
+}
+
+.checkbox-input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.texto-selecionados {
   font-weight: 500;
 }
 
-.lista-bs-scroll {
+/* Lista Rolável */
+.lista-pl-scroll {
   flex: 1;
   overflow-y: auto;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
 }
 
-.lista-bs-scroll::-webkit-scrollbar { width: 8px; }
-.lista-bs-scroll::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
-.lista-bs-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; border: 2px solid #ffffff; }
+.lista-pl-scroll::-webkit-scrollbar { width: 8px; }
+.lista-pl-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; border: 2px solid #ffffff; }
 
-.item-bs-coleta {
+.estado-vazio-pl {
+  padding: 40px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.item-pl-coleta {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 12px;
   padding: 16px;
   border-bottom: 1px solid #f1f5f9;
   cursor: pointer;
@@ -140,27 +161,31 @@
   border-left: 4px solid transparent;
 }
 
-.item-bs-coleta:hover { background-color: #f8fafc; }
+.item-pl-coleta:hover { background-color: #f8fafc; }
 
 /* Item Selecionado */
-.item-bs-coleta.selecionado {
+.item-pl-coleta.selecionado {
   background-color: #eff6ff;
   border-left-color: #2563eb;
 }
 
-.item-bs-info {
+.item-pl-check { margin-top: 2px; }
+
+.item-pl-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.item-bs-titulo { font-size: 0.95rem; color: #1e293b; }
-.item-bs-detalhes { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
-.item-bs-destino { font-size: 0.75rem; color: #2563eb; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+.item-pl-titulo { font-size: 0.95rem; color: #1e293b; }
+.item-pl-detalhes { font-size: 0.75rem; color: #64748b; }
+.item-pl-destino { font-size: 0.75rem; color: #2563eb; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 
 .painel-selecao-footer {
   padding: 16px;
-  border-top: 1px solid #e2e8f0;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
   background-color: #ffffff;
 }
 
@@ -184,9 +209,8 @@
 .btn-gerar-rota.ativo { background-color: #2563eb; cursor: pointer; }
 .btn-gerar-rota.ativo:hover { background-color: #1d4ed8; }
 
-
 /* ========================================= */
-/* PAINEL DIREITO (ESTADOS)                  */
+/* PAINEL DIREITO (ESTADOS E ROTA)           */
 /* ========================================= */
 
 .painel-preview {
@@ -197,7 +221,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 650px;
+  height: calc(100vh - 160px);
+  min-height: 600px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   text-align: center;
   padding: 40px;
@@ -214,7 +239,8 @@
   border-radius: 12px;
   display: flex;
   flex-direction: column;
-  height: 650px;
+  height: calc(100vh - 160px);
+  min-height: 600px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   overflow: hidden;
 }
@@ -224,7 +250,6 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   border-bottom: 1px solid #e2e8f0;
-  background-color: #fafafa;
 }
 
 .rota-kpi-item {
@@ -232,7 +257,7 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 16px;
+  padding: 20px;
   border-right: 1px solid #e2e8f0;
 }
 .rota-kpi-item:last-child { border-right: none; }
@@ -240,29 +265,30 @@
 .kpi-icone-bg {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.kpi-icone-bg.azul { background-color: #eff6ff; color: #3b82f6; }
+.kpi-icone-bg.azul { background-color: #eff6ff; color: #2563eb; }
 .kpi-icone-bg.verde { background-color: #ecfdf5; color: #10b981; }
 
-.kpi-textos { display: flex; flex-direction: column; }
+.kpi-textos { display: flex; flex-direction: column; align-items: center; }
 .kpi-textos strong { font-size: 1.25rem; font-weight: 700; color: #1e293b; line-height: 1.1; }
-.kpi-textos span { font-size: 0.75rem; color: #64748b; }
+.kpi-textos span { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
 
 /* Cabeçalho de Impressão */
 .rota-header-imprimir {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px;
+  padding: 20px 24px;
+  background-color: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
 }
 
-.rota-header-imprimir h2 { font-size: 1.125rem; font-weight: 600; color: #1e293b; margin: 0 0 4px 0; }
-.rota-header-imprimir p { font-size: 0.875rem; color: #64748b; margin: 0; }
+.rota-header-imprimir h2 { font-size: 1rem; font-weight: 700; color: #1e293b; margin: 0 0 4px 0; }
+.rota-header-imprimir p { font-size: 0.85rem; color: #64748b; margin: 0; }
 
 .btn-imprimir {
   display: flex;
@@ -278,13 +304,14 @@
   cursor: pointer;
   transition: all 0.2s;
 }
-.btn-imprimir:hover { background-color: #f8fafc; border-color: #94a3b8; color: #0f172a; }
+.btn-imprimir:hover { background-color: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
 
 /* Scroll das Paradas */
 .rota-paradas-scroll {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  background-color: #ffffff;
 }
 .rota-paradas-scroll::-webkit-scrollbar { width: 8px; }
 .rota-paradas-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; border: 2px solid #ffffff; }
@@ -302,43 +329,57 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background-color: #eff6ff; /* Azul claro do topo da parada */
+  background-color: #eff6ff; 
   border-bottom: 1px solid #e2e8f0;
   border-radius: 12px 12px 0 0;
 }
 
 .parada-header-esq { display: flex; align-items: center; gap: 12px; }
-.badge-parada-num { background-color: #bfdbfe; color: #1d4ed8; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; }
-.badge-parada-loc { display: flex; align-items: center; gap: 4px; background-color: #fefce8; color: #ca8a04; border: 1px solid #fde047; padding: 4px 10px; border-radius: 6px; font-size: 0.875rem; font-weight: 600; }
-.parada-total-geral { font-size: 0.875rem; color: #475569; }
-.parada-total-geral strong { color: #1e293b; font-size: 1rem; }
+.badge-parada-num { color: #2563eb; font-size: 0.8rem; font-weight: 700; }
+.badge-parada-loc { display: flex; align-items: center; gap: 6px; background-color: #fefce8; color: #a16207; border: 1px solid #fde047; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+.parada-total-geral { font-size: 0.85rem; color: #475569; }
+.parada-total-geral strong { color: #1e293b; font-size: 1rem; margin-left: 4px; }
 
 /* Corpo da Parada (NFs e Itens) */
-.parada-body { padding: 16px; }
+.parada-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+.nf-grupo-container {
+  display: flex;
+  flex-direction: column;
+}
 
 .nf-linha-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.badge-nf-tit { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; color: #475569; font-weight: 500; }
-.badge-nf-num { background-color: #dbeafe; color: #2563eb; font-weight: 700; padding: 4px 12px; border-radius: 6px; font-size: 1rem; letter-spacing: 0.05em; }
+.badge-nf-tit { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #475569; font-weight: 500; }
+.badge-nf-num { background-color: #eff6ff; color: #2563eb; font-weight: 700; padding: 4px 16px; border-radius: 20px; font-size: 1rem; letter-spacing: 0.05em; }
+
+.texto-qtd-nf { font-size: 0.85rem; color: #475569; }
+.texto-qtd-nf strong { color: #1e293b; }
 
 /* Item Individual */
 .item-linha-detalhe {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding-bottom: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.badge-wbs-item { background-color: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+.item-linha-detalhe:last-child {
+  border-bottom: none;
+}
+
+.badge-wbs-item { background-color: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
 
 .item-desc-textos { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .item-desc-textos strong { font-size: 1rem; color: #1e293b; font-family: monospace, sans-serif; }
-.item-desc-textos span { font-size: 0.75rem; color: #64748b; }
+.item-nome-desc { font-size: 0.8rem; color: #475569; }
+.item-pn-desc { font-size: 0.75rem; color: #94a3b8; }
 
 .item-qtd-destaque { text-align: right; }
 .item-qtd-destaque strong { font-size: 1.25rem; color: #1e293b; }
@@ -346,26 +387,25 @@
 
 /* Totais / Subtotais */
 .linha-subtotal {
-  border-top: 1px dashed #cbd5e1;
   padding-top: 12px;
   text-align: right;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   color: #475569;
 }
-.linha-subtotal strong { color: #1e293b; }
+.linha-subtotal strong { color: #1e293b; font-size: 0.95rem; }
 
 .linha-total-final {
-  background-color: #f8fafc;
+  background-color: #f1f5f9;
   padding: 16px;
   border-top: 1px solid #e2e8f0;
   text-align: right;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: #1e293b;
   border-radius: 0 0 12px 12px;
   text-transform: uppercase;
 }
-.linha-total-final strong { color: #2563eb; font-size: 1.25rem; margin-left: 8px; }
+.linha-total-final strong { color: #2563eb; font-size: 1.15rem; margin-left: 8px; }
 
 /* Responsividade */
 @media (max-width: 1024px) {

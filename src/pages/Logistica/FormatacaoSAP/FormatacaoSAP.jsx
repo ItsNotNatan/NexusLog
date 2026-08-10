@@ -1,149 +1,343 @@
-import React, { useState } from 'react';
-import { FileSpreadsheet, Download, RefreshCw, CheckCircle, FileText } from 'lucide-react';
+// =================================================================
+// ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
+// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP
+//            (Atualizado: Nomenclatura unificada para PL - Packing List)
+// =================================================================
+import React, { useState, useEffect } from 'react';
+import { 
+  FileSpreadsheet, Search, X, CheckCircle2, Circle, 
+  Layers, Copy, Lightbulb, AlertTriangle 
+} from 'lucide-react';
 import './FormatacaoSAP.css';
-
-// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA DE API
-// O apiFetch gerencia o token JWT e adapta a URL base (.env ou localhost) automaticamente
 import { apiFetch } from '../../../services/api';
 
 export default function FormatacaoSAP() {
-  const [carregando, setCarregando] = useState(false);
-  const [sucesso, setSucesso] = useState(false);
-  const [dadosSAP, setDadosSAP] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [solicitacoes, setSolicitacoes] = useState([]);
+  
+  // ---------------------------------------------------------------------------
+  // ESTADOS DA INTERFACE
+  // ---------------------------------------------------------------------------
+  // ✨ Aba inicial definida como 'PL' em vez de 'BS'
+  const [abaAtiva, setAbaAtiva] = useState('PL'); 
+  const [busca, setBusca] = useState('');
+  const [selecionados, setSelecionados] = useState([]); // IDs das solicitações selecionadas
+  const [categoriaGeral, setCategoriaGeral] = useState('');
+  const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
 
-  // =========================================================================
-  // 🔄 CARREGAMENTO E FORMATAÇÃO DOS DADOS PARA O PADRÃO SAP
-  // =========================================================================
-  const carregarEDatarmatarSAP = async () => {
-    try {
-      setCarregando(true);
-      setSucesso(false);
+  // Opções de Categoria para o SAP
+  const opcoesCategoria = ['Preencher .', 'Consumo', 'Imobilizado', 'Transferência', 'Venda'];
 
-      // 2. REFATORAÇÃO DO FETCH
-      // O apiFetch busca o token no localStorage, adiciona os headers e faz o parse do JSON automaticamente
-      const resultado = await apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo');
-
-      if (resultado.sucesso) {
-        // Formata os dados no padrao de colunas do SAP usando PL
-        const dadosFormatados = resultado.dados.map((sol) => ({
-          DOCUMENTO_SAP: sol.id,
-          NUMERO_PL: sol.pl || sol.bs || 'N/A',
-          CENTRO_EMISSOR: sol.filial || 'BR02',
-          WBS_ELEMENTO: sol.wbs || 'MIG-0000',
-          SOLICITANTE: sol.solicitante,
-          TIPO_MOVIMENTO: sol.tipo === 'Transferencia WBS' ? '311' : '261',
-          DATA_DOCUMENTO: sol.dataSolicitacao ? sol.dataSolicitacao.split(' ')[0] : '01/08/2026',
-          STATUS_INTEGRACAO: 'PRONTO_SAP'
-        }));
-
-        setDadosSAP(dadosFormatados);
-        setSucesso(true);
-      } else {
-        alert('Erro ao carregar dados concluídos para formatação SAP.');
+  // ---------------------------------------------------------------------------
+  // 1. BUSCA DE DADOS NA API
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const buscarDados = async () => {
+      try {
+        setCarregando(true);
+        // Busca solicitações concluídas (onde foi gerada PL)
+        const resultado = await apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=100');
+        
+        if (resultado.sucesso && resultado.dados) {
+          setSolicitacoes(resultado.dados);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar dados:', error.message);
+      } finally {
+        setCarregando(false);
       }
-    } catch (error) {
-      console.error('Erro na integração SAP:', error.message);
-      alert('Falha na comunicação com o servidor.');
-    } finally {
-      setCarregando(false);
-    }
+    };
+    buscarDados();
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // 2. LÓGICA DE SELEÇÃO E FILTRAGEM
+  // ---------------------------------------------------------------------------
+  const toggleSelecao = (id) => {
+    setSelecionados(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
   };
 
-  // =========================================================================
-  // 📥 EXPORTAÇÃO DO ARQUIVO CSV
-  // =========================================================================
-  const exportarCSV = () => {
-    if (dadosSAP.length === 0) return;
-
-    const cabecalho = "DOCUMENTO_SAP;NUMERO_PL;CENTRO_EMISSOR;WBS_ELEMENTO;SOLICITANTE;TIPO_MOVIMENTO;DATA_DOCUMENTO;STATUS_INTEGRACAO\n";
-    const linhas = dadosSAP.map(row => 
-      `${row.DOCUMENTO_SAP};${row.NUMERO_PL};${row.CENTRO_EMISSOR};${row.WBS_ELEMENTO};${row.SOLICITANTE};${row.TIPO_MOVIMENTO};${row.DATA_DOCUMENTO};${row.STATUS_INTEGRACAO}`
-    ).join("\n");
-
-    const blob = new Blob([cabecalho + linhas], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `LAYOUT_SAP_PL_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const limparSelecao = () => {
+    setSelecionados([]);
+    setCategoriaGeral('');
+    setCategoriasIndividuais({});
   };
 
+  // Filtra as solicitações para a lista da esquerda
+  const listaFiltrada = solicitacoes.filter(sol => {
+    const termo = busca.toLowerCase();
+    const isPL = sol.pl && sol.pl !== '-'; // Verifica se tem Packing List gerada
+    
+    // Filtra pela Aba (PL ou PS)
+    if (abaAtiva === 'PL' && !isPL) return false;
+    if (abaAtiva === 'PS' && isPL) return false;
+
+    // Filtra pela barra de Pesquisa
+    const identificador = abaAtiva === 'PL' ? sol.pl : sol.ps;
+    return identificador?.toLowerCase().includes(termo) || 
+           sol.solicitante?.toLowerCase().includes(termo) ||
+           sol.wbs?.toLowerCase().includes(termo);
+  });
+
+  // Consolidar todos os itens das solicitações selecionadas na tabela da direita
+  const itensConsolidados = solicitacoes
+    .filter(sol => selecionados.includes(sol.id))
+    .flatMap(sol => {
+      // Define a origem como a PL (se existir) ou a PS
+      const identificador = sol.pl && sol.pl !== '-' ? sol.pl : sol.ps;
+      
+      return (sol.itens || []).map(item => ({
+        idLinha: `${sol.id}-${item.id}`,
+        origem: identificador,
+        desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
+        quantidade: item.quantidade_solicitada || item.qtd || 1,
+        valorUnitario: item.valor_unitario_manual || 0,
+        wbs: sol.wbs || item.wbsOrigem || '-',
+        destino: sol.filial || '-',
+      }));
+    });
+
+  // ---------------------------------------------------------------------------
+  // 3. LÓGICA DE CÓPIA PARA A ÁREA DE TRANSFERÊNCIA (CLIPBOARD)
+  // ---------------------------------------------------------------------------
+  const atualizarCategoriaGeral = (valor) => {
+    setCategoriaGeral(valor);
+    const novasCatIndividuais = {};
+    itensConsolidados.forEach(item => {
+      novasCatIndividuais[item.idLinha] = valor;
+    });
+    setCategoriasIndividuais(novasCatIndividuais);
+  };
+
+  const atualizarCategoriaIndividual = (idLinha, valor) => {
+    setCategoriasIndividuais(prev => ({ ...prev, [idLinha]: valor }));
+  };
+
+  const gerarLinhaTsv = (item) => {
+    const categoria = categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .';
+    const valorFormatado = Number(item.valorUnitario).toFixed(2);
+    // Ordem exata: Desenho SAP \t Quantidade \t Valor Unitário \t WBS \t Filial de Destino \t Categoria
+    return `${item.desenhoSAP}\t${item.quantidade}\t${valorFormatado}\t${item.wbs}\t${item.destino}\t${categoria}`;
+  };
+
+  const copiarLinha = (item) => {
+    const texto = gerarLinhaTsv(item);
+    navigator.clipboard.writeText(texto);
+  };
+
+  const copiarTudo = () => {
+    if (itensConsolidados.length === 0) return;
+    const textoCompleto = itensConsolidados.map(gerarLinhaTsv).join('\n');
+    navigator.clipboard.writeText(textoCompleto);
+    alert('Dados copiados para a área de transferência! Pronto para colar no SAP.');
+  };
+
+  // ---------------------------------------------------------------------------
+  // 4. INTERFACE (RENDER)
+  // ---------------------------------------------------------------------------
   return (
-    <div className="sap-wrapper">
-      <header className="sap-cabecalho">
+    <div className="form-sap-wrapper">
+      
+      {/* CABEÇALHO DA PÁGINA */}
+      <div className="form-sap-cabecalho">
+        <div className="form-sap-icone-titulo">
+          <FileSpreadsheet size={28} />
+        </div>
         <div>
-          <h1>Formatação & Exportação SAP</h1>
-          <p>Gere o layout padronizado de Packing Lists (PL) concluídos para importação no ERP SAP</p>
+          <h1>Formatação para SAP</h1>
+          <p>Selecione múltiplas PL para juntar (limite de 20 itens), preencha a Categoria e copie as linhas formatadas.</p>
         </div>
-      </header>
+      </div>
 
-      <div className="sap-cartao">
-        <div className="sap-acoes-topo">
-          <button className="btn-sap-gerar" onClick={carregarEDatarmatarSAP} disabled={carregando}>
-            <RefreshCw size={18} className={carregando ? "animate-spin" : ""} />
-            {carregando ? "A processar..." : "Gerar Tabela SAP (PLs Concluídas)"}
-          </button>
-
-          {dadosSAP.length > 0 && (
-            <button className="btn-sap-exportar" onClick={exportarCSV}>
-              <Download size={18} />
-              Exportar CSV SAP
+      <div className="form-sap-grid">
+        
+        {/* ================= COLUNA ESQUERDA: LISTA E PESQUISA ================= */}
+        <div className="form-sap-coluna-esq">
+          <div className="sap-abas">
+            <button 
+              className={`sap-btn-aba ${abaAtiva === 'PL' ? 'ativo' : ''}`}
+              onClick={() => setAbaAtiva('PL')}
+            >
+              Packing Lists (PL)
             </button>
-          )}
+            <button 
+              className={`sap-btn-aba ${abaAtiva === 'PS' ? 'ativo' : ''}`}
+              onClick={() => setAbaAtiva('PS')}
+            >
+              Solicitações (PS)
+            </button>
+          </div>
+
+          <div className="sap-pesquisa-caixa">
+            <div className="sap-input-wrapper">
+              <Search size={16} className="sap-icone-pesquisa" />
+              <input 
+                type="text" 
+                placeholder="Buscar por nº PL, WBS..." 
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+              />
+            </div>
+            
+            <div className="sap-selecao-info">
+              <span className="texto-selecionados">{selecionados.length} selecionado(s)</span>
+              {selecionados.length > 0 && (
+                <button className="btn-limpar-selecao" onClick={limparSelecao}>
+                  <X size={14} /> Limpar
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="sap-lista-scroll">
+            {carregando ? (
+              <div className="sap-estado-vazio">A carregar documentos...</div>
+            ) : listaFiltrada.length === 0 ? (
+              <div className="sap-estado-vazio">Nenhum documento encontrado.</div>
+            ) : (
+              listaFiltrada.map(sol => {
+                const isSelected = selecionados.includes(sol.id);
+                // Utiliza a PL diretamente, sem substituir texto
+                const identificador = abaAtiva === 'PL' ? sol.pl : sol.ps;
+                const dataFormatada = sol.criacaoPl !== '—' ? sol.criacaoPl.split(' ')[0] : 'N/D';
+                const qtdItens = sol.itens ? sol.itens.length : 0;
+
+                return (
+                  <div 
+                    key={sol.id} 
+                    className={`sap-lista-item ${isSelected ? 'selecionado' : ''}`}
+                    onClick={() => toggleSelecao(sol.id)}
+                  >
+                    <div className="sap-item-check">
+                      {isSelected ? <CheckCircle2 size={20} color="#2563eb" className="check-preenchido" /> : <Circle size={20} color="#cbd5e1" />}
+                    </div>
+                    <div className="sap-item-detalhes">
+                      <div className="sap-item-titulo">{identificador}</div>
+                      <div className="sap-item-subtitulo">
+                        {sol.solicitante.toUpperCase()} · {qtdItens} itens · {dataFormatada}
+                      </div>
+                      <div className="sap-item-destino">
+                        &rarr; {sol.filial}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
 
-        {sucesso && (
-          <div className="alerta-sucesso-sap">
-            <CheckCircle size={18} />
-            <span>Formatados <strong>{dadosSAP.length}</strong> registos de PL para o layout padrão SAP.</span>
-          </div>
-        )}
+        {/* ================= COLUNA DIREITA: PREVIEW E AÇÕES ================= */}
+        <div className="form-sap-coluna-dir">
+          
+          {selecionados.length === 0 ? (
+            <div className="sap-preview-vazio">
+              <FileSpreadsheet size={48} color="#cbd5e1" />
+              <h3>Nenhum documento selecionado</h3>
+              <p>Selecione itens na lista ao lado para começar a formatar.</p>
+            </div>
+          ) : (
+            <div className="sap-preview-conteudo">
+              
+              {/* Alerta Topo */}
+              <div className="sap-alerta-selecao">
+                <div className="sap-alerta-texto">
+                  <AlertTriangle size={16} /> 
+                  {selecionados.length} PL selecionado(s) — {itensConsolidados.length} itens no total
+                </div>
+                <div className="sap-tags-selecionadas">
+                  {solicitacoes.filter(s => selecionados.includes(s.id)).slice(0, 3).map(s => (
+                    <span key={s.id} className="sap-tag">
+                      {abaAtiva === 'PL' ? s.pl : s.ps} 
+                      <X size={12} onClick={() => toggleSelecao(s.id)} />
+                    </span>
+                  ))}
+                  {selecionados.length > 3 && <span className="sap-tag-extra">+{selecionados.length - 3}</span>}
+                </div>
+              </div>
 
-        <div className="tabela-scroll">
-          <table className="tabela-sap">
-            <thead>
-              <tr>
-                <th>DOC. SAP (ID)</th>
-                <th>Nº DA PL</th>
-                <th>CENTRO</th>
-                <th>ELEMENTO WBS</th>
-                <th>SOLICITANTE</th>
-                <th>TIPO MOV.</th>
-                <th>DATA DOC.</th>
-                <th>STATUS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dadosSAP.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                    Clique no botão acima para carregar e formatar as solicitações de PL.
-                  </td>
-                </tr>
-              ) : (
-                dadosSAP.map((item, index) => (
-                  <tr key={index}>
-                    <td className="fonte-negrito">{item.DOCUMENTO_SAP}</td>
-                    <td>
-                      <span className="badge-sap-pl">
-                        <FileText size={13} /> {item.NUMERO_PL}
-                      </span>
-                    </td>
-                    <td>{item.CENTRO_EMISSOR}</td>
-                    <td className="texto-wbs">{item.WBS_ELEMENTO}</td>
-                    <td>{item.SOLICITANTE}</td>
-                    <td><code>{item.TIPO_MOVIMENTO}</code></td>
-                    <td>{item.DATA_DOCUMENTO}</td>
-                    <td>
-                      <span className="badge-sap-status">{item.STATUS_INTEGRACAO}</span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+              {/* Barra de Ação Global (Categoria) */}
+              <div className="sap-barra-acao">
+                <div className="sap-categoria-global">
+                  <div className="sap-icone-camadas"><Layers size={20} /></div>
+                  <div className="sap-labels-categoria">
+                    <span className="sap-label-forte">CATEGORIA GERAL</span>
+                    <span className="sap-label-fraco">Preenche todos os itens abaixo</span>
+                  </div>
+                  <select 
+                    className="sap-select-categoria"
+                    value={categoriaGeral}
+                    onChange={(e) => atualizarCategoriaGeral(e.target.value)}
+                  >
+                    <option value="">— Escolher —</option>
+                    {opcoesCategoria.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+                
+                <button className="sap-btn-copiar-tudo" onClick={copiarTudo}>
+                  <Copy size={16} /> Copiar Tudo para SAP
+                </button>
+              </div>
+
+              {/* Tabela de Itens */}
+              <div className="sap-tabela-container">
+                <table className="sap-tabela-preview">
+                  <thead>
+                    <tr>
+                      <th>ORIGEM</th>
+                      <th>DESENHO SAP</th>
+                      <th>QUANTIDADE</th>
+                      <th>VALOR UNITÁRIO</th>
+                      <th>WBS</th>
+                      <th>DESTINO</th>
+                      <th>CATEGORIA</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itensConsolidados.map(item => (
+                      <tr key={item.idLinha}>
+                        <td className="texto-cinza">{item.origem}</td>
+                        <td className="texto-negrito">{item.desenhoSAP}</td>
+                        <td className="texto-negrito">{item.quantidade}</td>
+                        <td>{Number(item.valorUnitario).toFixed(2)}</td>
+                        <td className="texto-azul-link">{item.wbs}</td>
+                        <td>{item.destino}</td>
+                        <td>
+                          <select 
+                            className="sap-select-tabela"
+                            value={categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .'}
+                            onChange={(e) => atualizarCategoriaIndividual(item.idLinha, e.target.value)}
+                          >
+                            <option value="Preencher .">Preencher .</option>
+                            {opcoesCategoria.filter(c => c !== 'Preencher .').map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="td-acao">
+                          <button className="btn-copiar-linha" onClick={() => copiarLinha(item)} title="Copiar esta linha">
+                            <Copy size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Nota de Rodapé */}
+              <div className="sap-footer-nota">
+                <Lightbulb size={16} color="#eab308" />
+                <span>
+                  Ordem das colunas: <strong>Desenho SAP · Quantidade · Valor Unitário · WBS · Filial de Destino · Categoria</strong> — Use a <strong>Categoria Geral</strong> para preencher todos de uma vez, ou edite individualmente.
+                </span>
+              </div>
+
+            </div>
+          )}
         </div>
       </div>
     </div>
