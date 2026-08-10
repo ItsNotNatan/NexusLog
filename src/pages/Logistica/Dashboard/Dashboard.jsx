@@ -1,9 +1,9 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/Dashboard/Dashboard.jsx
-// DESCRIÇÃO: Dashboard de Operações integrado com a data de aprovação
-//            da PL e finalização real do banco de dados.
+// DESCRIÇÃO: Dashboard de Operações com datas formatadas em PT-BR,
+//            gráficos dinâmicos e cronômetro de SLA em tempo real.
 // =================================================================
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './Dashboard.css';
 import { 
   Settings, ClipboardList, Clock, Activity, 
@@ -13,23 +13,75 @@ import {
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import { apiFetch } from '../../../services/api';
 
+// ---------------------------------------------------------------------------
+// 1. LEITOR E FORMATADOR UNIVERSAL DE DATAS (ISO e PT-BR)
+// ---------------------------------------------------------------------------
+const parseDataBackend = (dataStr) => {
+  if (!dataStr || typeof dataStr !== 'string') return null;
+  
+  const strLimpa = dataStr.trim();
+  if (!strLimpa || strLimpa === '—' || strLimpa === '-' || strLimpa === 'não definido') return null;
+
+  // Prioriza formato brasileiro DD/MM/YYYY HH:mm:ss para evitar inversão de dia/mês pelo new Date()
+  if (strLimpa.includes('/')) {
+    try {
+      const [dataParte, horaParte] = strLimpa.split(' ');
+      const partesData = dataParte.split('/');
+      
+      if (partesData.length === 3) {
+        const dia = parseInt(partesData[0], 10);
+        const mes = parseInt(partesData[1], 10) - 1;
+        const ano = parseInt(partesData[2], 10);
+
+        const horaMin = horaParte ? horaParte.split(':') : [0, 0, 0];
+        const hora = parseInt(horaMin[0] || 0, 10);
+        const minuto = parseInt(horaMin[1] || 0, 10);
+        const segundo = parseInt(horaMin[2] || 0, 10);
+
+        const dataBr = new Date(ano, mes, dia, hora, minuto, segundo);
+        if (!isNaN(dataBr.getTime())) return dataBr;
+      }
+    } catch (e) {
+      // Continua para fallback ISO em caso de erro de formatação
+    }
+  }
+
+  // Fallback para padrão ISO (YYYY-MM-DDTHH:mm:ss.sssZ)
+  const dataIso = new Date(strLimpa);
+  if (!isNaN(dataIso.getTime())) {
+    return dataIso;
+  }
+
+  return null;
+};
+
+const formatarDataBr = (dataStr) => {
+  const d = parseDataBackend(dataStr);
+  if (!d) return '—';
+  const dia = String(d.getDate()).padStart(2, '0');
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const ano = d.getFullYear();
+  const hora = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${dia}/${mes}/${ano} ${hora}:${min}`;
+};
+
 export default function Dashboard() {
   const [dadosTabela, setDadosTabela] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [tempoAtual, setTempoAtual] = useState(new Date());
 
   // ---------------------------------------------------------------------------
-  // 1. BUSCA E FORMATAÇÃO DOS DADOS DA API
+  // 2. BUSCA E TRATAMENTO DOS DADOS DA API
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const buscarDados = async () => {
       try {
-        const resultado = await apiFetch('/solicitacoes/listar');
+        setCarregando(true);
+        const resultado = await apiFetch('/solicitacoes/listar?limit=1000');
 
-        if (resultado.sucesso) {
+        if (resultado?.sucesso && Array.isArray(resultado.dados)) {
           const dadosFormatados = resultado.dados.map((item) => {
-            
-            // Definição de prefixos por tipo de solicitação
             let prefixo = "PS"; 
             if (item.tipo === "Crossdocking") prefixo = "CD";
             else if (item.tipo === "Nota Fiscal") prefixo = "NF";
@@ -37,36 +89,36 @@ export default function Dashboard() {
             else if (item.tipo === "Reintegracao") prefixo = "REI";
             else if (item.tipo === "Entrada") prefixo = "EN";
 
-            const idLimpo = item.id.replace(/\D/g, '') || item.id;
+            const idLimpo = item.id ? String(item.id).replace(/\D/g, '') : item.ps;
 
-            // REGRA DA PL E DATA DE APROVAÇÃO:
-            // Capturamos o número da PL e a data real da aprovação enviada pelo Back-end
             let numeroPL = "-";
             let dataCriacaoPL = null;
 
             if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
-                numeroPL = item.pl || item.bs || "-";
-                dataCriacaoPL = item.dataAprovacaoPL || item.criacaoPl || item.criacao_pl || item.updated_at || item.created_at || item.dataSolicitacao;
+              numeroPL = item.pl || "-";
+              dataCriacaoPL = item.dataAprovacaoPL || item.criacaoPl || item.updated_at || item.created_at;
             }
 
             return {
-              id: `${prefixo}:${idLimpo}`,
+              id: `${prefixo}:${idLimpo || item.ps}`,
               tipo: item.tipo,
               solicitante: item.solicitante,
               wbs: item.wbs,
               status: item.status,
               pl: numeroPL,
-              criacaoPl: dataCriacaoPL || '—', // Data do início do Target (momento da PL)
-              dataSolicitacao: item.dataSolicitacao || item.created_at, // Registro original
+              criacaoPl: dataCriacaoPL ? formatarDataBr(dataCriacaoPL) : '—',
+              criacaoPlRaw: dataCriacaoPL,
+              prazoFinalizacao: item.prazoFinalizacao || null,
+              dataSolicitacao: item.dataSolicitacao || item.created_at,
               dataEntrega: item.dataEntrega || 'não definido',
-              dataFinalizacaoISO: item.dataFinalizacaoISO // ✨ Data real de quando o pedido foi finalizado
+              dataFinalizacaoISO: item.dataFinalizacaoISO || item.updated_at
             };
           });
           
           setDadosTabela(dadosFormatados);
         }
       } catch (error) {
-        console.error("Erro ao carregar os dados do Dashboard:", error.message);
+        console.error("Erro ao carregar os dados do Dashboard:", error?.message || error);
       } finally {
         setCarregando(false);
       }
@@ -76,7 +128,7 @@ export default function Dashboard() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // 2. CRONÓMETRO EM TEMPO REAL
+  // 3. CRONÔMETRO EM TEMPO REAL
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -86,62 +138,15 @@ export default function Dashboard() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // 3. LEITOR UNIVERSAL DE DATAS
-  // Converte strings ISO ou formato brasileiro (DD/MM/YYYY) para objeto Date
+  // 4. CÁLCULO DO TEMPO RESTANTE E SLA DO TARGET (3 DIAS PÓS-PL)
   // ---------------------------------------------------------------------------
-  const parseDataBackend = (dataStr) => {
-    if (!dataStr || typeof dataStr !== 'string') return null;
-    
-    const strLimpa = dataStr.trim();
-    if (!strLimpa || strLimpa === '—' || strLimpa === '-' || strLimpa === 'não definido') return null;
+  const calcularTempoRestante = (item, agora) => {
+    const { criacaoPlRaw, prazoFinalizacao, status, tipo, dataSolicitacao, dataFinalizacaoISO, dataEntrega } = item;
 
-    // Tentativa 1: Formato Nativo ISO (ex: "2026-08-09T21:43:00.000Z")
-    let data = new Date(strLimpa);
-    if (!isNaN(data.getTime())) {
-      return data;
-    }
-
-    // Tentativa 2: Formato Brasileiro (ex: "09/08/2026 21:43:00" ou "09/08/2026")
-    if (strLimpa.includes('/')) {
-      try {
-        const [dataParte, horaParte] = strLimpa.split(' ');
-        const partesData = dataParte.split('/');
-        
-        if (partesData.length === 3) {
-          const dia = parseInt(partesData[0], 10);
-          const mes = parseInt(partesData[1], 10) - 1;
-          const ano = parseInt(partesData[2], 10);
-
-          const horaMin = horaParte ? horaParte.split(':') : [0, 0];
-          const hora = parseInt(horaMin[0] || 0, 10);
-          const minuto = parseInt(horaMin[1] || 0, 10);
-          const segundo = parseInt(horaMin[2] || 0, 10);
-
-          data = new Date(ano, mes, dia, hora, minuto, segundo);
-          if (!isNaN(data.getTime())) {
-            return data;
-          }
-        }
-      } catch (e) {
-        return null;
-      }
-    }
-
-    return null;
-  };
-
-  // ---------------------------------------------------------------------------
-  // 4. CÁLCULO DO TEMPO RESTANTE DO TARGET (3 DIAS PÓS-PL)
-  // ---------------------------------------------------------------------------
-  const calcularTempoRestante = (item) => {
-    const { criacaoPl, status, tipo, dataSolicitacao, dataFinalizacaoISO, dataEntrega } = item;
-
-    // Caso 1: Cancelados ou Recusados
     if (status === 'Cancelado' || status === 'Recusado') {
       return { texto: 'Cancelado', cor: 'neutro', dentroTarget: null };
     }
 
-    // Caso 2: Exceção Entrada de Material (Instantâneo)
     const ehEntrada = tipo === 'Entrada' || (item.id && item.id.startsWith('EN:'));
     if (ehEntrada) {
       if (status === 'Concluído') {
@@ -150,30 +155,31 @@ export default function Dashboard() {
       return { texto: 'Instantâneo', cor: 'verde', dentroTarget: true };
     }
 
-    // Caso 3: Em 'Pendente' (sem PL gerada ainda)
-    if (status === 'Pendente' || !criacaoPl || criacaoPl === '—') {
+    if (status === 'Pendente' || (!criacaoPlRaw && !prazoFinalizacao)) {
       return { texto: 'Aguardando Aprovação', cor: 'neutro', dentroTarget: null };
     }
 
-    // Caso 4: Aprovado -> Target de 3 Dias a contar da data de aprovação da PL
-    const dataAprovacaoPL = parseDataBackend(criacaoPl) || parseDataBackend(dataSolicitacao);
+    let dataLimite = parseDataBackend(prazoFinalizacao);
     
-    if (!dataAprovacaoPL || isNaN(dataAprovacaoPL.getTime())) {
+    if (!dataLimite) {
+      const dataAprovacaoPL = parseDataBackend(criacaoPlRaw) || parseDataBackend(dataSolicitacao);
+      if (dataAprovacaoPL && !isNaN(dataAprovacaoPL.getTime())) {
+        const prazoTargetMs = 3 * 24 * 60 * 60 * 1000;
+        dataLimite = new Date(dataAprovacaoPL.getTime() + prazoTargetMs);
+      }
+    }
+
+    if (!dataLimite || isNaN(dataLimite.getTime())) {
       return { texto: '—', cor: 'neutro', dentroTarget: null };
     }
 
-    const prazoTargetMs = 3 * 24 * 60 * 60 * 1000; // 3 dias em ms
-    const dataLimite = new Date(dataAprovacaoPL.getTime() + prazoTargetMs);
-
-    // Se já tiver sido concluída/entregue, compara com a data REAL da conclusão
     if (status === 'Concluído') {
-      const dataConclusao = parseDataBackend(dataFinalizacaoISO) || parseDataBackend(dataEntrega) || tempoAtual;
+      const dataConclusao = parseDataBackend(dataFinalizacaoISO) || parseDataBackend(dataEntrega) || agora;
       const cumpriuTarget = dataConclusao.getTime() <= dataLimite.getTime();
       return { texto: 'Entregue', cor: 'neutro', dentroTarget: cumpriuTarget };
     }
 
-    // Para itens em separação (contagem regressiva ao vivo)
-    const diferencaMs = dataLimite.getTime() - tempoAtual.getTime();
+    const diferencaMs = dataLimite.getTime() - agora.getTime();
     const pad = (num) => String(num).padStart(2, '0');
 
     if (diferencaMs < 0) {
@@ -203,28 +209,110 @@ export default function Dashboard() {
     }
   };
 
-  // Mapeamento dos dados com recálculo em tempo real
-  const dadosTabelaAoVivo = dadosTabela.map(item => {
-    const contagemAoVivo = calcularTempoRestante(item);
-    return {
-      ...item,
-      contagem: contagemAoVivo.texto,
-      contagemStatus: contagemAoVivo.cor,
-      dentroTarget: contagemAoVivo.dentroTarget
-    };
-  });
+  // ---------------------------------------------------------------------------
+  // 5. CÁLCULO MEMOIZADO DAS MÉTRICAS E GRÁFICOS
+  // ---------------------------------------------------------------------------
+  const { 
+    dadosTabelaAoVivo, 
+    dentroTargetCount, 
+    foraTargetCount, 
+    totalAvaliados,
+    totalFinalizados,
+    totalRecusados,
+    totalEmAndamento,
+    ultimosMeses,
+    dadosGraficoLinha
+  } = useMemo(() => {
+    const aoVivo = dadosTabela.map(item => {
+      const contagemAoVivo = calcularTempoRestante(item, tempoAtual);
+      return {
+        ...item,
+        contagem: contagemAoVivo.texto,
+        contagemStatus: contagemAoVivo.cor,
+        dentroTarget: contagemAoVivo.dentroTarget
+      };
+    });
 
-  // Indicadores dos Cards de Eficiência
-  const solicitacoesConcluidas = dadosTabelaAoVivo.filter(i => i.status === 'Concluído');
-  const dentroTargetCount = solicitacoesConcluidas.filter(i => i.dentroTarget === true).length;
-  const foraTargetCount = solicitacoesConcluidas.filter(i => i.dentroTarget === false).length;
-  const totalAvaliados = solicitacoesConcluidas.length;
+    const solicitacoesAvaliadas = aoVivo.filter(i => i.dentroTarget !== null);
+    const dentroCount = solicitacoesAvaliadas.filter(i => i.dentroTarget === true).length;
+    const foraCount = solicitacoesAvaliadas.filter(i => i.dentroTarget === false).length;
+    const totalAv = solicitacoesAvaliadas.length;
+
+    const finalizados = dadosTabela.filter(i => i.status === 'Concluído').length;
+    const recusados = dadosTabela.filter(i => i.status === 'Recusado' || i.status === 'Cancelado').length;
+    const emAndamento = dadosTabela.filter(i => i.status === 'Em Separação').length;
+
+    // Gerador dos últimos 6 meses com cálculo dinâmico de performance
+    const nomesMeses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const hoje = new Date();
+    const meses = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const mesNum = d.getMonth();
+      const ano = d.getFullYear();
+
+      const itensDoMes = aoVivo.filter(item => {
+        const dt = parseDataBackend(item.criacaoPlRaw || item.dataSolicitacao);
+        return dt && dt.getMonth() === mesNum && dt.getFullYear() === ano && item.dentroTarget !== null;
+      });
+
+      const totalMes = itensDoMes.length;
+      const dentroMes = itensDoMes.filter(item => item.dentroTarget === true).length;
+      const pctDentro = totalMes > 0 ? Math.round((dentroMes / totalMes) * 100) : null;
+      const pctFora = pctDentro !== null ? 100 - pctDentro : null;
+
+      meses.push({ 
+        rotulo: `${nomesMeses[mesNum]}/${String(ano).slice(-2)}`,
+        mesNum,
+        ano,
+        totalMes,
+        pctDentro,
+        pctFora
+      });
+    }
+
+    // Geração dos pontos da linha no SVG do Gráfico 1 (ViewBox: 0 0 100 100)
+    const larguraPlot = 100;
+    const passoX = meses.length > 1 ? larguraPlot / (meses.length - 1) : 0;
+    const pontosDentro = meses.map((m, idx) => {
+      const x = idx * passoX;
+      const y = m.pctDentro !== null ? 100 - m.pctDentro : null;
+      return { x, y, val: m.pctDentro };
+    });
+
+    return {
+      dadosTabelaAoVivo: aoVivo,
+      dentroTargetCount: dentroCount,
+      foraTargetCount: foraCount,
+      totalAvaliados: totalAv,
+      totalFinalizados: finalizados,
+      totalRecusados: recusados,
+      totalEmAndamento: emAndamento,
+      ultimosMeses: meses,
+      dadosGraficoLinha: pontosDentro
+    };
+  }, [dadosTabela, tempoAtual]);
+
+  // Proporções do Gráfico de Status
+  const maxStatusCount = Math.max(totalFinalizados, totalRecusados, totalEmAndamento, 1);
+  const alturaVerde = `${(totalFinalizados / maxStatusCount) * 100}%`;
+  const alturaVermelha = `${(totalRecusados / maxStatusCount) * 100}%`;
+  const alturaAzul = `${(totalEmAndamento / maxStatusCount) * 100}%`;
+
+  // String para d do path SVG
+  const caminhoSvgDentro = dadosGraficoLinha
+    .filter(p => p.y !== null)
+    .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+    .join(' ');
 
   // ---------------------------------------------------------------------------
-  // 5. ESTRUTURA VISUAL
+  // 6. ESTRUTURA VISUAL
   // ---------------------------------------------------------------------------
   return (
     <div className="dashboard-container">
+      
+      {/* CABEÇALHO */}
       <header className="dashboard-header">
         <div>
           <h1>Dashboard de Operações</h1>
@@ -233,16 +321,17 @@ export default function Dashboard() {
         <div className="header-actions">
           <div className="target-badge">
             <Settings size={16} />
-            <span>Target Atual: <strong>3 Dias (Pós-PL)</strong></span>
+            <span>Target Atual: <strong>3 Dias (Expiração PL)</strong></span>
           </div>
-          <select className="period-select">
-            <option>Todo Período</option>
-            <option>Este Mês</option>
-            <option>Semana Passada</option>
+          <select className="period-select" defaultValue="Todo Período">
+            <option value="Todo Período">Todo Período</option>
+            <option value="Este Mês">Este Mês</option>
+            <option value="Semana Passada">Semana Passada</option>
           </select>
         </div>
       </header>
 
+      {/* CARDS DE ESTATÍSTICAS */}
       <div className="cards-grid">
         <div className="stat-card">
           <div className="card-header">
@@ -270,7 +359,7 @@ export default function Dashboard() {
             <div className="icon-wrapper icon-blue"><Activity size={20} /></div>
           </div>
           <p className="card-value value-blue">
-            {carregando ? '-' : dadosTabela.filter(i => i.status === 'Em Separação').length}
+            {carregando ? '-' : totalEmAndamento}
           </p>
           <p className="card-description">Sendo processados agora</p>
         </div>
@@ -281,7 +370,7 @@ export default function Dashboard() {
             <div className="icon-wrapper icon-blue"><CheckCircle2 size={20} /></div>
           </div>
           <p className="card-value value-blue">
-            {carregando ? '-' : dadosTabela.filter(i => i.status === 'Concluído').length}
+            {carregando ? '-' : totalFinalizados}
           </p>
           <p className="card-description">Demandas entregues</p>
         </div>
@@ -295,7 +384,7 @@ export default function Dashboard() {
           </div>
           <div className="efficiency-textos">
             <h2>Eficiência de Atendimento</h2>
-            <p>Lead time: Geração de PL &rarr; Finalização &middot; Target: 3 dia(s) (Entrada: Instantâneo)</p>
+            <p>Lead time: Aprovação da PL &rarr; Finalização &middot; Target: 3 dia(s) até expirar (Entrada: Instantâneo)</p>
           </div>
         </div>
 
@@ -307,7 +396,7 @@ export default function Dashboard() {
           </div>
           <div className="eff-card red">
             <XCircle size={24} strokeWidth={1.5} />
-            <span>Fora do Target</span>
+            <span>Fora do Target (Expirados)</span>
             <strong>{carregando ? '0' : foraTargetCount}</strong>
           </div>
           <div className="eff-card gray">
@@ -318,27 +407,35 @@ export default function Dashboard() {
         </div>
         <p className="efficiency-footer">
           {totalAvaliados === 0 
-            ? "Nenhum PL concluído ainda para cálculo de eficiência." 
-            : `Total de ${totalAvaliados} solicitação(ões) avaliada(s) segundo a regra do Target pós-PL.`}
+            ? "Nenhum PL em processamento ou concluído para cálculo de eficiência." 
+            : `Total de ${totalAvaliados} solicitação(ões) avaliada(s) segundo a regra de expiração de 3 dias.`}
         </p>
       </div>
 
+      {/* GRÁFICOS */}
       <div className="graficos-grid-2col">
+        
+        {/* GRÁFICO 1: DENTRO VS FORA DO TARGET */}
         <div className="grafico-card">
           <div className="grafico-header">
             <div className="grafico-titulo-grupo">
               <div className="grafico-icone"><TrendingUp size={18} /></div>
               <div className="grafico-textos">
                 <h3>Dentro vs. Fora do Target</h3>
-                <p>% sobre finalizados por mês · variação mês a mês</p>
+                <p>% sobre finalizados e ativos por mês · variação mês a mês</p>
               </div>
             </div>
             <button className="btn-csv"><Download size={14}/> CSV</button>
           </div>
 
           <div className="meses-selecao">
-            {['jan/26', 'fev/26', 'mar/26', 'abr/26', 'mai/26', 'jun/26'].map(mes => (
-              <div key={mes} className="mes-box"><span>{mes}</span><span style={{color: '#cbd5e1'}}>—</span></div>
+            {ultimosMeses.map(m => (
+              <div key={m.rotulo} className="mes-box">
+                <span>{m.rotulo}</span>
+                <span style={{ color: m.pctDentro !== null ? '#059669' : '#94a3b8', fontWeight: 'bold' }}>
+                  {m.pctDentro !== null ? `${m.pctDentro}%` : '—'}
+                </span>
+              </div>
             ))}
           </div>
 
@@ -351,8 +448,36 @@ export default function Dashboard() {
               <div className="linha-horizontal"></div><div className="linha-horizontal"></div>
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
+
+            {/* SVG Layer dinâmico do Gráfico de Linhas */}
+            <svg className="grafico-svg-layer" viewBox="0 0 100 100" preserveAspectRatio="none">
+              {caminhoSvgDentro && (
+                <path
+                  d={caminhoSvgDentro}
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="2.5"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+              {dadosGraficoLinha.map((p, idx) => (
+                p.y !== null && (
+                  <circle
+                    key={idx}
+                    cx={p.x}
+                    cy={p.y}
+                    r="3.5"
+                    fill="#10b981"
+                    stroke="#ffffff"
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )
+              ))}
+            </svg>
+
             <div className="grafico-eixo-x">
-              <span>jan/26</span><span>fev/26</span><span>mar/26</span><span>abr/26</span><span>mai/26</span><span>jun/26</span>
+              {ultimosMeses.map(m => <span key={m.rotulo}>{m.rotulo}</span>)}
             </div>
           </div>
           <div className="grafico-legenda">
@@ -361,52 +486,70 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* GRÁFICO 2: ACOMPANHAMENTO DE PL POR STATUS */}
         <div className="grafico-card">
           <div className="grafico-header">
             <div className="grafico-titulo-grupo">
               <div className="grafico-icone"><FileText size={18} /></div>
               <div className="grafico-textos">
                 <h3>Acompanhamento de PL por Status</h3>
-                <p>Finalizados · Recusados · Em Andamento</p>
+                <p>Finalizados · Recusados / Cancelados · Em Andamento</p>
               </div>
             </div>
             <button className="btn-csv"><Download size={14}/> CSV</button>
           </div>
 
           <div className="status-caixas-grid">
-            <div className="status-box status-verde"><span>Finalizados</span><strong>{dadosTabela.filter(i => i.status === 'Concluído').length}</strong></div>
-            <div className="status-box status-vermelho"><span>Recusados</span><strong>{dadosTabela.filter(i => i.status === 'Recusado' || i.status === 'Cancelado').length}</strong></div>
-            <div className="status-box status-azul"><span>Em Andamento</span><strong>{dadosTabela.filter(i => i.status === 'Em Separação').length}</strong></div>
+            <div className="status-box status-verde"><span>Finalizados</span><strong>{totalFinalizados}</strong></div>
+            <div className="status-box status-vermelho"><span>Recusados</span><strong>{totalRecusados}</strong></div>
+            <div className="status-box status-azul"><span>Em Andamento</span><strong>{totalEmAndamento}</strong></div>
           </div>
 
           <div className="grafico-area">
-            <div className="grafico-eixo-y"><span>12</span><span>9</span><span>6</span><span>3</span><span>0</span></div>
+            <div className="grafico-eixo-y">
+              <span>{maxStatusCount}</span>
+              <span>{Math.round(maxStatusCount * 0.75)}</span>
+              <span>{Math.round(maxStatusCount * 0.5)}</span>
+              <span>{Math.round(maxStatusCount * 0.25)}</span>
+              <span>0</span>
+            </div>
             <div className="grafico-linhas">
               <div className="linha-horizontal"></div><div className="linha-horizontal"></div>
               <div className="linha-horizontal"></div><div className="linha-horizontal"></div>
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
             <div className="grafico-barras">
-              <div className="barra-container"><span className="barra-label-topo" style={{opacity: 0}}>0</span><div className="barra-preenchimento verde" style={{height: '0%'}}></div></div>
-              <div className="barra-container"><span className="barra-label-topo">1</span><div className="barra-preenchimento vermelha" style={{height: '8.3%'}}></div></div>
-              <div className="barra-container"><span className="barra-label-topo">11</span><div className="barra-preenchimento azul" style={{height: '91.6%'}}></div></div>
+              <div className="barra-container">
+                <span className="barra-label-topo">{totalFinalizados}</span>
+                <div className="barra-preenchimento verde" style={{ height: alturaVerde }}></div>
+              </div>
+              <div className="barra-container">
+                <span className="barra-label-topo">{totalRecusados}</span>
+                <div className="barra-preenchimento vermelha" style={{ height: alturaVermelha }}></div>
+              </div>
+              <div className="barra-container">
+                <span className="barra-label-topo">{totalEmAndamento}</span>
+                <div className="barra-preenchimento azul" style={{ height: alturaAzul }}></div>
+              </div>
             </div>
             <div className="grafico-eixo-x" style={{padding: '0 30px'}}>
               <span>Finalizados</span><span>Recusados</span><span>Em Andamento</span>
             </div>
           </div>
         </div>
+
       </div>
 
+      {/* TABELA DE DEMANDAS COM RELÓGIO AO VIVO */}
       <div className="graficos-grid-1col" style={{ marginTop: '24px' }}>
-         {carregando ? (
-           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px', color: '#94a3b8', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-             <Loader2 size={32} className="animate-spin" style={{ marginBottom: '12px' }} />
-             <span>A sincronizar os dados do servidor...</span>
-           </div>
-         ) : (
-           <TabelaDemandas dados={dadosTabelaAoVivo} />
-         )}
+        {carregando ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px', color: '#94a3b8', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <Loader2 size={32} className="animate-spin" style={{ marginBottom: '12px' }} />
+            <span>A sincronizar os dados do servidor...</span>
+          </div>
+        ) : (
+          <TabelaDemandas dados={dadosTabelaAoVivo} />
+        )}
       </div>
 
     </div>

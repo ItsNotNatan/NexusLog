@@ -1,7 +1,12 @@
+/* ========================================================================== */
+/* ARQUIVO: ExportarDados.css                                                 */
+/* DESCRIÇÃO: Estilos ajustados ao novo design visual com KPIs de Target      */
+/* ========================================================================== */
+
 /* CONTAINER GERAL */
 .exportar-wrapper {
   padding: 32px;
-  background-color: #f4f5f7; /* Fundo cinza bem claro */
+  background-color: #f4f5f7;
   font-family: system-ui, -apple-system, sans-serif;
   color: #334155;
   min-height: 100vh;
@@ -38,15 +43,21 @@
   border: none;
   border-radius: 8px;
   padding: 10px 20px;
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s;
   box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
 }
 
-.btn-exportar:hover {
+.btn-exportar:hover:not(:disabled) {
   background-color: #1d4ed8;
+}
+
+.btn-exportar:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* 2. ABAS (TABS) */
@@ -83,15 +94,15 @@
   border-color: #2563eb;
 }
 
-/* 3. CARTÕES KPI (GRID) */
-.kpis-grid {
+/* 3. CARTÕES KPI (NOVO DESIGN) */
+.kpis-grid-export {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
 
-.kpi-card {
+.kpi-card-export {
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -99,43 +110,52 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  transition: all 0.2s ease;
 }
 
-.kpi-titulo {
+/* Cores específicas de borda como na imagem */
+.kpis-grid-export .kpi-card-export:nth-child(2) { border-color: #a7f3d0; } /* Verde */
+.kpis-grid-export .kpi-card-export:nth-child(3) { border-color: #fecaca; } /* Vermelho */
+
+.kpi-titulo-export {
   font-size: 0.875rem;
   color: #64748b;
   margin-bottom: 12px;
 }
 
-.kpi-valor {
-  font-size: 2rem;
+.kpi-valor-export {
+  font-size: 2.25rem;
   font-weight: 600;
   line-height: 1;
 }
 
-.kpi-subtitulo {
+.kpi-preto { color: #1e293b; }
+.kpi-verde { color: #10b981; }
+.kpi-vermelho { color: #ef4444; }
+.kpi-azul { color: #2563eb; }
+
+.kpi-subtitulo-verde {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #10b981;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+.kpi-subtitulo-export {
+  font-size: 0.75rem;
+  color: #64748b;
   margin-top: 8px;
 }
 
-/* Estilos Específicos dos KPIs */
-.kpi-card.padrao .kpi-valor { color: #1e293b; }
-.kpi-card.sucesso { border-color: #a7f3d0; }
-.kpi-card.sucesso .kpi-valor { color: #10b981; }
-.kpi-card.alerta { border-color: #fecaca; }
-.kpi-card.alerta .kpi-valor { color: #ef4444; }
-.kpi-card.info .kpi-valor { color: #3b82f6; }
-
-/* 4. ÁREA DA TABELA */
-.tabela-cartao {
+/* 4. ÁREA DA TABELA (COM FILTROS) */
+.tabela-exportar-container {
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
 }
 
-.tabela-controles {
+.tabela-controles-exportar {
   display: flex;
   justify-content: space-between;
   padding: 16px;
@@ -144,15 +164,15 @@
   gap: 16px;
 }
 
-.controles-esquerdos {
+.controles-dropdowns {
   display: flex;
   gap: 12px;
 }
 
-.select-filtro {
+.select-filtro-exportar {
   padding: 8px 32px 8px 12px;
   border: 1px solid #cbd5e1;
-  border-radius: 20px; /* Bordas bem arredondadas como na imagem */
+  border-radius: 8px; /* Bordas suaves como no resto do sistema */
   background-color: #ffffff;
   font-size: 0.875rem;
   color: #334155;
@@ -161,23 +181,25 @@
   appearance: auto;
 }
 
-.pesquisa-wrapper {
+.pesquisa-exportar-wrapper {
   position: relative;
   width: 300px;
 }
 
-.pesquisa-wrapper input {
+.pesquisa-exportar-wrapper input {
   width: 100%;
   padding: 8px 12px 8px 36px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   font-size: 0.875rem;
+  background-color: #f8fafc;
   box-sizing: border-box;
   outline: none;
 }
 
-.pesquisa-wrapper input:focus { border-color: #93c5fd; }
-.icone-pesquisa {
+.pesquisa-exportar-wrapper input:focus { border-color: #93c5fd; background-color: #ffffff; }
+
+.icone-pesquisa-exportar {
   position: absolute;
   left: 10px;
   top: 50%;
@@ -185,118 +207,104 @@
   color: #94a3b8;
 }
 
-.tabela-info {
+.tabela-info-exportar {
   display: flex;
   justify-content: space-between;
   padding: 12px 16px;
   background-color: #ffffff;
   border-bottom: 1px solid #e2e8f0;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   color: #64748b;
 }
 
 /* ESTRUTURA DA TABELA */
-.tabela-scroll {
+.tabela-scroll-exportar {
   width: 100%;
   overflow-x: auto;
 }
+.tabela-scroll-exportar::-webkit-scrollbar { height: 8px; }
+.tabela-scroll-exportar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
 
-.dados-table {
+.dados-table-exportar {
   width: 100%;
-  min-width: 900px;
+  min-width: 1100px;
   border-collapse: collapse;
   text-align: left;
 }
 
-.dados-table th {
+.dados-table-exportar th {
   padding: 12px 16px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
   border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
 }
 
-.dados-table td {
+.dados-table-exportar td {
   padding: 16px;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 /* ESTILOS DE TEXTO E BADGES DA TABELA */
-.fonte-negrito { font-weight: 600; color: #1e293b; }
-.texto-cinza { color: #64748b; }
-.texto-amarelo { color: #eab308; } /* Cor amarela para o "não definido" */
+.fonte-negrito { font-weight: 600; color: #1e293b; font-family: monospace, sans-serif; }
+.texto-cinza { color: #94a3b8; }
+.texto-amarelo { color: #f59e0b; }
+.texto-verde { color: #10b981; }
 
 .link-azul {
   color: #2563eb;
-  text-decoration: none;
   font-weight: 500;
+  font-family: monospace, sans-serif;
 }
-
-.link-azul:hover { text-decoration: underline; }
 
 .badge-status-simples {
   display: inline-block;
   padding: 4px 12px;
   background-color: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 999px; /* Formato de pílula */
+  border-radius: 999px;
   color: #475569;
   font-size: 0.75rem;
   font-weight: 500;
 }
 
-/* ========================================================== */
-/* BADGES TARGET (DENTRO / FORA)                              */
-/* ========================================================== */
-.badge-target-dentro {
-  display: inline-block;
+/* Badges Target (Dentro/Fora) com Ícones */
+.badge-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 10px;
-  background-color: #d1fae5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
+  border: 1px solid transparent;
 }
 
-.badge-target-fora {
-  display: inline-block;
-  padding: 4px 10px;
-  background-color: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
+.badge-dentro {
+  background-color: #ffffff;
+  color: #10b981;
 }
 
-/* ========================================================== */
-/* CONTAGEM REGRESSIVA (ESTILO RELÓGIO DIGITAL)               */
-/* ========================================================== */
-.badge-countdown {
-  display: inline-block;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.9rem;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 6px;
-  letter-spacing: 1px;
-}
-
-.countdown-verde {
-  background-color: #ecfdf5; /* Fundo verde clarinho */
-  color: #10b981; /* Verde esmeralda brilhante */
-}
-
-.countdown-vermelho {
-  background-color: #fef2f2;
+.badge-fora {
+  background-color: #ffffff;
   color: #ef4444;
 }
 
-.countdown-neutro {
-  background-color: #f8fafc;
-  color: #64748b;
+.estado-carregando-exportar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  color: #94a3b8;
+  gap: 12px;
+}
+
+@media (max-width: 1024px) {
+  .kpis-grid-export { grid-template-columns: repeat(2, 1fr); }
 }
