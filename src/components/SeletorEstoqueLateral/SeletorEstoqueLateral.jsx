@@ -1,15 +1,20 @@
 // =================================================================
 // ARQUIVO: src/components/SeletorEstoqueLateral/SeletorEstoqueLateral.jsx
-// DESCRIÇÃO: Seletor lateral de estoque, filtrando pela filial ativa no Header.
+// DESCRIÇÃO: Seletor lateral de estoque, filtrando automaticamente pela filial ativa no Header.
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
 import { AuthContext } from '../../contexts/AuthContext';
 
 export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionarItem, itensSelecionados = [], bloquearTransferidos = false }) {
-  // 1. Obter a filial atualmente selecionada no Header
+  
+  // ---------------------------------------------------------------------------
+  // 1. CONEXÃO GLOBAL: Obter a filial atualmente selecionada no Header
+  // O 'estoqueAtual' guarda a filial que o utilizador quer ver (ex: "BR06" para Betim).
+  // ---------------------------------------------------------------------------
   const { estoqueAtual } = useContext(AuthContext);
 
+  // Estados locais para controlar a pesquisa, paginação e interações com o rato
   const [busca, setBusca] = useState('');
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 5;
@@ -17,16 +22,22 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
   const [hoverId, setHoverId] = useState(null);
   const [copiadoId, setCopiadoId] = useState(null);
 
-  // 2. Filtragem principal do estoque
+  // ---------------------------------------------------------------------------
+  // 2. MOTOR DE FILTRAGEM: Analisa o estoque e decide o que mostrar
+  // ---------------------------------------------------------------------------
   const estoqueFiltrado = estoque?.filter(item => {
-    // REGRA 1: Filtro por Filial
-    // Se a filial no Header não for "TODOS", verifica se a filial do item corresponde.
+    
+    // REGRA 1: Filtro por Filial (A funcionalidade que pediste!)
+    // Primeiro, tentamos encontrar a qual filial este item pertence.
     const filialItem = item.filial_id || item.filial || item.filial_origem_id;
+    
+    // Se o cabeçalho NÃO estiver em "TODOS" e a filial do item for diferente
+    // da filial que está no cabeçalho, retornamos 'false' para esconder este item.
     if (estoqueAtual && estoqueAtual !== 'TODOS' && filialItem && filialItem !== estoqueAtual) {
       return false; 
     }
 
-    // REGRA 2: Esconder itens já selecionados no carrinho
+    // REGRA 2: Filtro de Carrinho (Esconder itens já selecionados)
     const idDoItem = item.idBD || item.id;
     const jaEstaSelecionado = itensSelecionados.some(selecionado => 
       selecionado.estoque_id === idDoItem || 
@@ -35,7 +46,7 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
     );
     if (jaEstaSelecionado) return false;
 
-    // REGRA 3: Filtro de pesquisa por texto
+    // REGRA 3: Filtro de Pesquisa (Busca por texto)
     const termo = busca.toLowerCase();
     return (
       (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
@@ -47,23 +58,33 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
     );
   }) || [];
 
-  // Reset da página quando a busca ou a filial mudam
+  // ---------------------------------------------------------------------------
+  // 3. EFEITOS DE CICLO DE VIDA (useEffect)
+  // ---------------------------------------------------------------------------
+  
+  // Reset da página: Se o utilizador mudar a filial no Header ou escrever na busca, 
+  // voltamos sempre para a primeira página.
   useEffect(() => {
     setPaginaAtual(1);
   }, [busca, estoqueAtual]);
 
+  // Cálculo de páginas baseado no resultado do filtro
   const totalPaginas = Math.ceil(estoqueFiltrado.length / itensPorPagina) || 1;
   
-  // Garantir que a página atual não excede o limite após filtragem
+  // Garantir que a página atual não fica presa num número que já não existe
   useEffect(() => {
     if (paginaAtual > totalPaginas) {
       setPaginaAtual(totalPaginas);
     }
   }, [estoqueFiltrado.length, totalPaginas, paginaAtual]);
 
+  // Cortar a lista para mostrar apenas os itens da página atual
   const indexInicio = (Math.max(1, paginaAtual) - 1) * itensPorPagina;
   const itensPaginados = estoqueFiltrado.slice(indexInicio, indexInicio + itensPorPagina);
 
+  // ---------------------------------------------------------------------------
+  // 4. FUNÇÕES DE INTERAÇÃO
+  // ---------------------------------------------------------------------------
   const copiarParaAreaTransferencia = (e, texto, idUnico) => {
     e.stopPropagation(); 
     if (!texto || texto === "SEM SAP") return;
@@ -71,11 +92,15 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
     navigator.clipboard.writeText(texto);
     setCopiadoId(idUnico);
 
+    // Remove o ícone de 'sucesso' após 2 segundos
     setTimeout(() => {
       setCopiadoId(null);
     }, 2000);
   };
 
+  // ---------------------------------------------------------------------------
+  // 5. INTERFACE (RENDER)
+  // ---------------------------------------------------------------------------
   return (
     <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', height: '100%', minHeight: '600px', overflow: 'hidden' }}>
       
@@ -117,8 +142,8 @@ export default function SeletorEstoqueLateral({ estoque, carregando, onAdicionar
         ) : estoqueFiltrado.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px' }}>
             <AlertCircle size={36} style={{ opacity: 0.4, margin: '0 auto 12px auto' }} />
-            <p style={{ fontSize: '0.85rem', margin: 0 }}>
-              {estoque?.length > 0 ? "Todos os itens encontrados já estão na lista ou não pertencem a esta filial." : "Nenhum material encontrado."}
+            <p style={{ fontSize: '0.85rem', margin: 0, padding: '0 16px' }}>
+              {estoque?.length > 0 ? `Nenhum material encontrado para a filial selecionada.` : "Nenhum material encontrado."}
             </p>
           </div>
         ) : (

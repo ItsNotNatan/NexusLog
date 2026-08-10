@@ -1,3 +1,8 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/FazerSolicitacao/MaterialEstoque.jsx
+// DESCRIÇÃO: Ecrã para solicitar material do estoque. Inclui a correção
+// que envia a filial_id para o seletor lateral conseguir filtrar.
+// =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import {
   User,
@@ -45,6 +50,9 @@ export default function MaterialEstoque() {
   const [estoqueDisponivel, setEstoqueDisponivel] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
+  // ---------------------------------------------------------------------------
+  // BUSCA E FORMATAÇÃO DO ESTOQUE
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
@@ -55,6 +63,12 @@ export default function MaterialEstoque() {
             .filter((item) => item.quantidade_disponivel > 0)
             .map((item) => ({
               idBD: item.id,
+              
+              // ✨ CORREÇÃO APLICADA AQUI: 
+              // Adicionámos a filial_id para que o SeletorEstoqueLateral saiba a que 
+              // filial este item pertence e consiga filtrá-lo corretamente.
+              filial_id: item.filial_id || item.filial || item.filial_origem_id,
+              
               desenhoSAP: item.desenho_sap_manual || item.desenho_sap || "-",
               materialDescription: item.descricao_manual || item.descricao || "-",
               numPecaFabricante: item.part_number_manual || item.part_number || "-",
@@ -433,7 +447,7 @@ export default function MaterialEstoque() {
           estoque={estoqueDisponivel}
           carregando={carregandoEstoque}
           onAdicionarItem={adicionarItemDoEstoque}
-          itensSelecionados={listaSegura} // 👈 ADICIONAR ISTO!
+          itensSelecionados={listaSegura} 
         />
 
         <div
