@@ -11,6 +11,10 @@ export default function TabelaDemandas({ dados = [] }) {
   const [modalAberto, setModalAberto] = useState(false);
   const [itemSelecionado, setItemSelecionado] = useState(null);
   const [historicoItem, setHistoricoItem] = useState([]);
+  
+  // ✨ NOVO STATE: Guarda o tipo da solicitação (ex: "Transferencia WBS")
+  const [tipoSolicitacao, setTipoSolicitacao] = useState('');
+  
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   
   const [termoPesquisa, setTermoPesquisa] = useState('');
@@ -31,22 +35,28 @@ export default function TabelaDemandas({ dados = [] }) {
       // 2. Buscamos os detalhes completos da solicitação na API
       const resultado = await apiFetch(`/solicitacoes/listar?busca=${psBusca}`);
       
-      // 3. Verificamos se encontrou e extraímos os itens
+      // 3. Verificamos se encontrou e extraímos os itens e o tipo
       if (resultado.sucesso && resultado.dados && resultado.dados.length > 0) {
         // Encontra a solicitação que tem exatamente esse PS
         const solicitacaoExata = resultado.dados.find(d => d.ps === psBusca);
         
         if (solicitacaoExata && solicitacaoExata.itens) {
           setHistoricoItem(solicitacaoExata.itens);
+          
+          // ✨ SALVA O TIPO DA SOLICITAÇÃO (Se for undefined, guarda string vazia)
+          setTipoSolicitacao(solicitacaoExata.tipo || '');
         } else {
           setHistoricoItem([]);
+          setTipoSolicitacao('');
         }
       } else {
         setHistoricoItem([]);
+        setTipoSolicitacao('');
       }
     } catch (error) {
       console.error("Erro ao buscar os itens da solicitação:", error.message);
       setHistoricoItem([]);
+      setTipoSolicitacao('');
     } finally {
       setCarregandoHistorico(false);
     }
@@ -55,6 +65,7 @@ export default function TabelaDemandas({ dados = [] }) {
   const fecharModal = () => {
     setModalAberto(false);
     setHistoricoItem([]);
+    setTipoSolicitacao(''); // ✨ Limpa o tipo ao fechar
   };
 
   const dadosFiltrados = dados.filter((linha) => {
@@ -207,16 +218,54 @@ export default function TabelaDemandas({ dados = [] }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {historicoItem.map((hist, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '8px', color: '#666', fontFamily: 'monospace' }}>{hist.desenho_sap_manual || '-'}</td>
-                        <td style={{ padding: '8px', fontWeight: 'bold', fontFamily: 'monospace' }}>{hist.part_number_manual || '-'}</td>
-                        <td style={{ padding: '8px' }}>{hist.descricao_manual || '-'}</td>
-                        <td style={{ padding: '8px', textAlign: 'center', color: '#0056b3', fontWeight: 'bold' }}>
-                          {hist.quantidade_solicitada || hist.qtd || 1} <span style={{ fontSize: '12px', fontWeight: 'normal' }}>{hist.unidade_medida_manual || 'Un'}</span>
-                        </td>
-                      </tr>
-                    ))}
+                    {historicoItem.map((hist, idx) => {
+                      // ✨ LÓGICA DE IDENTIFICAÇÃO: Verifica se é uma transferência WBS
+                      const isTransferencia = 
+                        tipoSolicitacao === 'Transferencia WBS' || 
+                        tipoSolicitacao === 'Transfer. WBS' || 
+                        hist.is_transferencia || 
+                        hist.isTransferencia;
+
+                      // ✨ NOVA LÓGICA DE CORES: Se for transferência, a linha inteira fica amarela!
+                      const corFundoLinha = isTransferencia ? '#fefce8' : 'transparent';
+                      const corBordaLinha = isTransferencia ? '#fde047' : '#eee';
+
+                      return (
+                        <tr key={idx} style={{ backgroundColor: corFundoLinha, borderBottom: `1px solid ${corBordaLinha}`, transition: 'background-color 0.2s' }}>
+                          <td style={{ padding: '8px', color: isTransferencia ? '#a16207' : '#666', fontFamily: 'monospace' }}>
+                            {hist.desenho_sap_manual || '-'}
+                          </td>
+                          <td style={{ padding: '8px', fontWeight: 'bold', color: isTransferencia ? '#854d0e' : 'inherit', fontFamily: 'monospace' }}>
+                            {hist.part_number_manual || '-'}
+                          </td>
+                          <td style={{ padding: '8px', color: isTransferencia ? '#854d0e' : 'inherit' }}>
+                            {hist.descricao_manual || '-'}
+                            
+                            {/* ✨ ETIQUETA MANTIDA para dar ainda mais destaque */}
+                            {isTransferencia && (
+                              <div style={{ marginTop: '6px' }}>
+                                <span style={{ 
+                                  fontSize: '0.65rem', 
+                                  backgroundColor: '#fef08a', 
+                                  color: '#854d0e', 
+                                  border: '1px solid #eab308', 
+                                  padding: '2px 6px', 
+                                  borderRadius: '4px', 
+                                  fontWeight: 'bold',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em'
+                                }}>
+                                  ★ Transferência WBS
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'center', color: isTransferencia ? '#a16207' : '#0056b3', fontWeight: 'bold' }}>
+                            {hist.quantidade_solicitada || hist.qtd || 1} <span style={{ fontSize: '12px', fontWeight: 'normal' }}>{hist.unidade_medida_manual || 'Un'}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

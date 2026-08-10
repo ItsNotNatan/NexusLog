@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/Dashboard/Dashboard.jsx
-// DESCRIÇÃO: Dashboard de Operações com a regra de negócio de prefixos corrigida
+// DESCRIÇÃO: Dashboard de Operações com regra de Target por tipo de solicitação
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import './Dashboard.css';
@@ -26,7 +26,7 @@ export default function Dashboard() {
         if (resultado.sucesso) {
           const dadosFormatados = resultado.dados.map((item) => {
             
-            // ✨ AQUI ESTÁ A CORREÇÃO: Aplicamos a mesma regra de prefixos do Acompanhamento
+            // Regra de prefixos por tipo de solicitação
             let prefixo = "PS"; 
             if (item.tipo === "Crossdocking") prefixo = "CD";
             else if (item.tipo === "Nota Fiscal") prefixo = "NF";
@@ -36,7 +36,7 @@ export default function Dashboard() {
 
             const idLimpo = item.id.replace(/\D/g, '') || item.id;
 
-            // ✨ REGRA DO PL: Só exibe se não estiver pendente/cancelado
+            // Regra da PL: Exibe número caso a solicitação não esteja pendente/cancelada
             let numeroPL = "-";
             if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
                 numeroPL = item.pl || item.bs || "-";
@@ -44,6 +44,7 @@ export default function Dashboard() {
 
             return {
               id: `${prefixo}:${idLimpo}`,
+              tipo: item.tipo, // Conservado para verificação de regras de Target
               solicitante: item.solicitante,
               wbs: item.wbs,
               status: item.status,
@@ -65,7 +66,7 @@ export default function Dashboard() {
     buscarDados();
   }, []);
 
-  // 2. Lógica de Cronómetro (Atualiza a cada segundo)
+  // 2. Lógica do Cronómetro em tempo real
   useEffect(() => {
     const intervalo = setInterval(() => {
       setTempoAtual(new Date());
@@ -73,26 +74,33 @@ export default function Dashboard() {
     return () => clearInterval(intervalo);
   }, []);
 
+  // Auxiliar para converter a string de data vinda do backend num objeto Date
   const parseDataBackend = (dataStr) => {
     if (!dataStr || typeof dataStr !== 'string' || !dataStr.includes('/')) return null;
     try {
       const [dataParte, horaParte] = dataStr.split(' ');
       const [dia, mes, ano] = dataParte.split('/');
-      const [hora, minuto] = horaParte.split(':');
-      return new Date(ano, mes - 1, dia, hora, minuto);
+      const horaMin = horaParte ? horaParte.split(':') : [0, 0];
+      return new Date(ano, mes - 1, dia, horaMin[0] || 0, horaMin[1] || 0);
     } catch (e) {
       return null;
     }
   };
 
-  const calcularTempoRestante = (dataStr, status) => {
-    if (status === 'Concluído') return { texto: 'Entregue', cor: 'neutro' };
-    if (status === 'Cancelado' || status === 'Recusado') return { texto: 'Cancelado', cor: 'neutro' };
-    
-    const dataCriacao = parseDataBackend(dataStr);
-    if (!dataCriacao) return { texto: '—', cor: 'neutro' };
+  // 3. Função para calcular o tempo restante baseado na regra do Target
+  const calcularTempoRestante = (item) => {
+    const { criacaoPl, status, tipo } = item;
 
-    const prazoTargetMs = 3 * 24 * 60 * 60 * 1000; 
+    if (status === 'Concluído') return { texto: 'Entregue', cor: 'neutro', dentroTarget: true };
+    if (status === 'Cancelado' || status === 'Recusado') return { texto: 'Cancelado', cor: 'neutro', dentroTarget: null };
+    
+    const dataCriacao = parseDataBackend(criacaoPl);
+    if (!dataCriacao) return { texto: '—', cor: 'neutro', dentroTarget: null };
+
+    // EXCEÇÃO: Se for Entrada de Material, o processamento é instantâneo (Target = 0 dias)
+    const ehEntrada = tipo === 'Entrada' || (item.id && item.id.startsWith('EN:'));
+    const prazoTargetMs = ehEntrada ? 0 : (3 * 24 * 60 * 60 * 1000); // 3 dias em milissegundos
+    
     const dataLimite = new Date(dataCriacao.getTime() + prazoTargetMs);
     const diferencaMs = dataLimite.getTime() - tempoAtual.getTime();
     
@@ -104,25 +112,48 @@ export default function Dashboard() {
       const horas = Math.floor((atrasoAbsoluto / (1000 * 60 * 60)) % 24);
       const minutos = Math.floor((atrasoAbsoluto / 1000 / 60) % 60);
       const segundos = Math.floor((atrasoAbsoluto / 1000) % 60);
-      return { texto: `-${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, cor: 'vermelho' };
+
+      // Se for Entrada e estiver atrasado por alguns segundos/minutos
+      if (ehEntrada && dias === 0 && horas === 0 && minutos === 0) {
+        return { texto: 'Instantâneo', cor: 'amarelo', dentroTarget: false };
+      }
+
+      return { 
+        texto: `-${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, 
+        cor: 'vermelho', 
+        dentroTarget: false 
+      };
     } else {
       const dias = Math.floor(diferencaMs / (1000 * 60 * 60 * 24));
       const horas = Math.floor((diferencaMs / (1000 * 60 * 60)) % 24);
       const minutos = Math.floor((diferencaMs / 1000 / 60) % 60);
       const segundos = Math.floor((diferencaMs / 1000) % 60);
       const corStatus = dias === 0 ? 'amarelo' : 'verde';
-      return { texto: `${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, cor: corStatus };
+      
+      return { 
+        texto: `${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, 
+        cor: corStatus, 
+        dentroTarget: true 
+      };
     }
   };
 
+  // Mapeia os dados em tempo real para a Tabela e Indicadores
   const dadosTabelaAoVivo = dadosTabela.map(item => {
-    const contagemAoVivo = calcularTempoRestante(item.criacaoPl, item.status);
+    const contagemAoVivo = calcularTempoRestante(item);
     return {
       ...item,
       contagem: contagemAoVivo.texto,
-      contagemStatus: contagemAoVivo.cor
+      contagemStatus: contagemAoVivo.cor,
+      dentroTarget: contagemAoVivo.dentroTarget
     };
   });
+
+  // 4. Cálculo dinâmico dos cartões de Eficiência de Atendimento
+  const solicitacoesConcluidas = dadosTabelaAoVivo.filter(i => i.status === 'Concluído');
+  const dentroTargetCount = solicitacoesConcluidas.filter(i => i.dentroTarget === true).length;
+  const foraTargetCount = solicitacoesConcluidas.filter(i => i.dentroTarget === false).length;
+  const totalAvaliados = solicitacoesConcluidas.length;
 
   return (
     <div className="dashboard-container">
@@ -188,6 +219,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* SECÇÃO DE EFICIÊNCIA DE ATENDIMENTO */}
       <div className="efficiency-section">
         <div className="efficiency-header">
           <div className="efficiency-icon">
@@ -195,7 +227,7 @@ export default function Dashboard() {
           </div>
           <div className="efficiency-textos">
             <h2>Eficiência de Atendimento</h2>
-            <p>Lead time: Data Criação &rarr; Data de Finalização &middot; Target: 3 dia(s)</p>
+            <p>Lead time: Data Criação &rarr; Data de Finalização &middot; Target: 3 dia(s) (Entrada: Instantâneo)</p>
           </div>
         </div>
 
@@ -203,20 +235,24 @@ export default function Dashboard() {
           <div className="eff-card green">
             <CheckCircle2 size={24} strokeWidth={1.5} />
             <span>Dentro do Target</span>
-            <strong>0</strong>
+            <strong>{carregando ? '0' : dentroTargetCount}</strong>
           </div>
           <div className="eff-card red">
             <XCircle size={24} strokeWidth={1.5} />
             <span>Fora do Target</span>
-            <strong>0</strong>
+            <strong>{carregando ? '0' : foraTargetCount}</strong>
           </div>
           <div className="eff-card gray">
             <BarChart3 size={24} strokeWidth={1.5} />
             <span>Total Avaliado</span>
-            <strong>0</strong>
+            <strong>{carregando ? '0' : totalAvaliados}</strong>
           </div>
         </div>
-        <p className="efficiency-footer">Nenhum PL concluído ainda para cálculo de eficiência.</p>
+        <p className="efficiency-footer">
+          {totalAvaliados === 0 
+            ? "Nenhum PL concluído ainda para cálculo de eficiência." 
+            : `Total de ${totalAvaliados} solicitação(ões) avaliada(s) segundo a regra do Target.`}
+        </p>
       </div>
 
       <div className="graficos-grid-2col">
