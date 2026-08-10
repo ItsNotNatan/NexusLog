@@ -1,6 +1,7 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/Dashboard/Dashboard.jsx
-// DESCRIÇÃO: Dashboard de Operações com regra de Target por tipo de solicitação
+// DESCRIÇÃO: Dashboard de Operações integrado com a data de aprovação
+//            da PL e finalização real do banco de dados.
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import './Dashboard.css';
@@ -17,7 +18,9 @@ export default function Dashboard() {
   const [carregando, setCarregando] = useState(true);
   const [tempoAtual, setTempoAtual] = useState(new Date());
 
-  // 1. Busca de Dados e Formatação
+  // ---------------------------------------------------------------------------
+  // 1. BUSCA E FORMATAÇÃO DOS DADOS DA API
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const buscarDados = async () => {
       try {
@@ -26,7 +29,7 @@ export default function Dashboard() {
         if (resultado.sucesso) {
           const dadosFormatados = resultado.dados.map((item) => {
             
-            // Regra de prefixos por tipo de solicitação
+            // Definição de prefixos por tipo de solicitação
             let prefixo = "PS"; 
             if (item.tipo === "Crossdocking") prefixo = "CD";
             else if (item.tipo === "Nota Fiscal") prefixo = "NF";
@@ -36,21 +39,27 @@ export default function Dashboard() {
 
             const idLimpo = item.id.replace(/\D/g, '') || item.id;
 
-            // Regra da PL: Exibe número caso a solicitação não esteja pendente/cancelada
+            // REGRA DA PL E DATA DE APROVAÇÃO:
+            // Capturamos o número da PL e a data real da aprovação enviada pelo Back-end
             let numeroPL = "-";
+            let dataCriacaoPL = null;
+
             if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
                 numeroPL = item.pl || item.bs || "-";
+                dataCriacaoPL = item.dataAprovacaoPL || item.criacaoPl || item.criacao_pl || item.updated_at || item.created_at || item.dataSolicitacao;
             }
 
             return {
               id: `${prefixo}:${idLimpo}`,
-              tipo: item.tipo, // Conservado para verificação de regras de Target
+              tipo: item.tipo,
               solicitante: item.solicitante,
               wbs: item.wbs,
               status: item.status,
               pl: numeroPL,
-              criacaoPl: item.dataSolicitacao,
-              dataEntrega: item.dataEntrega || 'não definido'
+              criacaoPl: dataCriacaoPL || '—', // Data do início do Target (momento da PL)
+              dataSolicitacao: item.dataSolicitacao || item.created_at, // Registro original
+              dataEntrega: item.dataEntrega || 'não definido',
+              dataFinalizacaoISO: item.dataFinalizacaoISO // ✨ Data real de quando o pedido foi finalizado
             };
           });
           
@@ -66,7 +75,9 @@ export default function Dashboard() {
     buscarDados();
   }, []);
 
-  // 2. Lógica do Cronómetro em tempo real
+  // ---------------------------------------------------------------------------
+  // 2. CRONÓMETRO EM TEMPO REAL
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const intervalo = setInterval(() => {
       setTempoAtual(new Date());
@@ -74,36 +85,95 @@ export default function Dashboard() {
     return () => clearInterval(intervalo);
   }, []);
 
-  // Auxiliar para converter a string de data vinda do backend num objeto Date
+  // ---------------------------------------------------------------------------
+  // 3. LEITOR UNIVERSAL DE DATAS
+  // Converte strings ISO ou formato brasileiro (DD/MM/YYYY) para objeto Date
+  // ---------------------------------------------------------------------------
   const parseDataBackend = (dataStr) => {
-    if (!dataStr || typeof dataStr !== 'string' || !dataStr.includes('/')) return null;
-    try {
-      const [dataParte, horaParte] = dataStr.split(' ');
-      const [dia, mes, ano] = dataParte.split('/');
-      const horaMin = horaParte ? horaParte.split(':') : [0, 0];
-      return new Date(ano, mes - 1, dia, horaMin[0] || 0, horaMin[1] || 0);
-    } catch (e) {
-      return null;
+    if (!dataStr || typeof dataStr !== 'string') return null;
+    
+    const strLimpa = dataStr.trim();
+    if (!strLimpa || strLimpa === '—' || strLimpa === '-' || strLimpa === 'não definido') return null;
+
+    // Tentativa 1: Formato Nativo ISO (ex: "2026-08-09T21:43:00.000Z")
+    let data = new Date(strLimpa);
+    if (!isNaN(data.getTime())) {
+      return data;
     }
+
+    // Tentativa 2: Formato Brasileiro (ex: "09/08/2026 21:43:00" ou "09/08/2026")
+    if (strLimpa.includes('/')) {
+      try {
+        const [dataParte, horaParte] = strLimpa.split(' ');
+        const partesData = dataParte.split('/');
+        
+        if (partesData.length === 3) {
+          const dia = parseInt(partesData[0], 10);
+          const mes = parseInt(partesData[1], 10) - 1;
+          const ano = parseInt(partesData[2], 10);
+
+          const horaMin = horaParte ? horaParte.split(':') : [0, 0];
+          const hora = parseInt(horaMin[0] || 0, 10);
+          const minuto = parseInt(horaMin[1] || 0, 10);
+          const segundo = parseInt(horaMin[2] || 0, 10);
+
+          data = new Date(ano, mes, dia, hora, minuto, segundo);
+          if (!isNaN(data.getTime())) {
+            return data;
+          }
+        }
+      } catch (e) {
+        return null;
+      }
+    }
+
+    return null;
   };
 
-  // 3. Função para calcular o tempo restante baseado na regra do Target
+  // ---------------------------------------------------------------------------
+  // 4. CÁLCULO DO TEMPO RESTANTE DO TARGET (3 DIAS PÓS-PL)
+  // ---------------------------------------------------------------------------
   const calcularTempoRestante = (item) => {
-    const { criacaoPl, status, tipo } = item;
+    const { criacaoPl, status, tipo, dataSolicitacao, dataFinalizacaoISO, dataEntrega } = item;
 
-    if (status === 'Concluído') return { texto: 'Entregue', cor: 'neutro', dentroTarget: true };
-    if (status === 'Cancelado' || status === 'Recusado') return { texto: 'Cancelado', cor: 'neutro', dentroTarget: null };
-    
-    const dataCriacao = parseDataBackend(criacaoPl);
-    if (!dataCriacao) return { texto: '—', cor: 'neutro', dentroTarget: null };
+    // Caso 1: Cancelados ou Recusados
+    if (status === 'Cancelado' || status === 'Recusado') {
+      return { texto: 'Cancelado', cor: 'neutro', dentroTarget: null };
+    }
 
-    // EXCEÇÃO: Se for Entrada de Material, o processamento é instantâneo (Target = 0 dias)
+    // Caso 2: Exceção Entrada de Material (Instantâneo)
     const ehEntrada = tipo === 'Entrada' || (item.id && item.id.startsWith('EN:'));
-    const prazoTargetMs = ehEntrada ? 0 : (3 * 24 * 60 * 60 * 1000); // 3 dias em milissegundos
+    if (ehEntrada) {
+      if (status === 'Concluído') {
+        return { texto: 'Entregue', cor: 'neutro', dentroTarget: true };
+      }
+      return { texto: 'Instantâneo', cor: 'verde', dentroTarget: true };
+    }
+
+    // Caso 3: Em 'Pendente' (sem PL gerada ainda)
+    if (status === 'Pendente' || !criacaoPl || criacaoPl === '—') {
+      return { texto: 'Aguardando Aprovação', cor: 'neutro', dentroTarget: null };
+    }
+
+    // Caso 4: Aprovado -> Target de 3 Dias a contar da data de aprovação da PL
+    const dataAprovacaoPL = parseDataBackend(criacaoPl) || parseDataBackend(dataSolicitacao);
     
-    const dataLimite = new Date(dataCriacao.getTime() + prazoTargetMs);
+    if (!dataAprovacaoPL || isNaN(dataAprovacaoPL.getTime())) {
+      return { texto: '—', cor: 'neutro', dentroTarget: null };
+    }
+
+    const prazoTargetMs = 3 * 24 * 60 * 60 * 1000; // 3 dias em ms
+    const dataLimite = new Date(dataAprovacaoPL.getTime() + prazoTargetMs);
+
+    // Se já tiver sido concluída/entregue, compara com a data REAL da conclusão
+    if (status === 'Concluído') {
+      const dataConclusao = parseDataBackend(dataFinalizacaoISO) || parseDataBackend(dataEntrega) || tempoAtual;
+      const cumpriuTarget = dataConclusao.getTime() <= dataLimite.getTime();
+      return { texto: 'Entregue', cor: 'neutro', dentroTarget: cumpriuTarget };
+    }
+
+    // Para itens em separação (contagem regressiva ao vivo)
     const diferencaMs = dataLimite.getTime() - tempoAtual.getTime();
-    
     const pad = (num) => String(num).padStart(2, '0');
 
     if (diferencaMs < 0) {
@@ -112,11 +182,6 @@ export default function Dashboard() {
       const horas = Math.floor((atrasoAbsoluto / (1000 * 60 * 60)) % 24);
       const minutos = Math.floor((atrasoAbsoluto / 1000 / 60) % 60);
       const segundos = Math.floor((atrasoAbsoluto / 1000) % 60);
-
-      // Se for Entrada e estiver atrasado por alguns segundos/minutos
-      if (ehEntrada && dias === 0 && horas === 0 && minutos === 0) {
-        return { texto: 'Instantâneo', cor: 'amarelo', dentroTarget: false };
-      }
 
       return { 
         texto: `-${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, 
@@ -129,7 +194,7 @@ export default function Dashboard() {
       const minutos = Math.floor((diferencaMs / 1000 / 60) % 60);
       const segundos = Math.floor((diferencaMs / 1000) % 60);
       const corStatus = dias === 0 ? 'amarelo' : 'verde';
-      
+
       return { 
         texto: `${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, 
         cor: corStatus, 
@@ -138,7 +203,7 @@ export default function Dashboard() {
     }
   };
 
-  // Mapeia os dados em tempo real para a Tabela e Indicadores
+  // Mapeamento dos dados com recálculo em tempo real
   const dadosTabelaAoVivo = dadosTabela.map(item => {
     const contagemAoVivo = calcularTempoRestante(item);
     return {
@@ -149,12 +214,15 @@ export default function Dashboard() {
     };
   });
 
-  // 4. Cálculo dinâmico dos cartões de Eficiência de Atendimento
+  // Indicadores dos Cards de Eficiência
   const solicitacoesConcluidas = dadosTabelaAoVivo.filter(i => i.status === 'Concluído');
   const dentroTargetCount = solicitacoesConcluidas.filter(i => i.dentroTarget === true).length;
   const foraTargetCount = solicitacoesConcluidas.filter(i => i.dentroTarget === false).length;
   const totalAvaliados = solicitacoesConcluidas.length;
 
+  // ---------------------------------------------------------------------------
+  // 5. ESTRUTURA VISUAL
+  // ---------------------------------------------------------------------------
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
@@ -165,7 +233,7 @@ export default function Dashboard() {
         <div className="header-actions">
           <div className="target-badge">
             <Settings size={16} />
-            <span>Target Atual: <strong>3 Dias</strong></span>
+            <span>Target Atual: <strong>3 Dias (Pós-PL)</strong></span>
           </div>
           <select className="period-select">
             <option>Todo Período</option>
@@ -219,7 +287,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* SECÇÃO DE EFICIÊNCIA DE ATENDIMENTO */}
+      {/* EFICIÊNCIA DE ATENDIMENTO */}
       <div className="efficiency-section">
         <div className="efficiency-header">
           <div className="efficiency-icon">
@@ -227,7 +295,7 @@ export default function Dashboard() {
           </div>
           <div className="efficiency-textos">
             <h2>Eficiência de Atendimento</h2>
-            <p>Lead time: Data Criação &rarr; Data de Finalização &middot; Target: 3 dia(s) (Entrada: Instantâneo)</p>
+            <p>Lead time: Geração de PL &rarr; Finalização &middot; Target: 3 dia(s) (Entrada: Instantâneo)</p>
           </div>
         </div>
 
@@ -251,7 +319,7 @@ export default function Dashboard() {
         <p className="efficiency-footer">
           {totalAvaliados === 0 
             ? "Nenhum PL concluído ainda para cálculo de eficiência." 
-            : `Total de ${totalAvaliados} solicitação(ões) avaliada(s) segundo a regra do Target.`}
+            : `Total de ${totalAvaliados} solicitação(ões) avaliada(s) segundo a regra do Target pós-PL.`}
         </p>
       </div>
 
