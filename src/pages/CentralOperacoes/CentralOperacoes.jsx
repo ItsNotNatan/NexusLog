@@ -38,10 +38,15 @@ export default function CentralDeOperacoes() {
         </header>
 
         <main className="home-hub-grid">
-          {/* Módulo 1: Portal do Cliente */}
-          <div className="hub-card hub-card--blue">
+          {/* Módulo 1: Portal do Cliente (Hitbox no cartão inteiro) */}
+          <div 
+            className="hub-card hub-card--blue"
+            onClick={() => navigate('/cliente/consulta-estoque')}
+            role="button"
+            tabIndex={0}
+          >
             <div className="hub-card-icon">
-              <Box size={20} />
+              <Box size={32} />
             </div>
             <h3>Portal do Cliente</h3>
             <p>Consulte estoque, faça solicitações e acompanhe seus pedidos.</p>
@@ -50,18 +55,20 @@ export default function CentralDeOperacoes() {
               <span className="tag">Solicitações</span>
               <span className="tag">Rastreabilidade</span>
             </div>
-            <button
-              className="hub-card-action-btn"
-              onClick={() => navigate('/cliente/consulta-estoque')}
-            >
+            <div className="hub-card-action-btn">
               Acessar Portal <span className="arrow-transition">&rarr;</span>
-            </button>
+            </div>
           </div>
 
-          {/* Módulo 2: Área da Logística */}
-          <div className="hub-card hub-card--indigo">
+          {/* Módulo 2: Área da Logística (Hitbox no cartão inteiro) */}
+          <div 
+            className="hub-card hub-card--indigo"
+            onClick={() => navigate('/login')}
+            role="button"
+            tabIndex={0}
+          >
             <div className="hub-card-icon">
-              <LayoutGrid size={20} />
+              <LayoutGrid size={32} />
             </div>
             <h3>Área da Logística</h3>
             <p>Dashboard operacional, aprovações de PL, painel geral e controle de estoque.</p>
@@ -69,13 +76,11 @@ export default function CentralDeOperacoes() {
               <span className="tag">Dashboard</span>
               <span className="tag">Aprovação de PL</span>
               <span className="tag">Painel Geral</span>
+              <span className="tag">etc.</span>
             </div>
-            <button
-              className="hub-card-action-btn"
-              onClick={() => navigate('/login')}
-            >
+            <div className="hub-card-action-btn">
               Acessar Logística <span className="arrow-transition">&rarr;</span>
-            </button>
+            </div>
           </div>
         </main>
       </div>

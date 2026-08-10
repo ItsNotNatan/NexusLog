@@ -1,7 +1,7 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/FazerSolicitacao/MaterialEstoque.jsx
 // DESCRIÇÃO: Ecrã para solicitar material do estoque. Inclui a correção
-// que envia a filial_id para o seletor lateral conseguir filtrar.
+// que envia a filial_id e a formatação em tempo real do WBS/Centro de Custo.
 // =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import {
@@ -21,6 +21,17 @@ import GerenciadorAnexos from "../../../components/GerenciadorAnexos/Gerenciador
 import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral";
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
+
+// Funções auxiliares de formatação
+const formatarWBS = (valor) => {
+  if (!valor) return '';
+  // Remove caracteres especiais para formatar de forma limpa
+  const limpo = valor.replace(/[^a-zA-Z0-9]/g, '');
+  if (limpo.length > 5) {
+    return `${limpo.slice(0, 5)}-${limpo.slice(5)}`;
+  }
+  return limpo;
+};
 
 export default function MaterialEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
@@ -63,12 +74,7 @@ export default function MaterialEstoque() {
             .filter((item) => item.quantidade_disponivel > 0)
             .map((item) => ({
               idBD: item.id,
-              
-              // ✨ CORREÇÃO APLICADA AQUI: 
-              // Adicionámos a filial_id para que o SeletorEstoqueLateral saiba a que 
-              // filial este item pertence e consiga filtrá-lo corretamente.
               filial_id: item.filial_id || item.filial || item.filial_origem_id,
-              
               desenhoSAP: item.desenho_sap_manual || item.desenho_sap || "-",
               materialDescription: item.descricao_manual || item.descricao || "-",
               numPecaFabricante: item.part_number_manual || item.part_number || "-",
@@ -129,7 +135,6 @@ export default function MaterialEstoque() {
       return;
     }
 
-    // Verifica se o item já foi adicionado
     const itemJaExiste = itensSelecionados.some(i => i.estoque_id === item.idBD);
     if (itemJaExiste) {
       showAlert("Item Duplicado", "Este material já foi adicionado à sua lista.", "info");
@@ -279,10 +284,10 @@ export default function MaterialEstoque() {
             <input
               type="text"
               className="input-campo"
-              placeholder="Ex: WBS-PRJ-2024-001"
+              placeholder="Ex: 12345-67890"
               value={formDados.wbs}
               onChange={(e) =>
-                setFormDados({ ...formDados, wbs: e.target.value })
+                setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })
               }
             />
           </div>

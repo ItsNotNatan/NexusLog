@@ -59,6 +59,14 @@ export default function Traceabilly({ perfil = 'logistica' }) {
         let itensExtraidos = [];
 
         json.dados.forEach(solicitacao => {
+          // ✨ FILTRO LOCAL DE SEGURANÇA (Igual ao Seletor de Estoque)
+          // Garante que a solicitação pertence rigorosamente à filial selecionada no Header
+          const filialDaSolicitacao = solicitacao.filial || solicitacao.filial_origem || solicitacao.estoque || solicitacao.filial_id;
+          
+          if (estoqueAtual && estoqueAtual !== 'TODOS' && filialDaSolicitacao && filialDaSolicitacao !== estoqueAtual) {
+            return; // Salta esta solicitação se for de outra filial e não estiver em "TODOS"
+          }
+
           const estaAprovado = solicitacao.status === 'Em Separação' || solicitacao.status === 'Concluído';
           const naoEEntrada = solicitacao.tipo !== 'Entrada';
 
