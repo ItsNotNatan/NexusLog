@@ -29,8 +29,8 @@ export default function CentralDeOperacoes() {
           <img src={logoComau} alt="Logo Comau" className="home-hub-logo" />
           
           <h1 className="home-greeting">
-            Central de Operações <br />
-            <span className="logo-accent">COMAU Logistics</span>
+
+            Bem-vindo ao <span className="logo-accent">NexusLog</span>
           </h1>
           <p className="home-instructions">
             Controle de estoque, solicitações, aprovações e rastreabilidade em tempo real.
@@ -71,7 +71,7 @@ export default function CentralDeOperacoes() {
               <LayoutGrid size={36} />
             </div>
             <h3>Área da Logística</h3>
-            <p>Dashboard operacional, aprovações de PL, painel geral e controle de estoque.</p>
+            <p>Dashboard operacional, aprovações de Packing List, painel geral e controle de estoque.</p>
             <div className="area-tags">
               <span className="tag">Dashboard</span>
               <span className="tag">Aprovação de PL</span>
