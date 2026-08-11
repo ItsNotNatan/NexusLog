@@ -22,9 +22,8 @@ export default function Traceabilly({ perfil = 'logistica' }) {
   const { showAlert, showConfirm } = useAlert();
   const navigate = useNavigate();
 
-  // ✨ 2. O OBSERVADOR MÁGICO (AGORA BLINDADO)
+  // ✨ 2. O OBSERVADOR MÁGICO
   useEffect(() => {
-    // Só toma decisões DEPOIS que a aplicação estiver estável
     if (!carregandoInicial) {
       if (perfil === 'cliente' && estoqueAtual === 'TODOS') {
         showAlert(
@@ -51,50 +50,68 @@ export default function Traceabilly({ perfil = 'logistica' }) {
       setCarregando(true);
 
       const filtroFilial = !estoqueAtual || estoqueAtual === 'TODOS' ? '' : estoqueAtual;
-      const url = `/solicitacoes/listar?limit=500&filial=${filtroFilial}`;
+      
+      // ✨ BUSCA CRUZADA: Traz as solicitações e o estoque em paralelo
+      const [jsonSolicitacoes, jsonEstoque] = await Promise.all([
+        apiFetch(`/solicitacoes/listar?limit=500&filial=${filtroFilial}`),
+        apiFetch('/estoque/listar')
+      ]);
 
-      const json = await apiFetch(url);
+      if (jsonSolicitacoes.sucesso && jsonEstoque.sucesso) {
+        
+        // Mapeia o estoque para checagem rápida de saldo
+        const mapaEstoque = {};
+        jsonEstoque.dados.forEach(itemEstoque => {
+          mapaEstoque[itemEstoque.id] = itemEstoque;
+        });
 
-      if (json.sucesso) {
         let itensExtraidos = [];
 
-        json.dados.forEach(solicitacao => {
-          // ✨ FILTRO LOCAL DE SEGURANÇA (Igual ao Seletor de Estoque)
-          // Garante que a solicitação pertence rigorosamente à filial selecionada no Header
+        jsonSolicitacoes.dados.forEach(solicitacao => {
           const filialDaSolicitacao = solicitacao.filial || solicitacao.filial_origem || solicitacao.estoque || solicitacao.filial_id;
           
+          // Filtro de Segurança
           if (estoqueAtual && estoqueAtual !== 'TODOS' && filialDaSolicitacao && filialDaSolicitacao !== estoqueAtual) {
-            return; // Salta esta solicitação se for de outra filial e não estiver em "TODOS"
+            return;
           }
 
           const estaAprovado = solicitacao.status === 'Em Separação' || solicitacao.status === 'Concluído';
           const naoEEntrada = solicitacao.tipo !== 'Entrada';
 
           if (estaAprovado && naoEEntrada) {
-            
             solicitacao.itens.forEach(item => {
-              itensExtraidos.push({
-                id: item.id,
-                tipo: solicitacao.tipo,
-                partNumber: item.part_number_manual || item.part_number || '-',
-                descricao: item.descricao_manual || item.descricao || '-',
-                fornecedor: item.fornecedor || '-',
-                nfEntrada: item.nf_entrada || 'N/A',
-                bsSaida: solicitacao.pl || solicitacao.bs || '-', 
-                solicitacao: solicitacao.id,
-                solicitanteInicial: solicitacao.solicitante ? solicitacao.solicitante.charAt(0).toUpperCase() : 'U',
-                solicitanteNome: solicitacao.solicitante || 'Não identificado',
-                alocacao: item.alocacao || 'Padrão',
-                qtd: `${item.quantidade_solicitada} ${item.unidade_medida_manual || 'Unid'}`,
-                valor: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual}` : '-',
-                wbs: solicitacao.wbs || '-',
-                data: solicitacao.dataSolicitacao
-              });
+              
+              // ✨ VERIFICA SE O ITEM ESTÁ ZERADO NO BANCO DE DADOS
+              const estoqueVinculado = mapaEstoque[item.estoque_id];
+              const estaZerado = estoqueVinculado && (estoqueVinculado.quantidade_disponivel <= 0 || estoqueVinculado.status === 'Zerado');
+
+              // Só empurra para a Rastreabilidade se efetivamente esgotou o saldo
+              if (estaZerado) {
+                itensExtraidos.push({
+                  id: item.id,
+                  tipo: solicitacao.tipo,
+                  partNumber: item.part_number_manual || item.part_number || '-',
+                  descricao: item.descricao_manual || item.descricao || '-',
+                  fornecedor: item.fornecedor || '-',
+                  nfEntrada: item.nf_entrada || 'N/A',
+                  bsSaida: solicitacao.pl || solicitacao.bs || '-', 
+                  solicitacao: solicitacao.id,
+                  solicitanteInicial: solicitacao.solicitante ? solicitacao.solicitante.charAt(0).toUpperCase() : 'U',
+                  solicitanteNome: solicitacao.solicitante || 'Não identificado',
+                  alocacao: item.alocacao || 'Padrão',
+                  qtd: `${item.quantidade_solicitada} ${item.unidade_medida_manual || 'Unid'}`,
+                  valor: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual}` : '-',
+                  wbs: solicitacao.wbs || '-',
+                  data: solicitacao.dataSolicitacao
+                });
+              }
             });
           }
         });
 
         setDadosRastreabilidade(itensExtraidos);
+      } else {
+        showAlert("Erro de Servidor", "Falha ao processar os dados combinados.", "error");
       }
     } catch (error) {
       console.error("Erro ao buscar rastreabilidade:", error.message);
@@ -149,8 +166,6 @@ export default function Traceabilly({ perfil = 'logistica' }) {
     item.tipo.toLowerCase().includes(termoPesquisa.toLowerCase()) 
   );
 
-  // ✨ 3. PROTEÇÃO DE RENDERIZAÇÃO
-  // Esconde o ecrã enquanto carrega os dados ou enquanto está a viajar para outra página
   if (carregandoInicial || (perfil === 'cliente' && estoqueAtual === 'TODOS')) {
     return null;
   }
@@ -160,7 +175,7 @@ export default function Traceabilly({ perfil = 'logistica' }) {
       
       <header className="pagina-cabecalho">
         <h1>Rastreabilidade</h1>
-        <p>Banco de dados histórico — rastreador completo de saída de itens</p>
+        <p>Banco de dados histórico — rastreador completo de saída de itens que já não constam no estoque.</p>
       </header>
 
       <div className="traceabilly-cartao">
@@ -168,7 +183,7 @@ export default function Traceabilly({ perfil = 'logistica' }) {
         <div className="cartao-topo">
           <div className="titulo-grupo">
             <Archive className="icone-azul" size={20} />
-            <h2>Histórico de Movimentações</h2>
+            <h2>Histórico de Movimentações (Itens Zerados)</h2>
             <span className="badge-contador">{dadosFiltrados.length}</span>
           </div>
           
@@ -200,7 +215,7 @@ export default function Traceabilly({ perfil = 'logistica' }) {
           {carregando ? (
             <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
               <Loader className="icone-girando" size={32} />
-              <p>A carregar o histórico completo de saídas...</p>
+              <p>A cruzar dados com o estoque para carregar os itens esgotados...</p>
             </div>
           ) : (
             <table className="tabela-rastreabilidade" style={{ minWidth: '1300px' }}>
@@ -285,7 +300,7 @@ export default function Traceabilly({ perfil = 'logistica' }) {
                 ) : (
                   <tr>
                     <td colSpan="13" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Nenhum registo histórico de saída ou transferência encontrado para esta filial.
+                      Nenhum item com estoque zerado ou transferido encontrado para a filial atual.
                     </td>
                   </tr>
                 )}

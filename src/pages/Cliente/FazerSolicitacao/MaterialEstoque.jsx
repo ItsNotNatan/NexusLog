@@ -1,7 +1,8 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/FazerSolicitacao/MaterialEstoque.jsx
 // DESCRIÇÃO: Ecrã para solicitar material do estoque. Inclui a correção
-// que envia a filial_id e a formatação em tempo real do WBS/Centro de Custo.
+// que envia a filial_id para o seletor lateral conseguir filtrar e
+// formatação em tempo real do WBS.
 // =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import {
@@ -22,11 +23,13 @@ import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/Sel
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
 
-// Funções auxiliares de formatação
+// ✨ FUNÇÃO NOVA: Formata o WBS em tempo real (Ex: ABCDE-12345)
 const formatarWBS = (valor) => {
   if (!valor) return '';
-  // Remove caracteres especiais para formatar de forma limpa
-  const limpo = valor.replace(/[^a-zA-Z0-9]/g, '');
+  // Remove tudo o que não for letra ou número e força para maiúsculas
+  const limpo = valor.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  
+  // Insere o hífen automaticamente após o 5º caractere
   if (limpo.length > 5) {
     return `${limpo.slice(0, 5)}-${limpo.slice(5)}`;
   }
@@ -74,7 +77,11 @@ export default function MaterialEstoque() {
             .filter((item) => item.quantidade_disponivel > 0)
             .map((item) => ({
               idBD: item.id,
+              
+              // Adicionámos a filial_id para que o SeletorEstoqueLateral saiba a que 
+              // filial este item pertence e consiga filtrá-lo corretamente.
               filial_id: item.filial_id || item.filial || item.filial_origem_id,
+              
               desenhoSAP: item.desenho_sap_manual || item.desenho_sap || "-",
               materialDescription: item.descricao_manual || item.descricao || "-",
               numPecaFabricante: item.part_number_manual || item.part_number || "-",
@@ -135,6 +142,7 @@ export default function MaterialEstoque() {
       return;
     }
 
+    // Verifica se o item já foi adicionado
     const itemJaExiste = itensSelecionados.some(i => i.estoque_id === item.idBD);
     if (itemJaExiste) {
       showAlert("Item Duplicado", "Este material já foi adicionado à sua lista.", "info");
@@ -279,18 +287,21 @@ export default function MaterialEstoque() {
               }
             />
           </div>
+
           <div className="input-grupo">
             <label>WBS / CENTRO DE CUSTO *</label>
             <input
               type="text"
               className="input-campo"
-              placeholder="Ex: 12345-67890"
+              placeholder="Ex: ABCDE-12345"
               value={formDados.wbs}
+              // ✨ MUDANÇA: Agora o input passa pelo formatarWBS
               onChange={(e) =>
                 setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })
               }
             />
           </div>
+
           <div className="input-grupo">
             <label>
               <MapPin size={14} /> FILIAL DE ORIGEM
@@ -306,6 +317,7 @@ export default function MaterialEstoque() {
               <span className="badge-fixo">Fixo</span>
             </div>
           </div>
+
           <div className="input-grupo row-span-2">
             <label>
               <MapPin size={14} /> DESTINO *
@@ -319,6 +331,7 @@ export default function MaterialEstoque() {
               }
             ></textarea>
           </div>
+
           <div className="input-grupo">
             <label>
               <Calendar size={14} /> DATA DE NECESSIDADE *
@@ -336,6 +349,7 @@ export default function MaterialEstoque() {
               }
             />
           </div>
+
           <div className="input-grupo span-2">
             <label>OBSERVAÇÕES GERAIS</label>
             <textarea
@@ -432,7 +446,6 @@ export default function MaterialEstoque() {
                   ></textarea>
                 </div>
               )}
-
             </div>
           </div>
         </div>
