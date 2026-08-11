@@ -174,7 +174,7 @@ export default function Traceabilly({ perfil = 'logistica' }) {
     <div className="traceabilly-wrapper">
       
       <header className="pagina-cabecalho">
-        <h1>Rastreabilidade</h1>
+        <h1>Histórico de movimentação</h1>
         <p>Banco de dados histórico — rastreador completo de saída de itens que já não constam no estoque.</p>
       </header>
 

@@ -18,13 +18,13 @@ export default function Sidebar({ modulo }) {
     { path: '/cliente/consulta-estoque', label: 'Consulta de Estoque', icon: <Boxes size={20} /> },
     { path: '/cliente/fazer-solicitacao', label: 'Fazer Solicitação', icon: <ClipboardEdit size={20} /> },
     { path: '/cliente/acompanhamento-solicitacoes', label: 'Acompanhamento', icon: <FileClock size={20} /> },
-    { path: '/cliente/rastreabilidade', label: 'Rastreabilidade', icon: <Archive size={20} /> },
+    { path: '/cliente/rastreabilidade', label: 'Histórico', icon: <Archive size={20} /> },
   ];
 
   const menuLogistica = [
     { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
-    { path: '/logistica/traceabilly', label: 'Rastreabilidade', icon: <Archive size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
+    { path: '/logistica/traceabilly', label: 'Histórico', icon: <Archive size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/painel', label: 'Painel Geral', icon: <ClipboardList size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/visao-geral', label: 'Visão Geral do Estoque', icon: <Boxes size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['ADM', 'LIDER'] },
