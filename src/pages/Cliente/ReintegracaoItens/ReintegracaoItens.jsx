@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { User, RefreshCcw, Search, Send, Box, ChevronDown, ChevronUp } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -13,8 +13,9 @@ export default function ReintegracaoItens() {
   const [nome, setNome] = useState('');
   const [pesquisa, setPesquisa] = useState('');
   
-  // Estado que armazena todas as PLs vindas do banco de dados
+  // Estado que armazena todas as PLs e Reintegrações
   const [listaDePl, setListaDePl] = useState([]);
+  const [listaReintegracoes, setListaReintegracoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
   // Estados de controlo da PL Selecionada
@@ -22,58 +23,94 @@ export default function ReintegracaoItens() {
   const [itensDaPL, setItensDaPL] = useState([]);
 
   // =======================================================================
-  // 1. CARREGAR AS PLs DO BACKEND AO INICIAR A PÁGINA
+  // 1. FUNÇÃO PARA CARREGAR DADOS DO BACKEND
   // =======================================================================
-  useEffect(() => {
-    const buscarPLs = async () => {
-      try {
-        setCarregando(true);
-        // Traz as solicitações da filial atual
-        const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
-        const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=500`);
+  const buscarDados = useCallback(async () => {
+    try {
+      setCarregando(true);
+      const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
+      
+      const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
 
-        if (resultado.sucesso) {
-          // Filtra APENAS solicitações do tipo "Material" que já tenham sido aprovadas ou concluídas
-          const plsValidas = resultado.dados.filter(sol => 
-            sol.tipo === 'Material' && 
-            (sol.status === 'Em Separação' || sol.status === 'Concluído') &&
-            sol.pl && sol.pl !== '-'
-          );
+      if (resultado.sucesso) {
+        // 1. Guardar as PLs de Material normais
+        const plsValidas = resultado.dados.filter(sol => 
+          sol.tipo === 'Material' && 
+          (sol.status === 'Em Separação' || sol.status === 'Concluído') &&
+          sol.pl && sol.pl !== '-'
+        );
+        setListaDePl(plsValidas);
 
-          setListaDePl(plsValidas);
-        } else {
-          console.error("Erro ao buscar as PLs:", resultado.erro);
-        }
-      } catch (error) {
-        console.error("Falha na ligação com o servidor:", error.message);
-      } finally {
-        setCarregando(false);
+        // ✨ 2. NOVA REGRA: Só consideramos os itens devolvidos SE a logística
+        // já tiver aprovado ('Em Separação') ou finalizado ('Concluído').
+        const reints = resultado.dados.filter(sol => 
+          (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
+          (sol.status === 'Em Separação' || sol.status === 'Concluído')
+        );
+        setListaReintegracoes(reints);
+      } else {
+        console.error("Erro ao buscar as PLs:", resultado.erro);
       }
-    };
-
-    buscarPLs();
+    } catch (error) {
+      console.error("Falha na ligação com o servidor:", error.message);
+    } finally {
+      setCarregando(false);
+    }
   }, [estoqueAtual]);
 
+  useEffect(() => {
+    buscarDados();
+  }, [buscarDados]);
+
   // =======================================================================
-  // 2. AÇÃO DE SELECIONAR A PL E PREPARAR OS ITENS
+  // 2. AÇÃO DE SELECIONAR A PL E CALCULAR MATEMÁTICA DE ITENS RESTANTES
   // =======================================================================
   const handleSelecionarPL = (plOriginal) => {
-    // Se o cliente clicar na mesma PL que já está aberta, ela fecha.
+    // Fecha a gaveta se já estiver aberta
     if (plSelecionada === plOriginal.id) {
       setPlSelecionada(null);
       setItensDaPL([]);
       return;
     }
 
+    // A. Vamos somar tudo o que JÁ FOI DEVOLVIDO E APROVADO desta PL
+    const qtdJaDevolvida = {};
+    listaReintegracoes.forEach(reint => {
+      // Verifica se a observação da reintegração cita o número desta PL
+      if (reint.observacoes && reint.observacoes.includes(plOriginal.pl)) {
+        (reint.itens || []).forEach(it => {
+          // Usa o ID da prateleira para mapear o item exato devolvido
+          qtdJaDevolvida[it.estoque_id] = (qtdJaDevolvida[it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
+        });
+      }
+    });
+
+    // B. Agora mapeamos os itens da PL descontando o que já foi devolvido
+    const itensMapeados = (plOriginal.itens || []).map(item => {
+      const devolvidoAnteriormente = qtdJaDevolvida[item.estoque_id] || 0;
+      
+      // O que o cliente ainda pode devolver = (Qtd Original - Qtd que já devolveu)
+      const maxPermitido = Math.max(0, Number(item.quantidade_solicitada) - devolvidoAnteriormente);
+
+      return {
+        ...item,
+        quantidade_maxima_permitida: maxPermitido,
+        quantidade_devolvida: 0 // Inicia a caixa de input com 0
+      };
+    }).filter(item => item.quantidade_maxima_permitida > 0); // Remove itens que já esgotaram o limite de devolução
+
+    // C. Se não sobrar nada, não abre a gaveta e avisa o cliente
+    if (itensMapeados.length === 0) {
+      showAlert(
+        "PL Totalmente Reintegrada", 
+        "Todos os itens desta Packing List já foram devolvidos ao estoque e aprovados pela equipa de logística.", 
+        "info"
+      );
+      return;
+    }
+
+    // Abre a gaveta e exibe os itens restantes
     setPlSelecionada(plOriginal.id);
-
-    // Mapeia os itens da PL selecionada adicionando a propriedade "quantidade_devolvida" 
-    // com o valor inicial a 0.
-    const itensMapeados = (plOriginal.itens || []).map(item => ({
-      ...item,
-      quantidade_devolvida: 0 // Valor editável pelo utilizador
-    }));
-
     setItensDaPL(itensMapeados);
   };
 
@@ -87,9 +124,9 @@ export default function ReintegracaoItens() {
     setItensDaPL(prevItens => 
       prevItens.map(item => {
         if (item.id === itemId) {
-          // Não permite devolver mais do que foi pedido originalmente
-          if (valorNum > item.quantidade_solicitada) {
-            valorNum = item.quantidade_solicitada;
+          // Bloqueia caso o cliente tente escrever um número maior que o permitido
+          if (valorNum > item.quantidade_maxima_permitida) {
+            valorNum = item.quantidade_maxima_permitida;
           }
           return { ...item, quantidade_devolvida: valorNum };
         }
@@ -124,11 +161,11 @@ export default function ReintegracaoItens() {
     const payload = {
       solicitante: {
         nome: nome,
-        pl_origem: plDados.pl, // Extrai a sigla da PL limpa (ex: PL #15)
+        pl_origem: plDados.pl, 
         wbs: plDados.wbs,
         filial_origem: estoqueAtual
       },
-      itens: itensParaDevolver // A API do backend já vai saber que é para ler isto
+      itens: itensParaDevolver
     };
 
     try {
@@ -137,14 +174,23 @@ export default function ReintegracaoItens() {
         body: JSON.stringify(payload)
       });
 
-      if (dados.sucesso || dados.ps_id || dados.pl_id) {
-        showAlert("Sucesso!", `Reintegração solicitada com sucesso. ID gerado: ${dados.ps_id || dados.pl_id}`, "success");
+      if (dados.sucesso || dados.ps || dados.ps_id) {
+        // ✨ NOVO AVISO DE SUCESSO DEIXANDO CLARO O PS E O PL
+        const idGerado = dados.ps || dados.ps_id || dados.pl_id;
+        showAlert(
+          "Sucesso!", 
+          `Reintegração solicitada! Pedido (PS) gerado: ${idGerado}. A PL correspondente será gerada assim que a logística aprovar o pedido.`, 
+          "success"
+        );
         
         // Reset da Tela
         setNome('');
         setPlSelecionada(null);
         setItensDaPL([]);
         setPesquisa('');
+
+        // 🔄 RECARREGA OS DADOS
+        buscarDados();
       } else {
         showAlert("Erro de Servidor", dados.erro, "error");
       }
@@ -212,7 +258,7 @@ export default function ReintegracaoItens() {
           {carregando ? (
             <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
               <RefreshCcw className="animate-spin" size={24} style={{ display: 'block', margin: '0 auto 10px auto' }} />
-              A carregar Packing Lists da base de dados...
+              Carregando Packing Lists da base de dados...
             </div>
           ) : listaFiltrada.length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>
@@ -254,7 +300,7 @@ export default function ReintegracaoItens() {
                   </div>
                 </div>
 
-                {/* PAINEL EXPANSÍVEL (SÓ ABRE QUANDO O PL ESTIVER SELECIONADO) */}
+                {/* PAINEL EXPANSÍVEL */}
                 {plSelecionada === pl.id && (
                   <div style={{
                     border: '2px solid #f97316',
@@ -279,7 +325,7 @@ export default function ReintegracaoItens() {
                         <tr style={{ borderBottom: '1px solid #fed7aa', color: '#9a3412' }}>
                           <th style={{ padding: '8px', fontWeight: '600' }}>PART NUMBER</th>
                           <th style={{ padding: '8px', fontWeight: '600' }}>DESCRIÇÃO</th>
-                          <th style={{ padding: '8px', fontWeight: '600' }}>RETIRADO DA PL</th>
+                          <th style={{ padding: '8px', fontWeight: '600' }}>SALDO P/ DEVOLVER</th>
                           <th style={{ padding: '8px', fontWeight: '600', width: '120px' }}>QTD DEVOLVER</th>
                         </tr>
                       </thead>
@@ -292,15 +338,17 @@ export default function ReintegracaoItens() {
                             <td style={{ padding: '12px 8px', color: '#7c2d12' }}>
                               {itemTabela.descricao_manual}
                             </td>
-                            <td style={{ padding: '12px 8px', color: '#7c2d12' }}>
-                              {itemTabela.quantidade_solicitada} {itemTabela.unidade_medida_manual}
+                            
+                            {/* ✨ EXIBE A QUANTIDADE ATUALIZADA (Descontando as devoluções) */}
+                            <td style={{ padding: '12px 8px', color: '#7c2d12', fontWeight: 'bold' }}>
+                              {itemTabela.quantidade_maxima_permitida} {itemTabela.unidade_medida_manual}
                             </td>
+
                             <td style={{ padding: '8px' }}>
-                              {/* INPUT DE QUANTIDADE A DEVOLVER */}
                               <input 
                                 type="number" 
                                 min="0" 
-                                max={itemTabela.quantidade_solicitada}
+                                max={itemTabela.quantidade_maxima_permitida}
                                 value={itemTabela.quantidade_devolvida}
                                 onChange={(e) => alterarQuantidade(itemTabela.id, e.target.value)}
                                 style={{
