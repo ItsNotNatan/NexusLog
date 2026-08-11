@@ -30,7 +30,7 @@ export default function CentralDeOperacoes() {
           
           <h1 className="home-greeting">
 
-            Bem-vindo ao <span className="logo-accent">NexusLog</span>
+            Bem-vindo ao NEXUS<span className="logo-accent">Log</span>
           </h1>
           <p className="home-instructions">
             Uma plataforma centralizada para controle de estoque, solicitações, aprovações e rastreabilidade em tempo real.
