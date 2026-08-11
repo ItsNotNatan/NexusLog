@@ -33,7 +33,7 @@ export default function CentralDeOperacoes() {
             Bem-vindo ao <span className="logo-accent">NexusLog</span>
           </h1>
           <p className="home-instructions">
-            Controle de estoque, solicitações, aprovações e rastreabilidade em tempo real.
+            Uma plataforma centralizada para controle de estoque, solicitações, aprovações e rastreabilidade em tempo real.
           </p>
         </header>
 
@@ -74,9 +74,8 @@ export default function CentralDeOperacoes() {
             <p>Dashboard operacional, aprovações de Packing List, painel geral e controle de estoque.</p>
             <div className="area-tags">
               <span className="tag">Dashboard</span>
-              <span className="tag">Aprovação de PL</span>
-              <span className="tag">Painel Geral</span>
-              <span className="tag">etc.</span>
+              <span className="tag">Aprovação de Solicitações</span>
+              <span className="tag">Rota de Coleta</span>
             </div>
             <div className="hub-card-action-btn">
               Acessar Logística <span className="arrow-transition">&rarr;</span>
