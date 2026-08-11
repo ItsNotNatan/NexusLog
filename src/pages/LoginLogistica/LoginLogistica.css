@@ -129,3 +129,11 @@
   background-color: #93c5fd;
   cursor: not-allowed;
 }
+
+/* Adicione no LoginLogistica.css */
+.login-logo-img {
+  height: 75px; /* Altura ideal para telas de login */
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 12px;
+}

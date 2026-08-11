@@ -46,7 +46,7 @@ export default function CentralDeOperacoes() {
             tabIndex={0}
           >
             <div className="hub-card-icon">
-              <Box size={32} />
+              <Box size={36} />
             </div>
             <h3>Portal do Cliente</h3>
             <p>Consulte estoque, faça solicitações e acompanhe seus pedidos.</p>
@@ -68,7 +68,7 @@ export default function CentralDeOperacoes() {
             tabIndex={0}
           >
             <div className="hub-card-icon">
-              <LayoutGrid size={32} />
+              <LayoutGrid size={36} />
             </div>
             <h3>Área da Logística</h3>
             <p>Dashboard operacional, aprovações de PL, painel geral e controle de estoque.</p>

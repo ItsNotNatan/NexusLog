@@ -8,9 +8,19 @@
   box-sizing: border-box;
 }
 
-/* CABEÇALHO */
+/* ✨ ESTILOS DA LOGO DA COMAU E DO CABEÇALHO */
 .painel-cabecalho {
   margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Alinha tudo à esquerda */
+}
+
+.painel-logo {
+  height: 100px; /* Tamanho em destaque */
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 16px; /* Espaçamento entre a logo e o título */
 }
 
 .painel-cabecalho h1 {

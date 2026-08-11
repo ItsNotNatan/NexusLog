@@ -1,14 +1,39 @@
-/* src/index.css */
+/* Importação da fonte Inter do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ── CONFIGURAÇÃO GLOBAL DE TELA ── */
 html, body, #root {
   margin: 0;
   padding: 0;
   width: 100%;
   height: 100%;
-  height: 100dvh;
-  overflow: hidden !important;
+  height: 100dvh; /* Evita que a tela suba/desça no mobile */
+  overflow: hidden !important; /* Trava qualquer rolagem na raiz */
+  box-sizing: border-box;
+  
+  /* ── FONTE GLOBAL DA APLICAÇÃO ── */
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #334155; /* Cor de texto padrão (Slate 700) */
+  background-color: #f8fafc;
+}
+
+/* Garante que o box-sizing seja respeitado em TODOS os componentes */
+*, *::before, *::after {
   box-sizing: border-box;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
+/* 
+  Inputs, Textareas, Selects e Buttons costumam ignorar a fonte do body no navegador.
+  Isto força-os a usar a fonte Inter também! 
+*/
+input, button, textarea, select {
+  font-family: inherit;
+}
+
+/* Padronização de âncoras (links) */
+a {
+  text-decoration: none;
+  color: inherit;
 }

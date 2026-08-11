@@ -13,6 +13,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+// ✨ 1. IMPORTAÇÃO DA LOGO DA COMAU
+import logoComau from '../../assets/logo-comau.png';
+
 const filtrosArray = ['Todos', 'Material', 'Transferencia WBS', 'Nota Fiscal', 'Entrada', 'Crossdocking', 'Reintegracao'];
 
 const renderBadgeStatus = (status) => {
@@ -147,6 +150,8 @@ export default function PainelGeralSolicitacoes() {
     <div className="painel-geral-wrapper">
 
       <header className="painel-cabecalho">
+        {/* ✨ 2. INSERÇÃO DA LOGO */}
+        <img src={logoComau} alt="Logo COMAU" className="painel-logo" />
         <h1>Painel Geral de Solicitações</h1>
         <p>Gerencie todas as solicitações — materiais, WBS, NFs, entradas, crossdocking e reintegrações</p>
       </header>
@@ -341,7 +346,7 @@ export default function PainelGeralSolicitacoes() {
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                lidarComMudancaStatus(linha.idOriginal || linha.id, 'Em Separação');
+                                lidarComMudancaStatus(linha.id, 'Em Separação');
                               }}
                             >
                               <RefreshCw size={14} /> Aprovar
@@ -353,7 +358,7 @@ export default function PainelGeralSolicitacoes() {
                             value={linha.status}
                             onChange={(e) => {
                               e.stopPropagation();
-                              lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value);
+                              lidarComMudancaStatus(linha.id, e.target.value);
                             }}
                             style={{
                               padding: '6px 12px',

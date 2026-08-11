@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './LoginLogistica.css';
-import { Hexagon, Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import { useAuth } from '../../contexts/AuthContext';
 
-// 1. IMPORTAÇÃO DA NOVA FUNÇÃO
-// Trazemos a função apiFetch que criaste para centralizar as requisições
+// 1. IMPORTAÇÃO DA NOVA FUNÇÃO E DA LOGO
 import { apiFetch } from '../../services/api';
+import logoComau from '../../assets/logo-comau.png';
 
 export default function LoginLogistica() {
   const [email, setEmail] = useState('');
@@ -24,33 +24,23 @@ export default function LoginLogistica() {
     setErro('');
 
     try {
-      // 2. UTILIZAÇÃO DO APIFETCH
-      // Em vez de usar o 'fetch' nativo com 'localhost:3001', passamos apenas a rota final.
-      // O 'apiFetch' já cuida da URL base (Vercel ou Localhost) e transforma a resposta em JSON.
       const data = await apiFetch('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, senha }),
       });
 
-      // 3. VALIDAÇÃO DE NEGÓCIO
-      // O apiFetch já verifica erros de servidor (ex: 500, 404), 
-      // mas verificamos também se a API indicou "sucesso: false" nas regras de negócio.
       if (!data.sucesso) {
         throw new Error(data.erro || 'Erro ao fazer login.');
       }
 
-      // 4. VALIDAÇÃO DE CARGO
-      // Garante que clientes ou utilizadores não autorizados não entram no painel de logística.
       if (data.usuario.cargo !== 'ADM' && data.usuario.cargo !== 'LIDER' && data.usuario.cargo !== 'OPERADOR') {
         throw new Error('Acesso negado. Este portal é exclusivo para a equipe de Logística.');
       }
 
-      // 5. LOGIN E REDIRECIONAMENTO
       await login(data.usuario, data.token);
       navigate('/logistica/painel');
 
     } catch (error) {
-      // Captura qualquer erro lançado acima ou dentro do apiFetch e mostra no ecrã.
       setErro(error.message);
     } finally {
       setCarregando(false);
@@ -89,7 +79,8 @@ export default function LoginLogistica() {
         </button>
 
         <div className="login-logo-seccao">
-          <div className="login-logo-icone"><Hexagon size={32} /></div>
+          {/* ✨ LOGO DA COMAU SUBSTITUINDO O HEXÁGONO */}
+          <img src={logoComau} alt="Logo COMAU" className="login-logo-img" />
           <h2>NexusLog</h2>
           <p>Controle Operacional &bull; Back-Office</p>
         </div>

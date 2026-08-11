@@ -66,7 +66,10 @@
 }
 
 .home-hub-logo {
-  height: clamp(60px, 11vh, 110px);
+  /* Aumentamos de 60px para 80px (mínimo) */
+  /* Aumentamos de 11vh para 14vh (ideal) */
+  /* Aumentamos de 110px para 150px (máximo) */
+  height: clamp(80px, 14vh, 150px) !important;
   width: auto;
   object-fit: contain;
   margin-bottom: 0.5rem;
