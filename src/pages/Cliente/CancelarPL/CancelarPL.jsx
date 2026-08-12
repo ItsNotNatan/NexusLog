@@ -184,12 +184,13 @@ export default function CancelarPL() {
               >
                 <div className="item-pl-info">
                   
-                  {/* ✨ AQUI APARECEM TANTO O PS QUANTO A PL LADO A LADO */}
+                  {/* ✨ AQUI APARECEM TANTO O PS QUANTO A PL LADO A LADO (OU AVISO "SEM PL") */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <span className="item-pl-titulo" style={{ color: solicitacaoSelecionada === sol.id ? '#dc2626' : '#1e293b' }}>
                       {sol.ps}
                     </span>
-                    {sol.pl && sol.pl !== '-' && (
+                    
+                    {sol.pl && sol.pl !== '-' ? (
                       <span style={{ 
                         backgroundColor: solicitacaoSelecionada === sol.id ? '#fee2e2' : '#e0f2fe', 
                         color: solicitacaoSelecionada === sol.id ? '#dc2626' : '#0284c7', 
@@ -200,6 +201,18 @@ export default function CancelarPL() {
                         border: `1px solid ${solicitacaoSelecionada === sol.id ? '#fca5a5' : '#bae6fd'}`
                       }}>
                         {sol.pl}
+                      </span>
+                    ) : (
+                      <span style={{ 
+                        backgroundColor: '#f1f5f9', 
+                        color: '#64748b', 
+                        padding: '2px 8px', 
+                        borderRadius: '999px', 
+                        fontSize: '0.70rem', 
+                        fontWeight: '600',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        Sem PL
                       </span>
                     )}
                   </div>
@@ -240,7 +253,7 @@ export default function CancelarPL() {
         <>
           <div className="tabela-cancelamento-container">
             <div className="tabela-cancelamento-header">
-              <strong>{solAtivaParaTabela.ps} {solAtivaParaTabela.pl && solAtivaParaTabela.pl !== '-' ? `/ ${solAtivaParaTabela.pl}` : ''} — Itens constados na solicitação</strong>
+              <strong>{solAtivaParaTabela.ps} {solAtivaParaTabela.pl && solAtivaParaTabela.pl !== '-' ? `/ ${solAtivaParaTabela.pl}` : '/ Sem PL'} — Itens constados na solicitação</strong>
               <span>O cancelamento é total. Todos os itens listados retornarão ao saldo de estoque após aprovação da logística.</span>
             </div>
             
