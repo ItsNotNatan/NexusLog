@@ -19,13 +19,9 @@ import {
 } from 'lucide-react';
 
 import { AuthContext } from '../../../contexts/AuthContext';
-// ✨ IMPORTAÇÃO DO HOOK DE ALERTAS GLOBAIS
 import { useAlert } from '../../../contexts/AlertContext';
-
-// 1. IMPORTAÇÃO DA FUNÇÃO CENTRALIZADA DE API
 import { apiFetch } from '../../../services/api';
 
-// FUNÇÃO AUXILIAR: Traduz os códigos brutos para os nomes reais dos galpões
 const obterNomeFilial = (codigo) => {
   if (!codigo || codigo === '-') return 'N/D';
 
@@ -42,26 +38,21 @@ const obterNomeFilial = (codigo) => {
 
 export default function PainelAprovacao() {
   const { estoqueAtual } = useContext(AuthContext);
-  // ✨ INICIALIZAÇÃO DOS ALERTAS GLOBAIS
   const { showAlert, showConfirm } = useAlert();
 
-  // --- ESTADOS DO COMPONENTE ---
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [carregando, setCarregando] = useState(true);
 
-  // --- ESTADOS DA LINHA EXPANDIDA (EDIÇÃO INLINE) ---
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [solicitacaoSendoEditada, setSolicitacaoSendoEditada] = useState(null);
   const [itensEdicao, setItensEdicao] = useState([]);
 
-  // --- ESTADOS DE PAGINAÇÃO ---
   const [paginaGeral, setPaginaGeral] = useState(1);
   const [paginaEntradas, setPaginaEntradas] = useState(1);
   const itensPorPagina = 5;
 
-  // --- BUSCA INICIAL DOS DADOS ---
   useEffect(() => {
     const buscarDados = async () => {
       try {
@@ -81,6 +72,8 @@ export default function PainelAprovacao() {
 
         if (resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados
+            // ✨ CORREÇÃO: Mantemos apenas o que está "Pendente". 
+            // O Backend já se encarrega de mudar o status da original para "Cancelado" assim que a logística aprova o cancelamento!
             .filter(item => item.status === 'Pendente')
             .map((item) => {
               let valorTotal = 0;
@@ -143,7 +136,6 @@ export default function PainelAprovacao() {
   const indexUltimoEntradas = paginaEntradas * itensPorPagina;
   const entradasPendentesPaginadas = entradasPendentes.slice(indexPrimeiroEntradas, indexUltimoEntradas);
 
-  // --- LÓGICA DE ABRIR A LINHA PARA EDIÇÃO INLINE ---
   const toggleLinha = (idUnico, linha) => {
     if (linhaExpandida === idUnico) {
       setLinhaExpandida(null);
@@ -156,9 +148,7 @@ export default function PainelAprovacao() {
     }
   };
 
-  // --- FUNÇÕES DE MANIPULAÇÃO DA TABELA INLINE ---
   const adicionarLinhaItem = () => {
-    // ✨ TRAVA MÁXIMA DE 20 ITENS
     if (itensEdicao.length >= 20) {
       showAlert("Limite Atingido", "Não é possível adicionar mais do que 20 itens nesta solicitação.", "warning");
       return;
@@ -186,7 +176,6 @@ export default function PainelAprovacao() {
   };
 
   const removerLinhaItem = (indexParaRemover) => {
-    // ✨ TRAVA MÍNIMA DE 1 ITEM
     if (itensEdicao.length <= 1) {
       showAlert("Ação Bloqueada", "A solicitação deve conter pelo menos 1 item.", "warning");
       return;
@@ -201,7 +190,6 @@ export default function PainelAprovacao() {
     setItensEdicao(novosItens);
   };
 
-  // --- SALVAR A EDIÇÃO ---
   const salvarEdicaoItens = async () => {
     if (!solicitacaoSendoEditada) return;
 
@@ -237,8 +225,6 @@ export default function PainelAprovacao() {
     }
   };
 
-  // --- AÇÃO DE APROVAR ---
-// --- AÇÃO DE APROVAR ---
   const handleAprovar = async (e, idOriginal) => {
     e.stopPropagation();
 
@@ -257,16 +243,18 @@ export default function PainelAprovacao() {
         });
 
         if (resposta.sucesso) {
-          // ✨ VERIFICA SE É UM CANCELAMENTO PARA RECARREGAR O ECRÃ
           const solAprovada = dadosTabela.find(s => s.idOriginal === idOriginal);
+          
+          setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
+          setLinhaExpandida(null);
+
           if (solAprovada && solAprovada.tipo === 'Cancelado') {
-            showAlert("Cancelamento Concluído", "A solicitação original foi cancelada no sistema e o estoque devolvido com sucesso.", "success");
-            setTimeout(() => window.location.reload(), 2000);
+            showAlert("Cancelamento Aprovado", "O pedido original foi cancelado no sistema e o estoque devolvido com sucesso.", "success");
+            // Atualiza para limpar a original que ficou 'Cancelado' na base de dados
+            setTimeout(() => window.location.reload(), 1500); 
             return;
           }
 
-          setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
-          setLinhaExpandida(null);
           showAlert("Solicitação Aprovada", "A solicitação foi aprovada e enviada para separação com sucesso!", "success");
         } else {
           showAlert("Erro no Servidor", resposta.erro || "Não foi possível aprovar a solicitação.", "error");
@@ -278,7 +266,6 @@ export default function PainelAprovacao() {
     }
   };
 
-  // --- AÇÃO DE RECUSAR ---
   const handleRecusar = async (e, idOriginal) => {
     e.stopPropagation();
     
@@ -304,16 +291,12 @@ export default function PainelAprovacao() {
     }
   };
 
-  // GAVETA DE EDIÇÃO COMPLETA (AGORA INTELIGENTE)
   const renderizarGavetaEdicao = () => {
-    // ✨ LÓGICA DE BLOQUEIO DE EDIÇÃO: Só é editável se for do tipo 'Entrada'
     const podeEditar = solicitacaoSendoEditada?.tipo === 'Entrada';
     
-    // Controlo visual e lógico dos limites
     const limiteAtingido = itensEdicao.length >= 20;
     const limiteMinimo = itensEdicao.length <= 1;
 
-    // Cria um estilo dinâmico que remove as bordas dos inputs caso não se possa editar
     const estiloInput = { 
       width: '100%', 
       padding: '6px', 
@@ -331,7 +314,6 @@ export default function PainelAprovacao() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <h4 style={{ margin: 0, color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <FileText size={18} color="#0284c7" /> 
-              {/* Muda o título dependendo do tipo da solicitação */}
               {podeEditar ? 'Itens da Entrada (Modo de Edição)' : 'Itens da Solicitação (Visualização)'}
             </h4>
             
@@ -342,7 +324,6 @@ export default function PainelAprovacao() {
             )}
           </div>
           
-          {/* Botão de Nova Linha com estilo de desativado se atingir o limite */}
           {podeEditar && (
             <button
               onClick={adicionarLinhaItem}
@@ -366,7 +347,6 @@ export default function PainelAprovacao() {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2200px' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {/* Esconde a coluna de Ações (Lixo) se for Visualização */}
                 {podeEditar && <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', textAlign: 'center', width: '60px' }}>AÇÕES</th>}
                 <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DESENHO SAP</th>
                 <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>Nº PEÇA FABRICANTE</th>
