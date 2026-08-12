@@ -238,6 +238,7 @@ export default function PainelAprovacao() {
   };
 
   // --- AÇÃO DE APROVAR ---
+// --- AÇÃO DE APROVAR ---
   const handleAprovar = async (e, idOriginal) => {
     e.stopPropagation();
 
@@ -256,6 +257,14 @@ export default function PainelAprovacao() {
         });
 
         if (resposta.sucesso) {
+          // ✨ VERIFICA SE É UM CANCELAMENTO PARA RECARREGAR O ECRÃ
+          const solAprovada = dadosTabela.find(s => s.idOriginal === idOriginal);
+          if (solAprovada && solAprovada.tipo === 'Cancelado') {
+            showAlert("Cancelamento Concluído", "A solicitação original foi cancelada no sistema e o estoque devolvido com sucesso.", "success");
+            setTimeout(() => window.location.reload(), 2000);
+            return;
+          }
+
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
           showAlert("Solicitação Aprovada", "A solicitação foi aprovada e enviada para separação com sucesso!", "success");

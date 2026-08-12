@@ -31,7 +31,7 @@ export default function CancelarPL() {
 
         if (resultado.sucesso) {
           const solicitacoesFormatadas = resultado.dados
-            // ✨ CORREÇÃO: Filtramos para ignorar pedidos que JÁ SÃO de Cancelamento ou Reintegração
+            // Filtramos para ignorar pedidos que JÁ SÃO de Cancelamento ou Reintegração
             .filter(item => 
               (item.status === 'Pendente' || item.status === 'Em Separação') &&
               item.tipo !== 'Cancelado' &&
@@ -88,9 +88,9 @@ export default function CancelarPL() {
         wbs: solAtiva.wbs,
         observacoes: `[CANCELAMENTO] Motivo: ${justificativa} (Origem: ${identificadorCancelado} / ${solAtiva.idOriginal})`,
         tipo: 'Cancelado',
-        filial_origem: estoqueAtual 
-      },
-      itens: solAtiva.itensReais 
+        filial_origem: estoqueAtual,
+        itens: solAtiva.itensReais 
+      }
     };
 
     try {
@@ -183,9 +183,27 @@ export default function CancelarPL() {
                 onClick={() => setSolicitacaoSelecionada(sol.id)} 
               >
                 <div className="item-pl-info">
-                  <span className="item-pl-titulo" style={{ color: solicitacaoSelecionada === sol.id ? '#dc2626' : '#1e293b' }}>
-                    {sol.pl && sol.pl !== '-' ? sol.pl : sol.ps}
-                  </span>
+                  
+                  {/* ✨ AQUI APARECEM TANTO O PS QUANTO A PL LADO A LADO */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span className="item-pl-titulo" style={{ color: solicitacaoSelecionada === sol.id ? '#dc2626' : '#1e293b' }}>
+                      {sol.ps}
+                    </span>
+                    {sol.pl && sol.pl !== '-' && (
+                      <span style={{ 
+                        backgroundColor: solicitacaoSelecionada === sol.id ? '#fee2e2' : '#e0f2fe', 
+                        color: solicitacaoSelecionada === sol.id ? '#dc2626' : '#0284c7', 
+                        padding: '2px 8px', 
+                        borderRadius: '999px', 
+                        fontSize: '0.70rem', 
+                        fontWeight: '600',
+                        border: `1px solid ${solicitacaoSelecionada === sol.id ? '#fca5a5' : '#bae6fd'}`
+                      }}>
+                        {sol.pl}
+                      </span>
+                    )}
+                  </div>
+                  
                   <span className="item-pl-detalhes">
                     {sol.solicitante.toUpperCase()} - {sol.itensReais.length} itens listados - WBS: {sol.wbs}
                   </span>
@@ -222,7 +240,7 @@ export default function CancelarPL() {
         <>
           <div className="tabela-cancelamento-container">
             <div className="tabela-cancelamento-header">
-              <strong>{solAtivaParaTabela.pl && solAtivaParaTabela.pl !== '-' ? solAtivaParaTabela.pl : solAtivaParaTabela.ps} — Itens constados na solicitação</strong>
+              <strong>{solAtivaParaTabela.ps} {solAtivaParaTabela.pl && solAtivaParaTabela.pl !== '-' ? `/ ${solAtivaParaTabela.pl}` : ''} — Itens constados na solicitação</strong>
               <span>O cancelamento é total. Todos os itens listados retornarão ao saldo de estoque após aprovação da logística.</span>
             </div>
             

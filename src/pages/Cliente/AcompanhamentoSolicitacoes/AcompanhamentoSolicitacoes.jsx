@@ -138,7 +138,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             (sol.status === 'Em Separação' || sol.status === 'Concluído')
           );
 
-          // ✨ NOVO: Procura todos os pedidos de cancelamento ativos (que não foram recusados)
           const cancelamentosAtivos = resultadoSol.dados.filter(sol => 
             sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
           );
@@ -164,16 +163,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
             let statusFinalVisual = item.status;
 
-            // ✨ LÓGICA MÁGICA 1: Verifica se existe um pedido de cancelamento para esta solicitação
             const temPedidoDeCancelamento = cancelamentosAtivos.find(canc => 
               canc.observacoes && canc.observacoes.includes(item.idOriginal)
             );
 
-            // Se for a solicitação original e alguém pediu o cancelamento dela, pinta visualmente como Cancelado!
             if (item.tipo !== 'Cancelado' && temPedidoDeCancelamento) {
               statusFinalVisual = 'Cancelado';
             }
-            // LÓGICA MÁGICA 2: Reintegração Total
             else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
               const qtdJaDevolvida = {};
               reints.forEach(reint => {
@@ -271,6 +267,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       });
 
       if (dados.sucesso) {
+        const solAlterada = dadosTabela.find(s => s.idOriginal === idSolicitacao);
+        if (solAlterada && solAlterada.tipo === 'Cancelado' && (novoStatus === 'Em Separação' || novoStatus === 'Concluído')) {
+            showAlert("Cancelamento Aprovado", "O pedido original foi cancelado e o estoque devolvido com sucesso.", "success");
+            setTimeout(() => window.location.reload(), 1500);
+            return;
+        }
+
         setDadosTabela(prev => prev.map(sol => {
           if (sol.idOriginal === idSolicitacao) {
             let novoPl = sol.pl;
@@ -434,7 +437,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   }
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
 
-                  // ✨ AGORA UTILIZA O STATUSEXIBICAO PARA SABER SE É PARA PINTAR DE VERMELHO (Gatilho visual mágico)
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado';
 
                   return (
@@ -443,7 +445,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         className={isExpandida ? "tr-expandida" : ""}
                         style={{ 
                           backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '',
-                          borderBottom: isRecusadoOuCancelado ? '2px solid #ef4444' : '1px solid #f1f5f9',
+                          borderBottom: '1px solid #f1f5f9', // ✨ CORREÇÃO: Remove a borda vermelha espessa
                           opacity: isRecusadoOuCancelado ? 0.8 : 1 
                         }}
                       >
