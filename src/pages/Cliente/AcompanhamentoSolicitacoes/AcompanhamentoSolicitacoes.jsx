@@ -138,6 +138,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             (sol.status === 'Em Separação' || sol.status === 'Concluído')
           );
 
+          // ✨ NOVO: Procura todos os pedidos de cancelamento ativos (que não foram recusados)
+          const cancelamentosAtivos = resultadoSol.dados.filter(sol => 
+            sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
+          );
+
           const dadosFormatados = resultadoSol.dados.map((item) => {
             let prefixo = "PS"; 
             const idNumerico = item.id.replace(/\D/g, "");
@@ -158,7 +163,18 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             }
 
             let statusFinalVisual = item.status;
-            if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
+
+            // ✨ LÓGICA MÁGICA 1: Verifica se existe um pedido de cancelamento para esta solicitação
+            const temPedidoDeCancelamento = cancelamentosAtivos.find(canc => 
+              canc.observacoes && canc.observacoes.includes(item.idOriginal)
+            );
+
+            // Se for a solicitação original e alguém pediu o cancelamento dela, pinta visualmente como Cancelado!
+            if (item.tipo !== 'Cancelado' && temPedidoDeCancelamento) {
+              statusFinalVisual = 'Cancelado';
+            }
+            // LÓGICA MÁGICA 2: Reintegração Total
+            else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
               const qtdJaDevolvida = {};
               reints.forEach(reint => {
                 if (reint.observacoes && reint.observacoes.includes(numeroPL)) {
@@ -216,18 +232,19 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     setPaginaAtual(1);
   }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
+  // KPIs
   const kpiTotal = dadosTabela.length;
   const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
   const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
   const kpiConcluidos = dadosTabela.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length;
-  const kpiRecusados = dadosTabela.filter((item) => item.status === "Recusado" || item.status === "Cancelado").length;
+  const kpiRecusados = dadosTabela.filter((item) => item.status === "Recusado" || item.statusExibicao === "Cancelado").length;
 
   const dadosFiltrados = dadosTabela.filter((item) => {
     if (filtroStatus === 'Todos') return true;
     if (filtroStatus === 'Pendente') return item.status === 'Pendente';
-    if (filtroStatus === 'Em Separação') return item.status === 'Em Separação' || item.status === 'Em Andamento';
+    if (filtroStatus === 'Em Andamento') return item.status === 'Em Separação' || item.status === 'Em Andamento';
     if (filtroStatus === 'Concluído') return item.status === 'Concluído' || item.statusExibicao === 'Reintegrado';
-    if (filtroStatus === 'Recusado') return item.status === 'Recusado' || item.status === 'Cancelado';
+    if (filtroStatus === 'Recusado') return item.status === 'Recusado' || item.status === 'Cancelado' || item.statusExibicao === 'Cancelado';
     return true;
   });
 
@@ -361,7 +378,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         <div className={`kpi-card-resumo kpi-pendentes ${filtroStatus === "Pendente" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Pendente")}>
           <span>Pendentes</span><strong>{kpiPendentes}</strong>
         </div>
-        <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Separação" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Em Separação")}>
+        <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Andamento" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Em Andamento")}>
           <span>Em Separação</span><strong>{kpiAndamento}</strong>
         </div>
         <div className={`kpi-card-resumo kpi-concluidos ${filtroStatus === "Concluído" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Concluído")}>
@@ -417,13 +434,18 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   }
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
 
-                  const isRecusadoOuCancelado = linha.status === 'Recusado' || linha.status === 'Cancelado';
+                  // ✨ AGORA UTILIZA O STATUSEXIBICAO PARA SABER SE É PARA PINTAR DE VERMELHO (Gatilho visual mágico)
+                  const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado';
 
                   return (
                     <React.Fragment key={idUnico}>
                       <tr 
                         className={isExpandida ? "tr-expandida" : ""}
-                        style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '' }}
+                        style={{ 
+                          backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '',
+                          borderBottom: isRecusadoOuCancelado ? '2px solid #ef4444' : '1px solid #f1f5f9',
+                          opacity: isRecusadoOuCancelado ? 0.8 : 1 
+                        }}
                       >
                         <td className="col-chevron" onClick={() => toggleLinha(idUnico)}><ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: "#94a3b8" }}/></td>
                         <td>
@@ -458,6 +480,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {linha.statusExibicao === 'Reintegrado' ? (
                               <span style={{ color: "#10b981", fontSize: "0.875rem", fontWeight: "600" }}>Resolvido</span>
+                            ) : linha.statusExibicao === 'Cancelado' && linha.tipo !== 'Cancelado' ? (
+                              <span style={{ color: "#ef4444", fontSize: "0.875rem", fontWeight: "600" }}>Cancelamento Solicitado</span>
                             ) : isOperador ? (
                               <span style={{ color: "#64748b", fontSize: "0.875rem", fontWeight: "500" }}>{linha.status}</span>
                             ) : (
@@ -486,7 +510,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           <td colSpan={perfil === "logistica" ? 9 : 8} className="td-expandida">
                             <DetalhesSolicitacao item={linha} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
                             
-                            {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && (
+                            {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
                               <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
                                 <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
                                 <GerenciadorAnexos anexos={anexosNovos} setAnexos={setAnexosNovos} titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO" />

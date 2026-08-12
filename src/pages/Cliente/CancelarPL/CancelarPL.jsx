@@ -3,7 +3,6 @@ import { AlertTriangle, XCircle, Search, Loader2 } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import './CancelarPL.css';
 
-// ✨ 1. IMPORTAÇÃO DOS CONTEXTOS GLOBAIS
 import { AuthContext } from '../../../contexts/AuthContext';
 import { AlertContext } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
@@ -12,45 +11,50 @@ export default function CancelarPL() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useContext(AlertContext);
 
-  const [listaDePl, setListaDePl] = useState([]);
+  const [listaSolicitacoes, setListaSolicitacoes] = useState([]);
   const [pesquisa, setPesquisa] = useState('');
-  const [plSelecionada, setPlSelecionada] = useState(null); 
+  const [solicitacaoSelecionada, setSolicitacaoSelecionada] = useState(null); 
   const [carregando, setCarregando] = useState(true);
 
   const [nomeSolicitante, setNomeSolicitante] = useState('');
   const [justificativa, setJustificativa] = useState('');
 
   // ==========================================
-  // EFEITO: Buscar a lista de PLs
+  // EFEITO: Buscar a lista de Solicitações
   // ==========================================
   useEffect(() => {
     const buscarSolicitacoes = async () => {
       try {
         setCarregando(true);
-        // Filtra apenas as PLs da filial atualmente selecionada no cabeçalho
         const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
         const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=500`);
 
         if (resultado.sucesso) {
-          const plFormatadas = resultado.dados
-            // Apenas permite cancelar o que está pendente ou já em separação
-            .filter(item => item.status === 'Pendente' || item.status === 'Em Separação')
+          const solicitacoesFormatadas = resultado.dados
+            // ✨ CORREÇÃO: Filtramos para ignorar pedidos que JÁ SÃO de Cancelamento ou Reintegração
+            .filter(item => 
+              (item.status === 'Pendente' || item.status === 'Em Separação') &&
+              item.tipo !== 'Cancelado' &&
+              item.tipo !== 'Reintegracao' &&
+              item.tipo !== 'Reintegração'
+            )
             .map(item => ({
               id: item.id.replace(/\D/g, ''), 
               idOriginal: item.id,
+              ps: item.ps, 
+              pl: item.pl, 
               solicitante: item.solicitante,
               wbs: item.wbs,
-              itensReais: item.itens || [], // ✨ BUSCA OS ITENS VERDADEIROS DO BANCO
-              pl: item.pl,
+              itensReais: item.itens || [], 
               status: item.status
             }));
 
-          setListaDePl(plFormatadas);
+          setListaSolicitacoes(solicitacoesFormatadas);
         } else {
           console.error("Erro retornado do servidor:", resultado.erro);
         }
       } catch (error) {
-        console.error("Falha ao buscar PL do banco:", error.message);
+        console.error("Falha ao buscar solicitações do banco:", error.message);
       } finally {
         setCarregando(false);
       }
@@ -65,8 +69,8 @@ export default function CancelarPL() {
   // AÇÃO: Enviar pedido de cancelamento
   // ==========================================
   const handleEnviar = async () => {
-    if (!plSelecionada) {
-      showAlert("Atenção", "Por favor, selecione uma PL na lista para prosseguir com o cancelamento.", "warning");
+    if (!solicitacaoSelecionada) {
+      showAlert("Atenção", "Por favor, selecione uma solicitação na lista para prosseguir com o cancelamento.", "warning");
       return;
     }
 
@@ -75,18 +79,18 @@ export default function CancelarPL() {
       return;
     }
 
-    const dadosDaPl = listaDePl.find(p => p.id === plSelecionada);
+    const solAtiva = listaSolicitacoes.find(p => p.id === solicitacaoSelecionada);
+    const identificadorCancelado = solAtiva.pl && solAtiva.pl !== '-' ? solAtiva.pl : solAtiva.ps;
 
     const payload = {
       solicitante: {
         nome: nomeSolicitante,
-        wbs: dadosDaPl.wbs,
-        observacoes: `[CANCELAMENTO] Motivo: ${justificativa} (Origem: ${dadosDaPl.idOriginal})`,
+        wbs: solAtiva.wbs,
+        observacoes: `[CANCELAMENTO] Motivo: ${justificativa} (Origem: ${identificadorCancelado} / ${solAtiva.idOriginal})`,
         tipo: 'Cancelado',
-        filial_origem: estoqueAtual // ✨ IDENTIFICA A FILIAL
+        filial_origem: estoqueAtual 
       },
-      // Passamos os itens para que, no futuro, a logística saiba o que deve voltar
-      itens: dadosDaPl.itensReais 
+      itens: solAtiva.itensReais 
     };
 
     try {
@@ -96,11 +100,11 @@ export default function CancelarPL() {
       });
 
       if (dados.sucesso || dados.ps_id || dados.pl_id) {
-        showAlert("Cancelamento Solicitado", `Sucesso! O pedido de cancelamento foi registrado sob o ID: ${dados.ps_id || dados.pl_id}`, "success");
+        showAlert("Cancelamento Solicitado", `Sucesso! O pedido de cancelamento para a solicitação ${identificadorCancelado} foi registrado!`, "success");
         
-        // Remove a PL da lista visualmente
-        setListaDePl(prev => prev.filter(p => p.id !== plSelecionada));
-        setPlSelecionada(null);
+        // Remove a solicitação da lista visualmente
+        setListaSolicitacoes(prev => prev.filter(p => p.id !== solicitacaoSelecionada));
+        setSolicitacaoSelecionada(null);
         setPesquisa('');
         setNomeSolicitante('');
         setJustificativa('');
@@ -113,14 +117,15 @@ export default function CancelarPL() {
     }
   };
 
-  const listaFiltrada = listaDePl.filter(pl => 
-    pl.id.includes(pesquisa) || 
-    pl.solicitante.toLowerCase().includes(pesquisa.toLowerCase()) ||
-    pl.wbs.toLowerCase().includes(pesquisa.toLowerCase())
+  const listaFiltrada = listaSolicitacoes.filter(sol => 
+    sol.id.includes(pesquisa) || 
+    (sol.ps && sol.ps.toLowerCase().includes(pesquisa.toLowerCase())) ||
+    (sol.pl && sol.pl.toLowerCase().includes(pesquisa.toLowerCase())) ||
+    sol.solicitante.toLowerCase().includes(pesquisa.toLowerCase()) ||
+    sol.wbs.toLowerCase().includes(pesquisa.toLowerCase())
   );
 
-  // Encontra os detalhes da PL atualmente selecionada para desenhar a tabela
-  const plAtivaParaTabela = listaDePl.find(p => p.id === plSelecionada);
+  const solAtivaParaTabela = listaSolicitacoes.find(p => p.id === solicitacaoSelecionada);
 
   return (
     <div className="cancelar-wrapper">
@@ -129,8 +134,8 @@ export default function CancelarPL() {
       <div className="banner-aviso banner-vermelho">
         <AlertTriangle size={24} />
         <div>
-          <strong>Cancelamento de PL (Packing List)</strong>
-          <p>Selecione os itens e quantidades que retornarão ao estoque. Esta ação solicitará o cancelamento à equipe de logística.</p>
+          <strong>Cancelamento de Solicitação (PS / PL)</strong>
+          <p>Selecione a solicitação ativa que deseja cancelar. Esta ação enviará um pedido de cancelamento à equipe de logística.</p>
         </div>
       </div>
 
@@ -139,7 +144,7 @@ export default function CancelarPL() {
         <div className="form-header">
           <div className="form-header-esquerda">
             <div className="form-header-icone vermelho"><XCircle size={18} /></div>
-            <h2>Selecionar PL para Cancelar</h2>
+            <h2>Selecionar Solicitação</h2>
           </div>
         </div>
         
@@ -148,7 +153,7 @@ export default function CancelarPL() {
           <input 
             type="text" 
             className="input-campo foco-vermelho" 
-            placeholder="Buscar por nº PL, ID ou solicitante..." 
+            placeholder="Buscar por PS, PL, ID ou solicitante..." 
             style={{ paddingLeft: '40px' }}
             value={pesquisa}
             onChange={(e) => setPesquisa(e.target.value)} 
@@ -160,42 +165,42 @@ export default function CancelarPL() {
           {carregando ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '32px', color: '#94a3b8' }}>
               <Loader2 size={24} className="animate-spin" />
-              <span style={{ fontSize: '0.875rem' }}>Buscando packing lists ativos...</span>
+              <span style={{ fontSize: '0.875rem' }}>Buscando solicitações ativas...</span>
             </div>
           ) : listaFiltrada.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem', marginTop: '16px', padding: '16px' }}>
-              Nenhum packing list ativo encontrado para essa busca.
+              Nenhuma solicitação ativa encontrada para essa busca.
             </p>
           ) : (
-            listaFiltrada.map((pl) => (
+            listaFiltrada.map((sol) => (
               <div 
-                key={pl.id} 
+                key={sol.id} 
                 className="item-pl"
                 style={{
-                  border: plSelecionada === pl.id ? '2px solid #ef4444' : '1px solid #e2e8f0',
-                  backgroundColor: plSelecionada === pl.id ? '#fef2f2' : '#ffffff'
+                  border: solicitacaoSelecionada === sol.id ? '2px solid #ef4444' : '1px solid #e2e8f0',
+                  backgroundColor: solicitacaoSelecionada === sol.id ? '#fef2f2' : '#ffffff'
                 }}
-                onClick={() => setPlSelecionada(pl.id)} 
+                onClick={() => setSolicitacaoSelecionada(sol.id)} 
               >
                 <div className="item-pl-info">
-                  <span className="item-pl-titulo" style={{ color: plSelecionada === pl.id ? '#dc2626' : '#1e293b' }}>
-                    {pl.pl !== '-' && pl.pl ? pl.pl : `ID #${pl.id}`}
+                  <span className="item-pl-titulo" style={{ color: solicitacaoSelecionada === sol.id ? '#dc2626' : '#1e293b' }}>
+                    {sol.pl && sol.pl !== '-' ? sol.pl : sol.ps}
                   </span>
                   <span className="item-pl-detalhes">
-                    {pl.solicitante.toUpperCase()} - {pl.itensReais.length} itens listados - WBS: {pl.wbs}
+                    {sol.solicitante.toUpperCase()} - {sol.itensReais.length} itens listados - WBS: {sol.wbs}
                   </span>
                 </div>
                 
                 <div className="item-pl-direita">
                   <span className="badge-separacao" style={{ 
-                    backgroundColor: pl.status === 'Pendente' ? '#fefce8' : '#eff6ff', 
-                    color: pl.status === 'Pendente' ? '#ca8a04' : '#3b82f6',
-                    borderColor: pl.status === 'Pendente' ? '#fef08a' : '#bfdbfe'
+                    backgroundColor: sol.status === 'Pendente' ? '#fefce8' : '#eff6ff', 
+                    color: sol.status === 'Pendente' ? '#ca8a04' : '#3b82f6',
+                    borderColor: sol.status === 'Pendente' ? '#fef08a' : '#bfdbfe'
                   }}>
-                    {pl.status}
+                    {sol.status}
                   </span>
                   <div className="setas-ordem">
-                    {plSelecionada === pl.id ? (
+                    {solicitacaoSelecionada === sol.id ? (
                        <div className="seta-bola" style={{ backgroundColor: '#ef4444' }}></div>
                     ) : (
                       <>
@@ -213,15 +218,14 @@ export default function CancelarPL() {
       </div>
 
       {/* PAINEL DE AÇÃO QUANDO SELECIONADO */}
-      {plSelecionada && plAtivaParaTabela && (
+      {solicitacaoSelecionada && solAtivaParaTabela && (
         <>
           <div className="tabela-cancelamento-container">
             <div className="tabela-cancelamento-header">
-              <strong>{plAtivaParaTabela.pl !== '-' ? plAtivaParaTabela.pl : `Solicitação #${plAtivaParaTabela.id}`} — Itens constados na PL</strong>
-              <span>O cancelamento é total. Todos os itens listados retornarão ao saldo de estoque após aprovação.</span>
+              <strong>{solAtivaParaTabela.pl && solAtivaParaTabela.pl !== '-' ? solAtivaParaTabela.pl : solAtivaParaTabela.ps} — Itens constados na solicitação</strong>
+              <span>O cancelamento é total. Todos os itens listados retornarão ao saldo de estoque após aprovação da logística.</span>
             </div>
             
-            {/* ✨ TABELA DINÂMICA COM OS DADOS REAIS DO BANCO */}
             <table className="tabela-cancelamento">
               <thead>
                 <tr>
@@ -231,8 +235,8 @@ export default function CancelarPL() {
                 </tr>
               </thead>
               <tbody>
-                {plAtivaParaTabela.itensReais.length > 0 ? (
-                  plAtivaParaTabela.itensReais.map((it, idx) => (
+                {solAtivaParaTabela.itensReais.length > 0 ? (
+                  solAtivaParaTabela.itensReais.map((it, idx) => (
                     <tr key={idx}>
                       <td style={{ fontFamily: 'monospace', fontWeight: '600' }}>
                         {it.part_number_manual || it.part_number || '-'}
@@ -280,7 +284,7 @@ export default function CancelarPL() {
             </div>
 
             <BotaoAcaoGlobal 
-              texto={`Cancelar ${plAtivaParaTabela.pl !== '-' && plAtivaParaTabela.pl ? plAtivaParaTabela.pl : 'Solicitação'}`} 
+              texto={`Cancelar ${solAtivaParaTabela.pl && solAtivaParaTabela.pl !== '-' ? solAtivaParaTabela.pl : solAtivaParaTabela.ps}`} 
               icone={<XCircle size={16} />} 
               cor="vermelho" 
               onClick={handleEnviar} 
