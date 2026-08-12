@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { AlertTriangle, XCircle, Search, Loader2 } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import './CancelarPL.css';
 
-// 1. IMPORTAÇÃO DA FUNÇÃO MÁGICA
-// Trazemos a nossa função centralizada que já sabe se estamos no localhost ou no Vercel.
+// ✨ 1. IMPORTAÇÃO DOS CONTEXTOS GLOBAIS
+import { AuthContext } from '../../../contexts/AuthContext';
+import { AlertContext } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 
 export default function CancelarPL() {
+  const { estoqueAtual } = useContext(AuthContext);
+  const { showAlert } = useContext(AlertContext);
+
   const [listaDePl, setListaDePl] = useState([]);
   const [pesquisa, setPesquisa] = useState('');
   const [plSelecionada, setPlSelecionada] = useState(null); 
@@ -22,20 +26,22 @@ export default function CancelarPL() {
   useEffect(() => {
     const buscarSolicitacoes = async () => {
       try {
-        // 2. REFATORAÇÃO DO GET
-        // Substituímos o fetch longo por uma chamada simples ao apiFetch
-        const resultado = await apiFetch('/solicitacoes/listar');
+        setCarregando(true);
+        // Filtra apenas as PLs da filial atualmente selecionada no cabeçalho
+        const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
+        const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=500`);
 
-        // Como a apiFetch já trata os erros de rede, validamos apenas a regra de negócio
         if (resultado.sucesso) {
           const plFormatadas = resultado.dados
-            .filter(item => item.status !== 'Cancelado' && item.status !== 'Concluído' && item.status !== 'Recusado')
+            // Apenas permite cancelar o que está pendente ou já em separação
+            .filter(item => item.status === 'Pendente' || item.status === 'Em Separação')
             .map(item => ({
               id: item.id.replace(/\D/g, ''), 
               idOriginal: item.id,
               solicitante: item.solicitante,
               wbs: item.wbs,
-              itens: 1, 
+              itensReais: item.itens || [], // ✨ BUSCA OS ITENS VERDADEIROS DO BANCO
+              pl: item.pl,
               status: item.status
             }));
 
@@ -44,27 +50,28 @@ export default function CancelarPL() {
           console.error("Erro retornado do servidor:", resultado.erro);
         }
       } catch (error) {
-        // A apiFetch atira erros limpos que capturamos aqui
         console.error("Falha ao buscar PL do banco:", error.message);
       } finally {
         setCarregando(false);
       }
     };
 
-    buscarSolicitacoes();
-  }, []);
+    if (estoqueAtual) {
+      buscarSolicitacoes();
+    }
+  }, [estoqueAtual]);
 
   // ==========================================
   // AÇÃO: Enviar pedido de cancelamento
   // ==========================================
   const handleEnviar = async () => {
     if (!plSelecionada) {
-      alert("Por favor, selecione uma PL na lista para prosseguir com o cancelamento.");
+      showAlert("Atenção", "Por favor, selecione uma PL na lista para prosseguir com o cancelamento.", "warning");
       return;
     }
 
     if (!nomeSolicitante || !justificativa) {
-      alert("Por favor, preencha o seu nome e a justificativa para o cancelamento.");
+      showAlert("Campos Obrigatórios", "Por favor, preencha o seu nome e a justificativa para o cancelamento.", "warning");
       return;
     }
 
@@ -75,33 +82,34 @@ export default function CancelarPL() {
         nome: nomeSolicitante,
         wbs: dadosDaPl.wbs,
         observacoes: `[CANCELAMENTO] Motivo: ${justificativa} (Origem: ${dadosDaPl.idOriginal})`,
-        tipo: 'Cancelado' 
+        tipo: 'Cancelado',
+        filial_origem: estoqueAtual // ✨ IDENTIFICA A FILIAL
       },
-      itens: [] 
+      // Passamos os itens para que, no futuro, a logística saiba o que deve voltar
+      itens: dadosDaPl.itensReais 
     };
 
     try {
-      // 3. REFATORAÇÃO DO POST
-      // Não precisamos enviar os headers manualmente, a apiFetch já envia 'application/json'
       const dados = await apiFetch('/solicitacoes/cancelamento', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
 
-      // Se não atirou erro no try/catch, validamos a resposta
       if (dados.sucesso || dados.ps_id || dados.pl_id) {
-        alert(`Sucesso! Solicitação de Cancelamento registrada sob o ID: ${dados.ps_id || dados.pl_id}`);
+        showAlert("Cancelamento Solicitado", `Sucesso! O pedido de cancelamento foi registrado sob o ID: ${dados.ps_id || dados.pl_id}`, "success");
+        
+        // Remove a PL da lista visualmente
         setListaDePl(prev => prev.filter(p => p.id !== plSelecionada));
         setPlSelecionada(null);
         setPesquisa('');
         setNomeSolicitante('');
         setJustificativa('');
       } else {
-        alert(`Erro do servidor: ${dados.erro}`);
+        showAlert("Erro de Servidor", dados.erro, "error");
       }
     } catch (error) {
       console.error("Erro na requisição:", error);
-      alert("Falha ao conectar com o servidor backend. O erro foi documentado na consola.");
+      showAlert("Falha de Conexão", "Não foi possível conectar ao servidor para efetuar o cancelamento.", "error");
     }
   };
 
@@ -111,6 +119,9 @@ export default function CancelarPL() {
     pl.wbs.toLowerCase().includes(pesquisa.toLowerCase())
   );
 
+  // Encontra os detalhes da PL atualmente selecionada para desenhar a tabela
+  const plAtivaParaTabela = listaDePl.find(p => p.id === plSelecionada);
+
   return (
     <div className="cancelar-wrapper">
       
@@ -119,7 +130,7 @@ export default function CancelarPL() {
         <AlertTriangle size={24} />
         <div>
           <strong>Cancelamento de PL (Packing List)</strong>
-          <p>Selecione os itens e quantidades que retornarão ao estoque. Esta ação não pode ser desfeita.</p>
+          <p>Selecione os itens e quantidades que retornarão ao estoque. Esta ação solicitará o cancelamento à equipe de logística.</p>
         </div>
       </div>
 
@@ -168,18 +179,24 @@ export default function CancelarPL() {
               >
                 <div className="item-pl-info">
                   <span className="item-pl-titulo" style={{ color: plSelecionada === pl.id ? '#dc2626' : '#1e293b' }}>
-                    PL #{pl.id}
+                    {pl.pl !== '-' && pl.pl ? pl.pl : `ID #${pl.id}`}
                   </span>
                   <span className="item-pl-detalhes">
-                    {pl.solicitante.toUpperCase()} - {pl.itens} itens - WBS: {pl.wbs}
+                    {pl.solicitante.toUpperCase()} - {pl.itensReais.length} itens listados - WBS: {pl.wbs}
                   </span>
                 </div>
                 
                 <div className="item-pl-direita">
-                  <span className="badge-separacao">Em Separação</span>
+                  <span className="badge-separacao" style={{ 
+                    backgroundColor: pl.status === 'Pendente' ? '#fefce8' : '#eff6ff', 
+                    color: pl.status === 'Pendente' ? '#ca8a04' : '#3b82f6',
+                    borderColor: pl.status === 'Pendente' ? '#fef08a' : '#bfdbfe'
+                  }}>
+                    {pl.status}
+                  </span>
                   <div className="setas-ordem">
                     {plSelecionada === pl.id ? (
-                       <div className="seta-bola" style={{ backgroundColor: '#94a3b8' }}></div>
+                       <div className="seta-bola" style={{ backgroundColor: '#ef4444' }}></div>
                     ) : (
                       <>
                         <span style={{ fontSize: '10px' }}>▲</span>
@@ -196,27 +213,45 @@ export default function CancelarPL() {
       </div>
 
       {/* PAINEL DE AÇÃO QUANDO SELECIONADO */}
-      {plSelecionada && (
+      {plSelecionada && plAtivaParaTabela && (
         <>
           <div className="tabela-cancelamento-container">
             <div className="tabela-cancelamento-header">
-              <strong>PL #{plSelecionada} — Itens serão devolvidos integralmente ao estoque</strong>
-              <span>O cancelamento é total. Todos os itens abaixo retornarão ao saldo de estoque.</span>
+              <strong>{plAtivaParaTabela.pl !== '-' ? plAtivaParaTabela.pl : `Solicitação #${plAtivaParaTabela.id}`} — Itens constados na PL</strong>
+              <span>O cancelamento é total. Todos os itens listados retornarão ao saldo de estoque após aprovação.</span>
             </div>
+            
+            {/* ✨ TABELA DINÂMICA COM OS DADOS REAIS DO BANCO */}
             <table className="tabela-cancelamento">
               <thead>
                 <tr>
                   <th>Part Number</th>
                   <th>Descrição</th>
-                  <th>Qtd a Retornar</th>
+                  <th>Quantidade Solicitada</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td style={{ fontFamily: 'monospace' }}>2967073</td>
-                  <td>MODULO DE RELE PLC RSC 24UC 21 21</td>
-                  <td className="td-qtd-verde">15 NR</td>
-                </tr>
+                {plAtivaParaTabela.itensReais.length > 0 ? (
+                  plAtivaParaTabela.itensReais.map((it, idx) => (
+                    <tr key={idx}>
+                      <td style={{ fontFamily: 'monospace', fontWeight: '600' }}>
+                        {it.part_number_manual || it.part_number || '-'}
+                      </td>
+                      <td style={{ color: '#475569' }}>
+                        {it.descricao_manual || it.descricao || 'Sem Descrição'}
+                      </td>
+                      <td className="td-qtd-verde">
+                        {it.quantidade_solicitada} {it.unidade_medida_manual || 'Un'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="3" style={{ textAlign: 'center', color: '#94a3b8', padding: '24px' }}>
+                      Nenhum item individual encontrado nesta solicitação.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -245,7 +280,7 @@ export default function CancelarPL() {
             </div>
 
             <BotaoAcaoGlobal 
-              texto={`Cancelar PL #${plSelecionada}`} 
+              texto={`Cancelar ${plAtivaParaTabela.pl !== '-' && plAtivaParaTabela.pl ? plAtivaParaTabela.pl : 'Solicitação'}`} 
               icone={<XCircle size={16} />} 
               cor="vermelho" 
               onClick={handleEnviar} 
