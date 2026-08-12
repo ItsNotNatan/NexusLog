@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
-// DESCRIÇÃO: Tabela de acompanhamento com detecção automática de Reintegração
+// DESCRIÇÃO: Tabela de acompanhamento com filtros interativos e paginação local
 // =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
@@ -40,7 +40,6 @@ const renderBadgeStatus = (status) => {
         </span>
       );
     case "Concluído":
-    // ✨ 1. ADICIONADO O STATUS REINTEGRADO AQUI PARA FICAR VERDE!
     case "Reintegrado": 
       return (
         <span className="badge-status status-concluido">
@@ -97,7 +96,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [totalRegistros, setTotalRegistros] = useState(0);
   
   const itensPorPagina = 10;
 
@@ -122,7 +120,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       try {
         setCarregando(true);
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
-        const urlSolicitacoes = `/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&status=${filtroStatus !== 'Todos' ? filtroStatus : ''}&filial=${estoqueAtual}`;
+        
+        const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
@@ -134,8 +133,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         }
 
         if (resultadoSol.sucesso) {
-          
-          // ✨ 2. EXTRAI TODAS AS REINTEGRAÇÕES PARA FAZER A MATEMÁTICA
           const reints = resultadoSol.dados.filter(sol => 
             (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
             (sol.status === 'Em Separação' || sol.status === 'Concluído')
@@ -160,7 +157,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 numeroPL = item.pl || item.bs || "-";
             }
 
-            // ✨ 3. LÓGICA MÁGICA: O STATUS PASSA A SER "REINTEGRADO" SE TUDO FOI DEVOLVIDO
             let statusFinalVisual = item.status;
             if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
               const qtdJaDevolvida = {};
@@ -177,7 +173,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 return (Number(origItem.quantidade_solicitada) - devolvido) > 0;
               });
 
-              // Se a PL tiver itens e nenhum deles restou, altera o nome visual para Reintegrado
               if (itensRestantes.length === 0 && (item.itens || []).length > 0) {
                 statusFinalVisual = 'Reintegrado';
               }
@@ -188,7 +183,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               idOriginal: item.id,
               id: idNumerico || item.id,
               prefixo: prefixo,
-              statusExibicao: statusFinalVisual, // <-- ✨ 4. Propriedade visual para a tabela
+              statusExibicao: statusFinalVisual, 
               statusDestinoAprovacao: statusDestinoAprovacao, 
               acaoTipo: acaoTipo,
               acaoValor: acaoValor,
@@ -200,7 +195,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           });
 
           setDadosTabela(dadosFormatados);
-          setTotalRegistros(resultadoSol.total || resultadoSol.dados.length);
         } else {
           showAlert("Erro Operacional", resultadoSol.erro || 'Falha ao buscar dados.', "error");
         }
@@ -216,11 +210,32 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     } else {
       setCarregando(false);
     }
-  }, [paginaAtual, filtroAtivo, filtroStatus, termoPesquisa, token, estoqueAtual, showAlert, perfil]);
+  }, [filtroAtivo, termoPesquisa, token, estoqueAtual, showAlert, perfil]);
 
   useEffect(() => {
     setPaginaAtual(1);
   }, [filtroAtivo, filtroStatus, termoPesquisa]);
+
+  const kpiTotal = dadosTabela.length;
+  const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
+  const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
+  const kpiConcluidos = dadosTabela.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length;
+  const kpiRecusados = dadosTabela.filter((item) => item.status === "Recusado" || item.status === "Cancelado").length;
+
+  const dadosFiltrados = dadosTabela.filter((item) => {
+    if (filtroStatus === 'Todos') return true;
+    if (filtroStatus === 'Pendente') return item.status === 'Pendente';
+    if (filtroStatus === 'Em Separação') return item.status === 'Em Separação' || item.status === 'Em Andamento';
+    if (filtroStatus === 'Concluído') return item.status === 'Concluído' || item.statusExibicao === 'Reintegrado';
+    if (filtroStatus === 'Recusado') return item.status === 'Recusado' || item.status === 'Cancelado';
+    return true;
+  });
+
+  const totalRegistrosFiltrados = dadosFiltrados.length;
+  const totalPaginas = Math.max(1, Math.ceil(totalRegistrosFiltrados / itensPorPagina));
+  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
+  const indexUltimoItem = paginaAtual * itensPorPagina;
+  const dadosPaginados = dadosFiltrados.slice(indexPrimeiroItem, indexUltimoItem);
 
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
     const confirmar = await showConfirm("Alterar Status", `Tem certeza que deseja mudar o status para "${novoStatus}"?`, "warning", "Sim, Mudar");
@@ -266,16 +281,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       showAlert("Falha de Conexão", "Não foi possível ligar ao servidor ao atualizar o status.", "error");
     }
   };
-
-  const kpiTotal = dadosTabela.length;
-  const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
-  const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
-  const kpiConcluidos = dadosTabela.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length;
-  const kpiRecusados = dadosTabela.filter((item) => item.status === "Recusado" || item.status === "Cancelado").length;
-
-  const totalPaginas = Math.max(1, Math.ceil(totalRegistros / itensPorPagina));
-  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
-  const indexUltimoItem = paginaAtual * itensPorPagina;
 
   const toggleLinha = (idUnico) => {
     setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
@@ -356,8 +361,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         <div className={`kpi-card-resumo kpi-pendentes ${filtroStatus === "Pendente" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Pendente")}>
           <span>Pendentes</span><strong>{kpiPendentes}</strong>
         </div>
-        <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Separação" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Em Andamento")}>
-          <span>Em Andamento</span><strong>{kpiAndamento}</strong>
+        <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Separação" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Em Separação")}>
+          <span>Em Separação</span><strong>{kpiAndamento}</strong>
         </div>
         <div className={`kpi-card-resumo kpi-concluidos ${filtroStatus === "Concluído" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Concluído")}>
           <span>Concluídos</span><strong>{kpiConcluidos}</strong>
@@ -398,10 +403,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             <tbody>
               {carregando ? (
                 <tr><td colSpan={perfil === "logistica" ? 9 : 8} style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>Carregando solicitações...</td></tr>
-              ) : dadosTabela.length === 0 ? (
+              ) : dadosPaginados.length === 0 ? (
                 <tr><td colSpan={perfil === "logistica" ? 9 : 8} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
-                dadosTabela.map((linha, index) => {
+                dadosPaginados.map((linha, index) => {
                   const idUnico = `${linha.prefixo}-${linha.id}-${index}`;
                   const isExpandida = linhaExpandida === idUnico;
                   const isCrossdocking = linha.tipo === 'Crossdocking';
@@ -412,9 +417,14 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   }
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
 
+                  const isRecusadoOuCancelado = linha.status === 'Recusado' || linha.status === 'Cancelado';
+
                   return (
                     <React.Fragment key={idUnico}>
-                      <tr className={isExpandida ? "tr-expandida" : ""}>
+                      <tr 
+                        className={isExpandida ? "tr-expandida" : ""}
+                        style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '' }}
+                      >
                         <td className="col-chevron" onClick={() => toggleLinha(idUnico)}><ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: "#94a3b8" }}/></td>
                         <td>
                           <div className="bloco-tipo-id">
@@ -442,13 +452,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         <td className="texto-data">{linha.dataSolicitacao}</td>
                         <td>{linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? <span className="texto-data-verde">{linha.dataEntrega}</span> : <span className="traco-vazio">—</span>}</td>
                         
-                        {/* ✨ 5. UTILIZA A PROPRIEDADE VISUAL "statusExibicao" NA TABELA */}
                         <td>{renderBadgeStatus(linha.statusExibicao)}</td>
 
                         {perfil === "logistica" && (
                           <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            
-                            {/* ✨ 6. BLOQUEIO DE AÇÕES SE JÁ ESTIVER REINTEGRADO */}
                             {linha.statusExibicao === 'Reintegrado' ? (
                               <span style={{ color: "#10b981", fontSize: "0.875rem", fontWeight: "600" }}>Resolvido</span>
                             ) : isOperador ? (
@@ -479,7 +486,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           <td colSpan={perfil === "logistica" ? 9 : 8} className="td-expandida">
                             <DetalhesSolicitacao item={linha} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
                             
-                            {/* ✨ 7. OCULTA O UPLOAD DE ANEXOS SE ESTIVER REINTEGRADO */}
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && (
                               <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
                                 <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
@@ -502,7 +508,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </table>
 
           <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>Página <strong>{paginaAtual}</strong> de <strong>{totalRegistros ? totalPaginas : 1}</strong> &middot; Exibindo {dadosTabela.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistros)}</strong> de <strong>{totalRegistros}</strong> resultados</div>
+            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
+            </div>
             <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}><ChevronLeft size={16} /> Anterior</button>
               {Array.from({ length: totalPaginas }, (_, index) => {
@@ -510,7 +518,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 const ehAtiva = paginaAtual === numeroPagina;
                 return (<button key={numeroPagina} onClick={() => setPaginaAtual(numeroPagina)} disabled={carregando} style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: carregando ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease' }}>{numeroPagina}</button>);
               })}
-              <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || dadosTabela.length === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || dadosTabela.length === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || dadosTabela.length === 0) ? 0.6 : 1 }}>Próxima <ChevronRight size={16} /></button>
+              <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 0.6 : 1 }}>Próxima <ChevronRight size={16} /></button>
             </div>
           </div>
         </div>

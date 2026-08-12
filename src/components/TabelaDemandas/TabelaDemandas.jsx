@@ -161,14 +161,26 @@ export default function TabelaDemandas({ dados = [] }) {
                 <td className={linha.dataEntrega === 'não definido' ? 'texto-amarelo' : 'texto-cinza'}>
                   {linha.dataEntrega || '—'}
                 </td>
-                <td>
-                  {/* Avalia a propriedade contagemStatus vinda do Dashboard. Se existir, formata como badge */}
-                  {linha.contagemStatus ? (
-                    <span className={`badge-countdown countdown-${linha.contagemStatus}`}>
+<td>
+                  {linha.contagem ? (
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '4px 12px',
+                      borderRadius: '999px', /* Borda totalmente arredondada */
+                      fontWeight: '700',
+                      fontSize: '0.85rem',
+                      fontFamily: 'monospace, sans-serif',
+                      textAlign: 'center',
+                      minWidth: '100px',
+                      /* Borda e Cor dinâmicas consoante o status enviado pelo Dashboard */
+                      border: `1px solid ${linha.contagemStatus === 'vermelho' ? '#fca5a5' : (linha.contagemStatus === 'amarelo' ? '#fde047' : '#6ee7b7')}`,
+                      color: linha.contagemStatus === 'vermelho' ? '#dc2626' : (linha.contagemStatus === 'amarelo' ? '#d97706' : '#059669'),
+                      backgroundColor: linha.contagemStatus === 'vermelho' ? '#fef2f2' : (linha.contagemStatus === 'amarelo' ? '#fefce8' : '#ecfdf5')
+                    }}>
                       {linha.contagem}
                     </span>
                   ) : (
-                    <span className="texto-cinza fonte-negrito">{linha.contagem || '—'}</span>
+                    <span className="texto-cinza fonte-negrito">—</span>
                   )}
                 </td>
               </tr>
