@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 import {
   LayoutDashboard, ListTodo, PackagePlus, Archive, Download, FileSpreadsheet, Settings, Hexagon,
-  ClipboardEdit, Boxes, FileClock, Waypoints, ClipboardList, Home, Lock // ⬅️ Lock adicionado aqui!
+  ClipboardEdit, Boxes, FileClock, Waypoints, ClipboardList, Home, Lock, ArrowLeftRight // ⬅️ Ícone ArrowLeftRight adicionado!
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -21,16 +21,18 @@ export default function Sidebar({ modulo }) {
     { path: '/cliente/rastreabilidade', label: 'Histórico', icon: <Archive size={20} /> },
   ];
 
+  // ✨ NOVA ORDEM APLICADA ABAIXO (incluindo o espaço reservado para Transferência de Estoque)
   const menuLogistica = [
-    { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
-    { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
-    { path: '/logistica/traceabilly', label: 'Histórico', icon: <Archive size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
-    { path: '/logistica/painel', label: 'Painel Geral', icon: <ClipboardList size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
-    { path: '/logistica/visao-geral', label: 'Visão Geral do Estoque', icon: <Boxes size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
-    { path: '/logistica/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['ADM', 'LIDER'] },
     { path: '/logistica/PainelAprovacao', label: 'Painel de Aprovação', icon: <ListTodo size={20} />, roles: ['ADM', 'LIDER'] },
-    { path: '/logistica/exportar', label: 'Exportar Dados (PS)', icon: <Download size={20} />, roles: ['ADM', 'LIDER'] },
+    { path: '/logistica/painel', label: 'Painel Geral', icon: <ClipboardList size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/rota-coleta', label: 'Rota de Coleta', icon: <Waypoints size={20} />, roles: ['ADM', 'LIDER'] },
+    { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
+    { path: '/logistica/transferencia-estoque', label: 'Transferência de Estoque', icon: <ArrowLeftRight size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
+    { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
+    { path: '/logistica/visao-geral', label: 'Visão Geral do Estoque', icon: <Boxes size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
+    { path: '/logistica/traceabilly', label: 'Histórico', icon: <Archive size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
+    { path: '/logistica/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['ADM', 'LIDER'] },
+    { path: '/logistica/exportar', label: 'Exportar Dados (PS)', icon: <Download size={20} />, roles: ['ADM', 'LIDER'] },
     { path: '/logistica/configuracoes', label: 'Configurações', icon: <Settings size={20} />, roles: ['ADM'] },
   ];
 

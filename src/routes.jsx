@@ -19,6 +19,8 @@ import FormatacaoSAP from './pages/Logistica/FormatacaoSAP/FormatacaoSAP';
 import Configuracoes from './pages/Logistica/Configuracoes/Configuracoes';
 import RotaColeta from './pages/Logistica/RotaColeta/RotaColeta';
 import VisaoGeralEstoque from './pages/Logistica/VisaoGeralEstoque/VisaoGeralEstoque';
+// ✨ NOVO: Importação da página de Transferência de Estoque
+import TransferenciaEstoque from './pages/Logistica/TransferenciaEstoque/TransferenciaEstoque'; 
 
 // --- PÁGINAS DO CLIENTE ---
 import FazerSolicitacao from './pages/Cliente/FazerSolicitacao/FazerSolicitacao';
@@ -68,6 +70,8 @@ export const router = createBrowserRouter([
           { path: "traceabilly", element: <Traceabilly perfil="logistica" /> },
           { path: "painel", element: <AcompanhamentoSolicitacoes perfil="logistica" /> },
           { path: "visao-geral", element: <VisaoGeralEstoque /> },
+          // ✨ NOVA ROTA REGISTADA AQUI
+          { path: "transferencia-estoque", element: <TransferenciaEstoque /> },
 
           {
             // 🛡️ 2º Escudo: A partir daqui, Operador é barrado! Só Líder e ADM passam.
