@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/PainelAprovacao/PainelAprovacao.jsx
-// DESCRIÇÃO: Painel de Aprovação integrado com o AlertContext global
+// DESCRIÇÃO: Painel de Aprovação com edição condicional apenas para Entradas
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './PainelAprovacao.css';
@@ -158,6 +158,12 @@ export default function PainelAprovacao() {
 
   // --- FUNÇÕES DE MANIPULAÇÃO DA TABELA INLINE ---
   const adicionarLinhaItem = () => {
+    // ✨ TRAVA MÁXIMA DE 20 ITENS
+    if (itensEdicao.length >= 20) {
+      showAlert("Limite Atingido", "Não é possível adicionar mais do que 20 itens nesta solicitação.", "warning");
+      return;
+    }
+
     setItensEdicao([...itensEdicao, {
       id_temporario: `novo-${Date.now()}`,
       desenhoSAP: '',
@@ -180,6 +186,12 @@ export default function PainelAprovacao() {
   };
 
   const removerLinhaItem = (indexParaRemover) => {
+    // ✨ TRAVA MÍNIMA DE 1 ITEM
+    if (itensEdicao.length <= 1) {
+      showAlert("Ação Bloqueada", "A solicitação deve conter pelo menos 1 item.", "warning");
+      return;
+    }
+
     setItensEdicao(itensEdicao.filter((_, index) => index !== indexParaRemover));
   };
 
@@ -229,7 +241,6 @@ export default function PainelAprovacao() {
   const handleAprovar = async (e, idOriginal) => {
     e.stopPropagation();
 
-    // ✨ CONFIRMAÇÃO COM O ALERTCONTEXT
     const confirmado = await showConfirm(
       "Aprovar Solicitação",
       "Tem certeza que deseja aprovar esta solicitação?",
@@ -247,7 +258,6 @@ export default function PainelAprovacao() {
         if (resposta.sucesso) {
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
-          // ✨ ALERT DE SUCESSO
           showAlert("Solicitação Aprovada", "A solicitação foi aprovada e enviada para separação com sucesso!", "success");
         } else {
           showAlert("Erro no Servidor", resposta.erro || "Não foi possível aprovar a solicitação.", "error");
@@ -274,7 +284,6 @@ export default function PainelAprovacao() {
         if (resposta.sucesso) {
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
-          // ✨ ALERT DE INFORMAÇÃO/RECUSA
           showAlert("Solicitação Recusada", "A solicitação foi recusada com sucesso.", "info");
         } else {
           showAlert("Erro no Servidor", resposta.erro || "Não foi possível recusar a solicitação.", "error");
@@ -286,135 +295,196 @@ export default function PainelAprovacao() {
     }
   };
 
-  // GAVETA DE EDIÇÃO COMPLETA
-  const renderizarGavetaEdicao = () => (
-    <div className="gaveta-detalhes" style={{ padding: '24px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h4 style={{ margin: 0, color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <FileText size={18} color="#0284c7" /> Itens da Solicitação (Modo de Edição)
-        </h4>
-        <button
-          onClick={adicionarLinhaItem}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: '#fff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
-        >
-          <Plus size={14} /> Adicionar Nova Linha
-        </button>
-      </div>
+  // GAVETA DE EDIÇÃO COMPLETA (AGORA INTELIGENTE)
+  const renderizarGavetaEdicao = () => {
+    // ✨ LÓGICA DE BLOQUEIO DE EDIÇÃO: Só é editável se for do tipo 'Entrada'
+    const podeEditar = solicitacaoSendoEditada?.tipo === 'Entrada';
+    
+    // Controlo visual e lógico dos limites
+    const limiteAtingido = itensEdicao.length >= 20;
+    const limiteMinimo = itensEdicao.length <= 1;
 
-      <div style={{ overflowX: 'auto', marginBottom: '20px', paddingBottom: '10px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2200px' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', textAlign: 'center', width: '60px' }}>AÇÕES</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DESENHO SAP</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>Nº PEÇA FABRICANTE</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>FORNECEDOR</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '120px' }}>QTD. FORNECIDA</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>NF DE ENTRADA</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '140px' }}>UNIDADE DE MEDIDA</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', minWidth: '200px' }}>VENDOR DESCRIPTION</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>WBS ELEMENT</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DATA DE NECESSIDADE</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>EMISSÃO NF</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>RECEB. NF</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DOCUMENTO DE COMPRAS</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>PO NET PRICE</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '100px' }}>CENTRO</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '100px' }}>DEPÓSITO</th>
-              <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>ALOCAÇÃO</th>
-            </tr>
-          </thead>
-          <tbody>
-            {itensEdicao.map((item, index) => (
-              <tr key={item.id || item.id_temporario || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                  <button onClick={() => removerLinhaItem(index)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }} title="Remover linha">
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.desenhoSAP || item.desenho_sap_manual || item.desenho_sap || ''} onChange={(e) => atualizarCampoItem(index, 'desenhoSAP', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Desenho SAP" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.numPecaFabricante || item.part_number || ''} onChange={(e) => atualizarCampoItem(index, 'numPecaFabricante', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="PN" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.fornecedor || ''} onChange={(e) => atualizarCampoItem(index, 'fornecedor', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Fornecedor" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="number" value={item.qtdFornecida || item.quantidade_solicitada || item.quantidade || 1} onChange={(e) => atualizarCampoItem(index, 'qtdFornecida', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} min="1" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.nfEntrada || ''} onChange={(e) => atualizarCampoItem(index, 'nfEntrada', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="NF Entrada" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <select value={item.unidadeMedida || 'Unid'} onChange={(e) => atualizarCampoItem(index, 'unidadeMedida', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }}>
-                    <option value="Unid">Unid</option>
-                    <option value="Kg">Kg</option>
-                    <option value="Metro">Metro</option>
-                    <option value="Caixa">Caixa</option>
-                    <option value="Litro">Litro</option>
-                    <option value="NR">NR</option>
-                  </select>
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.vendorDescription || item.materialDescription || ''} onChange={(e) => atualizarCampoItem(index, 'vendorDescription', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Descrição do fornecedor" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.wbsElement || ''} onChange={(e) => atualizarCampoItem(index, 'wbsElement', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="WBS" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="date" value={item.dataNecessidade || ''} onChange={(e) => atualizarCampoItem(index, 'dataNecessidade', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="date" value={item.emissaoNF || ''} onChange={(e) => atualizarCampoItem(index, 'emissaoNF', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="date" value={item.recebNF || ''} onChange={(e) => atualizarCampoItem(index, 'recebNF', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.docCompras || ''} onChange={(e) => atualizarCampoItem(index, 'docCompras', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Doc Compras" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.poNetPrice || ''} onChange={(e) => atualizarCampoItem(index, 'poNetPrice', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="R$ 0,00" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.centro || ''} onChange={(e) => atualizarCampoItem(index, 'centro', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Centro" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.deposito || ''} onChange={(e) => atualizarCampoItem(index, 'deposito', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Depósito" />
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  <input type="text" value={item.alocacao || ''} onChange={(e) => atualizarCampoItem(index, 'alocacao', e.target.value)} style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }} placeholder="Alocação" />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    // Cria um estilo dinâmico que remove as bordas dos inputs caso não se possa editar
+    const estiloInput = { 
+      width: '100%', 
+      padding: '6px', 
+      border: podeEditar ? '1px solid #cbd5e1' : 'none', 
+      borderRadius: '4px', 
+      fontSize: '0.85rem',
+      backgroundColor: podeEditar ? '#ffffff' : 'transparent',
+      color: '#334155',
+      appearance: podeEditar ? 'auto' : 'none'
+    };
 
-        {itensEdicao.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.875rem' }}>
-            Não existem itens nesta solicitação. Adicione uma nova linha.
+    return (
+      <div className="gaveta-detalhes" style={{ padding: '24px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h4 style={{ margin: 0, color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileText size={18} color="#0284c7" /> 
+              {/* Muda o título dependendo do tipo da solicitação */}
+              {podeEditar ? 'Itens da Entrada (Modo de Edição)' : 'Itens da Solicitação (Visualização)'}
+            </h4>
+            
+            {podeEditar && (
+              <span style={{ fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '12px' }}>
+                {itensEdicao.length} / 20 itens
+              </span>
+            )}
           </div>
-        )}
-      </div>
+          
+          {/* Botão de Nova Linha com estilo de desativado se atingir o limite */}
+          {podeEditar && (
+            <button
+              onClick={adicionarLinhaItem}
+              disabled={limiteAtingido}
+              title={limiteAtingido ? "Limite de 20 itens atingido" : "Adicionar Nova Linha"}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', 
+                background: '#fff', 
+                color: limiteAtingido ? '#94a3b8' : '#334155', 
+                border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', 
+                cursor: limiteAtingido ? 'not-allowed' : 'pointer',
+                opacity: limiteAtingido ? 0.6 : 1
+              }}
+            >
+              <Plus size={14} /> Adicionar Nova Linha
+            </button>
+          )}
+        </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-        <button
-          onClick={() => toggleLinha(linhaExpandida, solicitacaoSendoEditada)}
-          style={{ padding: '8px 16px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#475569', fontWeight: '600', cursor: 'pointer', fontSize: '0.85rem' }}
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={salvarEdicaoItens}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#0284c7', border: 'none', borderRadius: '6px', color: '#fff', fontWeight: '600', cursor: 'pointer', fontSize: '0.85rem' }}
-        >
-          <Save size={16} /> Guardar Alterações
-        </button>
+        <div style={{ overflowX: 'auto', marginBottom: '20px', paddingBottom: '10px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2200px' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                {/* Esconde a coluna de Ações (Lixo) se for Visualização */}
+                {podeEditar && <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', textAlign: 'center', width: '60px' }}>AÇÕES</th>}
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DESENHO SAP</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>Nº PEÇA FABRICANTE</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>FORNECEDOR</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '120px' }}>QTD. FORNECIDA</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>NF DE ENTRADA</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '140px' }}>UNIDADE DE MEDIDA</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', minWidth: '200px' }}>VENDOR DESCRIPTION</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>WBS ELEMENT</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DATA DE NECESSIDADE</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>EMISSÃO NF</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>RECEB. NF</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>DOCUMENTO DE COMPRAS</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>PO NET PRICE</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '100px' }}>CENTRO</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '100px' }}>DEPÓSITO</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>ALOCAÇÃO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itensEdicao.map((item, index) => (
+                <tr key={item.id || item.id_temporario || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  
+                  {podeEditar && (
+                    <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                      <button 
+                        onClick={() => removerLinhaItem(index)} 
+                        disabled={limiteMinimo}
+                        title={limiteMinimo ? "A solicitação precisa de pelo menos 1 item." : "Remover linha"}
+                        style={{ 
+                          background: 'none', border: 'none', padding: '4px', 
+                          color: limiteMinimo ? '#cbd5e1' : '#ef4444', 
+                          cursor: limiteMinimo ? 'not-allowed' : 'pointer' 
+                        }} 
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  )}
+                  
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.desenhoSAP || item.desenho_sap_manual || item.desenho_sap || ''} onChange={(e) => atualizarCampoItem(index, 'desenhoSAP', e.target.value)} style={estiloInput} placeholder="Desenho SAP" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.numPecaFabricante || item.part_number || ''} onChange={(e) => atualizarCampoItem(index, 'numPecaFabricante', e.target.value)} style={estiloInput} placeholder="PN" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.fornecedor || ''} onChange={(e) => atualizarCampoItem(index, 'fornecedor', e.target.value)} style={estiloInput} placeholder="Fornecedor" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="number" readOnly={!podeEditar} value={item.qtdFornecida || item.quantidade_solicitada || item.quantidade || 1} onChange={(e) => atualizarCampoItem(index, 'qtdFornecida', e.target.value)} style={estiloInput} min="1" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.nfEntrada || ''} onChange={(e) => atualizarCampoItem(index, 'nfEntrada', e.target.value)} style={estiloInput} placeholder="NF Entrada" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <select disabled={!podeEditar} value={item.unidadeMedida || item.unidade_medida_manual || 'Unid'} onChange={(e) => atualizarCampoItem(index, 'unidadeMedida', e.target.value)} style={estiloInput}>
+                      <option value="Unid">Unid</option>
+                      <option value="Kg">Kg</option>
+                      <option value="Metro">Metro</option>
+                      <option value="Caixa">Caixa</option>
+                      <option value="Litro">Litro</option>
+                      <option value="NR">NR</option>
+                    </select>
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.vendorDescription || item.materialDescription || item.descricao_manual || ''} onChange={(e) => atualizarCampoItem(index, 'vendorDescription', e.target.value)} style={estiloInput} placeholder="Descrição do material" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.wbsElement || item.wbs_element || ''} onChange={(e) => atualizarCampoItem(index, 'wbsElement', e.target.value)} style={estiloInput} placeholder="WBS" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="date" readOnly={!podeEditar} value={item.dataNecessidade || ''} onChange={(e) => atualizarCampoItem(index, 'dataNecessidade', e.target.value)} style={estiloInput} />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="date" readOnly={!podeEditar} value={item.emissaoNF || ''} onChange={(e) => atualizarCampoItem(index, 'emissaoNF', e.target.value)} style={estiloInput} />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="date" readOnly={!podeEditar} value={item.recebNF || ''} onChange={(e) => atualizarCampoItem(index, 'recebNF', e.target.value)} style={estiloInput} />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.docCompras || item.documento_compras || ''} onChange={(e) => atualizarCampoItem(index, 'docCompras', e.target.value)} style={estiloInput} placeholder="Doc Compras" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.poNetPrice || item.valor_unitario_manual || ''} onChange={(e) => atualizarCampoItem(index, 'poNetPrice', e.target.value)} style={estiloInput} placeholder="R$ 0,00" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.centro || ''} onChange={(e) => atualizarCampoItem(index, 'centro', e.target.value)} style={estiloInput} placeholder="Centro" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.deposito || ''} onChange={(e) => atualizarCampoItem(index, 'deposito', e.target.value)} style={estiloInput} placeholder="Depósito" />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <input type="text" readOnly={!podeEditar} value={item.alocacao || ''} onChange={(e) => atualizarCampoItem(index, 'alocacao', e.target.value)} style={estiloInput} placeholder="Alocação" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {itensEdicao.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.875rem' }}>
+              Não existem itens nesta solicitação.
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <button
+            onClick={() => toggleLinha(linhaExpandida, solicitacaoSendoEditada)}
+            style={{ padding: '8px 16px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#475569', fontWeight: '600', cursor: 'pointer', fontSize: '0.85rem' }}
+          >
+            {podeEditar ? 'Cancelar' : 'Fechar Visão'}
+          </button>
+          
+          {podeEditar && (
+            <button
+              onClick={salvarEdicaoItens}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#0284c7', border: 'none', borderRadius: '6px', color: '#fff', fontWeight: '600', cursor: 'pointer', fontSize: '0.85rem' }}
+            >
+              <Save size={16} /> Guardar Alterações
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="dashboard-container" style={{ position: 'relative' }}>
@@ -487,7 +557,7 @@ export default function PainelAprovacao() {
 
                           <div className="item-acoes-grupo">
                             <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico, linha)}>
-                              <Eye size={16} /> {isExpandida ? "Fechar Itens" : "Ver / Editar Itens"}
+                              <Eye size={16} /> {isExpandida ? "Fechar Itens" : "Ver Itens"}
                             </button>
 
                             {isCrossdocking && !nfNoEstoque ? (
