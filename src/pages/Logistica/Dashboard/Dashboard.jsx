@@ -22,7 +22,6 @@ const parseDataBackend = (dataStr) => {
   const strLimpa = dataStr.trim();
   if (!strLimpa || strLimpa === '—' || strLimpa === '-' || strLimpa === 'não definido') return null;
 
-  // Prioriza formato brasileiro DD/MM/YYYY HH:mm:ss para evitar inversão de dia/mês pelo new Date()
   if (strLimpa.includes('/')) {
     try {
       const [dataParte, horaParte] = strLimpa.split(' ');
@@ -46,7 +45,6 @@ const parseDataBackend = (dataStr) => {
     }
   }
 
-  // Fallback para padrão ISO (YYYY-MM-DDTHH:mm:ss.sssZ)
   const dataIso = new Date(strLimpa);
   if (!isNaN(dataIso.getTime())) {
     return dataIso;
@@ -86,7 +84,7 @@ export default function Dashboard() {
             if (item.tipo === "Crossdocking") prefixo = "CD";
             else if (item.tipo === "Nota Fiscal") prefixo = "NF";
             else if (item.tipo === "Transferencia WBS") prefixo = "TR";
-            else if (item.tipo === "Reintegracao") prefixo = "REI";
+            else if (item.tipo === "Reintegracao" || item.tipo === "Reintegração") prefixo = "REI";
             else if (item.tipo === "Entrada") prefixo = "EN";
 
             const idLimpo = item.id ? String(item.id).replace(/\D/g, '') : item.ps;
@@ -320,7 +318,7 @@ export default function Dashboard() {
         </div>
         <div className="header-actions">
           <div className="target-badge">
-            <Settings size={16} />
+            <Settings size={18} color="#2563eb" />
             <span>Target Atual: <strong>3 Dias (Expiração PL)</strong></span>
           </div>
           <select className="period-select" defaultValue="Todo Período">
@@ -336,7 +334,7 @@ export default function Dashboard() {
         <div className="stat-card">
           <div className="card-header">
             <h3 className="card-title">Solicitações Recebidas</h3>
-            <div className="icon-wrapper icon-blue"><ClipboardList size={20} /></div>
+            <div className="icon-wrapper icon-blue"><ClipboardList size={22} /></div>
           </div>
           <p className="card-value value-blue">{carregando ? '-' : dadosTabela.length}</p>
           <p className="card-description">Total de pedidos no período</p>
@@ -345,7 +343,7 @@ export default function Dashboard() {
         <div className="stat-card">
           <div className="card-header">
             <h3 className="card-title">Aguardando Aprovação</h3>
-            <div className="icon-wrapper icon-orange"><Clock size={20} /></div>
+            <div className="icon-wrapper icon-orange"><Clock size={22} /></div>
           </div>
           <p className="card-value value-orange">
             {carregando ? '-' : dadosTabela.filter(i => i.status === 'Pendente').length}
@@ -356,7 +354,7 @@ export default function Dashboard() {
         <div className="stat-card">
           <div className="card-header">
             <h3 className="card-title">Em Separação</h3>
-            <div className="icon-wrapper icon-blue"><Activity size={20} /></div>
+            <div className="icon-wrapper icon-blue"><Activity size={22} /></div>
           </div>
           <p className="card-value value-blue">
             {carregando ? '-' : totalEmAndamento}
@@ -367,7 +365,7 @@ export default function Dashboard() {
         <div className="stat-card">
           <div className="card-header">
             <h3 className="card-title">Finalizados</h3>
-            <div className="icon-wrapper icon-blue"><CheckCircle2 size={20} /></div>
+            <div className="icon-wrapper icon-green"><CheckCircle2 size={22} /></div>
           </div>
           <p className="card-value value-blue">
             {carregando ? '-' : totalFinalizados}
@@ -380,7 +378,7 @@ export default function Dashboard() {
       <div className="efficiency-section">
         <div className="efficiency-header">
           <div className="efficiency-icon">
-            <Target size={20} />
+            <Target size={24} />
           </div>
           <div className="efficiency-textos">
             <h2>Eficiência de Atendimento</h2>
@@ -390,17 +388,17 @@ export default function Dashboard() {
 
         <div className="efficiency-grid">
           <div className="eff-card green">
-            <CheckCircle2 size={24} strokeWidth={1.5} />
+            <CheckCircle2 size={28} strokeWidth={2} />
             <span>Dentro do Target</span>
             <strong>{carregando ? '0' : dentroTargetCount}</strong>
           </div>
           <div className="eff-card red">
-            <XCircle size={24} strokeWidth={1.5} />
+            <XCircle size={28} strokeWidth={2} />
             <span>Fora do Target (Expirados)</span>
             <strong>{carregando ? '0' : foraTargetCount}</strong>
           </div>
           <div className="eff-card gray">
-            <BarChart3 size={24} strokeWidth={1.5} />
+            <BarChart3 size={28} strokeWidth={2} />
             <span>Total Avaliado</span>
             <strong>{carregando ? '0' : totalAvaliados}</strong>
           </div>
@@ -419,10 +417,10 @@ export default function Dashboard() {
         <div className="grafico-card">
           <div className="grafico-header">
             <div className="grafico-titulo-grupo">
-              <div className="grafico-icone"><TrendingUp size={18} /></div>
+              <div className="grafico-icone"><TrendingUp size={20} /></div>
               <div className="grafico-textos">
                 <h3>Dentro vs. Fora do Target</h3>
-                <p>% sobre finalizados e ativos por mês · variação mês a mês</p>
+                <p>% sobre finalizados e ativos por mês</p>
               </div>
             </div>
             <button className="btn-csv"><Download size={14}/> CSV</button>
@@ -432,7 +430,7 @@ export default function Dashboard() {
             {ultimosMeses.map(m => (
               <div key={m.rotulo} className="mes-box">
                 <span>{m.rotulo}</span>
-                <span style={{ color: m.pctDentro !== null ? '#059669' : '#94a3b8', fontWeight: 'bold' }}>
+                <span style={{ color: m.pctDentro !== null ? '#059669' : '#94a3b8', fontWeight: '800' }}>
                   {m.pctDentro !== null ? `${m.pctDentro}%` : '—'}
                 </span>
               </div>
@@ -456,7 +454,9 @@ export default function Dashboard() {
                   d={caminhoSvgDentro}
                   fill="none"
                   stroke="#10b981"
-                  strokeWidth="2.5"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   vectorEffect="non-scaling-stroke"
                 />
               )}
@@ -466,10 +466,10 @@ export default function Dashboard() {
                     key={idx}
                     cx={p.x}
                     cy={p.y}
-                    r="3.5"
+                    r="4"
                     fill="#10b981"
                     stroke="#ffffff"
-                    strokeWidth="1"
+                    strokeWidth="2"
                     vectorEffect="non-scaling-stroke"
                   />
                 )
@@ -490,10 +490,10 @@ export default function Dashboard() {
         <div className="grafico-card">
           <div className="grafico-header">
             <div className="grafico-titulo-grupo">
-              <div className="grafico-icone"><FileText size={18} /></div>
+              <div className="grafico-icone"><FileText size={20} /></div>
               <div className="grafico-textos">
-                <h3>Acompanhamento de PL por Status</h3>
-                <p>Finalizados · Recusados / Cancelados · Em Andamento</p>
+                <h3>Acompanhamento de PL</h3>
+                <p>Volume atual por fase</p>
               </div>
             </div>
             <button className="btn-csv"><Download size={14}/> CSV</button>
@@ -532,7 +532,7 @@ export default function Dashboard() {
                 <div className="barra-preenchimento azul" style={{ height: alturaAzul }}></div>
               </div>
             </div>
-            <div className="grafico-eixo-x" style={{padding: '0 30px'}}>
+            <div className="grafico-eixo-x" style={{ padding: '0 8%' }}>
               <span>Finalizados</span><span>Recusados</span><span>Em Andamento</span>
             </div>
           </div>
@@ -541,11 +541,11 @@ export default function Dashboard() {
       </div>
 
       {/* TABELA DE DEMANDAS COM RELÓGIO AO VIVO */}
-      <div className="graficos-grid-1col" style={{ marginTop: '24px' }}>
+      <div className="graficos-grid-1col">
         {carregando ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px', color: '#94a3b8', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <Loader2 size={32} className="animate-spin" style={{ marginBottom: '12px' }} />
-            <span>A sincronizar os dados do servidor...</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px', color: '#94a3b8' }}>
+            <Loader2 size={40} className="animate-spin" style={{ marginBottom: '16px', color: '#3b82f6' }} />
+            <span style={{ fontSize: '1.1rem', fontWeight: '500' }}>Sincronizando dados com o servidor...</span>
           </div>
         ) : (
           <TabelaDemandas dados={dadosTabelaAoVivo} />

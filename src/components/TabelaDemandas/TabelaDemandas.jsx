@@ -11,12 +11,12 @@ export default function TabelaDemandas({ dados = [] }) {
   const [modalAberto, setModalAberto] = useState(false);
   const [itemSelecionado, setItemSelecionado] = useState(null);
   const [historicoItem, setHistoricoItem] = useState([]);
-  
+
   // ✨ NOVO STATE: Guarda o tipo da solicitação (ex: "Transferencia WBS")
   const [tipoSolicitacao, setTipoSolicitacao] = useState('');
-  
+
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
-  
+
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [filtoStatus, setFiltoStatus] = useState('Todos os Status');
 
@@ -31,18 +31,18 @@ export default function TabelaDemandas({ dados = [] }) {
     try {
       // 1. A linha.id tem o PS exato (ex: "PS-20260809-8331")
       const psBusca = linha.id;
-      
+
       // 2. Buscamos os detalhes completos da solicitação na API
       const resultado = await apiFetch(`/solicitacoes/listar?busca=${psBusca}`);
-      
+
       // 3. Verificamos se encontrou e extraímos os itens e o tipo
       if (resultado.sucesso && resultado.dados && resultado.dados.length > 0) {
         // Encontra a solicitação que tem exatamente esse PS
         const solicitacaoExata = resultado.dados.find(d => d.ps === psBusca);
-        
+
         if (solicitacaoExata && solicitacaoExata.itens) {
           setHistoricoItem(solicitacaoExata.itens);
-          
+
           // ✨ SALVA O TIPO DA SOLICITAÇÃO (Se for undefined, guarda string vazia)
           setTipoSolicitacao(solicitacaoExata.tipo || '');
         } else {
@@ -70,15 +70,15 @@ export default function TabelaDemandas({ dados = [] }) {
 
   const dadosFiltrados = dados.filter((linha) => {
     const termo = termoPesquisa.toLowerCase();
-    
-    const batePesquisa = 
+
+    const batePesquisa =
       (linha.id && String(linha.id).toLowerCase().includes(termo)) ||
       (linha.solicitante && linha.solicitante.toLowerCase().includes(termo)) ||
       (linha.wbs && linha.wbs.toLowerCase().includes(termo)) ||
       ((linha.pl || linha.bs) && String(linha.pl || linha.bs).toLowerCase().includes(termo));
 
-    const bateStatus = 
-      filtoStatus === 'Todos os Status' || 
+    const bateStatus =
+      filtoStatus === 'Todos os Status' ||
       (linha.status && linha.status === filtoStatus);
 
     return batePesquisa && bateStatus;
@@ -88,14 +88,14 @@ export default function TabelaDemandas({ dados = [] }) {
 
   return (
     <div className="tabela-cartao" style={{ position: 'relative' }}>
-      
+
       <div className="tabela-controles">
         <div className="controles-esquerdos">
           <select className="select-filtro">
             <option>Todo Período</option>
           </select>
-          
-          <select 
+
+          <select
             className="select-filtro"
             value={filtoStatus}
             onChange={(e) => setFiltoStatus(e.target.value)}
@@ -105,12 +105,12 @@ export default function TabelaDemandas({ dados = [] }) {
             ))}
           </select>
         </div>
-        
+
         <div className="pesquisa-wrapper">
           <Search className="icone-pesquisa" size={16} />
-          <input 
-            type="text" 
-            placeholder="Buscar PS, PL, WBS..." 
+          <input
+            type="text"
+            placeholder="Buscar PS, PL, WBS..."
             value={termoPesquisa}
             onChange={(e) => setTermoPesquisa(e.target.value)}
           />
@@ -138,15 +138,15 @@ export default function TabelaDemandas({ dados = [] }) {
           </thead>
           <tbody>
             {dadosFiltrados.map((linha, index) => (
-              <tr 
-                key={index} 
-                onDoubleClick={() => handleDuploClique(linha)} 
+              <tr
+                key={index}
+                onDoubleClick={() => handleDuploClique(linha)}
                 style={{ cursor: 'pointer' }}
                 title="Duplo clique para ver os itens da solicitação"
               >
                 <td className="fonte-negrito">{linha.id}</td>
                 <td>{linha.solicitante}</td>
-                <td><a href="#" className="link-azul" onClick={(e)=>e.preventDefault()}>{linha.wbs}</a></td>
+                <td><a href="#" className="link-azul" onClick={(e) => e.preventDefault()}>{linha.wbs}</a></td>
                 <td>
                   <span className="badge-status-simples">{linha.status}</span>
                 </td>
@@ -162,7 +162,8 @@ export default function TabelaDemandas({ dados = [] }) {
                   {linha.dataEntrega || '—'}
                 </td>
                 <td>
-                  {linha.contagem && String(linha.contagem).includes('d') ? (
+                  {/* Avalia a propriedade contagemStatus vinda do Dashboard. Se existir, formata como badge */}
+                  {linha.contagemStatus ? (
                     <span className={`badge-countdown countdown-${linha.contagemStatus}`}>
                       {linha.contagem}
                     </span>
@@ -186,7 +187,7 @@ export default function TabelaDemandas({ dados = [] }) {
             backgroundColor: '#fff', padding: '24px', borderRadius: '8px',
             width: '750px', maxWidth: '90%', boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
           }}>
-            
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '12px', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <PackageOpen size={20} color="#0056b3" />
@@ -220,10 +221,10 @@ export default function TabelaDemandas({ dados = [] }) {
                   <tbody>
                     {historicoItem.map((hist, idx) => {
                       // ✨ LÓGICA DE IDENTIFICAÇÃO: Verifica se é uma transferência WBS
-                      const isTransferencia = 
-                        tipoSolicitacao === 'Transferencia WBS' || 
-                        tipoSolicitacao === 'Transfer. WBS' || 
-                        hist.is_transferencia || 
+                      const isTransferencia =
+                        tipoSolicitacao === 'Transferencia WBS' ||
+                        tipoSolicitacao === 'Transfer. WBS' ||
+                        hist.is_transferencia ||
                         hist.isTransferencia;
 
                       // ✨ NOVA LÓGICA DE CORES: Se for transferência, a linha inteira fica amarela!
@@ -240,17 +241,17 @@ export default function TabelaDemandas({ dados = [] }) {
                           </td>
                           <td style={{ padding: '8px', color: isTransferencia ? '#854d0e' : 'inherit' }}>
                             {hist.descricao_manual || '-'}
-                            
+
                             {/* ✨ ETIQUETA MANTIDA para dar ainda mais destaque */}
                             {isTransferencia && (
                               <div style={{ marginTop: '6px' }}>
-                                <span style={{ 
-                                  fontSize: '0.65rem', 
-                                  backgroundColor: '#fef08a', 
-                                  color: '#854d0e', 
-                                  border: '1px solid #eab308', 
-                                  padding: '2px 6px', 
-                                  borderRadius: '4px', 
+                                <span style={{
+                                  fontSize: '0.65rem',
+                                  backgroundColor: '#fef08a',
+                                  color: '#854d0e',
+                                  border: '1px solid #eab308',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
                                   fontWeight: 'bold',
                                   textTransform: 'uppercase',
                                   letterSpacing: '0.05em'
@@ -274,7 +275,7 @@ export default function TabelaDemandas({ dados = [] }) {
                 Nenhum item encontrado para esta solicitação.
               </p>
             )}
-            
+
           </div>
         </div>
       )}

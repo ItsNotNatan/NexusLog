@@ -13,17 +13,15 @@ export default function ReintegracaoItens() {
   const [nome, setNome] = useState('');
   const [pesquisa, setPesquisa] = useState('');
   
-  // Estado que armazena todas as PLs e Reintegrações
   const [listaDePl, setListaDePl] = useState([]);
   const [listaReintegracoes, setListaReintegracoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
-  // Estados de controlo da PL Selecionada
   const [plSelecionada, setPlSelecionada] = useState(null);
   const [itensDaPL, setItensDaPL] = useState([]);
 
   // =======================================================================
-  // 1. FUNÇÃO PARA CARREGAR DADOS DO BACKEND
+  // 1. FUNÇÃO PARA CARREGAR DADOS E CALCULAR STATUS DE REINTEGRAÇÃO
   // =======================================================================
   const buscarDados = useCallback(async () => {
     try {
@@ -33,21 +31,43 @@ export default function ReintegracaoItens() {
       const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
 
       if (resultado.sucesso) {
-        // 1. Guardar as PLs de Material normais
         const plsValidas = resultado.dados.filter(sol => 
           sol.tipo === 'Material' && 
           (sol.status === 'Em Separação' || sol.status === 'Concluído') &&
           sol.pl && sol.pl !== '-'
         );
-        setListaDePl(plsValidas);
 
-        // ✨ 2. NOVA REGRA: Só consideramos os itens devolvidos SE a logística
-        // já tiver aprovado ('Em Separação') ou finalizado ('Concluído').
         const reints = resultado.dados.filter(sol => 
           (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
           (sol.status === 'Em Separação' || sol.status === 'Concluído')
         );
         setListaReintegracoes(reints);
+
+        // ✨ MÁGICA: Calcula se a PL já foi totalmente reintegrada
+        const plsFormatadas = plsValidas.map(plOriginal => {
+          const qtdJaDevolvida = {};
+          reints.forEach(reint => {
+            if (reint.observacoes && reint.observacoes.includes(plOriginal.pl)) {
+              (reint.itens || []).forEach(it => {
+                qtdJaDevolvida[it.estoque_id] = (qtdJaDevolvida[it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
+              });
+            }
+          });
+
+          const itensRestantes = (plOriginal.itens || []).filter(item => {
+            const devolvido = qtdJaDevolvida[item.estoque_id] || 0;
+            return (Number(item.quantidade_solicitada) - devolvido) > 0;
+          });
+
+          const isTotalmenteReintegrado = itensRestantes.length === 0 && (plOriginal.itens || []).length > 0;
+
+          return {
+            ...plOriginal,
+            statusExibicao: isTotalmenteReintegrado ? 'Reintegrado' : plOriginal.status
+          };
+        });
+
+        setListaDePl(plsFormatadas);
       } else {
         console.error("Erro ao buscar as PLs:", resultado.erro);
       }
@@ -63,60 +83,48 @@ export default function ReintegracaoItens() {
   }, [buscarDados]);
 
   // =======================================================================
-  // 2. AÇÃO DE SELECIONAR A PL E CALCULAR MATEMÁTICA DE ITENS RESTANTES
+  // 2. AÇÃO DE SELECIONAR A PL
   // =======================================================================
   const handleSelecionarPL = (plOriginal) => {
-    // Fecha a gaveta se já estiver aberta
+    if (plOriginal.statusExibicao === 'Reintegrado') {
+      showAlert(
+        "PL Totalmente Reintegrada", 
+        "Todos os itens desta Packing List já foram devolvidos e constam no estoque.", 
+        "info"
+      );
+      return;
+    }
+
     if (plSelecionada === plOriginal.id) {
       setPlSelecionada(null);
       setItensDaPL([]);
       return;
     }
 
-    // A. Vamos somar tudo o que JÁ FOI DEVOLVIDO E APROVADO desta PL
     const qtdJaDevolvida = {};
     listaReintegracoes.forEach(reint => {
-      // Verifica se a observação da reintegração cita o número desta PL
       if (reint.observacoes && reint.observacoes.includes(plOriginal.pl)) {
         (reint.itens || []).forEach(it => {
-          // Usa o ID da prateleira para mapear o item exato devolvido
           qtdJaDevolvida[it.estoque_id] = (qtdJaDevolvida[it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
         });
       }
     });
 
-    // B. Agora mapeamos os itens da PL descontando o que já foi devolvido
     const itensMapeados = (plOriginal.itens || []).map(item => {
       const devolvidoAnteriormente = qtdJaDevolvida[item.estoque_id] || 0;
-      
-      // O que o cliente ainda pode devolver = (Qtd Original - Qtd que já devolveu)
       const maxPermitido = Math.max(0, Number(item.quantidade_solicitada) - devolvidoAnteriormente);
 
       return {
         ...item,
         quantidade_maxima_permitida: maxPermitido,
-        quantidade_devolvida: 0 // Inicia a caixa de input com 0
+        quantidade_devolvida: 0
       };
-    }).filter(item => item.quantidade_maxima_permitida > 0); // Remove itens que já esgotaram o limite de devolução
+    }).filter(item => item.quantidade_maxima_permitida > 0); 
 
-    // C. Se não sobrar nada, não abre a gaveta e avisa o cliente
-    if (itensMapeados.length === 0) {
-      showAlert(
-        "PL Totalmente Reintegrada", 
-        "Todos os itens desta Packing List já foram devolvidos ao estoque e aprovados pela equipa de logística.", 
-        "info"
-      );
-      return;
-    }
-
-    // Abre a gaveta e exibe os itens restantes
     setPlSelecionada(plOriginal.id);
     setItensDaPL(itensMapeados);
   };
 
-  // =======================================================================
-  // 3. ATUALIZAR A QUANTIDADE A DEVOLVER NA TABELA EXPANDIDA
-  // =======================================================================
   const alterarQuantidade = (itemId, novaQuantidade) => {
     let valorNum = parseInt(novaQuantidade, 10);
     if (isNaN(valorNum) || valorNum < 0) valorNum = 0;
@@ -124,7 +132,6 @@ export default function ReintegracaoItens() {
     setItensDaPL(prevItens => 
       prevItens.map(item => {
         if (item.id === itemId) {
-          // Bloqueia caso o cliente tente escrever um número maior que o permitido
           if (valorNum > item.quantidade_maxima_permitida) {
             valorNum = item.quantidade_maxima_permitida;
           }
@@ -135,9 +142,6 @@ export default function ReintegracaoItens() {
     );
   };
 
-  // =======================================================================
-  // 4. SUBMETER A SOLICITAÇÃO PARA O BACKEND
-  // =======================================================================
   const handleEnviar = async () => {
     if (!nome) {
       showAlert("Campo Obrigatório", "Por favor, preencha o seu nome.", "warning");
@@ -148,7 +152,6 @@ export default function ReintegracaoItens() {
       return;
     }
 
-    // Filtramos apenas os itens em que o cliente preencheu uma quantidade > 0
     const itensParaDevolver = itensDaPL.filter(item => item.quantidade_devolvida > 0);
 
     if (itensParaDevolver.length === 0) {
@@ -175,22 +178,19 @@ export default function ReintegracaoItens() {
       });
 
       if (dados.sucesso || dados.ps || dados.ps_id) {
-        // ✨ NOVO AVISO DE SUCESSO DEIXANDO CLARO O PS E O PL
         const idGerado = dados.ps || dados.ps_id || dados.pl_id;
         showAlert(
           "Sucesso!", 
-          `Reintegração solicitada! Pedido (PS) gerado: ${idGerado}. A PL correspondente será gerada assim que a logística aprovar o pedido.`, 
+          `Reintegração solicitada! Pedido (PS) gerado: ${idGerado}.`, 
           "success"
         );
         
-        // Reset da Tela
         setNome('');
         setPlSelecionada(null);
         setItensDaPL([]);
         setPesquisa('');
 
-        // 🔄 RECARREGA OS DADOS
-        buscarDados();
+        buscarDados(); // Recarrega os dados e atualiza o status para "Reintegrado" em tempo real
       } else {
         showAlert("Erro de Servidor", dados.erro, "error");
       }
@@ -200,9 +200,6 @@ export default function ReintegracaoItens() {
     }
   };
 
-  // =======================================================================
-  // 5. FILTRAGEM DA BARRA DE PESQUISA (FRONT-END)
-  // =======================================================================
   const listaFiltrada = listaDePl.filter(pl => 
     (pl.pl && pl.pl.toLowerCase().includes(pesquisa.toLowerCase())) || 
     (pl.id && pl.id.toLowerCase().includes(pesquisa.toLowerCase())) || 
@@ -213,7 +210,6 @@ export default function ReintegracaoItens() {
   return (
     <div className="limitador-largura">
       
-      {/* 1. DADOS DO SOLICITANTE */}
       <div className="form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
@@ -233,7 +229,6 @@ export default function ReintegracaoItens() {
         </div>
       </div>
 
-      {/* 2. PESQUISA E LISTAGEM DE PLs */}
       <div className="form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
@@ -268,7 +263,6 @@ export default function ReintegracaoItens() {
             listaFiltrada.map((pl) => (
               <React.Fragment key={pl.id}>
                 
-                {/* LINHA DO PACKING LIST PRINCIPAL */}
                 <div 
                   className="item-pl"
                   style={{
@@ -276,7 +270,8 @@ export default function ReintegracaoItens() {
                     backgroundColor: plSelecionada === pl.id ? '#fff7ed' : '#ffffff',
                     borderBottomLeftRadius: plSelecionada === pl.id ? '0px' : '8px',
                     borderBottomRightRadius: plSelecionada === pl.id ? '0px' : '8px',
-                    marginBottom: plSelecionada === pl.id ? '0px' : '12px'
+                    marginBottom: plSelecionada === pl.id ? '0px' : '12px',
+                    opacity: pl.statusExibicao === 'Reintegrado' ? 0.7 : 1
                   }}
                   onClick={() => handleSelecionarPL(pl)}
                 >
@@ -289,18 +284,22 @@ export default function ReintegracaoItens() {
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    
+                    {/* ✨ O BADGE MUDA DE COR DEPENDENDO DO CÁLCULO */}
                     <span className="badge-separacao" style={{ 
-                      backgroundColor: pl.status === 'Concluído' ? '#ecfdf5' : '#e0f2fe',
-                      borderColor: pl.status === 'Concluído' ? '#a7f3d0' : '#bae6fd',
-                      color: pl.status === 'Concluído' ? '#059669' : '#0284c7'
+                      backgroundColor: pl.statusExibicao === 'Reintegrado' || pl.statusExibicao === 'Concluído' ? '#ecfdf5' : '#e0f2fe',
+                      borderColor: pl.statusExibicao === 'Reintegrado' || pl.statusExibicao === 'Concluído' ? '#a7f3d0' : '#bae6fd',
+                      color: pl.statusExibicao === 'Reintegrado' || pl.statusExibicao === 'Concluído' ? '#059669' : '#0284c7'
                     }}>
-                      {pl.status}
+                      {pl.statusExibicao}
                     </span>
-                    {plSelecionada === pl.id ? <ChevronUp size={18} color="#ea580c"/> : <ChevronDown size={18} color="#94a3b8"/>}
+                    
+                    {pl.statusExibicao !== 'Reintegrado' && (
+                      plSelecionada === pl.id ? <ChevronUp size={18} color="#ea580c"/> : <ChevronDown size={18} color="#94a3b8"/>
+                    )}
                   </div>
                 </div>
 
-                {/* PAINEL EXPANSÍVEL */}
                 {plSelecionada === pl.id && (
                   <div style={{
                     border: '2px solid #f97316',
@@ -338,12 +337,9 @@ export default function ReintegracaoItens() {
                             <td style={{ padding: '12px 8px', color: '#7c2d12' }}>
                               {itemTabela.descricao_manual}
                             </td>
-                            
-                            {/* ✨ EXIBE A QUANTIDADE ATUALIZADA (Descontando as devoluções) */}
                             <td style={{ padding: '12px 8px', color: '#7c2d12', fontWeight: 'bold' }}>
                               {itemTabela.quantidade_maxima_permitida} {itemTabela.unidade_medida_manual}
                             </td>
-
                             <td style={{ padding: '8px' }}>
                               <input 
                                 type="number" 
@@ -362,10 +358,6 @@ export default function ReintegracaoItens() {
                         ))}
                       </tbody>
                     </table>
-
-                    <div style={{ marginTop: '16px', fontSize: '0.75rem', color: '#c2410c' }}>
-                      * Se não for devolver determinado item, deixe a "Qtd Devolver" como 0.
-                    </div>
 
                   </div>
                 )}
