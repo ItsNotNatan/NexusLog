@@ -12,7 +12,7 @@ export default function Sidebar({ modulo }) {
   const location = useLocation();
 
   const { usuario, estoqueAtual } = useAuth();
-  const role = usuario?.cargo; 
+  const role = usuario?.cargo;
 
   const menuCliente = [
     { path: '/cliente/consulta-estoque', label: 'Consulta de Estoque', icon: <Boxes size={20} /> },
@@ -44,17 +44,17 @@ export default function Sidebar({ modulo }) {
         if (item.path !== '/cliente/consulta-estoque') {
           return { ...item, isDisabled: true };
         }
-        return item; 
+        return item;
       });
     } else {
-      menuItems = menuCliente; 
+      menuItems = menuCliente;
     }
   } else {
     const menuLogisticaFiltrado = menuLogistica.filter(item => item.roles.includes(role));
     menuItems = menuLogisticaFiltrado;
   }
 
-  const tituloSidebar = modulo === 'cliente' ? 'Portal do Cliente' : 'NexusLog';
+  const tituloSidebar = modulo === 'cliente' ? 'Portal do Cliente' : 'STOCKLog';
 
   return (
     <aside className="sidebar-container">
@@ -71,12 +71,12 @@ export default function Sidebar({ modulo }) {
             <li key={item.path} title={item.isDisabled ? "Selecione uma filial específica no topo para acessar" : ""}>
               <NavLink
                 to={item.path}
-                className={({ isActive }) => 
+                className={({ isActive }) =>
                   `nav-item ${isActive && !item.isDisabled ? "ativo" : ""} ${item.isDisabled ? "desabilitado" : ""}`
                 }
                 onClick={(e) => {
                   if (item.isDisabled) {
-                    e.preventDefault(); 
+                    e.preventDefault();
                   }
                 }}
               >

@@ -29,8 +29,8 @@ export default function CentralDeOperacoes() {
           <img src={logoComau} alt="Logo Comau" className="home-hub-logo" />
           
           <h1 className="home-greeting">
-
-            Bem-vindo ao NEXUS<span className="logo-accent">Log</span>
+            {/* ✨ NOME ATUALIZADO AQUI */}
+            Bem-vindo ao STOCK<span className="logo-accent">Log</span>
           </h1>
           <p className="home-instructions">
             Uma plataforma centralizada para controle de estoque, solicitações, aprovações e rastreabilidade em tempo real.
@@ -38,7 +38,6 @@ export default function CentralDeOperacoes() {
         </header>
 
         <main className="home-hub-grid">
-          {/* Módulo 1: Portal do Cliente (Hitbox no cartão inteiro) */}
           <div 
             className="hub-card hub-card--blue"
             onClick={() => navigate('/cliente/consulta-estoque')}
@@ -60,7 +59,6 @@ export default function CentralDeOperacoes() {
             </div>
           </div>
 
-          {/* Módulo 2: Área da Logística (Hitbox no cartão inteiro) */}
           <div 
             className="hub-card hub-card--indigo"
             onClick={() => navigate('/login')}

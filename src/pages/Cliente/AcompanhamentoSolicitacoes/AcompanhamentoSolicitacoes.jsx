@@ -1,7 +1,3 @@
-// =================================================================
-// ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
-// DESCRIÇÃO: Tabela de acompanhamento com filtros interativos e paginação local
-// =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
@@ -22,25 +18,13 @@ const renderBadgeStatus = (status) => {
     case "Pendente":
     case "Em Separação":
     case "Em Andamento":
-      return (
-        <span className="badge-status status-separacao">
-          <RefreshCw size={14} className="animate-spin" /> {status}
-        </span>
-      );
+      return <span className="badge-status status-separacao"><RefreshCw size={14} className="animate-spin" /> {status}</span>;
     case "Concluído":
     case "Reintegrado": 
-      return (
-        <span className="badge-status status-concluido">
-          <CheckCircle2 size={14} /> {status}
-        </span>
-      );
+      return <span className="badge-status status-concluido"><CheckCircle2 size={14} /> {status}</span>;
     case "Cancelado":
     case "Recusado":
-      return (
-        <span className="badge-status status-cancelado">
-          <XCircle size={14} /> {status}
-        </span>
-      );
+      return <span className="badge-status status-cancelado"><XCircle size={14} /> {status}</span>;
     default:
       return <span className="badge-status">{status}</span>;
   }
@@ -62,9 +46,18 @@ const obterClasseBadgeTipo = (tipo) => {
 };
 
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
-  const { estoqueAtual, carregandoInicial } = useContext(AuthContext);
+  // ✨ Puxa as filiais do Contexto
+  const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
   const { showAlert, showConfirm } = useAlert(); 
   const navigate = useNavigate();
+
+  // ✨ NOVA FUNÇÃO DINÂMICA: Substitui aquela lista fixa antiga!
+  const obterNomeFilialDinamico = (codigo) => {
+    if (!codigo) return 'N/D';
+    if (codigo === 'TODOS') return 'Todas as Filiais';
+    const filial = filiaisGlobais.find(f => f.id === codigo);
+    return filial ? filial.nome : codigo;
+  };
 
   useEffect(() => {
     if (!carregandoInicial) {
@@ -77,7 +70,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]);
-  const [filiaisCadastradas, setFiliaisCadastradas] = useState([]); // ✨ NOVO ESTADO DINÂMICO
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [termoPesquisa, setTermoPesquisa] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -94,23 +86,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (dadosUsuario && dadosUsuario !== 'undefined') {
       usuarioLogado = JSON.parse(dadosUsuario);
     }
-  } catch (erro) {
-    console.warn('Sessão vazia ou inválida.');
-  }
+  } catch (erro) {}
+  
   const token = localStorage.getItem('@NexusLog:token') || '';
   const isOperador = String(usuarioLogado.cargo || '').toLowerCase().trim().includes('operador');
-
   const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
-
-  // ✨ NOVA FUNÇÃO DINÂMICA: Procura o nome da filial na lista baixada do banco
-  const obterNomeFilialDinamico = (codigo) => {
-    if (!codigo) return 'N/D';
-    const codLimpo = String(codigo).toUpperCase().trim();
-    if (codLimpo === "TODOS") return "Todas as Filiais";
-    
-    const filialEncontrada = filiaisCadastradas.find(f => f.id === codLimpo);
-    return filialEncontrada ? filialEncontrada.nome : codigo;
-  };
 
   useEffect(() => {
     if (perfil === 'cliente' && estoqueAtual === 'TODOS') return;
@@ -122,19 +102,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
-        // ✨ FAZ O FETCH DAS FILIAIS AO MESMO TEMPO
-        const [resultadoSol, resultadoEst, resultadoFiliais] = await Promise.all([
+        const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
-          apiFetch("/estoque/listar"),
-          apiFetch("/filiais/listar")
+          apiFetch("/estoque/listar")
         ]);
 
         if (resultadoEst.sucesso) {
           setEstoque(resultadoEst.dados);
-        }
-
-        if (resultadoFiliais.sucesso) {
-          setFiliaisCadastradas(resultadoFiliais.dados);
         }
 
         if (resultadoSol.sucesso) {
@@ -229,11 +203,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   }, [filtroAtivo, termoPesquisa, token, estoqueAtual, showAlert, perfil]);
 
-  useEffect(() => {
-    setPaginaAtual(1);
-  }, [filtroAtivo, filtroStatus, termoPesquisa]);
+  useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  // KPIs
   const kpiTotal = dadosTabela.length;
   const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
   const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
@@ -441,7 +412,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                     nfNoEstoque = estoque.some(itemEstoque => String(itemEstoque.nf_entrada || '').trim() === String(linha.nfCrossdocking || '').trim() && String(itemEstoque.nf_entrada || '').trim() !== '');
                   }
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
-
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado';
 
                   return (
@@ -475,6 +445,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                         <td>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
+                            {/* ✨ A MÁGICA FINAL AQUI: A Tabela agora puxa o nome da filial da Base de Dados! */}
                             <MapPin size={12} /> {obterNomeFilialDinamico(linha.filial || linha.estoque)}
                           </span>
                         </td>

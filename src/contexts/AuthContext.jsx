@@ -1,9 +1,10 @@
 // =================================================================
 // ARQUIVO: src/contexts/AuthContext.jsx
-// DESCRIÇÃO: Gestão global do estado de autenticação e filial ativa
+// DESCRIÇÃO: Gestão global do estado de autenticação e filiais do sistema
 // =================================================================
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiFetch } from '../services/api'; // ✨ Importação da nossa API
 
 export const AuthContext = createContext({});
 
@@ -12,37 +13,50 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [estoqueAtual, setEstoqueAtual] = useState('');
   const [carregandoInicial, setCarregandoInicial] = useState(true);
+  
+  // ✨ NOVO: Variável global que vai guardar as filiais para todo o site usar
+  const [filiaisGlobais, setFiliaisGlobais] = useState([]);
 
-  // 1. RESTAURA A SESSÃO AO CARREGAR A PÁGINA (F5)
+  // RESTAURA A SESSÃO E BUSCA AS FILIAIS AO CARREGAR A PÁGINA
   useEffect(() => {
-    const tokenSalvo = localStorage.getItem('@NexusLog:token');
-    const usuarioSalvo = localStorage.getItem('@NexusLog:usuario');
-    const filialSalva = localStorage.getItem('@NexusLog:filialAtiva');
-
-    // ✨ A CORREÇÃO ESTÁ AQUI:
-    // Lemos a filial do navegador para TODOS (clientes públicos e funcionários).
-    // Se não houver nenhuma guardada no navegador, forçamos o 'TODOS' por padrão.
-    setEstoqueAtual(filialSalva || 'TODOS');
-
-    // Recupera os dados do utilizador apenas se houver login
-    if (tokenSalvo && usuarioSalvo) {
+    const iniciarSistema = async () => {
+      // 1. Vai buscar as filiais à base de dados logo de início
       try {
-        if (usuarioSalvo !== 'undefined') {
-          const usuarioObj = JSON.parse(usuarioSalvo);
-          setToken(tokenSalvo);
-          setUsuario(usuarioObj);
+        const resFiliais = await apiFetch('/filiais/listar');
+        if (resFiliais.sucesso) {
+          setFiliaisGlobais(resFiliais.dados);
         }
-      } catch (e) {
-        console.warn("Sessão corrompida, a limpar dados.");
-        localStorage.removeItem('@NexusLog:usuario');
-        localStorage.removeItem('@NexusLog:token');
+      } catch (error) {
+        console.error("Erro ao carregar filiais na inicialização", error);
       }
-    }
 
-    setCarregandoInicial(false);
+      // 2. Lê a sessão do utilizador
+      const tokenSalvo = localStorage.getItem('@NexusLog:token');
+      const usuarioSalvo = localStorage.getItem('@NexusLog:usuario');
+      const filialSalva = localStorage.getItem('@NexusLog:filialAtiva');
+
+      setEstoqueAtual(filialSalva || 'TODOS');
+
+      if (tokenSalvo && usuarioSalvo) {
+        try {
+          if (usuarioSalvo !== 'undefined') {
+            const usuarioObj = JSON.parse(usuarioSalvo);
+            setToken(tokenSalvo);
+            setUsuario(usuarioObj);
+          }
+        } catch (e) {
+          console.warn("Sessão corrompida, a limpar dados.");
+          localStorage.removeItem('@NexusLog:usuario');
+          localStorage.removeItem('@NexusLog:token');
+        }
+      }
+
+      setCarregandoInicial(false);
+    };
+
+    iniciarSistema();
   }, []);
 
-  // 2. FUNÇÃO DE LOGIN
   const login = async (dadosUsuario, tokenRecebido) => {
     setUsuario(dadosUsuario);
     setToken(tokenRecebido);
@@ -55,11 +69,9 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('@NexusLog:filialAtiva', filialInicial);
   };
 
-  // 3. FUNÇÃO DE LOGOUT
   const logout = () => {
     setUsuario(null);
     setToken(null);
-    // ✨ Ao sair, garantimos que volta para a visão de cliente restrita
     setEstoqueAtual('TODOS'); 
 
     localStorage.removeItem('@NexusLog:token');
@@ -67,7 +79,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('@NexusLog:filialAtiva');
   };
 
-  // 4. TROCAR FILIAL ATIVA (Guarda no estado e no navegador)
   const MudarFilial = (novaFilialId) => {
     setEstoqueAtual(novaFilialId);
     localStorage.setItem('@NexusLog:filialAtiva', novaFilialId);
@@ -82,7 +93,8 @@ export const AuthProvider = ({ children }) => {
       setEstoqueAtual: MudarFilial,  
       login,
       logout,
-      carregandoInicial
+      carregandoInicial,
+      filiaisGlobais // ✨ Agora todos os componentes podem ver as filiais!
     }}>
       {children}
     </AuthContext.Provider>

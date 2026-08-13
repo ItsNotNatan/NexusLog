@@ -5,7 +5,6 @@ import { Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import { useAuth } from '../../contexts/AuthContext';
 
-// 1. IMPORTAÇÃO DA NOVA FUNÇÃO E DA LOGO
 import { apiFetch } from '../../services/api';
 import logoComau from '../../assets/logo-comau.png';
 
@@ -79,9 +78,9 @@ export default function LoginLogistica() {
         </button>
 
         <div className="login-logo-seccao">
-          {/* ✨ LOGO DA COMAU SUBSTITUINDO O HEXÁGONO */}
           <img src={logoComau} alt="Logo COMAU" className="login-logo-img" />
-          <h2>NexusLog</h2>
+          {/* ✨ NOME ATUALIZADO AQUI */}
+          <h2>STOCKLog</h2>
           <p>Controle Operacional &bull; Back-Office</p>
         </div>
 
