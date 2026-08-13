@@ -1,31 +1,53 @@
 // =================================================================
 // ARQUIVO: src/components/Header/Header.jsx
-// DESCRIÇÃO: Cabeçalho global com controle de filiais por utilizador (Protegido contra tela branca)
+// DESCRIÇÃO: Cabeçalho global com controle de filiais por utilizador (100% Dinâmico)
 // =================================================================
 
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../../contexts/AuthContext'; 
 import { MapPin } from 'lucide-react'; 
+import { apiFetch } from '../../services/api'; // ✨ Importação da nossa API
 import './Header.css';
-
-// Dicionário para formatar os nomes das filiais de forma amigável
-const NOME_FILIAIS = {
-    'BR02': 'BR02 — Santo André (SP)',
-    'BR04': 'BR04 — Goiana (PE)',
-    'BR06': 'BR06 — Betim (MG)'
-};
-
-const TOTAL_FILIAIS_SISTEMA = 3;
 
 const Header = ({ modulo }) => {
     const { usuario, logout, estoqueAtual, setEstoqueAtual } = useContext(AuthContext);
+    
+    // ✨ NOVO ESTADO: Guarda as filiais que vêm do banco de dados
+    const [filiaisCadastradas, setFiliaisCadastradas] = useState([]);
+
+    // ✨ EFEITO: Busca as filiais automaticamente ao carregar a página
+    useEffect(() => {
+        const carregarFiliais = async () => {
+            try {
+                const data = await apiFetch('/filiais/listar');
+                if (data.sucesso) {
+                    setFiliaisCadastradas(data.dados);
+                }
+            } catch (error) {
+                console.error("Erro ao carregar filiais no Header:", error);
+            }
+        };
+        carregarFiliais();
+    }, []);
+
+    // Função auxiliar para mostrar o nome bonito (ex: "BR08 — MANAUS")
+    const obterNomeAmigavel = (id) => {
+        const filial = filiaisCadastradas.find(f => f.id === id);
+        if (filial) {
+            return `${filial.id} — ${filial.nome}`;
+        }
+        return id; // Fallback caso a filial não seja encontrada no array
+    };
+
+    // A lógica de "Todas as Filiais" agora depende da quantidade real de filiais no sistema
+    const TOTAL_FILIAIS_SISTEMA = filiaisCadastradas.length > 0 ? filiaisCadastradas.length : 3;
 
     // 🛡️ BLINDAGEM: Garantimos um array vazio caso usuario ou filiais_acesso sejam nulos/undefined
     const filiaisPermitidas = Array.isArray(usuario?.filiais_acesso) && usuario.filiais_acesso.length > 0
         ? usuario.filiais_acesso 
         : (usuario?.filial ? [usuario.filial] : []);
 
-    // A opção "Todas" só é verdadeira se ele tiver as 3 (ou mais) filiais
+    // A opção "Todas" só é verdadeira se ele tiver permissão para todas as filiais existentes
     const temAcessoATodas = filiaisPermitidas.length >= TOTAL_FILIAIS_SISTEMA;
 
     // String estática para monitorizar mudanças no array de acessos
@@ -33,14 +55,14 @@ const Header = ({ modulo }) => {
 
     // ✨ AUTO-CORREÇÃO DE SEGURANÇA
     useEffect(() => {
-        if (usuario && filiaisPermitidas.length > 0) {
+        if (usuario && filiaisPermitidas.length > 0 && filiaisCadastradas.length > 0) {
             const podeAcessarAtual = filiaisPermitidas.includes(estoqueAtual) || (estoqueAtual === 'TODOS' && temAcessoATodas);
             
             if (!podeAcessarAtual) {
                 setEstoqueAtual(filiaisPermitidas[0]);
             }
         }
-    }, [usuario, estoqueAtual, filiaisPermitidasString, temAcessoATodas, setEstoqueAtual]);
+    }, [usuario, estoqueAtual, filiaisPermitidasString, temAcessoATodas, setEstoqueAtual, filiaisCadastradas]);
 
     return (
         <header className="app-header">
@@ -69,19 +91,22 @@ const Header = ({ modulo }) => {
                                     <option value="TODOS">Todas as Filiais</option>
                                 )}
                                 
+                                {/* Lista apenas as filiais a que ele tem acesso */}
                                 {filiaisPermitidas.map(filial => (
                                     <option key={filial} value={filial}>
-                                        {NOME_FILIAIS[filial] || filial}
+                                        {obterNomeAmigavel(filial)}
                                     </option>
                                 ))}
                             </>
                         ) : (
-                            /* SE FOR O CLIENTE (ACESSO PÚBLICO) */
+                            /* SE FOR O CLIENTE (ACESSO PÚBLICO) - LÊ TODAS DIRETAMENTE DO BANCO */
                             <>
                                 <option value="TODOS">Todas as Filiais</option>
-                                <option value="BR02">BR02 — Santo André (SP)</option>
-                                <option value="BR04">BR04 — Goiana (PE)</option>
-                                <option value="BR06">BR06 — Betim (MG)</option>
+                                {filiaisCadastradas.map(filial => (
+                                    <option key={filial.id} value={filial.id}>
+                                        {filial.id} — {filial.nome}
+                                    </option>
+                                ))}
                             </>
                         )}
                     </select>

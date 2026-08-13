@@ -17,18 +17,6 @@ import GerenciadorAnexos from "../../../components/GerenciadorAnexos/Gerenciador
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
 
-const obterNomeFilial = (codigo) => {
-  if (!codigo) return 'N/D';
-  const codLimpo = String(codigo).toUpperCase().trim();
-  switch (codLimpo) {
-    case "BR02": return "Santo André";
-    case "BR04": return "Goiana";
-    case "BR06": return "Betim";
-    case "TODOS": return "Todas as Filiais";
-    default: return codigo;
-  }
-};
-
 const renderBadgeStatus = (status) => {
   switch (status) {
     case "Pendente":
@@ -89,6 +77,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]);
+  const [filiaisCadastradas, setFiliaisCadastradas] = useState([]); // ✨ NOVO ESTADO DINÂMICO
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [termoPesquisa, setTermoPesquisa] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -113,6 +102,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
 
+  // ✨ NOVA FUNÇÃO DINÂMICA: Procura o nome da filial na lista baixada do banco
+  const obterNomeFilialDinamico = (codigo) => {
+    if (!codigo) return 'N/D';
+    const codLimpo = String(codigo).toUpperCase().trim();
+    if (codLimpo === "TODOS") return "Todas as Filiais";
+    
+    const filialEncontrada = filiaisCadastradas.find(f => f.id === codLimpo);
+    return filialEncontrada ? filialEncontrada.nome : codigo;
+  };
+
   useEffect(() => {
     if (perfil === 'cliente' && estoqueAtual === 'TODOS') return;
 
@@ -123,13 +122,19 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
-        const [resultadoSol, resultadoEst] = await Promise.all([
+        // ✨ FAZ O FETCH DAS FILIAIS AO MESMO TEMPO
+        const [resultadoSol, resultadoEst, resultadoFiliais] = await Promise.all([
           apiFetch(urlSolicitacoes),
-          apiFetch("/estoque/listar")
+          apiFetch("/estoque/listar"),
+          apiFetch("/filiais/listar")
         ]);
 
         if (resultadoEst.sucesso) {
           setEstoque(resultadoEst.dados);
+        }
+
+        if (resultadoFiliais.sucesso) {
+          setFiliaisCadastradas(resultadoFiliais.dados);
         }
 
         if (resultadoSol.sucesso) {
@@ -445,7 +450,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         className={isExpandida ? "tr-expandida" : ""}
                         style={{ 
                           backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '',
-                          borderBottom: '1px solid #f1f5f9', // ✨ CORREÇÃO: Remove a borda vermelha espessa
+                          borderBottom: isRecusadoOuCancelado ? '2px solid #ef4444' : '1px solid #f1f5f9',
                           opacity: isRecusadoOuCancelado ? 0.8 : 1 
                         }}
                       >
@@ -470,7 +475,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                         <td>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
-                            <MapPin size={12} /> {obterNomeFilial(linha.filial || linha.estoque)}
+                            <MapPin size={12} /> {obterNomeFilialDinamico(linha.filial || linha.estoque)}
                           </span>
                         </td>
                         <td className="texto-data">{linha.dataSolicitacao}</td>

@@ -284,3 +284,131 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================
+   ESTILOS NOVOS: ABA DE FILIAIS
+========================================= */
+
+.filial-form-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  background-color: #ffffff;
+}
+
+.filial-form-box h4 {
+  margin: 0 0 16px 0;
+  font-size: 0.9rem;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filial-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1.5fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.btn-cadastrar-roxo {
+  background-color: #8b5cf6;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s;
+}
+
+.btn-cadastrar-roxo:hover {
+  background-color: #7c3aed;
+}
+
+.filiais-lista-titulo {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  letter-spacing: 0.05em;
+}
+
+.filial-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  background-color: #ffffff;
+}
+
+.filial-item-esquerda {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.filial-icone-bg {
+  width: 44px;
+  height: 44px;
+  background-color: #faf5ff;
+  color: #a855f7;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.filial-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filial-codigo {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+.filial-detalhes {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.filial-detalhes strong {
+  color: #475569;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.btn-excluir-filial {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 8px;
+  transition: color 0.2s;
+}
+
+.btn-excluir-filial:hover {
+  color: #ef4444;
+}
+
+/* Responsividade */
+@media (max-width: 640px) {
+  .filial-grid {
+    grid-template-columns: 1fr;
+  }
+}
