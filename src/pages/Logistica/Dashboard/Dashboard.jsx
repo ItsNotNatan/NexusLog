@@ -3,7 +3,7 @@
 // DESCRIÇÃO: Dashboard de Operações com datas formatadas em PT-BR,
 //            gráficos dinâmicos e cronômetro de SLA em tempo real.
 // =================================================================
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import './Dashboard.css';
 import { 
   Settings, ClipboardList, Clock, Activity, 
@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import { apiFetch } from '../../../services/api';
+
+// ✨ NOVO: Importação do AuthContext para o Dashboard respeitar a Filial ativa
+import { AuthContext } from '../../../contexts/AuthContext';
 
 // ---------------------------------------------------------------------------
 // 1. LEITOR E FORMATADOR UNIVERSAL DE DATAS (ISO e PT-BR)
@@ -41,7 +44,7 @@ const parseDataBackend = (dataStr) => {
         if (!isNaN(dataBr.getTime())) return dataBr;
       }
     } catch (e) {
-      // Continua para fallback ISO em caso de erro de formatação
+      // Fallback
     }
   }
 
@@ -65,18 +68,23 @@ const formatarDataBr = (dataStr) => {
 };
 
 export default function Dashboard() {
+  // ✨ Puxa a filial selecionada no Header global
+  const { estoqueAtual } = useContext(AuthContext);
+
   const [dadosTabela, setDadosTabela] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [tempoAtual, setTempoAtual] = useState(new Date());
 
   // ---------------------------------------------------------------------------
-  // 2. BUSCA E TRATAMENTO DOS DADOS DA API
+  // 2. BUSCA E TRATAMENTO DOS DADOS DA API (Agora com Filtro de Filial)
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const buscarDados = async () => {
       try {
         setCarregando(true);
-        const resultado = await apiFetch('/solicitacoes/listar?limit=1000');
+        // ✨ O Dashboard agora atualiza os gráficos dependendo da filial escolhida
+        const filtroFilial = estoqueAtual && estoqueAtual !== 'TODOS' ? `&filial=${estoqueAtual}` : '';
+        const resultado = await apiFetch(`/solicitacoes/listar?limit=1000${filtroFilial}`);
 
         if (resultado?.sucesso && Array.isArray(resultado.dados)) {
           const dadosFormatados = resultado.dados.map((item) => {
@@ -123,7 +131,7 @@ export default function Dashboard() {
     };
 
     buscarDados();
-  }, []);
+  }, [estoqueAtual]); // ✨ Recarrega os gráficos sempre que mudar de filial
 
   // ---------------------------------------------------------------------------
   // 3. CRONÔMETRO EM TEMPO REAL
@@ -240,7 +248,6 @@ export default function Dashboard() {
     const recusados = dadosTabela.filter(i => i.status === 'Recusado' || i.status === 'Cancelado').length;
     const emAndamento = dadosTabela.filter(i => i.status === 'Em Separação').length;
 
-    // Gerador dos últimos 6 meses com cálculo dinâmico de performance
     const nomesMeses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
     const hoje = new Date();
     const meses = [];
@@ -270,7 +277,6 @@ export default function Dashboard() {
       });
     }
 
-    // Geração dos pontos da linha no SVG do Gráfico 1 (ViewBox: 0 0 100 100)
     const larguraPlot = 100;
     const passoX = meses.length > 1 ? larguraPlot / (meses.length - 1) : 0;
     const pontosDentro = meses.map((m, idx) => {
@@ -292,25 +298,18 @@ export default function Dashboard() {
     };
   }, [dadosTabela, tempoAtual]);
 
-  // Proporções do Gráfico de Status
   const maxStatusCount = Math.max(totalFinalizados, totalRecusados, totalEmAndamento, 1);
   const alturaVerde = `${(totalFinalizados / maxStatusCount) * 100}%`;
   const alturaVermelha = `${(totalRecusados / maxStatusCount) * 100}%`;
   const alturaAzul = `${(totalEmAndamento / maxStatusCount) * 100}%`;
 
-  // String para d do path SVG
   const caminhoSvgDentro = dadosGraficoLinha
     .filter(p => p.y !== null)
     .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
     .join(' ');
 
-  // ---------------------------------------------------------------------------
-  // 6. ESTRUTURA VISUAL
-  // ---------------------------------------------------------------------------
   return (
     <div className="dashboard-container">
-      
-      {/* CABEÇALHO */}
       <header className="dashboard-header">
         <div>
           <h1>Dashboard de Operações</h1>
@@ -329,7 +328,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* CARDS DE ESTATÍSTICAS */}
       <div className="cards-grid">
         <div className="stat-card">
           <div className="card-header">
@@ -374,7 +372,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* EFICIÊNCIA DE ATENDIMENTO */}
       <div className="efficiency-section">
         <div className="efficiency-header">
           <div className="efficiency-icon">
@@ -410,10 +407,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* GRÁFICOS */}
       <div className="graficos-grid-2col">
-        
-        {/* GRÁFICO 1: DENTRO VS FORA DO TARGET */}
         <div className="grafico-card">
           <div className="grafico-header">
             <div className="grafico-titulo-grupo">
@@ -447,31 +441,13 @@ export default function Dashboard() {
               <div className="linha-horizontal" style={{borderTopStyle: 'solid'}}></div>
             </div>
 
-            {/* SVG Layer dinâmico do Gráfico de Linhas */}
             <svg className="grafico-svg-layer" viewBox="0 0 100 100" preserveAspectRatio="none">
               {caminhoSvgDentro && (
-                <path
-                  d={caminhoSvgDentro}
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  vectorEffect="non-scaling-stroke"
-                />
+                <path d={caminhoSvgDentro} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
               )}
               {dadosGraficoLinha.map((p, idx) => (
                 p.y !== null && (
-                  <circle
-                    key={idx}
-                    cx={p.x}
-                    cy={p.y}
-                    r="4"
-                    fill="#10b981"
-                    stroke="#ffffff"
-                    strokeWidth="2"
-                    vectorEffect="non-scaling-stroke"
-                  />
+                  <circle key={idx} cx={p.x} cy={p.y} r="4" fill="#10b981" stroke="#ffffff" strokeWidth="2" vectorEffect="non-scaling-stroke" />
                 )
               ))}
             </svg>
@@ -486,7 +462,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* GRÁFICO 2: ACOMPANHAMENTO DE PL POR STATUS */}
         <div className="grafico-card">
           <div className="grafico-header">
             <div className="grafico-titulo-grupo">
@@ -540,7 +515,6 @@ export default function Dashboard() {
 
       </div>
 
-      {/* TABELA DE DEMANDAS COM RELÓGIO AO VIVO */}
       <div className="graficos-grid-1col">
         {carregando ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px', color: '#94a3b8' }}>

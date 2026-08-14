@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import './EntradaEstoque.css';
-import { User, Send, Paperclip, X, Info } from 'lucide-react';
+import { User, Send, Paperclip, X } from 'lucide-react';
 
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
@@ -11,7 +11,6 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { supabase } from '../../../supabaseClient';
 
 // 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
-// O apiFetch cuida de chavear a URL base (.env ou localhost) e injetar cabeçalhos automaticamente
 import { apiFetch } from '../../../services/api';
 
 const LIMITE_LOGISTICA = 60;
@@ -28,7 +27,6 @@ export default function EntradaEstoque() {
   });
 
   const [itens, setItens] = useState([]);
-  
   const [anexos, setAnexos] = useState([]);
   const processador = useProcessadorExcel();
 
@@ -85,6 +83,12 @@ export default function EntradaEstoque() {
   };
 
   const handleEnviar = async () => {
+    // ✨ CORREÇÃO CRÍTICA: Bloqueia a inserção cega se "Todas as Filiais" estiver selecionado
+    if (!estoqueAtual || estoqueAtual === 'TODOS') {
+      alert("⚠️ AÇÃO BLOQUEADA: Por favor, selecione uma filial específica no topo da página antes de registar a entrada.");
+      return;
+    }
+
     if (!formDados.nome || !formDados.wbs) {
       alert("Preencha o Nome e o WBS do solicitante.");
       return;
@@ -131,8 +135,6 @@ export default function EntradaEstoque() {
         anexos: anexosProcessados 
       };
 
-      // 2. REFATORAÇÃO DO FETCH
-      // Trocamos o fetch nativo e a conversão manual de JSON pelo apiFetch
       const dados = await apiFetch('/solicitacoes/entrada', {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -147,7 +149,6 @@ export default function EntradaEstoque() {
         alert(`Erro do servidor: ${dados.erro}`);
       }
     } catch (error) {
-      // Captura erros de rede ou exceções lançadas pela função utilitária
       alert(`Falha ao conectar com o servidor. Motivo: ${error.message}`);
     }
   };

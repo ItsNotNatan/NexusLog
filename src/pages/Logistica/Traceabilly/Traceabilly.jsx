@@ -1,314 +1,125 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate } from "react-router-dom";
-import './Traceabilly.css'; 
-import { 
-  Archive, 
-  Search, 
-  User, 
-  Calendar, 
-  Box, 
-  ArrowRight,
-  RotateCcw,
-  Loader
-} from 'lucide-react';
-
-import { useAlert } from '../../../contexts/AlertContext'; 
-import { AuthContext } from '../../../contexts/AuthContext'; 
+import { Search, Loader2, Archive, Calendar, User, MapPin, Hash } from 'lucide-react';
+import { AuthContext } from '../../../contexts/AuthContext';
+import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 
-export default function Traceabilly({ perfil = 'logistica' }) {
-  // ✨ 1. PUXAR A FILIAL E O ESTADO DE CARREGAMENTO
-  const { estoqueAtual, carregandoInicial } = useContext(AuthContext); 
-  const { showAlert, showConfirm } = useAlert();
-  const navigate = useNavigate();
+export default function Traceabilly({ perfil }) {
+  // ✨ Filiais globais
+  const { estoqueAtual, filiaisGlobais } = useContext(AuthContext);
+  const { showAlert } = useAlert();
 
-  // ✨ 2. O OBSERVADOR MÁGICO
-  useEffect(() => {
-    if (!carregandoInicial) {
-      if (perfil === 'cliente' && estoqueAtual === 'TODOS') {
-        showAlert(
-          "Ação Restrita", 
-          "Para acessar a Rastreabilidade, selecione uma filial específica no topo da página. Redirecionando...", 
-          "warning"
-        );
-        navigate('/cliente/consulta-estoque');
-      }
-    }
-  }, [estoqueAtual, perfil, navigate, showAlert, carregandoInicial]);
-
-  const [dadosRastreabilidade, setDadosRastreabilidade] = useState([]);
+  const [historico, setHistorico] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
 
+  // ✨ Função Dinâmica de formatação
+  const obterNomeFilialDinamico = (codigo) => {
+    if (!codigo || codigo === '-') return 'N/D';
+    const codLimpo = String(codigo).toUpperCase().trim();
+    const filialEncontrada = filiaisGlobais.find(f => f.id === codLimpo);
+    return filialEncontrada ? filialEncontrada.nome : codigo;
+  };
+
   useEffect(() => {
-    if (perfil === 'cliente' && estoqueAtual === 'TODOS') return;
+    const buscarHistorico = async () => {
+      try {
+        setCarregando(true);
+        const urlParams = estoqueAtual === 'TODOS' ? '?limit=1000' : `?filial=${estoqueAtual}&limit=1000`;
+        const resposta = await apiFetch(`/solicitacoes/listar${urlParams}`);
+        
+        if (resposta.sucesso) {
+          // Filtramos para mostrar apenas coisas que já mexeram no estoque (Em Separação, Concluído, Reintegrado)
+          const movimentos = resposta.dados.filter(sol => 
+            sol.status === 'Em Separação' || sol.status === 'Concluído' || sol.status === 'Reintegrado' || sol.status === 'Cancelado'
+          );
+          setHistorico(movimentos);
+        } else {
+          showAlert("Erro", resposta.erro, "error");
+        }
+      } catch (error) {
+        showAlert("Erro de Conexão", "Não foi possível carregar o histórico de movimentações.", "error");
+      } finally {
+        setCarregando(false);
+      }
+    };
     buscarHistorico();
-  }, [estoqueAtual, perfil]); 
+  }, [estoqueAtual, showAlert]);
 
-  const buscarHistorico = async () => {
-    try {
-      setCarregando(true);
-
-      const filtroFilial = !estoqueAtual || estoqueAtual === 'TODOS' ? '' : estoqueAtual;
-      
-      // ✨ BUSCA CRUZADA: Traz as solicitações e o estoque em paralelo
-      const [jsonSolicitacoes, jsonEstoque] = await Promise.all([
-        apiFetch(`/solicitacoes/listar?limit=500&filial=${filtroFilial}`),
-        apiFetch('/estoque/listar')
-      ]);
-
-      if (jsonSolicitacoes.sucesso && jsonEstoque.sucesso) {
-        
-        // Mapeia o estoque para checagem rápida de saldo
-        const mapaEstoque = {};
-        jsonEstoque.dados.forEach(itemEstoque => {
-          mapaEstoque[itemEstoque.id] = itemEstoque;
-        });
-
-        let itensExtraidos = [];
-
-        jsonSolicitacoes.dados.forEach(solicitacao => {
-          const filialDaSolicitacao = solicitacao.filial || solicitacao.filial_origem || solicitacao.estoque || solicitacao.filial_id;
-          
-          // Filtro de Segurança
-          if (estoqueAtual && estoqueAtual !== 'TODOS' && filialDaSolicitacao && filialDaSolicitacao !== estoqueAtual) {
-            return;
-          }
-
-          const estaAprovado = solicitacao.status === 'Em Separação' || solicitacao.status === 'Concluído';
-          const naoEEntrada = solicitacao.tipo !== 'Entrada';
-
-          if (estaAprovado && naoEEntrada) {
-            solicitacao.itens.forEach(item => {
-              
-              // ✨ VERIFICA SE O ITEM ESTÁ ZERADO NO BANCO DE DADOS
-              const estoqueVinculado = mapaEstoque[item.estoque_id];
-              const estaZerado = estoqueVinculado && (estoqueVinculado.quantidade_disponivel <= 0 || estoqueVinculado.status === 'Zerado');
-
-              // Só empurra para a Rastreabilidade se efetivamente esgotou o saldo
-              if (estaZerado) {
-                itensExtraidos.push({
-                  id: item.id,
-                  tipo: solicitacao.tipo,
-                  partNumber: item.part_number_manual || item.part_number || '-',
-                  descricao: item.descricao_manual || item.descricao || '-',
-                  fornecedor: item.fornecedor || '-',
-                  nfEntrada: item.nf_entrada || 'N/A',
-                  bsSaida: solicitacao.pl || solicitacao.bs || '-', 
-                  solicitacao: solicitacao.id,
-                  solicitanteInicial: solicitacao.solicitante ? solicitacao.solicitante.charAt(0).toUpperCase() : 'U',
-                  solicitanteNome: solicitacao.solicitante || 'Não identificado',
-                  alocacao: item.alocacao || 'Padrão',
-                  qtd: `${item.quantidade_solicitada} ${item.unidade_medida_manual || 'Unid'}`,
-                  valor: item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual}` : '-',
-                  wbs: solicitacao.wbs || '-',
-                  data: solicitacao.dataSolicitacao
-                });
-              }
-            });
-          }
-        });
-
-        setDadosRastreabilidade(itensExtraidos);
-      } else {
-        showAlert("Erro de Servidor", "Falha ao processar os dados combinados.", "error");
-      }
-    } catch (error) {
-      console.error("Erro ao buscar rastreabilidade:", error.message);
-      showAlert("Erro", "Erro ao carregar o histórico de rastreabilidade.", "error");
-    } finally {
-      setCarregando(false);
-    }
-  };
-
-  const handleReverterItem = async (item) => {
-    const confirmar = await showConfirm(
-      "Devolver Item", 
-      `Deseja devolver o item ${item.partNumber} ao estoque e removê-lo do histórico de saídas?`, 
-      "warning", 
-      "Sim, Devolver"
-    );
-    
-    if (!confirmar) return; 
-
-    try {
-      setCarregando(true);
-      
-      const json = await apiFetch('/solicitacoes/reverter', {
-        method: 'POST',
-        body: JSON.stringify({
-          id_item: item.id
-        })
-      });
-
-      if (json.sucesso) {
-        showAlert("Sucesso!", `O item ${item.partNumber} retornou ao estoque principal!`, "success");
-        
-        setDadosRastreabilidade(dadosAtuais => 
-          dadosAtuais.filter(dado => dado.id !== item.id)
-        );
-      } else {
-        showAlert("Erro na Reversão", `Falha ao reverter: ${json.erro}`, "error");
-      }
-    } catch (error) {
-      console.error("Erro na reversão:", error.message);
-      showAlert("Falha de Conexão", "Falha de conexão com o servidor.", "error");
-    } finally {
-      setCarregando(false);
-    }
-  };
-
-  const dadosFiltrados = dadosRastreabilidade.filter(item => 
-    item.partNumber.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
-    item.descricao.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
-    item.solicitanteNome.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
-    item.solicitacao.toLowerCase().includes(termoPesquisa.toLowerCase()) ||
-    item.tipo.toLowerCase().includes(termoPesquisa.toLowerCase()) 
+  const historicoFiltrado = historico.filter(item => 
+    (item.ps && item.ps.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
+    (item.solicitante && item.solicitante.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
+    (item.wbs && item.wbs.toLowerCase().includes(termoPesquisa.toLowerCase()))
   );
 
-  if (carregandoInicial || (perfil === 'cliente' && estoqueAtual === 'TODOS')) {
-    return null;
-  }
-
   return (
-    <div className="traceabilly-wrapper">
-      
-      <header className="pagina-cabecalho">
-        <h1>Histórico de movimentação</h1>
-        <p>Banco de dados histórico — rastreador completo de saída de itens que já não constam no estoque.</p>
+    <div style={{ padding: '32px', backgroundColor: '#f4f5f7', minHeight: '100vh', boxSizing: 'border-box' }}>
+      <header style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1e293b', margin: '0 0 8px 0' }}>Histórico de Rastreabilidade</h1>
+        <p style={{ color: '#64748b', margin: 0 }}>Consulte o histórico imutável de todas as movimentações de estoque do STOCKLog.</p>
       </header>
 
-      <div className="traceabilly-cartao">
-        
-        <div className="cartao-topo">
-          <div className="titulo-grupo">
-            <Archive className="icone-azul" size={20} />
-            <h2>Histórico de Movimentações (Itens Zerados)</h2>
-            <span className="badge-contador">{dadosFiltrados.length}</span>
-          </div>
-          
-          <div className="pesquisa-grupo">
-            <Search className="icone-pesquisa" size={18} />
+      <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ position: 'relative', width: '350px' }}>
+            <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input 
               type="text" 
-              placeholder="Buscar por PN, NF, PL, WBS, Solicitante..." 
-              className="input-pesquisa"
+              placeholder="Buscar por PS, Solicitante, WBS..." 
               value={termoPesquisa}
-              onChange={(e) => setTermoPesquisa(e.target.value)} 
+              onChange={(e) => setTermoPesquisa(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#f8fafc' }}
             />
           </div>
+          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}>{historicoFiltrado.length} registos encontrados</span>
         </div>
 
-        <div className="filtros-linha">
-          <button className="btn-filtro">
-            <User size={16} /> Quem solicitou
-          </button>
-          <button className="btn-filtro">
-            <Calendar size={16} /> Quando saiu
-          </button>
-          <button className="btn-filtro destaque">
-            <Box size={16} /> Qual PL/Solicitação
-          </button>
-        </div>
-
-        <div className="tabela-container">
+        <div style={{ padding: '24px' }}>
           {carregando ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
-              <Loader className="icone-girando" size={32} />
-              <p>A cruzar dados com o estoque para carregar os itens esgotados...</p>
-            </div>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><Loader2 className="animate-spin" size={32} style={{ margin: '0 auto 12px auto', display: 'block' }} /> A sincronizar histórico...</div>
+          ) : historicoFiltrado.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}><Archive size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum movimento registado no sistema.</div>
           ) : (
-            <table className="tabela-rastreabilidade" style={{ minWidth: '1300px' }}>
-              <thead>
-                <tr>
-                  <th>PART NUMBER</th>
-                  <th>DESCRIÇÃO</th>
-                  <th>FORNECEDOR</th>
-                  <th>NF ENTRADA</th>
-                  <th>PL DE SAÍDA</th>
-                  <th>SOLICITAÇÃO</th>
-                  <th>SOLICITANTE</th>
-                  <th>ALOCAÇÃO</th>
-                  <th>QTD</th>
-                  <th>VALOR</th>
-                  <th>WBS</th>
-                  <th>DATA</th>
-                  {perfil === 'logistica' && <th style={{ width: '40px' }}></th>}
-                </tr>
-              </thead>
-              
-              <tbody>
-                {dadosFiltrados.length > 0 ? (
-                  dadosFiltrados.map((linha, index) => {
-                    const isTransferencia = linha.tipo === 'Transferencia WBS';
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {historicoFiltrado.map(mov => (
+                <div key={mov.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'flex-start', gap: '20px', transition: 'box-shadow 0.2s' }} onMouseOver={e => e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)'} onMouseOut={e => e.currentTarget.style.boxShadow = 'none'}>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '100px' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Data Registo</span>
+                    <span style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: '700', textAlign: 'center' }}>{mov.dataSolicitacao.split(' ')[0]}<br/><span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: '500' }}>{mov.dataSolicitacao.split(' ')[1]}</span></span>
+                  </div>
 
-                    return (
-                      <tr 
-                        key={`${linha.id}-${index}`}
-                        style={{ backgroundColor: isTransferencia ? '#fefce8' : 'transparent' }}
-                      >
-                        <td className="fonte-forte">
-                          {linha.partNumber}
-                          {isTransferencia && (
-                            <div style={{ fontSize: '0.65rem', color: '#ca8a04', marginTop: '4px', fontWeight: 'bold' }}>
-                              (TRANSFERÊNCIA)
-                            </div>
-                          )}
-                        </td>
-                        <td>{linha.descricao}</td>
-                        <td className="texto-cinza">{linha.fornecedor}</td>
-                        
-                        <td><span className="badge-borda">{linha.nfEntrada}</span></td>
-                        
-                        <td>
-                          <div className="celula-flex">
-                            <ArrowRight size={14} className="icone-seta" />
-                            <span className="badge-azul-claro">{linha.bsSaida}</span>
-                          </div>
-                        </td>
-                        
-                        <td><span className="badge-azul-suave">{linha.solicitacao}</span></td>
-                        
-                        <td>
-                          <div className="celula-flex">
-                            <span className="avatar-circulo">{linha.solicitanteInicial}</span>
-                            <span className="fonte-forte">{linha.solicitanteNome}</span>
-                          </div>
-                        </td>
-                        
-                        <td><a href="#" className="link-alocacao">{linha.alocacao}</a></td>
-                        
-                        <td className="fonte-forte">{linha.qtd}</td>
-                        <td className="texto-cinza">{linha.valor}</td>
-                        <td><a href="#" className="link-alocacao">{linha.wbs}</a></td>
-                        <td className="texto-cinza">{linha.data}</td>
+                  <div style={{ width: '1px', backgroundColor: '#e2e8f0', alignSelf: 'stretch' }}></div>
 
-                        {perfil === 'logistica' && (
-                          <td>
-                            <button 
-                              className="btn-reverter" 
-                              title="Devolver item ao estoque e apagar histórico"
-                              onClick={() => handleReverterItem(linha)} 
-                            >
-                              <RotateCcw size={16} />
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="13" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Nenhum item com estoque zerado ou transferido encontrado para a filial atual.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <span style={{ backgroundColor: mov.tipo === 'Entrada' ? '#ecfdf5' : mov.tipo === 'Cancelado' ? '#fef2f2' : '#eff6ff', color: mov.tipo === 'Entrada' ? '#10b981' : mov.tipo === 'Cancelado' ? '#ef4444' : '#2563eb', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', border: `1px solid ${mov.tipo === 'Entrada' ? '#a7f3d0' : mov.tipo === 'Cancelado' ? '#fecaca' : '#bfdbfe'}` }}>
+                        {mov.tipo.toUpperCase()}
+                      </span>
+                      <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '4px' }}><Hash size={14}/> {mov.ps}</span>
+                      {mov.pl && mov.pl !== '-' && <span style={{ fontSize: '0.75rem', color: '#64748b', backgroundColor: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>{mov.pl}</span>}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px', fontSize: '0.85rem', color: '#475569', marginTop: '12px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><User size={14} color="#94a3b8"/> {mov.solicitante}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} color="#94a3b8"/> 
+                        {/* ✨ NOME DA FILIAL TRADUZIDO DE FORMA DINÂMICA */}
+                        {obterNomeFilialDinamico(mov.filial)}
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} color="#94a3b8"/> WBS: <strong style={{ color: '#2563eb' }}>{mov.wbs}</strong></span>
+                    </div>
+
+                    {mov.observacoes && (
+                      <div style={{ marginTop: '12px', padding: '10px 14px', backgroundColor: '#f8fafc', borderLeft: '3px solid #cbd5e1', fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', borderRadius: '0 4px 4px 0' }}>
+                        "{mov.observacoes}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
-
       </div>
     </div>
   );

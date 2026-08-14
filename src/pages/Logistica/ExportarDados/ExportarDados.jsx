@@ -1,31 +1,29 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/ExportarDados/ExportarDados.jsx
-// DESCRIÇÃO: Página de exportação de dados exibindo o prazo de 
-// finalização/expiração do PL vindo do banco e indicadores de Target.
+// DESCRIÇÃO: Página de exportação de dados com indicadores de Target.
 // =================================================================
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import './ExportarDados.css';
 import { 
   Download, FileText, Activity, BarChart3, 
-  CheckCircle2, Loader2, TrendingUp, Search, CheckCircle, XCircle
+  CheckCircle2, Loader2, TrendingUp, Search
 } from 'lucide-react';
 
 import { apiFetch } from '../../../services/api';
+import { AuthContext } from '../../../contexts/AuthContext'; // ✨ Importação do Contexto
 
 export default function ExportarDados() {
-  // ==========================================
-  // ESTADOS DO COMPONENTE
-  // ==========================================
+  // ✨ Puxa a filial selecionada no Header
+  const { estoqueAtual } = useContext(AuthContext);
+
   const [dadosTabela, setDadosTabela] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState('ps-pl');
 
-  // Filtros
   const [busca, setBusca] = useState('');
   const [filtroPeriodo, setFiltroPeriodo] = useState('Todo Período');
   const [filtroStatus, setFiltroStatus] = useState('Todos os Status');
 
-  // Configuração das Abas do Relatório
   const abasNav = [
     { id: 'ps-pl', label: 'PS + PL (Solicitações)', icone: <FileText size={16} /> },
     { id: 'target', label: 'Dentro vs Fora do Target', icone: <TrendingUp size={16} /> },
@@ -34,9 +32,6 @@ export default function ExportarDados() {
     { id: 'status', label: 'Status dos PL', icone: <CheckCircle2 size={16} /> },
   ];
 
-  // ==========================================
-  // FUNÇÕES AUXILIARES DE DATA E CÁLCULO
-  // ==========================================
   const parseDataBackend = (dataStr) => {
     if (!dataStr || dataStr === '-' || dataStr === '—' || dataStr === 'não definido') return null;
     let data = new Date(dataStr);
@@ -55,14 +50,14 @@ export default function ExportarDados() {
     return `${dia}/${mes}/${ano} ${hora}:${min}`;
   };
 
-  // ==========================================
-  // 🔄 CARREGAMENTO DOS DADOS REAIS DA API
-  // ==========================================
+  // 🔄 CARREGAMENTO DOS DADOS (Agora com Filtro de Filial)
   useEffect(() => {
     const carregarDadosExportacao = async () => {
       try {
         setCarregando(true);
-        const resultado = await apiFetch('/solicitacoes/listar?limit=1000');
+        // ✨ O Relatório passa a respeitar a filial escolhida no cabeçalho
+        const filtroFilial = estoqueAtual && estoqueAtual !== 'TODOS' ? `&filial=${estoqueAtual}` : '';
+        const resultado = await apiFetch(`/solicitacoes/listar?limit=1000${filtroFilial}`);
 
         if (resultado.sucesso) {
           const agora = new Date();
@@ -70,23 +65,20 @@ export default function ExportarDados() {
           const dadosFormatados = resultado.dados.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at);
             const dataFinalConclusao = parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
-            const dataPrazoExpira = parseDataBackend(item.prazoFinalizacao); // Data vinda do cálculo do Back-end
+            const dataPrazoExpira = parseDataBackend(item.prazoFinalizacao); 
             
             let leadTimeDias = null;
             let dentroTarget = null;
             const targetDias = 3;
 
-            // Se concluído, calcula a duração real (Lead Time)
             if (item.status === 'Concluído' && dataCriacao && dataFinalConclusao) {
               const diferencaMs = dataFinalConclusao.getTime() - dataCriacao.getTime();
               leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
               dentroTarget = leadTimeDias <= targetDias;
             } else if (item.status === 'Em Separação' && dataPrazoExpira) {
-              // Se ainda está em separação, verifica se a data atual já passou da data de expiração
               dentroTarget = agora <= dataPrazoExpira;
             }
 
-            // Soma o valor total dos itens
             const valorTotal = (item.itens || []).reduce((acc, it) => {
               const qtd = Number(it.quantidade_solicitada || 1);
               const val = Number(it.valor_unitario_manual || 0);
@@ -94,15 +86,13 @@ export default function ExportarDados() {
             }, 0);
 
             let plApresentacao = item.pl || '-';
-
-            // Define a data de expiração/finalização para exibição na coluna
             let textoFinalizacaoPL = 'não definido';
             let expirado = false;
 
             if (dataPrazoExpira) {
               textoFinalizacaoPL = formatarDataHora(item.prazoFinalizacao);
               if (agora > dataPrazoExpira && item.status !== 'Concluído') {
-                expirado = true; // Marca como expirado se a data atual for maior que a data limite
+                expirado = true;
               }
             } else if (item.status === 'Concluído' && dataFinalConclusao) {
               textoFinalizacaoPL = formatarDataHora(item.dataFinalizacaoISO || item.updated_at);
@@ -134,11 +124,8 @@ export default function ExportarDados() {
     };
 
     carregarDadosExportacao();
-  }, []);
+  }, [estoqueAtual]); // ✨ Recarrega ao mudar a filial
 
-  // ==========================================
-  // 🔍 LÓGICA DE FILTRAGEM
-  // ==========================================
   const listaFiltrada = dadosTabela.filter((item) => {
     const termo = busca.toLowerCase();
     const batePesquisa = 
@@ -148,15 +135,11 @@ export default function ExportarDados() {
       item.pl.toLowerCase().includes(termo);
 
     const bateStatus = filtroStatus === 'Todos os Status' || item.status === filtroStatus;
-    
     return batePesquisa && bateStatus;
   });
 
   const listaStatusUnicos = ['Todos os Status', ...new Set(dadosTabela.map(i => i.status))];
 
-  // ==========================================
-  // 📊 CÁLCULO DOS KPIS DE EFICIÊNCIA
-  // ==========================================
   const totalPs = listaFiltrada.length;
   const avaliadosTarget = listaFiltrada.filter(i => i.dentroTarget !== null);
   const qtdDentro = avaliadosTarget.filter(i => i.dentroTarget === true).length;
@@ -167,9 +150,6 @@ export default function ExportarDados() {
     eficiencia = Math.round((qtdDentro / avaliadosTarget.length) * 100);
   }
 
-  // ==========================================
-  // 📥 FUNÇÃO DE EXPORTAÇÃO PARA ARQUIVO CSV
-  // ==========================================
   const exportarCSV = () => {
     if (listaFiltrada.length === 0) {
       alert("Não existem dados disponíveis para exportação.");
@@ -189,7 +169,8 @@ export default function ExportarDados() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `RELATORIO_NEXUSLOG_${Date.now()}.csv`);
+    // ✨ ATUALIZAÇÃO DO NOME DO FICHEIRO PARA STOCKLOG
+    link.setAttribute('download', `RELATORIO_STOCKLOG_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -198,7 +179,6 @@ export default function ExportarDados() {
   return (
     <div className="exportar-wrapper">
       
-      {/* CABEÇALHO */}
       <header className="exportar-cabecalho">
         <div>
           <h1>Exportar Dados</h1>
@@ -209,37 +189,28 @@ export default function ExportarDados() {
         </button>
       </header>
 
-      {/* NAVEGAÇÃO POR ABAS */}
       <div className="abas-container">
         {abasNav.map((aba) => (
-          <button 
-            key={aba.id} 
-            className={`aba-item ${abaAtiva === aba.id ? 'ativo' : ''}`}
-            onClick={() => setAbaAtiva(aba.id)}
-          >
+          <button key={aba.id} className={`aba-item ${abaAtiva === aba.id ? 'ativo' : ''}`} onClick={() => setAbaAtiva(aba.id)}>
             {aba.icone} {aba.label}
           </button>
         ))}
       </div>
 
-      {/* CARTÕES DE INDICADORES (KPIS) */}
       <div className="kpis-grid-export">
         <div className="kpi-card-export">
           <span className="kpi-titulo-export">Total de PS</span>
           <strong className="kpi-valor-export kpi-preto">{carregando ? '-' : totalPs}</strong>
         </div>
-        
         <div className="kpi-card-export">
           <span className="kpi-titulo-export">Dentro do Target</span>
           <strong className="kpi-valor-export kpi-verde">{carregando ? '-' : qtdDentro}</strong>
           <span className="kpi-subtitulo-verde">{eficiencia}% de eficiência</span>
         </div>
-        
         <div className="kpi-card-export">
           <span className="kpi-titulo-export">Fora do Target</span>
           <strong className="kpi-valor-export kpi-vermelho">{carregando ? '-' : qtdFora}</strong>
         </div>
-        
         <div className="kpi-card-export">
           <span className="kpi-titulo-export">Target Atual</span>
           <strong className="kpi-valor-export kpi-azul">3d</strong>
@@ -247,40 +218,23 @@ export default function ExportarDados() {
         </div>
       </div>
 
-      {/* ÁREA DA TABELA COM FILTROS */}
       <div className="tabela-exportar-container">
-        
         <div className="tabela-controles-exportar">
           <div className="controles-dropdowns">
-            <select 
-              className="select-filtro-exportar"
-              value={filtroPeriodo}
-              onChange={(e) => setFiltroPeriodo(e.target.value)}
-            >
+            <select className="select-filtro-exportar" value={filtroPeriodo} onChange={(e) => setFiltroPeriodo(e.target.value)}>
               <option>Todo Período</option>
               <option>Este Mês</option>
               <option>Semana Passada</option>
             </select>
-            
-            <select 
-              className="select-filtro-exportar"
-              value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
-            >
+            <select className="select-filtro-exportar" value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}>
               {listaStatusUnicos.map((status, idx) => (
                 <option key={idx} value={status}>{status}</option>
               ))}
             </select>
           </div>
-          
           <div className="pesquisa-exportar-wrapper">
             <Search className="icone-pesquisa-exportar" size={16} />
-            <input 
-              type="text" 
-              placeholder="Buscar PS, PL, WBS..." 
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-            />
+            <input type="text" placeholder="Buscar PS, PL, WBS..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
         </div>
 
@@ -325,53 +279,18 @@ export default function ExportarDados() {
                       <td className="fonte-negrito">{linha.id}</td>
                       <td>{linha.solicitante}</td>
                       <td><span className="link-azul">{linha.wbs}</span></td>
-                      <td>
-                        <span className="badge-status-simples">{linha.status}</span>
-                      </td>
-                      <td>
-                        {linha.pl !== '-' ? (
-                          <span className="link-azul">{linha.pl}</span>
-                        ) : (
-                          <span className="texto-cinza">-</span>
-                        )}
-                      </td>
+                      <td><span className="badge-status-simples">{linha.status}</span></td>
+                      <td>{linha.pl !== '-' ? <span className="link-azul">{linha.pl}</span> : <span className="texto-cinza">-</span>}</td>
                       <td className="texto-cinza">{linha.criacaoPsFormatada}</td>
-                      
-                      {/* Célula com destaque caso a data limite tenha expirado */}
-                      <td className={
-                        linha.finalizacaoPlFormatada === 'não definido' 
-                          ? 'texto-amarelo' 
-                          : (linha.itemExpirado ? 'texto-vermelho fonte-negrito' : 'texto-verde')
-                      }>
-                        {linha.finalizacaoPlFormatada}
-                      </td>
-
+                      <td className={linha.finalizacaoPlFormatada === 'não definido' ? 'texto-amarelo' : (linha.itemExpirado ? 'texto-vermelho fonte-negrito' : 'texto-verde')}>{linha.finalizacaoPlFormatada}</td>
+                      <td>{linha.leadTime !== null ? <span className="fonte-negrito">{linha.leadTime.toFixed(2)}d</span> : <span className="texto-cinza">—</span>}</td>
                       <td>
-                        {linha.leadTime !== null ? (
-                          <span className="fonte-negrito">{linha.leadTime.toFixed(2)}d</span>
-                        ) : (
-                          <span className="texto-cinza">—</span>
-                        )}
-                      </td>
-                      <td>
-                        {linha.dentroTarget === true && (
-                          <span className="badge-target badge-dentro"><CheckCircle size={14} /> Dentro</span>
-                        )}
-                        {linha.dentroTarget === false && (
-                          <span className="badge-target badge-fora"><XCircle size={14} /> Fora</span>
-                        )}
-                        {linha.dentroTarget === null && (
-                          <span className="texto-cinza">—</span>
-                        )}
+                        {linha.dentroTarget === true && <span className="badge-target badge-dentro">Dentro</span>}
+                        {linha.dentroTarget === false && <span className="badge-target badge-fora">Fora</span>}
+                        {linha.dentroTarget === null && <span className="texto-cinza">—</span>}
                       </td>
                       <td style={{ textAlign: 'center' }}>{linha.itensCount}</td>
-                      <td>
-                        {linha.valorTotal > 0 ? (
-                          <span className="fonte-negrito">R$ {linha.valorTotal.toFixed(2)}</span>
-                        ) : (
-                          <span className="texto-cinza">—</span>
-                        )}
-                      </td>
+                      <td>{linha.valorTotal > 0 ? <span className="fonte-negrito">R$ {linha.valorTotal.toFixed(2)}</span> : <span className="texto-cinza">—</span>}</td>
                     </tr>
                   ))
                 )}
