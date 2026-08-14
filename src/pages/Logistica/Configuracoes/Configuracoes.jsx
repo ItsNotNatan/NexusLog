@@ -3,17 +3,21 @@
 // DESCRIÇÃO: Painel de configurações com gestão de utilizadores e Cadastro de Filiais
 // =================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import './Configuracoes.css';
 import { Target, Users, Edit, Plus, X, ChevronLeft, ChevronRight, Search, Trash2, Building, MapPin } from 'lucide-react';
 
 import { apiFetch } from '../../../services/api';
+// ✨ IMPORTAÇÃO DO CONTEXTO DE AUTENTICAÇÃO
+import { AuthContext } from '../../../contexts/AuthContext';
 
 export default function Configuracoes() {
+  // ✨ PUXAR A FUNÇÃO QUE ATUALIZA O HEADER INSTANTANEAMENTE
+  const { atualizarFiliaisGlobais } = useContext(AuthContext);
+
   const [abaAtiva, setAbaAtiva] = useState('filiais'); 
   const [prazo, setPrazo] = useState(3);
 
-  // ✨ CORREÇÃO: Iniciar o estado sempre vazio
   const [filiais, setFiliais] = useState([]);
   const [novaFilial, setNovaFilial] = useState({ id: '', nome: '', cidade: '' });
 
@@ -31,7 +35,6 @@ export default function Configuracoes() {
   
   const TODAS_AS_FILIAIS = filiais.map(f => f.id);
 
-  // ✨ CORREÇÃO: Iniciar sem filiais pré-selecionadas 'BR06'
   const [usuarioAtual, setUsuarioAtual] = useState({
     id: '',
     nome: '',
@@ -83,6 +86,9 @@ export default function Configuracoes() {
       if (data.sucesso) {
         setFiliais([...filiais, payload]);
         setNovaFilial({ id: '', nome: '', cidade: '' });
+        
+        // ✨ A MÁGICA ACONTECE AQUI: Atualiza o Header global!
+        atualizarFiliaisGlobais(); 
       } else {
         alert("Erro ao criar filial: " + data.erro);
       }
@@ -99,6 +105,9 @@ export default function Configuracoes() {
       const data = await apiFetch(`/filiais/${idFilial}`, { method: 'DELETE' });
       if (data.sucesso) {
         setFiliais(filiais.filter(f => f.id !== idFilial));
+        
+        // ✨ A MÁGICA ACONTECE AQUI TAMBÉM: Atualiza o Header global!
+        atualizarFiliaisGlobais();
       } else {
         alert("Erro ao apagar filial: " + data.erro);
       }

@@ -4,7 +4,7 @@
 // =================================================================
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiFetch } from '../services/api'; // ✨ Importação da nossa API
+import { apiFetch } from '../services/api';
 
 export const AuthContext = createContext({});
 
@@ -14,21 +14,24 @@ export const AuthProvider = ({ children }) => {
   const [estoqueAtual, setEstoqueAtual] = useState('');
   const [carregandoInicial, setCarregandoInicial] = useState(true);
   
-  // ✨ NOVO: Variável global que vai guardar as filiais para todo o site usar
   const [filiaisGlobais, setFiliaisGlobais] = useState([]);
 
-  // RESTAURA A SESSÃO E BUSCA AS FILIAIS AO CARREGAR A PÁGINA
+  // ✨ EXTRAÍMOS A FUNÇÃO PARA PODER SER CHAMADA DE FORA
+  const atualizarFiliaisGlobais = async () => {
+    try {
+      const resFiliais = await apiFetch('/filiais/listar');
+      if (resFiliais.sucesso) {
+        setFiliaisGlobais(resFiliais.dados);
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar filiais globais", error);
+    }
+  };
+
   useEffect(() => {
     const iniciarSistema = async () => {
       // 1. Vai buscar as filiais à base de dados logo de início
-      try {
-        const resFiliais = await apiFetch('/filiais/listar');
-        if (resFiliais.sucesso) {
-          setFiliaisGlobais(resFiliais.dados);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar filiais na inicialização", error);
-      }
+      await atualizarFiliaisGlobais();
 
       // 2. Lê a sessão do utilizador
       const tokenSalvo = localStorage.getItem('@NexusLog:token');
@@ -94,7 +97,8 @@ export const AuthProvider = ({ children }) => {
       login,
       logout,
       carregandoInicial,
-      filiaisGlobais // ✨ Agora todos os componentes podem ver as filiais!
+      filiaisGlobais,
+      atualizarFiliaisGlobais // ✨ AGORA A FUNÇÃO ESTÁ DISPONÍVEL GLOBALMENTE
     }}>
       {children}
     </AuthContext.Provider>
