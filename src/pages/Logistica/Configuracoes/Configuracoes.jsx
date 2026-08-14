@@ -10,36 +10,28 @@ import { Target, Users, Edit, Plus, X, ChevronLeft, ChevronRight, Search, Trash2
 import { apiFetch } from '../../../services/api';
 
 export default function Configuracoes() {
-  // ==========================================
-  // 1. ESTADOS DA PÁGINA E ABAS
-  // ==========================================
   const [abaAtiva, setAbaAtiva] = useState('filiais'); 
-
-  // Estado do Target
   const [prazo, setPrazo] = useState(3);
 
-  // ✨ ESTADOS PARA A GESTÃO DE FILIAIS
+  // ✨ CORREÇÃO: Iniciar o estado sempre vazio
   const [filiais, setFiliais] = useState([]);
   const [novaFilial, setNovaFilial] = useState({ id: '', nome: '', cidade: '' });
 
-  // Estados dos Utilizadores
   const [usuarios, setUsuarios] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [modoEdicao, setModoEdicao] = useState(false);
   
-  // Gestão da Exclusão de Utilizadores
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [usuarioParaExcluir, setUsuarioParaExcluir] = useState(null);
   const [senhaConfirmacao, setSenhaConfirmacao] = useState('');
   
-  // Estado da Pesquisa e Paginação
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 10;
   
-  // Array dinâmico extraído das filiais do banco
   const TODAS_AS_FILIAIS = filiais.map(f => f.id);
 
+  // ✨ CORREÇÃO: Iniciar sem filiais pré-selecionadas 'BR06'
   const [usuarioAtual, setUsuarioAtual] = useState({
     id: '',
     nome: '',
@@ -49,11 +41,7 @@ export default function Configuracoes() {
     filiais_acesso: [] 
   });
 
-  // ==========================================
-  // 2. EFEITOS E REQUISIÇÕES (API)
-  // ==========================================
   useEffect(() => {
-    // Carrega as filiais logo que a página abre
     carregarFiliais();
   }, []);
 
@@ -63,7 +51,6 @@ export default function Configuracoes() {
     }
   }, [abaAtiva]);
 
-  // 🔄 BUSCAR FILIAIS NO BANCO
   const carregarFiliais = async () => {
     try {
       const data = await apiFetch('/filiais/listar');
@@ -75,7 +62,6 @@ export default function Configuracoes() {
     }
   };
 
-  // 💾 CADASTRAR NOVA FILIAL
   const cadastrarFilial = async () => {
     if (!novaFilial.id || !novaFilial.nome) {
       alert("⚠️ Preencha o Código (ex: BR08) e o Nome da filial.");
@@ -105,7 +91,6 @@ export default function Configuracoes() {
     }
   };
 
-  // 🗑️ EXCLUIR FILIAL
   const excluirFilial = async (idFilial) => {
     const confirmar = window.confirm(`Tem certeza que deseja apagar a filial ${idFilial}? Isso pode afetar o acesso de utilizadores a esta filial.`);
     if (!confirmar) return;
@@ -122,7 +107,6 @@ export default function Configuracoes() {
     }
   };
 
-  // 🔄 BUSCAR UTILIZADORES NO BANCO
   const carregarUsuarios = async () => {
     try {
       const data = await apiFetch('/usuarios/listar');
@@ -138,7 +122,6 @@ export default function Configuracoes() {
     }
   };
 
-  // 💾 SALVAR OU ATUALIZAR UTILIZADOR
   const guardarUsuario = async () => {
     try {
       if (usuarioAtual.filiais_acesso.length === 0) {
@@ -181,7 +164,6 @@ export default function Configuracoes() {
     }
   };
 
-  // 🗑️ EXCLUIR UTILIZADOR COM CONFIRMAÇÃO DE SENHA
   const excluirUsuario = async () => {
     if (!senhaConfirmacao) {
       alert("Por favor, digite a sua senha para confirmar a exclusão.");
@@ -208,9 +190,6 @@ export default function Configuracoes() {
     }
   };
 
-  // ==========================================
-  // 3. FUNÇÕES AUXILIARES
-  // ==========================================
   const alternarFilial = (filialId) => {
     setUsuarioAtual(prev => {
       const novasFiliais = prev.filiais_acesso.includes(filialId)
@@ -265,7 +244,6 @@ export default function Configuracoes() {
     setPaginaAtual(1);
   };
 
-  // Lógica de Filtro e Paginação
   const usuariosFiltrados = usuarios.filter(user => {
     const busca = termoPesquisa.toLowerCase();
     const acessoFiliaisStr = user.filiais_acesso ? user.filiais_acesso.join(', ').toLowerCase() : '';
@@ -287,9 +265,6 @@ export default function Configuracoes() {
   const paginaAnterior = () => { if (paginaAtual > 1) setPaginaAtual(paginaAtual - 1); };
   const proximaPagina = () => { if (paginaAtual < totalPaginas) setPaginaAtual(paginaAtual + 1); };
 
-  // ==========================================
-  // 4. INTERFACE (RENDERIZAÇÃO)
-  // ==========================================
   return (
     <div className="config-wrapper">
       <header className="config-cabecalho">
@@ -297,7 +272,6 @@ export default function Configuracoes() {
         <p>Gira métricas do sistema e acessos de utilizadores</p>
       </header>
 
-      {/* --- MENU DE ABAS --- */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '2px solid #e5e7eb', paddingBottom: '8px', overflowX: 'auto' }}>
         <button 
           onClick={() => setAbaAtiva('filiais')}
@@ -339,7 +313,6 @@ export default function Configuracoes() {
         </button>
       </div>
 
-      {/* --- ABA 1: CADASTRO DE FILIAIS --- */}
       {abaAtiva === 'filiais' && (
         <div className="config-cartao">
           <div className="cartao-topo">
@@ -354,7 +327,6 @@ export default function Configuracoes() {
 
           <hr className="divisor" />
 
-          {/* FORMULÁRIO DE NOVA FILIAL */}
           <div className="filial-form-box">
             <h4><Plus size={16} /> Nova Filial</h4>
             
@@ -396,7 +368,6 @@ export default function Configuracoes() {
             </button>
           </div>
 
-          {/* LISTA DE FILIAIS CADASTRADAS */}
           <div className="filiais-lista-titulo">
             Filiais Cadastradas ({filiais.length})
           </div>
@@ -433,7 +404,6 @@ export default function Configuracoes() {
         </div>
       )}
 
-      {/* --- ABA 2: TARGET --- */}
       {abaAtiva === 'target' && (
         <div className="config-cartao">
           <div className="cartao-topo">
@@ -456,7 +426,6 @@ export default function Configuracoes() {
         </div>
       )}
 
-      {/* --- ABA 3: GESTÃO DE PERFIS --- */}
       {abaAtiva === 'perfis' && (
         <div className="config-cartao">
           <div className="cartao-topo" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
@@ -531,7 +500,6 @@ export default function Configuracoes() {
             </table>
           </div>
 
-          {/* CONTROLOS DE PAGINAÇÃO */}
           {usuariosFiltrados.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '8px 12px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
               <span style={{ fontSize: '14px', color: '#666' }}>
@@ -556,7 +524,6 @@ export default function Configuracoes() {
         </div>
       )}
 
-      {/* --- MODAL DE CRIAÇÃO / EDIÇÃO --- */}
       {modalAberto && (
         <div className="modal-overlay" style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
@@ -598,7 +565,6 @@ export default function Configuracoes() {
               </select>
             </div>
 
-            {/* ✨ OS CHECKBOXES AGORA VÊM DIRETAMENTE DAS FILIAIS CADASTRADAS */}
             <div className="form-grupo" style={{ marginBottom: '24px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
                 Acesso às Filiais (Dinâmico)
@@ -637,7 +603,6 @@ export default function Configuracoes() {
         </div>
       )}
 
-      {/* --- MODAL DE EXCLUSÃO COM SENHA --- */}
       {modalExcluirAberto && (
         <div className="modal-overlay" style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
