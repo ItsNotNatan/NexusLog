@@ -1,150 +1,252 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FileText } from 'lucide-react';
-import html2pdf from 'html2pdf.js';
+
+// Importações do pdfmake
+import pdfMake from 'pdfmake/build/pdfmake';
+import pdfFonts from 'pdfmake/build/vfs_fonts';
+
+// Importação apenas do logo
+import logoComau from '../../assets/logo-comau.png';
+
+try {
+  pdfMake.vfs = pdfFonts.pdfMake.vfs;
+} catch (e) {
+  console.error("Erro ao carregar fontes do PDF:", e);
+}
 
 export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
+  const [gerando, setGerando] = useState(false);
 
-  const gerarBoletimPDF = (e) => {
-    e.stopPropagation(); // Impede que a linha da tabela expanda ao clicar no botão
-    showAlert("Gerando PDF...", "Aguarde enquanto o documento de Packing List é processado e transferido.", "info");
+  if (!linha) return null;
 
-    setTimeout(() => {
-      // 1. Abre a aba imediatamente para evitar bloqueio de Pop-ups do navegador
-      const novaAba = window.open('', '_blank');
-      novaAba.document.write(`
-        <html>
-          <head><title>A gerar Boletim PDF...</title></head>
-          <body style="font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f1f5f9; color: #475569; margin: 0;">
-            <h2 style="font-weight: 500;">A compilar o boletim PDF. Por favor, aguarde...</h2>
-          </body>
-        </html>
-      `);
+  // Função auxiliar para converter imagens em Base64
+  const getBase64ImageFromURL = (url) => {
+    return new Promise((resolve, reject) => {
+      var img = new Image();
+      img.setAttribute("crossOrigin", "anonymous");
+      img.onload = function () {
+        var canvas = document.createElement("canvas");
+        canvas.width = this.width;
+        canvas.height = this.height;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(this, 0, 0);
+        var dataURL = canvas.toDataURL("image/png");
+        resolve(dataURL);
+      };
+      img.onerror = (error) => reject(error);
+      img.src = url;
+    });
+  };
 
-      // 2. Prepara os itens da tabela para o HTML
-      let itensHtml = '';
-      if (linha.itens && linha.itens.length > 0) {
-        itensHtml = linha.itens.map((item, idx) => `
-          <tr style="border-bottom: 1px solid #e2e8f0; background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-            <td style="padding: 10px; color: #64748b;">${item.desenho_sap_manual || '-'}</td>
-            <td style="padding: 10px; font-weight: 600; color: #1e293b;">${item.part_number_manual || '-'}</td>
-            <td style="padding: 10px; color: #334155;">${item.descricao_manual || '-'}</td>
-            <td style="padding: 10px; text-align: center; font-weight: bold; color: #2563eb;">${item.quantidade_solicitada} ${item.unidade_medida_manual || 'Un'}</td>
-          </tr>
-        `).join('');
-      } else {
-        itensHtml = `<tr><td colSpan="4" style="padding: 20px; text-align: center; color: #94a3b8;">Nenhum item individual especificado na solicitação.</td></tr>`;
-      }
+  const handleGerarPdf = async (e) => {
+    e.stopPropagation(); // Impede a expansão da linha na tabela
+    setGerando(true);
+    
+    if (showAlert) {
+      showAlert("Gerando PDF...", "O Boletim será aberto num novo separador dentro de instantes.", "info");
+    }
 
-      // 3. Monta o elemento HTML invisível em memória
-      const element = document.createElement('div');
-      element.innerHTML = `
-        <div style="padding: 40px; font-family: Helvetica, Arial, sans-serif; width: 800px; background-color: white;">
-          <!-- HEADER DA EMPRESA -->
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px;">
-            <div>
-              <h1 style="margin: 0; color: #1e293b; font-size: 28px; font-weight: 800;">STOCK<span style="color: #2563eb;">Log</span></h1>
-              <p style="margin: 4px 0 0 0; color: #64748b; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Boletim de Packing List / Entrada</p>
-            </div>
-            <div style="text-align: right;">
-              <h2 style="margin: 0; color: #2563eb; font-size: 24px;">${linha.pl}</h2>
-              <p style="margin: 4px 0 0 0; color: #475569; font-size: 14px;">Identificador Interno (PS): ${linha.prefixo}:${linha.id}</p>
-            </div>
-          </div>
+    try {
+      // Carregar a imagem do logo em Base64
+      const [logoBase64] = await Promise.all([
+        getBase64ImageFromURL(logoComau).catch(() => null)
+      ]);
 
-          <!-- INFORMAÇÕES DA SOLICITAÇÃO -->
-          <div style="display: flex; justify-content: space-between; margin-bottom: 30px; padding: 20px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-            <div style="width: 48%;">
-              <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; text-transform: uppercase; font-weight: 600;">Solicitante</p>
-              <p style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; font-weight: 600;">${linha.solicitante}</p>
-              
-              <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; text-transform: uppercase; font-weight: 600;">WBS / Projeto / Destino</p>
-              <p style="margin: 0; font-size: 15px; color: #1e293b;">${linha.wbs}</p>
-            </div>
-            <div style="width: 48%;">
-              <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; text-transform: uppercase; font-weight: 600;">Filial</p>
-              <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">${nomeFilial}</p>
-              
-              <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; text-transform: uppercase; font-weight: 600;">Data do Registo do Sistema</p>
-              <p style="margin: 0; font-size: 15px; color: #1e293b;">${linha.dataSolicitacao}</p>
-            </div>
-          </div>
+      // Monta as linhas da tabela de itens
+      const linhasItens = (linha.itens && linha.itens.length > 0)
+        ? linha.itens.map((it, idx) => [
+            { text: it.desenho_sap_manual || '-', margin: [0, 4], color: '#475569' },
+            { text: it.part_number_manual || '-', margin: [0, 4], bold: true, color: '#1e293b' },
+            { text: it.descricao_manual || '-', margin: [0, 4] },
+            { text: `${it.quantidade_solicitada} ${it.unidade_medida_manual || 'Un'}`, alignment: 'center', margin: [0, 4], bold: true, color: '#2563eb' }
+          ])
+        : [[{ text: 'Nenhum item individual especificado na solicitação.', colSpan: 4, alignment: 'center', margin: [0, 10], color: '#94a3b8' }, {}, {}, {}]];
 
-          <!-- TABELA DE ITENS -->
-          <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Itens da Solicitação (${linha.tipo})</h3>
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 13px;">
-            <thead>
-              <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
-                <th style="padding: 12px 10px; text-align: left; color: #475569; font-weight: 600; text-transform: uppercase;">Desenho SAP</th>
-                <th style="padding: 12px 10px; text-align: left; color: #475569; font-weight: 600; text-transform: uppercase;">Part Number</th>
-                <th style="padding: 12px 10px; text-align: left; color: #475569; font-weight: 600; text-transform: uppercase;">Descrição</th>
-                <th style="padding: 12px 10px; text-align: center; color: #475569; font-weight: 600; text-transform: uppercase;">Qtd</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itensHtml}
-            </tbody>
-          </table>
-
-          <!-- OBSERVAÇÕES -->
-          ${linha.observacoes ? `
-            <div style="margin-bottom: 40px; padding: 16px; background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0;">
-              <p style="margin: 0 0 8px 0; font-size: 13px; color: #b45309; font-weight: 700; text-transform: uppercase;">Observações / Motivo</p>
-              <p style="margin: 0; font-size: 14px; color: #92400e;">${linha.observacoes}</p>
-            </div>
-          ` : ''}
-
-          <!-- ASSINATURAS -->
-          <div style="display: flex; justify-content: space-between; margin-top: 80px; padding-top: 20px;">
-            <div style="width: 40%; text-align: center;">
-              <div style="border-top: 1px solid #94a3b8; padding-top: 12px;">
-                <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b;">Solicitante</p>
-                <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">${linha.solicitante}</p>
-              </div>
-            </div>
-            <div style="width: 40%; text-align: center;">
-              <div style="border-top: 1px solid #94a3b8; padding-top: 12px;">
-                <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b;">Responsável Almoxarifado / Logística</p>
-                <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Data e Assinatura</p>
-              </div>
-            </div>
-          </div>
+      const docDefinition = {
+        pageSize: 'A4',
+        pageMargins: [40, 30, 40, 30], 
+        content: [
           
-          <div style="margin-top: 50px; text-align: center; font-size: 11px; color: #cbd5e1;">
-            Documento gerado automaticamente pelo sistema STOCKLog em ${new Date().toLocaleString('pt-BR')}
-          </div>
-        </div>
-      `;
+          // ==========================================
+          // CABEÇALHO DO DOCUMENTO
+          // ==========================================
+          logoBase64 ? {
+            image: logoBase64,
+            width: 85,
+            alignment: 'center',
+            margin: [0, 0, 0, 8] 
+          } : { 
+            text: 'STOCKLog', 
+            style: 'headerMain', 
+            color: '#2563eb', 
+            margin: [0, 0, 0, 5] 
+          },
+          { text: `BOLETIM DE PACKING LIST / ${linha.tipo ? linha.tipo.toUpperCase() : 'DOCUMENTO'}`, style: 'headerSub' },
+          { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 515, y2: 3, lineWidth: 1.5, lineColor: '#2563eb' }] },
+          
+          // ==========================================
+          // NÚMEROS E IDENTIFICAÇÃO BÁSICA
+          // ==========================================
+          {
+            margin: [0, 15, 0, 15],
+            columns: [
+              { text: [{ text: 'Nº PL: ', bold: true, color: '#1e293b' }, { text: linha.pl || 'N/A', color: '#2563eb', fontSize: 14, bold: true }] },
+              { text: [{ text: 'Identificador (PS): ', bold: true, color: '#1e293b' }, `${linha.prefixo}:${linha.id}`], alignment: 'right' }
+            ]
+          },
 
-      // 4. Configura as opções e gera o Blob do PDF
-      const opt = {
-        margin:       0,
-        filename:     `Boletim_${linha.pl || linha.id}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+          // ==========================================
+          // DADOS DA SOLICITAÇÃO
+          // ==========================================
+          {
+            table: { widths: ['*'], body: [[{ text: 'INFORMAÇÕES DA SOLICITAÇÃO', style: 'sectionTitle', fillColor: '#f1f5f9' }]] },
+            layout: 'noBorders',
+            margin: [0, 0, 0, 4]
+          },
+          {
+            table: {
+              widths: [150, '*'],
+              body: [
+                [{ text: 'Solicitante:', bold: true, margin: [0, 4] }, { text: linha.solicitante || 'N/A', margin: [0, 4] }],
+                [{ text: 'WBS / Destino:', bold: true, margin: [0, 4] }, { text: linha.wbs || 'N/A', margin: [0, 4] }],
+                [{ text: 'Filial / Base:', bold: true, margin: [0, 4] }, { text: nomeFilial || 'N/A', margin: [0, 4] }],
+                [{ text: 'Data do Registo:', bold: true, margin: [0, 4] }, { text: linha.dataSolicitacao || 'N/A', margin: [0, 4] }],
+                [{ text: 'Tipo Operação:', bold: true, margin: [0, 4] }, { text: linha.tipo || 'N/A', margin: [0, 4] }]
+              ]
+            },
+            layout: 'lightHorizontalLines',
+            margin: [0, 0, 0, 20]
+          },
+
+          // ==========================================
+          // TABELA DE ITENS
+          // ==========================================
+          {
+            table: { widths: ['*'], body: [[{ text: `ITENS DA SOLICITAÇÃO`, style: 'sectionTitle', fillColor: '#f1f5f9' }]] },
+            layout: 'noBorders',
+            margin: [0, 0, 0, 4]
+          },
+          {
+            table: {
+              widths: ['auto', 'auto', '*', 60],
+              headerRows: 1,
+              body: [
+                [
+                  { text: 'Desenho SAP', bold: true, fillColor: '#f8fafc', margin: [0, 6], color: '#475569' },
+                  { text: 'Part Number', bold: true, fillColor: '#f8fafc', margin: [0, 6], color: '#475569' },
+                  { text: 'Descrição do Material', bold: true, fillColor: '#f8fafc', margin: [0, 6], color: '#475569' },
+                  { text: 'Qtd.', bold: true, alignment: 'center', fillColor: '#f8fafc', margin: [0, 6], color: '#475569' }
+                ],
+                ...linhasItens
+              ]
+            },
+            margin: [0, 0, 0, 20]
+          },
+
+          // ==========================================
+          // OBSERVAÇÕES
+          // ==========================================
+          linha.observacoes ? {
+            table: { widths: ['*'], body: [[{ text: 'OBSERVAÇÕES / JUSTIFICATIVA', style: 'sectionTitle', fillColor: '#fefce8', color: '#b45309' }]] },
+            layout: 'noBorders',
+            margin: [0, 0, 0, 4]
+          } : {},
+          linha.observacoes ? {
+            table: { widths: ['*'], body: [[{ text: linha.observacoes, margin: [5, 4, 5, 4], color: '#78350f' }]] },
+            margin: [0, 0, 0, 20]
+          } : {},
+
+          // ==========================================
+          // ASSINATURAS (Sem Carimbo)
+          // ==========================================
+          {
+            margin: [0, 60, 0, 0], 
+            columns: [
+              {
+                width: '*',
+                stack: [
+                  { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
+                  { text: 'Solicitante', style: 'signatureLabel', margin: [0, 5, 0, 2] },
+                  { text: linha.solicitante, fontSize: 9, color: '#64748b' }
+                ],
+                alignment: 'center'
+              },
+              {
+                width: '*',
+                stack: [
+                  { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
+                  { text: 'Responsável Almoxarifado / Logística', style: 'signatureLabel', margin: [0, 5, 0, 2] },
+                  { text: 'Data e Assinatura', fontSize: 9, color: '#64748b' }
+                ],
+                alignment: 'center'
+              }
+            ]
+          },
+          
+          // ==========================================
+          // RODAPÉ DO SISTEMA
+          // ==========================================
+          {
+            text: `Documento gerado automaticamente pelo sistema STOCKLog em ${new Date().toLocaleString('pt-BR')}`,
+            alignment: 'center',
+            fontSize: 8,
+            color: '#94a3b8',
+            margin: [0, 40, 0, 0]
+          }
+        ],
+        styles: {
+          headerMain: { fontSize: 24, bold: true, alignment: 'center' },
+          headerSub: { fontSize: 11, alignment: 'center', margin: [0, 1, 0, 6], color: '#64748b', bold: true, characterSpacing: 1 },
+          sectionTitle: { fontSize: 10, bold: true, color: '#1e293b', margin: [5, 4, 5, 4] },
+          signatureLabel: { fontSize: 10, bold: true, color: '#1e293b' }
+        },
+        defaultStyle: { 
+          fontSize: 9.5, 
+          color: '#334155',
+          font: 'Roboto' 
+        }
       };
 
-      html2pdf().set(opt).from(element).output('bloburl').then((pdfBlobUrl) => {
-        // 5. Substitui o conteúdo da aba "Aguarde..." pelo visualizador PDF nativo
-        novaAba.location.replace(pdfBlobUrl);
-      }).catch(err => {
-        console.error("Erro ao gerar PDF:", err);
-        novaAba.close();
-        showAlert("Erro", "Houve um problema ao gerar o documento PDF.", "error");
-      });
-    }, 400); // Dá 400ms para a interface respirar e renderizar o aviso antes de congelar a tela
+      // Abre o PDF numa nova aba
+      pdfMake.createPdf(docDefinition).open();
+
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      if (showAlert) showAlert("Erro", "Ocorreu um problema ao compilar os dados para o PDF.", "error");
+    } finally {
+      setGerando(false);
+    }
   };
 
   return (
     <span 
       className="badge-pl"
-      onClick={gerarBoletimPDF}
-      style={{ cursor: 'pointer', transition: 'all 0.2s', userSelect: 'none' }}
+      onClick={handleGerarPdf}
+      style={{ 
+        cursor: gerando ? 'not-allowed' : 'pointer', 
+        transition: 'all 0.2s', 
+        userSelect: 'none',
+        opacity: gerando ? 0.6 : 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px'
+      }}
       title="Clique para abrir o Boletim em PDF numa nova aba"
-      onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#dbeafe'; e.currentTarget.style.borderColor = '#93c5fd'; }}
-      onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#eff6ff'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
+      onMouseOver={(e) => { 
+        if(!gerando) {
+          e.currentTarget.style.backgroundColor = '#dbeafe'; 
+          e.currentTarget.style.borderColor = '#93c5fd'; 
+        }
+      }}
+      onMouseOut={(e) => { 
+        if(!gerando) {
+          e.currentTarget.style.backgroundColor = '#eff6ff'; 
+          e.currentTarget.style.borderColor = '#bfdbfe'; 
+        }
+      }}
     >
-      <FileText size={14} /> {linha.pl}
+      <FileText size={14} /> 
+      {gerando ? 'A Gerar...' : (linha.pl || 'Gerar PDF')}
     </span>
   );
 }
