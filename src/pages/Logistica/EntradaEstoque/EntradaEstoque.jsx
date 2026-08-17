@@ -27,33 +27,35 @@ export default function EntradaEstoque() {
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
   
-  // ✨ NOVO ESTADO: Guarda as NFs que estão aguardando Crossdocking
+  // ✨ ESTADO: Guarda as NFs de Crossdockings que estão "Pendentes"
   const [nfsCrossdocking, setNfsCrossdocking] = useState([]);
   const processador = useProcessadorExcel();
 
-  // ✨ NOVO EFEITO: Busca as solicitações de Crossdocking Pendentes no banco de dados
+  // ✨ EFEITO: Busca TUDO e faz o filtro cirúrgico no Frontend
   useEffect(() => {
-    const buscarCrossdockingPendente = async () => {
+    const buscarCrossdockingsPendentes = async () => {
       try {
         const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
-        // Filtramos para buscar apenas Crossdockings que ainda estão Pendentes
-        const resultado = await apiFetch(`/solicitacoes/listar?tipo=Crossdocking&status=Pendente&filial=${filialFiltro}&limit=1000`);
         
-        if (resultado.sucesso && resultado.dados) {
-          // Extraímos apenas os números das NFs desses pedidos
+        // Buscamos as solicitações apenas pela filial para evitar conflitos na API
+        const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
+        
+        if (resultado.sucesso && Array.isArray(resultado.dados)) {
+          // Filtramos manualmente pelo Tipo e Status para ter certeza absoluta que funciona
           const nfsAguardadas = resultado.dados
+            .filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente')
             .map(sol => sol.nfCrossdocking)
-            .filter(Boolean); // Remove os nulos/vazios
+            .filter(nf => nf !== null && nf !== undefined && nf !== ''); // Ignora as vazias
             
           setNfsCrossdocking(nfsAguardadas);
         }
       } catch (error) {
-        console.error("Erro ao buscar crossdockings pendentes:", error);
+        console.error("Erro ao buscar as solicitações de Crossdocking:", error);
       }
     };
 
     if (estoqueAtual) {
-      buscarCrossdockingPendente();
+      buscarCrossdockingsPendentes();
     }
   }, [estoqueAtual]);
 
@@ -179,7 +181,7 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ LÓGICA DO INDICADOR: Verifica se alguma NF digitada na tabela bate com as NFs pendentes
+  // ✨ LÓGICA DO INDICADOR: Verifica cada batida de tecla!
   const nfsNormalizadas = nfsCrossdocking.map(nf => String(nf).trim().toUpperCase());
   const nfsNaTabela = itens
     .map(i => String(i.nfEntrada || '').trim().toUpperCase())
@@ -198,7 +200,21 @@ export default function EntradaEstoque() {
         <p>Cadastro detalhado de itens — Back-Office Logística</p>
       </header>
 
-      {/* ✨ BANNER DE AVISO DE CROSSDOCKING */}
+      <div className="estoque-cartao form-cartao">
+        <div className="form-header">
+          <div className="form-header-esquerda">
+            <div className="icone-fundo-azul" style={{ width: '32px', height: '32px' }}><User size={18} className="icone-azul" /></div>
+            <h2>Operador Responsável</h2>
+          </div>
+        </div>
+        <div className="form-grid">
+          <div className="input-grupo"><label>NOME *</label><input type="text" className="input-campo" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} /></div>
+          <div className="input-grupo"><label>WBS *</label><input type="text" className="input-campo" placeholder="Ex: WBS-PRJ-2024-001" value={formDados.wbs} onChange={(e) => setFormDados({...formDados, wbs: e.target.value})} /></div>
+          <div className="input-grupo"><label>OBSERVAÇÕES</label><textarea className="input-campo" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})} style={{ minHeight: '42px' }}></textarea></div>
+        </div>
+      </div>
+
+      {/* ✨ BANNER ANIMADO DE AVISO DE CROSSDOCKING MOVIDO PARA CÁ */}
       {temCrossdockingAguardando && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '16px',
@@ -214,25 +230,11 @@ export default function EntradaEstoque() {
               Crossdocking Identificado!
             </strong>
             <span style={{ fontSize: '0.85rem' }}>
-              A Nota Fiscal <strong>{nfsUnicasEncontradas.join(', ')}</strong> pertence a uma solicitação de Crossdocking pendente. Ao registar esta entrada, o pedido de Crossdocking ficará automaticamente disponível para separação!
+              A Nota Fiscal <strong>{nfsUnicasEncontradas.join(', ')}</strong> pertence a uma solicitação de Crossdocking pendente. Ao registar esta entrada, o pedido de Crossdocking ficará automaticamente disponível para aprovação e separação!
             </span>
           </div>
         </div>
       )}
-
-      <div className="estoque-cartao form-cartao">
-        <div className="form-header">
-          <div className="form-header-esquerda">
-            <div className="icone-fundo-azul" style={{ width: '32px', height: '32px' }}><User size={18} className="icone-azul" /></div>
-            <h2>Operador Responsável</h2>
-          </div>
-        </div>
-        <div className="form-grid">
-          <div className="input-grupo"><label>NOME *</label><input type="text" className="input-campo" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} /></div>
-          <div className="input-grupo"><label>WBS *</label><input type="text" className="input-campo" placeholder="Ex: WBS-PRJ-2024-001" value={formDados.wbs} onChange={(e) => setFormDados({...formDados, wbs: e.target.value})} /></div>
-          <div className="input-grupo"><label>OBSERVAÇÕES</label><textarea className="input-campo" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})} style={{ minHeight: '42px' }}></textarea></div>
-        </div>
-      </div>
 
       <TabelaInsercaoItens 
         itens={itens}
