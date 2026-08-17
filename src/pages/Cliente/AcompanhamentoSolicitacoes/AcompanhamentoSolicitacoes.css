@@ -228,6 +228,22 @@
 .status-concluido { background-color: #ecfdf5; color: #10b981; border: 1px solid #a7f3d0; }
 .status-cancelado { background-color: #fef2f2; color: #ef4444; border: 1px solid #fecaca; }
 
+/* ESTILOS PARA INTERAÇÃO DE STATUS NA LOGÍSTICA */
+.btn-aprovar-acao {
+  transition: transform 0.2s, background-color 0.2s;
+}
+.btn-aprovar-acao:hover {
+  background-color: #c2410c !important;
+  transform: scale(1.02);
+}
+
+.select-acao {
+  transition: all 0.2s;
+}
+.select-acao:hover {
+  background-color: #dbeafe !important;
+}
+
 /* Tracinho para itens vazios */
 .traco-vazio {
   color: #cbd5e1;
@@ -238,7 +254,7 @@
 /* ========================================================== */
 .kpis-linha {
   display: grid;
-  grid-template-columns: repeat(6, 1fr); /* ✨ Acomoda perfeitamente os 6 cartões */
+  grid-template-columns: repeat(6, 1fr); 
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -291,10 +307,8 @@
 .kpi-recusados { border-color: #fed7aa; }
 .kpi-recusados strong { color: #ea580c; } 
 
-/* ✨ NOVA COR PARA OS CANCELADOS (Vermelho) */
 .kpi-cancelados { border-color: #fecaca; }
 .kpi-cancelados strong { color: #ef4444; } 
-
 
 /* --- ESTADO ATIVO (QUANDO O UTILIZADOR CLICA PARA FILTRAR) --- */
 .kpi-card-resumo.ativo.kpi-total { background-color: #f8fafc; box-shadow: 0 0 0 1px #e2e8f0; }
@@ -302,7 +316,7 @@
 .kpi-card-resumo.ativo.kpi-andamento { background-color: #eff6ff; box-shadow: 0 0 0 1px #bfdbfe; }
 .kpi-card-resumo.ativo.kpi-concluidos { background-color: #ecfdf5; box-shadow: 0 0 0 1px #a7f3d0; }
 .kpi-card-resumo.ativo.kpi-recusados { background-color: #fff7ed; box-shadow: 0 0 0 1px #fed7aa; }
-.kpi-card-resumo.ativo.kpi-cancelados { background-color: #fef2f2; box-shadow: 0 0 0 1px #fecaca; } /* Ativo Cancelado */
+.kpi-card-resumo.ativo.kpi-cancelados { background-color: #fef2f2; box-shadow: 0 0 0 1px #fecaca; } 
 
 /* Responsividade para não quebrar em telemóveis/tablets */
 @media (max-width: 1200px) {
@@ -409,7 +423,6 @@
   color: #1e293b;
 }
 
-/* Rotação do Ícone da Seta */
 .icone-rotacionado {
   transform: rotate(90deg);
   transition: transform 0.2s ease;

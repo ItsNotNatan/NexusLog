@@ -203,7 +203,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  // ✨ KPIs AGORA TOTALMENTE SEPARADOS
   const kpiTotal = dadosTabela.length;
   const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
   const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
@@ -216,7 +215,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (filtroStatus === 'Pendente') return item.status === 'Pendente';
     if (filtroStatus === 'Em Andamento') return item.status === 'Em Separação' || item.status === 'Em Andamento';
     if (filtroStatus === 'Concluído') return item.status === 'Concluído' || item.statusExibicao === 'Reintegrado';
-    // ✨ LÓGICA DE FILTRAGEM SEPARADA
     if (filtroStatus === 'Recusado') return item.status === 'Recusado';
     if (filtroStatus === 'Cancelado') return item.status === 'Cancelado' || item.statusExibicao === 'Cancelado';
     return true;
@@ -352,7 +350,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         <p>{perfil === "logistica" ? "Gerencie todas as solicitações — materiais, WBS, NFs, entradas, crossdocking e reintegrações" : "Visualize todas as solicitações abertas do sistema"}</p>
       </header>
 
-      {/* ✨ RENDERIZAÇÃO DOS 6 CARTÕES DE FILTRO */}
       <div className="kpis-linha">
         <div className={`kpi-card-resumo kpi-total ${filtroStatus === "Todos" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Todos")}>
           <span>Total</span><strong>{kpiTotal}</strong>
@@ -398,15 +395,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>FILIAL</th>
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
-                <th>STATUS</th>
-                {perfil === "logistica" && <th>AÇÕES</th>}
+                
+                {/* AÇÕES COMBINADO COM STATUS NA MESMA COLUNA */}
+                <th>STATUS {perfil === "logistica" && "/ AÇÃO"}</th>
               </tr>
             </thead>
             <tbody>
               {carregando ? (
-                <tr><td colSpan={perfil === "logistica" ? 9 : 8} style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>Carregando solicitações...</td></tr>
+                <tr><td colSpan="8" style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>Carregando solicitações...</td></tr>
               ) : dadosPaginados.length === 0 ? (
-                <tr><td colSpan={perfil === "logistica" ? 9 : 8} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
+                <tr><td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
                 dadosPaginados.map((linha, index) => {
                   const idUnico = `${linha.prefixo}-${linha.id}-${index}`;
@@ -457,40 +455,38 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         <td className="texto-data">{linha.dataSolicitacao}</td>
                         <td>{linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? <span className="texto-data-verde">{linha.dataEntrega}</span> : <span className="traco-vazio">—</span>}</td>
                         
-                        <td>{renderBadgeStatus(linha.statusExibicao)}</td>
-
-                        {perfil === "logistica" && (
-                          <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {linha.statusExibicao === 'Reintegrado' ? (
-                              <span style={{ color: "#10b981", fontSize: "0.875rem", fontWeight: "600" }}>Resolvido</span>
+                        {/* A MÁGICA DOS STATUS E BOTÕES INTEGRADOS AQUI */}
+                        <td>
+                          {perfil === "logistica" && !isOperador ? (
+                            linha.statusExibicao === 'Reintegrado' ? (
+                              <span className="badge-status status-concluido"><CheckCircle2 size={14} /> Resolvido</span>
                             ) : linha.statusExibicao === 'Cancelado' && linha.tipo !== 'Cancelado' ? (
-                              <span style={{ color: "#ef4444", fontSize: "0.875rem", fontWeight: "600" }}>Cancelamento Solicitado</span>
-                            ) : isOperador ? (
-                              <span style={{ color: "#64748b", fontSize: "0.875rem", fontWeight: "500" }}>{linha.status}</span>
-                            ) : (
-                              linha.status === 'Pendente' ? (
-                                statusBloqueado ? (
-                                  <div title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '6px 12px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', fontWeight: '600' }}><AlertCircle size={14} /> Aguardando NF</div>
-                                ) : (
-                                  <button className="btn-aprovar-acao" style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '20px', padding: '6px 16px', fontSize: '0.875rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao); }}><RefreshCw size={14} /> Aprovar</button>
-                                )
+                              <span className="badge-status status-cancelado"><AlertCircle size={14} /> Cancelamento Solicitado</span>
+                            ) : linha.status === 'Pendente' ? (
+                              statusBloqueado ? (
+                                <div title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '600' }}><AlertCircle size={14} /> Aguardando NF</div>
                               ) : (
-                                <select className="select-acao" value={linha.status} onChange={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value); }} style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '20px', backgroundColor: '#f8fafc', fontSize: '0.875rem', color: '#334155', outline: 'none', cursor: 'pointer' }}>
-                                  <option value="Pendente" disabled>Pendente</option>
-                                  <option value="Em Separação">Em Separação</option>
-                                  <option value="Concluído">Concluído</option>
-                                  <option value="Cancelado">Cancelado</option>
-                                  <option value="Recusado">Recusado</option>
-                                </select>
+                                <button className="btn-aprovar-acao" style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao); }}><RefreshCw size={14} /> Aprovar</button>
                               )
-                            )}
-                          </td>
-                        )}
+                            ) : (
+                              <select className="select-acao" value={linha.status} onChange={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value); }} style={{ padding: '4px 10px', border: '1px solid #bfdbfe', borderRadius: '999px', backgroundColor: '#eff6ff', fontSize: '0.75rem', color: '#2563eb', fontWeight: '600', outline: 'none', cursor: 'pointer' }}>
+                                <option value="Pendente" disabled>Pendente</option>
+                                <option value="Em Separação">Em Separação</option>
+                                <option value="Concluído">Concluído</option>
+                                <option value="Cancelado">Cancelado</option>
+                                <option value="Recusado">Recusado</option>
+                              </select>
+                            )
+                          ) : (
+                            renderBadgeStatus(linha.statusExibicao)
+                          )}
+                        </td>
                       </tr>
 
                       {isExpandida && (
                         <tr>
-                          <td colSpan={perfil === "logistica" ? 9 : 8} className="td-expandida">
+                          {/* ColSpan reduzido de 9 para 8, visto que tirámos a coluna Ações */}
+                          <td colSpan="8" className="td-expandida">
                             <DetalhesSolicitacao item={linha} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
                             
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
