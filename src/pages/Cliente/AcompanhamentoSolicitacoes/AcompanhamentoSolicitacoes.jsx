@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
   Search, ChevronRight, ChevronLeft, GitBranch, FileText,
-  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin
+  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, Calendar
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -203,6 +203,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
+  // KPIs
   const kpiTotal = dadosTabela.length;
   const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
   const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
@@ -275,6 +276,31 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       }
     } catch (error) {
       showAlert("Falha de Conexão", "Não foi possível ligar ao servidor ao atualizar o status.", "error");
+    }
+  };
+
+  // ✨ ATUALIZAÇÃO DA DATA DE ENTREGA INTERATIVA (LOGÍSTICA)
+  const lidarComMudancaDataEntrega = async (idSolicitacao, novaData) => {
+    try {
+      const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/local`, {
+        method: 'PATCH',
+        body: JSON.stringify({ data_necessidade: novaData })
+      });
+
+      if (dados.sucesso) {
+        const dataFormatada = novaData ? new Date(`${novaData}T00:00:00`).toLocaleDateString('pt-BR') : '—';
+        setDadosTabela(prev => prev.map(sol => {
+          if (sol.idOriginal === idSolicitacao) {
+            return { ...sol, dataEntrega: dataFormatada };
+          }
+          return sol;
+        }));
+        showAlert("Data Atualizada", "Data de entrega atualizada com sucesso!", "success");
+      } else {
+        showAlert("Erro", dados.erro || "Falha ao salvar a data de entrega.", "error");
+      }
+    } catch (error) {
+      showAlert("Erro de Conexão", "Não foi possível conectar ao servidor.", "error");
     }
   };
 
@@ -395,9 +421,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>FILIAL</th>
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
-                
-                {/* AÇÕES COMBINADO COM STATUS NA MESMA COLUNA */}
-                <th>STATUS {perfil === "logistica" && "/ AÇÃO"}</th>
+                <th>STATUS</th>
               </tr>
             </thead>
             <tbody>
@@ -453,9 +477,35 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           </span>
                         </td>
                         <td className="texto-data">{linha.dataSolicitacao}</td>
-                        <td>{linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? <span className="texto-data-verde">{linha.dataEntrega}</span> : <span className="traco-vazio">—</span>}</td>
                         
-                        {/* A MÁGICA DOS STATUS E BOTÕES INTEGRADOS AQUI */}
+                        {/* ✨ DATA DE ENTREGA EDITAVEL PARA A LOGISTICA */}
+                        <td>
+                          {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado ? (
+                            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                              <input 
+                                type="date"
+                                onChange={(e) => lidarComMudancaDataEntrega(linha.idOriginal, e.target.value)}
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '0.75rem',
+                                  borderRadius: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  backgroundColor: '#ffffff',
+                                  color: '#059669',
+                                  fontWeight: '600',
+                                  outline: 'none',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" 
+                              ? <span className="texto-data-verde">{linha.dataEntrega}</span> 
+                              : <span className="traco-vazio">—</span>
+                          )}
+                        </td>
+                        
+                        {/* ✨ STATUS E AÇÕES UNIFICADOS NA MESMA COLUNA */}
                         <td>
                           {perfil === "logistica" && !isOperador ? (
                             linha.statusExibicao === 'Reintegrado' ? (
@@ -485,7 +535,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                       {isExpandida && (
                         <tr>
-                          {/* ColSpan reduzido de 9 para 8, visto que tirámos a coluna Ações */}
                           <td colSpan="8" className="td-expandida">
                             <DetalhesSolicitacao item={linha} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
                             

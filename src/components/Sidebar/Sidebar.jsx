@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 import {
   LayoutDashboard, ListTodo, PackagePlus, Archive, Download, FileSpreadsheet, Settings, Hexagon,
-  ClipboardEdit, Boxes, FileClock, Waypoints, ClipboardList, Home, Lock, ArrowLeftRight // ⬅️ Ícone ArrowLeftRight adicionado!
+  ClipboardEdit, Boxes, FileClock, Waypoints, ClipboardList, Home, Lock, ArrowLeftRight
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -21,7 +21,6 @@ export default function Sidebar({ modulo }) {
     { path: '/cliente/rastreabilidade', label: 'Histórico', icon: <Archive size={20} /> },
   ];
 
-  // ✨ NOVA ORDEM APLICADA ABAIXO (incluindo o espaço reservado para Transferência de Estoque)
   const menuLogistica = [
     { path: '/logistica/PainelAprovacao', label: 'Painel de Aprovação', icon: <ListTodo size={20} />, roles: ['ADM', 'LIDER'] },
     { path: '/logistica/painel', label: 'Painel Geral', icon: <ClipboardList size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
@@ -54,15 +53,14 @@ export default function Sidebar({ modulo }) {
     menuItems = menuLogisticaFiltrado;
   }
 
-  const tituloSidebar = modulo === 'cliente' ? 'Portal do Cliente' : 'STOCKLog';
-
   return (
     <aside className="sidebar-container">
       <div className="sidebar-logo">
         <div className="logo-icone">
           <Hexagon size={24} />
         </div>
-        <h2>{tituloSidebar}</h2>
+        {/* ✨ TÍTULO FIXO AQUI */}
+        <h2>STOCKLog</h2>
       </div>
 
       <nav className="sidebar-nav">
@@ -84,7 +82,6 @@ export default function Sidebar({ modulo }) {
                   <span className="nav-icone">{item.icon}</span>
                   <span className="nav-texto">{item.label}</span>
                 </div>
-                {/* ✨ REGRA DO CADEADO: Se estiver desabilitado, desenha o cadeado */}
                 {item.isDisabled && (
                   <Lock size={16} className="icone-cadeado" />
                 )}
