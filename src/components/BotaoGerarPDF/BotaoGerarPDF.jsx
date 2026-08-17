@@ -38,12 +38,23 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
     });
   };
 
+  // Trata a formatação de datas que vêm do banco (DD/MM/AAAA)
+  const formatarDataSimples = (data) => {
+    if (!data) return '-';
+    if (data.includes('/')) return data;
+    try {
+      return new Date(data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    } catch {
+      return data;
+    }
+  };
+
   const handleGerarPdf = async (e) => {
     e.stopPropagation(); // Impede a expansão da linha na tabela
     setGerando(true);
     
     if (showAlert) {
-      showAlert("Gerando PDF...", "O Boletim será aberto num novo separador dentro de instantes.", "info");
+      showAlert("Gerando PDF...", "O Boletim Detalhado será aberto num novo separador dentro de instantes.", "info");
     }
 
     try {
@@ -52,19 +63,37 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
         getBase64ImageFromURL(logoComau).catch(() => null)
       ]);
 
-      // Monta as linhas da tabela de itens
+      // A data de necessidade está vinculada à solicitação global (linha)
+      const dataNecessidadeFormatada = formatarDataSimples(linha.data_necessidade || linha.dataNecessidade);
+
+      // Monta as linhas da tabela mapeando os campos exatos do banco
       const linhasItens = (linha.itens && linha.itens.length > 0)
-        ? linha.itens.map((it, idx) => [
-            { text: it.desenho_sap_manual || '-', margin: [0, 4], color: '#475569' },
-            { text: it.part_number_manual || '-', margin: [0, 4], bold: true, color: '#1e293b' },
-            { text: it.descricao_manual || '-', margin: [0, 4] },
-            { text: `${it.quantidade_solicitada} ${it.unidade_medida_manual || 'Un'}`, alignment: 'center', margin: [0, 4], bold: true, color: '#2563eb' }
+        ? linha.itens.map((it) => [
+            { text: it.desenho_sap_manual || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.part_number_manual || '-', margin: [0, 4], fontSize: 6, bold: true, color: '#1e293b' },
+            { text: it.fornecedor || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.referencia || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.quantidade_solicitada || '-', alignment: 'center', margin: [0, 4], fontSize: 6, bold: true, color: '#2563eb' },
+            { text: it.nf_entrada || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.unidade_medida_manual || 'Un', alignment: 'center', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.descricao_manual || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.wbs_element || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: dataNecessidadeFormatada, margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: formatarDataSimples(it.emissao_nf), margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: formatarDataSimples(it.receb_nf), margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.documento_compras || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.centro || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.deposito || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+            { text: it.alocacao || '-', margin: [0, 4], fontSize: 6, color: '#475569' }
           ])
-        : [[{ text: 'Nenhum item individual especificado na solicitação.', colSpan: 4, alignment: 'center', margin: [0, 10], color: '#94a3b8' }, {}, {}, {}]];
+        : [[{ text: 'Nenhum item individual detalhado nesta solicitação.', colSpan: 17, alignment: 'center', margin: [0, 10], color: '#94a3b8' }, ...Array(16).fill({})]];
 
       const docDefinition = {
+        // Folha A4 na horizontal para caber as 17 colunas
         pageSize: 'A4',
-        pageMargins: [40, 30, 40, 30], 
+        pageOrientation: 'landscape',
+        pageMargins: [30, 30, 30, 30], 
         content: [
           
           // ==========================================
@@ -81,8 +110,9 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
             color: '#2563eb', 
             margin: [0, 0, 0, 5] 
           },
-          { text: `BOLETIM DE PACKING LIST / ${linha.tipo ? linha.tipo.toUpperCase() : 'DOCUMENTO'}`, style: 'headerSub' },
-          { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 515, y2: 3, lineWidth: 1.5, lineColor: '#2563eb' }] },
+          { text: `BOLETIM DETALHADO / ${linha.tipo ? linha.tipo.toUpperCase() : 'DOCUMENTO'}`, style: 'headerSub' },
+          // Linha divisória adaptada para o tamanho landscape
+          { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 781, y2: 3, lineWidth: 1.5, lineColor: '#2563eb' }] },
           
           // ==========================================
           // NÚMEROS E IDENTIFICAÇÃO BÁSICA
@@ -90,7 +120,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
           {
             margin: [0, 15, 0, 15],
             columns: [
-              { text: [{ text: 'Nº PL: ', bold: true, color: '#1e293b' }, { text: linha.pl || 'N/A', color: '#2563eb', fontSize: 14, bold: true }] },
+              { text: [{ text: 'Nº PL / DOCUMENTO: ', bold: true, color: '#1e293b' }, { text: linha.pl || 'N/A', color: '#2563eb', fontSize: 12, bold: true }] },
               { text: [{ text: 'Identificador (PS): ', bold: true, color: '#1e293b' }, `${linha.prefixo}:${linha.id}`], alignment: 'right' }
             ]
           },
@@ -108,7 +138,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
               widths: [150, '*'],
               body: [
                 [{ text: 'Solicitante:', bold: true, margin: [0, 4] }, { text: linha.solicitante || 'N/A', margin: [0, 4] }],
-                [{ text: 'WBS / Destino:', bold: true, margin: [0, 4] }, { text: linha.wbs || 'N/A', margin: [0, 4] }],
+                [{ text: 'WBS / Destino Geral:', bold: true, margin: [0, 4] }, { text: linha.wbs || 'N/A', margin: [0, 4] }],
                 [{ text: 'Filial / Base:', bold: true, margin: [0, 4] }, { text: nomeFilial || 'N/A', margin: [0, 4] }],
                 [{ text: 'Data do Registo:', bold: true, margin: [0, 4] }, { text: linha.dataSolicitacao || 'N/A', margin: [0, 4] }],
                 [{ text: 'Tipo Operação:', bold: true, margin: [0, 4] }, { text: linha.tipo || 'N/A', margin: [0, 4] }]
@@ -119,23 +149,37 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
           },
 
           // ==========================================
-          // TABELA DE ITENS
+          // TABELA DE ITENS EXTREMAMENTE DETALHADA
           // ==========================================
           {
-            table: { widths: ['*'], body: [[{ text: `ITENS DA SOLICITAÇÃO`, style: 'sectionTitle', fillColor: '#f1f5f9' }]] },
+            table: { widths: ['*'], body: [[{ text: `DETALHAMENTO DE ITENS DA SOLICITAÇÃO`, style: 'sectionTitle', fillColor: '#f1f5f9' }]] },
             layout: 'noBorders',
             margin: [0, 0, 0, 4]
           },
           {
             table: {
-              widths: ['auto', 'auto', '*', 60],
+              // Ajuste de larguras para 17 colunas na folha A4 (Vendor Description recebe o '*')
+              widths: ['auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', '*', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
               headerRows: 1,
               body: [
                 [
-                  { text: 'Desenho SAP', bold: true, fillColor: '#f8fafc', margin: [0, 6], color: '#475569' },
-                  { text: 'Part Number', bold: true, fillColor: '#f8fafc', margin: [0, 6], color: '#475569' },
-                  { text: 'Descrição do Material', bold: true, fillColor: '#f8fafc', margin: [0, 6], color: '#475569' },
-                  { text: 'Qtd.', bold: true, alignment: 'center', fillColor: '#f8fafc', margin: [0, 6], color: '#475569' }
+                  { text: 'DESENHO SAP', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'Nº PEÇA FAB.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'FORNECEDOR', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'REFERÊNCIA', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'QTD. FORN.', bold: true, alignment: 'center', fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'NF DE ENT.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'UNID.', bold: true, alignment: 'center', fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'VENDOR DESC.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'WBS', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'DT NEC.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'EMIS. NF', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'REC. NF', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'DOC COMPRAS', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'PO PRICE', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'CENTRO', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'DEP.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  { text: 'ALOC.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' }
                 ],
                 ...linhasItens
               ]
