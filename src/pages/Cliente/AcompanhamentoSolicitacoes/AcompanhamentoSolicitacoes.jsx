@@ -279,12 +279,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  // ✨ ATUALIZAÇÃO DA DATA DE ENTREGA INTERATIVA (LOGÍSTICA) - CORRIGIDA
   const lidarComMudancaDataEntrega = async (idSolicitacao, novaData) => {
     try {
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/local`, {
         method: 'PATCH',
-        // ✨ AGORA ENVIA A PROPRIEDADE CORRETA: data_entrega
         body: JSON.stringify({ data_entrega: novaData })
       });
 
@@ -422,8 +420,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>FILIAL</th>
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
-                
-                {/* AÇÕES COMBINADO COM STATUS NA MESMA COLUNA */}
                 <th>STATUS {perfil === "logistica" && "/ AÇÃO"}</th>
               </tr>
             </thead>
@@ -481,12 +477,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                         <td className="texto-data">{linha.dataSolicitacao}</td>
                         
-                        {/* ✨ DATA DE ENTREGA EDITAVEL PARA A LOGISTICA */}
+                        {/* ✨ DATA DE ENTREGA EDITAVEL PARA A LOGISTICA CORRIGIDA (Com Value!) */}
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                               <input 
                                 type="date"
+                                value={linha.dataEntrega && linha.dataEntrega.includes('/') ? linha.dataEntrega.split('/').reverse().join('-') : ''}
                                 onChange={(e) => lidarComMudancaDataEntrega(linha.idOriginal, e.target.value)}
                                 style={{
                                   padding: '4px 8px',
@@ -508,7 +505,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           )}
                         </td>
                         
-                        {/* ✨ STATUS E AÇÕES UNIFICADOS NA MESMA COLUNA */}
                         <td>
                           {perfil === "logistica" && !isOperador ? (
                             linha.statusExibicao === 'Reintegrado' ? (
@@ -538,7 +534,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                       {isExpandida && (
                         <tr>
-                          {/* ColSpan reduzido de 9 para 8, visto que tirámos a coluna Ações */}
                           <td colSpan="8" className="td-expandida">
                             <DetalhesSolicitacao item={linha} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
                             
