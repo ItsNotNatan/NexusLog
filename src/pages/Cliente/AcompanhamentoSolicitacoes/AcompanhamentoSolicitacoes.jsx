@@ -46,12 +46,10 @@ const obterClasseBadgeTipo = (tipo) => {
 };
 
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
-  // ✨ Puxa as filiais do Contexto
   const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
   const { showAlert, showConfirm } = useAlert(); 
   const navigate = useNavigate();
 
-  // ✨ NOVA FUNÇÃO DINÂMICA: Substitui aquela lista fixa antiga!
   const obterNomeFilialDinamico = (codigo) => {
     if (!codigo) return 'N/D';
     if (codigo === 'TODOS') return 'Todas as Filiais';
@@ -205,18 +203,22 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
+  // ✨ KPIs AGORA TOTALMENTE SEPARADOS
   const kpiTotal = dadosTabela.length;
   const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
   const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
   const kpiConcluidos = dadosTabela.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length;
-  const kpiRecusados = dadosTabela.filter((item) => item.status === "Recusado" || item.statusExibicao === "Cancelado").length;
+  const kpiRecusados = dadosTabela.filter((item) => item.status === "Recusado").length;
+  const kpiCancelados = dadosTabela.filter((item) => item.status === "Cancelado" || item.statusExibicao === "Cancelado").length;
 
   const dadosFiltrados = dadosTabela.filter((item) => {
     if (filtroStatus === 'Todos') return true;
     if (filtroStatus === 'Pendente') return item.status === 'Pendente';
     if (filtroStatus === 'Em Andamento') return item.status === 'Em Separação' || item.status === 'Em Andamento';
     if (filtroStatus === 'Concluído') return item.status === 'Concluído' || item.statusExibicao === 'Reintegrado';
-    if (filtroStatus === 'Recusado') return item.status === 'Recusado' || item.status === 'Cancelado' || item.statusExibicao === 'Cancelado';
+    // ✨ LÓGICA DE FILTRAGEM SEPARADA
+    if (filtroStatus === 'Recusado') return item.status === 'Recusado';
+    if (filtroStatus === 'Cancelado') return item.status === 'Cancelado' || item.statusExibicao === 'Cancelado';
     return true;
   });
 
@@ -232,7 +234,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     let motivo = null;
     if (novoStatus === 'Recusado' || novoStatus === 'Cancelado') {
-      motivo = window.prompt("Por favor, informe o motivo da recusa:");
+      motivo = window.prompt("Por favor, informe o motivo da recusa/cancelamento:");
       if (!motivo) return;
     }
 
@@ -350,6 +352,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         <p>{perfil === "logistica" ? "Gerencie todas as solicitações — materiais, WBS, NFs, entradas, crossdocking e reintegrações" : "Visualize todas as solicitações abertas do sistema"}</p>
       </header>
 
+      {/* ✨ RENDERIZAÇÃO DOS 6 CARTÕES DE FILTRO */}
       <div className="kpis-linha">
         <div className={`kpi-card-resumo kpi-total ${filtroStatus === "Todos" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Todos")}>
           <span>Total</span><strong>{kpiTotal}</strong>
@@ -365,6 +368,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         </div>
         <div className={`kpi-card-resumo kpi-recusados ${filtroStatus === "Recusado" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Recusado")}>
           <span>Recusados</span><strong>{kpiRecusados}</strong>
+        </div>
+        <div className={`kpi-card-resumo kpi-cancelados ${filtroStatus === "Cancelado" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Cancelado")}>
+          <span>Cancelados</span><strong>{kpiCancelados}</strong>
         </div>
       </div>
 
@@ -420,7 +426,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         className={isExpandida ? "tr-expandida" : ""}
                         style={{ 
                           backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '',
-                          borderBottom: '1px solid #f1f5f9', // ✨ CORREÇÃO: Remove a borda vermelha espessa
+                          borderBottom: '1px solid #f1f5f9', 
                           opacity: isRecusadoOuCancelado ? 0.8 : 1 
                         }}
                       >
