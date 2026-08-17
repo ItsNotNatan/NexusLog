@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
-import { useAlert } from '../../../contexts/AlertContext'; 
+import { useAlert } from '../../../contexts/AlertContext';
 import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import BotaoGerarPDF from "../../../components/BotaoGerarPDF/BotaoGerarPDF"; // ✨ IMPORTA O COMPONENTE NOVO AQUI
@@ -21,7 +21,7 @@ const renderBadgeStatus = (status) => {
     case "Em Andamento":
       return <span className="badge-status status-separacao"><RefreshCw size={14} className="animate-spin" /> {status}</span>;
     case "Concluído":
-    case "Reintegrado": 
+    case "Reintegrado":
       return <span className="badge-status status-concluido"><CheckCircle2 size={14} /> {status}</span>;
     case "Cancelado":
     case "Recusado":
@@ -48,7 +48,8 @@ const obterClasseBadgeTipo = (tipo) => {
 
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
-  const { showAlert, showConfirm } = useAlert(); 
+// ✨ CORREÇÃO AQUI: Puxamos as novas funções do AlertContext
+  const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
   const navigate = useNavigate();
 
   const obterNomeFilialDinamico = (codigo) => {
@@ -76,7 +77,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
   const [paginaAtual, setPaginaAtual] = useState(1);
-  
+
   const itensPorPagina = 10;
 
   let usuarioLogado = {};
@@ -85,8 +86,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (dadosUsuario && dadosUsuario !== 'undefined') {
       usuarioLogado = JSON.parse(dadosUsuario);
     }
-  } catch (erro) {}
-  
+  } catch (erro) { }
+
   const token = localStorage.getItem('@NexusLog:token') || '';
   const isOperador = String(usuarioLogado.cargo || '').toLowerCase().trim().includes('operador');
   const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
@@ -98,7 +99,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       try {
         setCarregando(true);
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
-        
+
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
         const [resultadoSol, resultadoEst] = await Promise.all([
@@ -111,17 +112,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         }
 
         if (resultadoSol.sucesso) {
-          const reints = resultadoSol.dados.filter(sol => 
+          const reints = resultadoSol.dados.filter(sol =>
             (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
             (sol.status === 'Em Separação' || sol.status === 'Concluído')
           );
 
-          const cancelamentosAtivos = resultadoSol.dados.filter(sol => 
+          const cancelamentosAtivos = resultadoSol.dados.filter(sol =>
             sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
           );
 
           const dadosFormatados = resultadoSol.dados.map((item) => {
-            let prefixo = "PS"; 
+            let prefixo = "PS";
             const idNumerico = item.id.replace(/\D/g, "");
             let acaoTipo = "select";
             let acaoValor = item.status;
@@ -136,12 +137,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
             let numeroPL = "-";
             if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
-                numeroPL = item.pl || item.bs || "-";
+              numeroPL = item.pl || item.bs || "-";
             }
 
             let statusFinalVisual = item.status;
 
-            const temPedidoDeCancelamento = cancelamentosAtivos.find(canc => 
+            const temPedidoDeCancelamento = cancelamentosAtivos.find(canc =>
               canc.observacoes && canc.observacoes.includes(item.idOriginal)
             );
 
@@ -173,13 +174,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               idOriginal: item.id,
               id: idNumerico || item.id,
               prefixo: prefixo,
-              statusExibicao: statusFinalVisual, 
-              statusDestinoAprovacao: statusDestinoAprovacao, 
+              statusExibicao: statusFinalVisual,
+              statusDestinoAprovacao: statusDestinoAprovacao,
               acaoTipo: acaoTipo,
               acaoValor: acaoValor,
               dataSolicitacao: item.dataSolicitacao || "-",
               dataEntrega: item.dataEntrega || "-",
-              pl: numeroPL, 
+              pl: numeroPL,
               nfCrossdocking: item.nfCrossdocking || null
             };
           });
@@ -247,9 +248,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (dados.sucesso) {
         const solAlterada = dadosTabela.find(s => s.idOriginal === idSolicitacao);
         if (solAlterada && solAlterada.tipo === 'Cancelado' && (novoStatus === 'Em Separação' || novoStatus === 'Concluído')) {
-            showAlert("Cancelamento Aprovado", "O pedido original foi cancelado e o estoque devolvido com sucesso.", "success");
-            setTimeout(() => window.location.reload(), 1500);
-            return;
+          showAlert("Cancelamento Aprovado", "O pedido original foi cancelado e o estoque devolvido com sucesso.", "success");
+          setTimeout(() => window.location.reload(), 1500);
+          return;
         }
 
         setDadosTabela(prev => prev.map(sol => {
@@ -258,7 +259,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             if (dados.numeroPL) {
               novoPl = `PL #${dados.numeroPL}`;
             } else if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && sol.pl === '-') {
-              novoPl = `PL-${sol.id}`; 
+              novoPl = `PL-${sol.id}`;
             }
             return {
               ...sol,
@@ -317,8 +318,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       const dados = await apiFetch(`/solicitacoes/anexo/${anexo.id}`, { method: "DELETE" });
       if (dados.sucesso) {
         setDadosTabela((prev) => prev.map((sol) => {
-            if (sol.idOriginal === idSolicitacao) return { ...sol, anexos: sol.anexos.filter((a) => a.id !== anexo.id) };
-            return sol;
+          if (sol.idOriginal === idSolicitacao) return { ...sol, anexos: sol.anexos.filter((a) => a.id !== anexo.id) };
+          return sol;
         }));
       } else {
         showAlert("Erro", "Não foi possível apagar o anexo.", "error");
@@ -444,15 +445,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                   return (
                     <React.Fragment key={idUnico}>
-                      <tr 
+                      <tr
                         className={isExpandida ? "tr-expandida" : ""}
-                        style={{ 
+                        style={{
                           backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '',
-                          borderBottom: '1px solid #f1f5f9', 
-                          opacity: isRecusadoOuCancelado ? 0.8 : 1 
+                          borderBottom: '1px solid #f1f5f9',
+                          opacity: isRecusadoOuCancelado ? 0.8 : 1
                         }}
                       >
-                        <td className="col-chevron" onClick={() => toggleLinha(idUnico)}><ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: "#94a3b8" }}/></td>
+                        <td className="col-chevron" onClick={() => toggleLinha(idUnico)}><ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: "#94a3b8" }} /></td>
                         <td>
                           <div className="bloco-tipo-id">
                             <span className={`badge-tipo ${obterClasseBadgeTipo(linha.tipo)} ${linha.entregaUrgente ? "badge-urgente-critico" : ""}`}>
@@ -468,14 +469,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             {linha.wbs && <span style={{ fontSize: "0.75rem", color: "#2563eb", fontWeight: "500" }}>{linha.wbs}</span>}
                           </div>
                         </td>
-                        
+
                         {/* ✨ INSERÇÃO DO COMPONENTE LIMPO QUE GERA PDF NA NOVA ABA */}
                         <td>
                           {linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
-                            <BotaoGerarPDF 
-                              linha={linha} 
-                              nomeFilial={obterNomeFilialDinamico(linha.filial || linha.estoque)} 
-                              showAlert={showAlert} 
+                            // Substitua as propriedades que estava a enviar ao BotaoGerarPDF (na linha 373) por estas:
+                            <BotaoGerarPDF
+                              linha={linha}
+                              nomeFilial={obterNomeFilialDinamico(linha.filial || linha.estoque)}
+                              showAlert={showAlert}
+                              showLoading={showLoading}
+                              closeAlert={closeAlert}
                             />
                           ) : (
                             <span className="traco-vazio">—</span>
@@ -488,12 +492,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           </span>
                         </td>
                         <td className="texto-data">{linha.dataSolicitacao}</td>
-                        
+
                         {/* ✨ REGRA APLICADA: SÓ MOSTRA O INPUT SE O STATUS FOR DIFERENTE DE PENDENTE */}
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                              <input 
+                              <input
                                 type="date"
                                 value={linha.dataEntrega && linha.dataEntrega.includes('/') ? linha.dataEntrega.split('/').reverse().join('-') : ''}
                                 onChange={(e) => lidarComMudancaDataEntrega(linha.idOriginal, e.target.value)}
@@ -512,12 +516,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               />
                             </div>
                           ) : (
-                            linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" 
-                              ? <span className="texto-data-verde">{linha.dataEntrega}</span> 
+                            linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—"
+                              ? <span className="texto-data-verde">{linha.dataEntrega}</span>
                               : <span className="traco-vazio">—</span>
                           )}
                         </td>
-                        
+
                         <td>
                           {perfil === "logistica" && !isOperador ? (
                             linha.statusExibicao === 'Reintegrado' ? (
@@ -549,7 +553,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         <tr>
                           <td colSpan="8" className="td-expandida">
                             <DetalhesSolicitacao item={linha} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
-                            
+
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
                               <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
                                 <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
