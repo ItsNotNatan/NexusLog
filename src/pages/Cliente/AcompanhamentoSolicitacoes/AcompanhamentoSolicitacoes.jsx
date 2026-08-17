@@ -420,7 +420,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         className={isExpandida ? "tr-expandida" : ""}
                         style={{ 
                           backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '',
-                          borderBottom: isRecusadoOuCancelado ? '2px solid #ef4444' : '1px solid #f1f5f9',
+                          borderBottom: '1px solid #f1f5f9', // ✨ CORREÇÃO: Remove a borda vermelha espessa
                           opacity: isRecusadoOuCancelado ? 0.8 : 1 
                         }}
                       >
@@ -445,7 +445,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                         <td>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
-                            {/* ✨ A MÁGICA FINAL AQUI: A Tabela agora puxa o nome da filial da Base de Dados! */}
                             <MapPin size={12} /> {obterNomeFilialDinamico(linha.filial || linha.estoque)}
                           </span>
                         </td>
