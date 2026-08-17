@@ -63,9 +63,12 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
         getBase64ImageFromURL(logoComau).catch(() => null)
       ]);
 
+      // ✨ IDENTIFICAÇÃO DO TIPO DE SOLICITAÇÃO
+      const isCrossdocking = linha.tipo === 'Crossdocking';
+      const isReintegracao = linha.tipo === 'Reintegracao' || linha.tipo === 'Reintegração';
+
       // A data de necessidade está vinculada à solicitação global (linha)
       const dataNecessidadeFormatada = formatarDataSimples(linha.data_necessidade || linha.dataNecessidade);
-      const isCrossdocking = linha.tipo === 'Crossdocking';
 
       // Monta as linhas da tabela mapeando os campos exatos do banco
       let linhasItens = [];
@@ -99,6 +102,11 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
         linhasItens = [[{ text: 'Nenhum item individual detalhado nesta solicitação.', colSpan: 17, alignment: 'center', margin: [0, 10], color: '#94a3b8' }, ...Array(16).fill({})]];
       }
 
+      // ✨ TÍTULOS DINÂMICOS
+      const tituloPrincipal = isReintegracao 
+        ? 'BOLETIM DE REINTEGRAÇÃO DE ESTOQUE' 
+        : `BOLETIM DETALHADO / ${linha.tipo ? linha.tipo.toUpperCase() : 'DOCUMENTO'}`;
+
       const docDefinition = {
         // Folha A4 na horizontal para caber as 17 colunas
         pageSize: 'A4',
@@ -120,7 +128,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
             color: '#2563eb', 
             margin: [0, 0, 0, 5] 
           },
-          { text: `BOLETIM DETALHADO / ${linha.tipo ? linha.tipo.toUpperCase() : 'DOCUMENTO'}`, style: 'headerSub' },
+          { text: tituloPrincipal, style: 'headerSub' },
           // Linha divisória adaptada para o tamanho landscape
           { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 781, y2: 3, lineWidth: 1.5, lineColor: '#2563eb' }] },
           
@@ -130,7 +138,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
           {
             margin: [0, 15, 0, 15],
             columns: [
-              { text: [{ text: 'Nº PL / DOCUMENTO: ', bold: true, color: '#1e293b' }, { text: linha.pl || 'N/A', color: '#2563eb', fontSize: 12, bold: true }] },
+              { text: [{ text: isReintegracao ? 'Nº DOCUMENTO: ' : 'Nº PL / DOCUMENTO: ', bold: true, color: '#1e293b' }, { text: linha.pl || 'N/A', color: '#2563eb', fontSize: 12, bold: true }] },
               { text: [{ text: 'Identificador (PS): ', bold: true, color: '#1e293b' }, `${linha.prefixo}:${linha.id}`], alignment: 'right' }
             ]
           },
@@ -147,12 +155,12 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
             table: {
               widths: [150, '*'],
               body: [
-                [{ text: 'Solicitante:', bold: true, margin: [0, 4] }, { text: linha.solicitante || 'N/A', margin: [0, 4] }],
+                [{ text: isReintegracao ? 'Devolvido Por:' : 'Solicitante:', bold: true, margin: [0, 4] }, { text: linha.solicitante || 'N/A', margin: [0, 4] }],
                 [{ text: 'WBS / Destino Geral:', bold: true, margin: [0, 4] }, { text: linha.wbs || 'N/A', margin: [0, 4] }],
                 [{ text: 'Filial / Base:', bold: true, margin: [0, 4] }, { text: nomeFilial || 'N/A', margin: [0, 4] }],
                 [{ text: 'Data do Registo:', bold: true, margin: [0, 4] }, { text: linha.dataSolicitacao || 'N/A', margin: [0, 4] }],
                 [{ text: 'Tipo Operação:', bold: true, margin: [0, 4] }, { text: linha.tipo || 'N/A', margin: [0, 4] }],
-                // ✨ SE FOR CROSSDOCKING, ADICIONA A NF VINCULADA NAS INFORMAÇÕES PRINCIPAIS
+                // SE FOR CROSSDOCKING, ADICIONA A NF VINCULADA NAS INFORMAÇÕES PRINCIPAIS
                 ...(linha.nfCrossdocking ? [
                   [{ text: 'NF Vinculada (Crossdocking):', bold: true, margin: [0, 4], color: '#b45309' }, { text: linha.nfCrossdocking, margin: [0, 4], bold: true, color: '#d97706' }]
                 ] : [])
@@ -166,7 +174,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
           // TABELA DE ITENS EXTREMAMENTE DETALHADA
           // ==========================================
           {
-            table: { widths: ['*'], body: [[{ text: `DETALHAMENTO DE ITENS DA SOLICITAÇÃO`, style: 'sectionTitle', fillColor: '#f1f5f9' }]] },
+            table: { widths: ['*'], body: [[{ text: isReintegracao ? `ITENS DEVOLVIDOS AO ESTOQUE` : `DETALHAMENTO DE ITENS DA SOLICITAÇÃO`, style: 'sectionTitle', fillColor: '#f1f5f9' }]] },
             layout: 'noBorders',
             margin: [0, 0, 0, 4]
           },
@@ -181,7 +189,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
                   { text: 'Nº PEÇA FAB.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
                   { text: 'FORNECEDOR', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
                   { text: 'REFERÊNCIA', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'QTD. FORN.', bold: true, alignment: 'center', fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
+                  // ✨ COLUNA DINÂMICA: QTD. FORNECIDA vs QTD. DEVOLVIDA
+                  { text: isReintegracao ? 'QTD. DEVOLVIDA' : 'QTD. FORN.', bold: true, alignment: 'center', fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
                   { text: 'NF DE ENT.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
                   { text: 'UNID.', bold: true, alignment: 'center', fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
                   { text: 'VENDOR DESC.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
@@ -224,7 +233,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
                 width: '*',
                 stack: [
                   { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
-                  { text: 'Solicitante', style: 'signatureLabel', margin: [0, 5, 0, 2] },
+                  { text: isReintegracao ? 'Entregue por (Solicitante)' : 'Solicitante', style: 'signatureLabel', margin: [0, 5, 0, 2] },
                   { text: linha.solicitante, fontSize: 9, color: '#64748b' }
                 ],
                 alignment: 'center'
@@ -233,7 +242,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
                 width: '*',
                 stack: [
                   { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
-                  { text: 'Responsável Almoxarifado / Logística', style: 'signatureLabel', margin: [0, 5, 0, 2] },
+                  { text: isReintegracao ? 'Recebido por (Almoxarifado)' : 'Responsável Almoxarifado / Logística', style: 'signatureLabel', margin: [0, 5, 0, 2] },
                   { text: 'Data e Assinatura', fontSize: 9, color: '#64748b' }
                 ],
                 alignment: 'center'
