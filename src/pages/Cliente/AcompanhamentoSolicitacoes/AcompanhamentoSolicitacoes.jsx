@@ -279,12 +279,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  // ✨ ATUALIZAÇÃO DA DATA DE ENTREGA INTERATIVA (LOGÍSTICA)
+  // ✨ ATUALIZAÇÃO DA DATA DE ENTREGA INTERATIVA (LOGÍSTICA) - CORRIGIDA
   const lidarComMudancaDataEntrega = async (idSolicitacao, novaData) => {
     try {
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/local`, {
         method: 'PATCH',
-        body: JSON.stringify({ data_necessidade: novaData })
+        // ✨ AGORA ENVIA A PROPRIEDADE CORRETA: data_entrega
+        body: JSON.stringify({ data_entrega: novaData })
       });
 
       if (dados.sucesso) {
@@ -421,7 +422,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>FILIAL</th>
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
-                <th>STATUS</th>
+                
+                {/* AÇÕES COMBINADO COM STATUS NA MESMA COLUNA */}
+                <th>STATUS {perfil === "logistica" && "/ AÇÃO"}</th>
               </tr>
             </thead>
             <tbody>
@@ -535,6 +538,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                       {isExpandida && (
                         <tr>
+                          {/* ColSpan reduzido de 9 para 8, visto que tirámos a coluna Ações */}
                           <td colSpan="8" className="td-expandida">
                             <DetalhesSolicitacao item={linha} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
                             
