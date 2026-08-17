@@ -2,8 +2,8 @@ import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
-  Search, ChevronRight, ChevronLeft, GitBranch,
-  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin
+  Search, ChevronRight, ChevronLeft, GitBranch, FileText,
+  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, Calendar
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -489,8 +489,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                         <td className="texto-data">{linha.dataSolicitacao}</td>
                         
+                        {/* ✨ REGRA APLICADA: SÓ MOSTRA O INPUT SE O STATUS FOR DIFERENTE DE PENDENTE */}
                         <td>
-                          {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado ? (
+                          {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                               <input 
                                 type="date"
@@ -507,6 +508,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                   outline: 'none',
                                   cursor: 'pointer'
                                 }}
+                                title="Altere a data de entrega"
                               />
                             </div>
                           ) : (
