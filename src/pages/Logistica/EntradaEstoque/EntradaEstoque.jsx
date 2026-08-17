@@ -1,6 +1,6 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import './EntradaEstoque.css';
-import { User, Send, Paperclip, X } from 'lucide-react';
+import { User, Send, Paperclip, X, Truck } from 'lucide-react';
 
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
@@ -9,8 +9,6 @@ import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal
 import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; 
 import { AuthContext } from '../../../contexts/AuthContext';
 import { supabase } from '../../../supabaseClient';
-
-// 1. IMPORTAÇÃO DA NOSSA FUNÇÃO CENTRALIZADA
 import { apiFetch } from '../../../services/api';
 
 const LIMITE_LOGISTICA = 60;
@@ -28,7 +26,36 @@ export default function EntradaEstoque() {
 
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
+  
+  // ✨ NOVO ESTADO: Guarda as NFs que estão aguardando Crossdocking
+  const [nfsCrossdocking, setNfsCrossdocking] = useState([]);
   const processador = useProcessadorExcel();
+
+  // ✨ NOVO EFEITO: Busca as solicitações de Crossdocking Pendentes no banco de dados
+  useEffect(() => {
+    const buscarCrossdockingPendente = async () => {
+      try {
+        const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
+        // Filtramos para buscar apenas Crossdockings que ainda estão Pendentes
+        const resultado = await apiFetch(`/solicitacoes/listar?tipo=Crossdocking&status=Pendente&filial=${filialFiltro}&limit=1000`);
+        
+        if (resultado.sucesso && resultado.dados) {
+          // Extraímos apenas os números das NFs desses pedidos
+          const nfsAguardadas = resultado.dados
+            .map(sol => sol.nfCrossdocking)
+            .filter(Boolean); // Remove os nulos/vazios
+            
+          setNfsCrossdocking(nfsAguardadas);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar crossdockings pendentes:", error);
+      }
+    };
+
+    if (estoqueAtual) {
+      buscarCrossdockingPendente();
+    }
+  }, [estoqueAtual]);
 
   const handleImportarExcel = async (arquivo) => {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
@@ -83,7 +110,6 @@ export default function EntradaEstoque() {
   };
 
   const handleEnviar = async () => {
-    // ✨ CORREÇÃO CRÍTICA: Bloqueia a inserção cega se "Todas as Filiais" estiver selecionado
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       alert("⚠️ AÇÃO BLOQUEADA: Por favor, selecione uma filial específica no topo da página antes de registar a entrada.");
       return;
@@ -153,6 +179,16 @@ export default function EntradaEstoque() {
     }
   };
 
+  // ✨ LÓGICA DO INDICADOR: Verifica se alguma NF digitada na tabela bate com as NFs pendentes
+  const nfsNormalizadas = nfsCrossdocking.map(nf => String(nf).trim().toUpperCase());
+  const nfsNaTabela = itens
+    .map(i => String(i.nfEntrada || '').trim().toUpperCase())
+    .filter(nf => nf !== '' && nfsNormalizadas.includes(nf));
+    
+  // Tira duplicatas para exibir no alerta
+  const nfsUnicasEncontradas = [...new Set(nfsNaTabela)];
+  const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
+
   return (
     <div className="estoque-wrapper">
       <ModalProcessamento estaProcessando={processador.estaProcessando} concluido={processador.concluido} estadoProgresso={processador.estadoProgresso} resultado={processador.resultado} erroFatal={processador.erroFatal} onClose={processador.resetarProcessador} />
@@ -161,6 +197,28 @@ export default function EntradaEstoque() {
         <h1>Entrada de Estoque</h1>
         <p>Cadastro detalhado de itens — Back-Office Logística</p>
       </header>
+
+      {/* ✨ BANNER DE AVISO DE CROSSDOCKING */}
+      {temCrossdockingAguardando && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '16px',
+          backgroundColor: '#e0f2fe', border: '1px solid #bae6fd',
+          padding: '16px 24px', borderRadius: '12px', marginBottom: '24px',
+          color: '#0369a1', animation: 'fadeIn 0.3s ease-in-out'
+        }}>
+          <div style={{ backgroundColor: '#bae6fd', padding: '10px', borderRadius: '50%', color: '#0284c7' }}>
+            <Truck size={24} />
+          </div>
+          <div>
+            <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '4px' }}>
+              Crossdocking Identificado!
+            </strong>
+            <span style={{ fontSize: '0.85rem' }}>
+              A Nota Fiscal <strong>{nfsUnicasEncontradas.join(', ')}</strong> pertence a uma solicitação de Crossdocking pendente. Ao registar esta entrada, o pedido de Crossdocking ficará automaticamente disponível para separação!
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="estoque-cartao form-cartao">
         <div className="form-header">
