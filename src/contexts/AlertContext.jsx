@@ -7,14 +7,15 @@ const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" heigh
 const AlertIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 const ErrorIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>;
 const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>;
+const LoadingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="spin-icon"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
 
 export const AlertContext = createContext();
 
 export const AlertProvider = ({ children }) => {
   const [alertConfig, setAlertConfig] = useState(null);
 
-  // Fecha o alerta
-  const fechar = useCallback(() => {
+  // Fecha o alerta de forma programática
+  const closeAlert = useCallback(() => {
     setAlertConfig(null);
   }, []);
 
@@ -22,39 +23,51 @@ export const AlertProvider = ({ children }) => {
   const showAlert = useCallback((title, message, type = 'info') => {
     setAlertConfig({
       isConfirm: false,
+      hideButton: false,
       title,
       message,
       type,
-      onConfirm: fechar
+      onConfirm: closeAlert
     });
-  }, [fechar]);
+  }, [closeAlert]);
+
+  // ✨ NOVO: Chama um alerta sem botões e com ícone de carregamento
+  const showLoading = useCallback((title, message) => {
+    setAlertConfig({
+      isConfirm: false,
+      hideButton: true, // Esconde os botões
+      title,
+      message,
+      type: 'loading'
+    });
+  }, []);
 
   // Chama um alerta de confirmação (Retorna uma Promise, ótimo para await!)
   const showConfirm = useCallback((title, message, type = 'warning', confirmText = 'Confirmar') => {
     return new Promise((resolve) => {
       setAlertConfig({
         isConfirm: true,
+        hideButton: false,
         title,
         message,
         type,
         confirmText,
         onConfirm: () => {
-          fechar();
-          resolve(true); // O usuário clicou no botão principal
+          closeAlert();
+          resolve(true); 
         },
         onCancel: () => {
-          fechar();
-          resolve(false); // O usuário clicou em cancelar
+          closeAlert();
+          resolve(false); 
         }
       });
     });
-  }, [fechar]);
+  }, [closeAlert]);
 
   return (
-    <AlertContext.Provider value={{ showAlert, showConfirm }}>
+    <AlertContext.Provider value={{ showAlert, showConfirm, showLoading, closeAlert }}>
       {children}
 
-      {/* Renderiza o Portal na tela se houver alguma config ativa */}
       {alertConfig && createPortal(
         <div className="alert-overlay">
           <div className="alert-card">
@@ -65,6 +78,7 @@ export const AlertProvider = ({ children }) => {
                 {alertConfig.type === 'warning' && <AlertIcon />}
                 {alertConfig.type === 'error' && <ErrorIcon />}
                 {alertConfig.type === 'info' && <InfoIcon />}
+                {alertConfig.type === 'loading' && <LoadingIcon />}
               </div>
               <h3 className="alert-title">{alertConfig.title}</h3>
             </div>
@@ -73,19 +87,22 @@ export const AlertProvider = ({ children }) => {
               <p>{alertConfig.message}</p>
             </div>
 
-            <div className="alert-footer">
-              {alertConfig.isConfirm && (
-                <button className="alert-btn alert-btn--cancel" onClick={alertConfig.onCancel}>
-                  Cancelar
+            {/* ✨ OS BOTÕES SÓ APARECEM SE hideButton FOR FALSE */}
+            {!alertConfig.hideButton && (
+              <div className="alert-footer">
+                {alertConfig.isConfirm && (
+                  <button className="alert-btn alert-btn--cancel" onClick={alertConfig.onCancel}>
+                    Cancelar
+                  </button>
+                )}
+                <button 
+                  className={`alert-btn ${alertConfig.type === 'error' ? 'alert-btn--error' : 'alert-btn--confirm'}`} 
+                  onClick={alertConfig.onConfirm}
+                >
+                  {alertConfig.isConfirm ? alertConfig.confirmText : 'OK'}
                 </button>
-              )}
-              <button 
-                className={`alert-btn ${alertConfig.type === 'error' ? 'alert-btn--error' : 'alert-btn--confirm'}`} 
-                onClick={alertConfig.onConfirm}
-              >
-                {alertConfig.isConfirm ? alertConfig.confirmText : 'OK'}
-              </button>
-            </div>
+              </div>
+            )}
 
           </div>
         </div>,
