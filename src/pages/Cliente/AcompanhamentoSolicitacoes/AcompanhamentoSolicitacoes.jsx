@@ -2,14 +2,15 @@ import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
-  Search, ChevronRight, ChevronLeft, GitBranch, FileText,
-  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, Calendar
+  Search, ChevronRight, ChevronLeft, GitBranch,
+  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext'; 
 import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
+import BotaoGerarPDF from "../../../components/BotaoGerarPDF/BotaoGerarPDF"; // ✨ IMPORTA O COMPONENTE NOVO AQUI
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
 
@@ -467,9 +468,20 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             {linha.wbs && <span style={{ fontSize: "0.75rem", color: "#2563eb", fontWeight: "500" }}>{linha.wbs}</span>}
                           </div>
                         </td>
+                        
+                        {/* ✨ INSERÇÃO DO COMPONENTE LIMPO QUE GERA PDF NA NOVA ABA */}
                         <td>
-                          {linha.pl && linha.pl !== "-" && linha.pl !== "—" ? <span className="badge-pl"><FileText size={14} /> {linha.pl}</span> : <span className="traco-vazio">—</span>}
+                          {linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
+                            <BotaoGerarPDF 
+                              linha={linha} 
+                              nomeFilial={obterNomeFilialDinamico(linha.filial || linha.estoque)} 
+                              showAlert={showAlert} 
+                            />
+                          ) : (
+                            <span className="traco-vazio">—</span>
+                          )}
                         </td>
+
                         <td>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
                             <MapPin size={12} /> {obterNomeFilialDinamico(linha.filial || linha.estoque)}
@@ -477,7 +489,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                         <td className="texto-data">{linha.dataSolicitacao}</td>
                         
-                        {/* ✨ DATA DE ENTREGA EDITAVEL PARA A LOGISTICA CORRIGIDA (Com Value!) */}
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>

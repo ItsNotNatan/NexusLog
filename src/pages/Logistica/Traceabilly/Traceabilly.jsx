@@ -1,17 +1,23 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, Archive, Calendar, User, Box, ArrowRight } from 'lucide-react';
+import { Search, Loader2, Archive, Calendar, User, Box, ArrowRight, RotateCcw } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 import './Traceabilly.css';
 
 export default function Traceabilly({ perfil }) {
-  const { estoqueAtual } = useContext(AuthContext);
-  const { showAlert } = useAlert();
+  const { estoqueAtual, filiaisGlobais, usuario } = useContext(AuthContext);
+  const { showAlert, showConfirm } = useAlert();
 
   const [itensArquivados, setItensArquivados] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
+  
+  // Gatilho para recarregar a tabela após uma reversão bem sucedida
+  const [recarregar, setRecarregar] = useState(0);
+
+  // ✨ VERIFICAÇÃO DE PERMISSÃO: Apenas ADM e LÍDER no perfil logística podem reverter
+  const isAdminOuLider = perfil !== 'cliente' && (usuario?.cargo === 'ADM' || usuario?.cargo === 'LIDER');
 
   const formatarData = (dataISO) => {
     if (!dataISO) return '-';
@@ -36,24 +42,24 @@ export default function Traceabilly({ perfil }) {
         const resposta = await apiFetch(`/solicitacoes/listar${urlParams}`);
         
         if (resposta.sucesso) {
-          // Filtrar as movimentações concluídas, ativas ou reintegradas
           const movimentos = resposta.dados.filter(sol => 
             sol.status === 'Em Separação' || sol.status === 'Concluído' || sol.status === 'Reintegrado' || sol.status === 'Cancelado'
           );
 
-          // "Descompactar" cada solicitação para extrair a lista de itens individualmente
           const itemsList = [];
           movimentos.forEach(sol => {
             if (sol.itens && sol.itens.length > 0) {
               sol.itens.forEach(it => {
                 itemsList.push({
                   idUnico: `${sol.id}-${it.id}`,
+                  idItem: it.id, // ID real na tabela 'solicitacoes_itens' necessário para a API
+                  tipoOriginal: sol.tipo, // Necessário para bloquear a reversão de "Entradas"
                   desenhoSAP: it.desenho_sap_manual || '-',
                   partNumber: it.part_number_manual || '-',
                   descricao: it.descricao_manual || 'Sem descrição',
                   fornecedor: it.fornecedor || '-',
                   nfEntrada: it.nf_entrada || '-',
-                  bsSaida: sol.pl || '-', // Usamos o PL gerado como BS de Saída
+                  bsSaida: sol.pl || '-', 
                   solicitacao: sol.ps || '-',
                   solicitante: sol.solicitante || '-',
                   alocacao: it.alocacao || sol.tipo || '-',
@@ -80,9 +86,44 @@ export default function Traceabilly({ perfil }) {
     if (estoqueAtual) {
       buscarHistorico();
     }
-  }, [estoqueAtual, showAlert]);
+  }, [estoqueAtual, showAlert, recarregar]);
 
-  // Filtro Global da Tabela
+  // ✨ LÓGICA DE REVERTER ITEM AO ESTOQUE
+  const handleReverterItem = async (idItem) => {
+    if (!idItem) {
+      showAlert("Erro", "ID do item não encontrado.", "error");
+      return;
+    }
+
+    const confirmar = await showConfirm(
+      "Reverter Item",
+      "Tem a certeza que deseja devolver este item ao estoque? A quantidade será reposta e o registo de saída apagado permanentemente.",
+      "warning",
+      "Sim, Reverter"
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setCarregando(true);
+      const resposta = await apiFetch('/solicitacoes/reverter', {
+        method: 'POST',
+        body: JSON.stringify({ id_item: idItem })
+      });
+
+      if (resposta.sucesso) {
+        showAlert("Sucesso", "Item revertido para o estoque com sucesso!", "success");
+        setRecarregar(prev => prev + 1); // Dispara a recarga da tabela
+      } else {
+        showAlert("Erro de Servidor", resposta.erro, "error");
+      }
+    } catch (error) {
+      showAlert("Falha de Conexão", "Não foi possível comunicar com o servidor ao reverter o item.", "error");
+    } finally {
+      setCarregando(false);
+    }
+  };
+
   const historicoFiltrado = itensArquivados.filter(item => 
     (item.partNumber && item.partNumber.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
     (item.nfEntrada && item.nfEntrada.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
@@ -96,7 +137,6 @@ export default function Traceabilly({ perfil }) {
     <div className="traceabilly-wrapper">
       <div className="traceabilly-card">
         
-        {/* HEADER PRINCIPAL */}
         <div className="traceabilly-header">
           <div className="header-esquerda">
             <Archive size={20} className="icone-azul" />
@@ -115,7 +155,6 @@ export default function Traceabilly({ perfil }) {
           </div>
         </div>
 
-        {/* SUB-HEADER (Ícones Info) */}
         <div className="traceabilly-subheader">
           <div className="subheader-item">
             <User size={14} /> Quem solicitou
@@ -128,7 +167,6 @@ export default function Traceabilly({ perfil }) {
           </div>
         </div>
 
-        {/* TABELA DE DADOS DESCOMPACTADA */}
         <div className="tabela-container">
           {carregando ? (
             <div className="estado-vazio"><Loader2 className="animate-spin" size={32} /> A carregar histórico...</div>
@@ -151,6 +189,8 @@ export default function Traceabilly({ perfil }) {
                   <th>VALOR UNIT.</th>
                   <th>WBS</th>
                   <th>DATA SAÍDA</th>
+                  {/* ✨ COLUNA AÇÕES SÓ PARA LÍDER OU ADM */}
+                  {isAdminOuLider && <th style={{ textAlign: 'center' }}>AÇÃO</th>}
                 </tr>
               </thead>
               <tbody>
@@ -190,6 +230,24 @@ export default function Traceabilly({ perfil }) {
                     </td>
                     <td className="texto-azul" title={item.wbs}>{item.wbs}</td>
                     <td>{item.dataSaida}</td>
+                    
+                    {/* ✨ RENDERIZAÇÃO CONDICIONAL DO BOTÃO REVERTER */}
+                    {isAdminOuLider && (
+                      <td style={{ textAlign: 'center' }}>
+                        {/* Bloqueamos a reversão de Entradas, Notas Fiscais e Cancelamentos para não corromper o estoque */}
+                        {['Material', 'Transferencia WBS', 'Crossdocking'].includes(item.tipoOriginal) ? (
+                          <button 
+                            onClick={() => handleReverterItem(item.idItem)} 
+                            className="btn-reverter"
+                            title="Reverter item para o estoque"
+                          >
+                            <RotateCcw size={18} />
+                          </button>
+                        ) : (
+                          <span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>-</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
