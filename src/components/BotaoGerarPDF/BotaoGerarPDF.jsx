@@ -65,29 +65,39 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
 
       // A data de necessidade está vinculada à solicitação global (linha)
       const dataNecessidadeFormatada = formatarDataSimples(linha.data_necessidade || linha.dataNecessidade);
+      const isCrossdocking = linha.tipo === 'Crossdocking';
 
       // Monta as linhas da tabela mapeando os campos exatos do banco
-      const linhasItens = (linha.itens && linha.itens.length > 0)
-        ? linha.itens.map((it) => [
-            { text: it.desenho_sap_manual || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.part_number_manual || '-', margin: [0, 4], fontSize: 6, bold: true, color: '#1e293b' },
-            { text: it.fornecedor || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.referencia || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.quantidade_solicitada || '-', alignment: 'center', margin: [0, 4], fontSize: 6, bold: true, color: '#2563eb' },
-            { text: it.nf_entrada || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.unidade_medida_manual || 'Un', alignment: 'center', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.descricao_manual || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.wbs_element || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: dataNecessidadeFormatada, margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: formatarDataSimples(it.emissao_nf), margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: formatarDataSimples(it.receb_nf), margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.documento_compras || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.centro || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.deposito || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-            { text: it.alocacao || '-', margin: [0, 4], fontSize: 6, color: '#475569' }
-          ])
-        : [[{ text: 'Nenhum item individual detalhado nesta solicitação.', colSpan: 17, alignment: 'center', margin: [0, 10], color: '#94a3b8' }, ...Array(16).fill({})]];
+      let linhasItens = [];
+
+      if (linha.itens && linha.itens.length > 0) {
+        linhasItens = linha.itens.map((it) => [
+          { text: it.desenho_sap_manual || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.part_number_manual || '-', margin: [0, 4], fontSize: 6, bold: true, color: '#1e293b' },
+          { text: it.fornecedor || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.referencia || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.quantidade_solicitada || '-', alignment: 'center', margin: [0, 4], fontSize: 6, bold: true, color: '#2563eb' },
+          // Se for Crossdocking e não tiver NF no item, puxa a NF global da solicitação
+          { text: it.nf_entrada || linha.nfCrossdocking || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.unidade_medida_manual || 'Un', alignment: 'center', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.descricao_manual || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.wbs_element || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: dataNecessidadeFormatada, margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: formatarDataSimples(it.emissao_nf), margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: formatarDataSimples(it.receb_nf), margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.documento_compras || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.centro || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.deposito || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
+          { text: it.alocacao || '-', margin: [0, 4], fontSize: 6, color: '#475569' }
+        ]);
+      } else if (isCrossdocking) {
+        // Se for Crossdocking de Saída Total (sem itens)
+        linhasItens = [[{ text: `Saída Total (Crossdocking). Todos os volumes referentes à NF ${linha.nfCrossdocking || ''} estão incluídos. Consulte o anexo.`, colSpan: 17, alignment: 'center', margin: [0, 10], color: '#d97706', bold: true }, ...Array(16).fill({})]];
+      } else {
+        // Padrão vazio genérico
+        linhasItens = [[{ text: 'Nenhum item individual detalhado nesta solicitação.', colSpan: 17, alignment: 'center', margin: [0, 10], color: '#94a3b8' }, ...Array(16).fill({})]];
+      }
 
       const docDefinition = {
         // Folha A4 na horizontal para caber as 17 colunas
@@ -141,7 +151,11 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
                 [{ text: 'WBS / Destino Geral:', bold: true, margin: [0, 4] }, { text: linha.wbs || 'N/A', margin: [0, 4] }],
                 [{ text: 'Filial / Base:', bold: true, margin: [0, 4] }, { text: nomeFilial || 'N/A', margin: [0, 4] }],
                 [{ text: 'Data do Registo:', bold: true, margin: [0, 4] }, { text: linha.dataSolicitacao || 'N/A', margin: [0, 4] }],
-                [{ text: 'Tipo Operação:', bold: true, margin: [0, 4] }, { text: linha.tipo || 'N/A', margin: [0, 4] }]
+                [{ text: 'Tipo Operação:', bold: true, margin: [0, 4] }, { text: linha.tipo || 'N/A', margin: [0, 4] }],
+                // ✨ SE FOR CROSSDOCKING, ADICIONA A NF VINCULADA NAS INFORMAÇÕES PRINCIPAIS
+                ...(linha.nfCrossdocking ? [
+                  [{ text: 'NF Vinculada (Crossdocking):', bold: true, margin: [0, 4], color: '#b45309' }, { text: linha.nfCrossdocking, margin: [0, 4], bold: true, color: '#d97706' }]
+                ] : [])
               ]
             },
             layout: 'lightHorizontalLines',
@@ -275,7 +289,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert }) {
         alignItems: 'center',
         gap: '4px'
       }}
-      title="Clique para abrir o Boletim em PDF numa nova aba"
+      title="Clique para abrir o Boletim Detalhado em PDF numa nova aba"
       onMouseOver={(e) => { 
         if(!gerando) {
           e.currentTarget.style.backgroundColor = '#dbeafe'; 
