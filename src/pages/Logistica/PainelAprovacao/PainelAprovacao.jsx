@@ -36,6 +36,22 @@ const obterNomeFilial = (codigo) => {
   }
 };
 
+// ✨ FUNÇÃO ADICIONADA: Define as cores conforme o tipo da solicitação
+const obterClasseBadgeTipo = (tipo) => {
+  switch (tipo) {
+    case "Transfer. WBS":
+    case "Transferencia WBS": return "badge-tipo-amarelo";
+    case "Nota Fiscal": return "badge-tipo-roxo";
+    case "Entrada": return "badge-tipo-verde";
+    case "Crossdocking": return "badge-tipo-ciano";
+    case "Reintegração":
+    case "Reintegracao": return "badge-tipo-laranja";
+    case "Cancelado": return "badge-tipo-vermelho";
+    case "Material":
+    default: return "badge-tipo-azul";
+  }
+};
+
 export default function PainelAprovacao() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert, showConfirm } = useAlert();
@@ -72,8 +88,6 @@ export default function PainelAprovacao() {
 
         if (resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados
-            // ✨ CORREÇÃO: Mantemos apenas o que está "Pendente". 
-            // O Backend já se encarrega de mudar o status da original para "Cancelado" assim que a logística aprova o cancelamento!
             .filter(item => item.status === 'Pendente')
             .map((item) => {
               let valorTotal = 0;
@@ -250,7 +264,6 @@ export default function PainelAprovacao() {
 
           if (solAprovada && solAprovada.tipo === 'Cancelado') {
             showAlert("Cancelamento Aprovado", "O pedido original foi cancelado no sistema e o estoque devolvido com sucesso.", "success");
-            // Atualiza para limpar a original que ficou 'Cancelado' na base de dados
             setTimeout(() => window.location.reload(), 1500); 
             return;
           }
@@ -535,7 +548,8 @@ export default function PainelAprovacao() {
                           <div className="item-info-principal">
                             <div className="item-linha-id">
                               {linha.ps}
-                              <span className="badge-tipo-lista azul">{linha.tipo}</span>
+                              {/* ✨ AQUI ESTÁ A CHAMADA DA CLASSE DE COR DINÂMICA */}
+                              <span className={`badge-tipo-lista ${obterClasseBadgeTipo(linha.tipo)}`}>{linha.tipo}</span>
                             </div>
                             <div className="item-meta-info">
                               WBS: <a href="#" className="link-wbs">{linha.wbs}</a> &middot;
@@ -626,7 +640,8 @@ export default function PainelAprovacao() {
                           <div className="item-info-principal">
                             <div className="item-linha-id">
                               {linha.ps}
-                              <span className="badge-tipo-lista verde">Entrada</span>
+                              {/* ✨ AQUI ESTÁ A CHAMADA DA CLASSE DE COR DINÂMICA */}
+                              <span className={`badge-tipo-lista ${obterClasseBadgeTipo(linha.tipo)}`}>{linha.tipo}</span>
                             </div>
                             <div className="item-meta-info">
                               WBS: <a href="#" className="link-wbs">{linha.wbs}</a> &middot;
