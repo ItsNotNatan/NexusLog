@@ -28,7 +28,7 @@ export default function Sidebar({ modulo }) {
     { path: '/logistica/formatacao-sap', label: 'Formatação SAP', icon: <FileSpreadsheet size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/transferencia-estoque', label: 'Transferência de Estoque', icon: <ArrowLeftRight size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/entrada-estoque', label: 'Entrada de Estoque', icon: <PackagePlus size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
-    { path: '/logistica/visao-geral', label: 'Visão Geral do Estoque', icon: <Boxes size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
+    { path: '/logistica/visao-geral', label: 'Consulta de Estoque', icon: <Boxes size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/traceabilly', label: 'Histórico', icon: <Archive size={20} />, roles: ['ADM', 'LIDER', 'OPERADOR'] },
     { path: '/logistica/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['ADM', 'LIDER'] },
     { path: '/logistica/exportar', label: 'Exportar Dados (PS)', icon: <Download size={20} />, roles: ['ADM', 'LIDER'] },
