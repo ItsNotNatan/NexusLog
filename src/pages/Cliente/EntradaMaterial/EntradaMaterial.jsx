@@ -197,19 +197,7 @@ export default function EntradaMaterial() {
           <div className="input-grupo span-2"><label>OBSERVAÇÕES</label><textarea className="input-campo foco-verde" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea></div>
         </div>
       </div>
-
-      <TabelaInsercaoItens
-        itens={itens}
-        dataMinima={dataMinima}
-        mostrarDataNecessidade={true}
-        mostrarExemploExcel={true}
-        limiteLinhas={LIMITE_CLIENTE}
-        onAtualizarCampo={atualizarCampo}
-        onRemoverItem={removerItem}
-        onAdicionarLinha={adicionarLinhaEmBranco}
-        onImportarExcel={handleImportarExcel}
-      />
-
+      
       <div className="form-cartao">
         <div className="input-grupo">
           <label>ANEXOS (OPCIONAL - Notas Fiscais, Manuais, Fotos)</label>
@@ -228,6 +216,18 @@ export default function EntradaMaterial() {
           )}
         </div>
       </div>
+
+      <TabelaInsercaoItens
+        itens={itens}
+        dataMinima={dataMinima}
+        mostrarDataNecessidade={true}
+        mostrarExemploExcel={true}
+        limiteLinhas={LIMITE_CLIENTE}
+        onAtualizarCampo={atualizarCampo}
+        onRemoverItem={removerItem}
+        onAdicionarLinha={adicionarLinhaEmBranco}
+        onImportarExcel={handleImportarExcel}
+      />
 
       <BotaoAcaoGlobal texto="Registrar Entrada" icone={<Send size={16} />} cor="verde" onClick={handleEnviar} />
     </div>
