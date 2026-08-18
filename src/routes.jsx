@@ -70,7 +70,6 @@ export const router = createBrowserRouter([
           { path: "traceabilly", element: <Traceabilly perfil="logistica" /> },
           { path: "painel", element: <AcompanhamentoSolicitacoes perfil="logistica" /> },
           { path: "visao-geral", element: <VisaoGeralEstoque /> },
-          // ✨ NOVA ROTA REGISTADA AQUI
           { path: "transferencia-estoque", element: <TransferenciaEstoque /> },
 
           {
