@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
-import { Search, X, PackageOpen, Loader, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, RotateCcw, XCircle, FileText, Edit } from 'lucide-react'; // ✨ EDIT IMPORTADO
+// =================================================================
+// ARQUIVO: src/components/TabelaDemandas/TabelaDemandas.jsx
+// DESCRIÇÃO: Tabela de listagem com duplo-clique para ver Itens da Solicitação
+// =================================================================
+import React, { useState, useEffect } from 'react';
+import { Search, X, PackageOpen, Loader, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, RotateCcw, XCircle, FileText, Edit, ChevronLeft, ChevronRight } from 'lucide-react'; // ✨ CHEVRONS IMPORTADOS PARA A PAGINAÇÃO
 
 import { apiFetch } from '../../services/api';
 
@@ -13,6 +17,10 @@ export default function TabelaDemandas({ dados = [] }) {
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [filtoStatus, setFiltoStatus] = useState('Todos os Status');
 
+  // ✨ NOVOS ESTADOS: Controle de Paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 7;
+
   const renderFluxo = (tipo) => {
     switch(tipo) {
       case 'Material': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fef2f2', color: '#dc2626', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fecaca' }}><ArrowUpRight size={14}/> Retirada de Material</span>;
@@ -24,14 +32,13 @@ export default function TabelaDemandas({ dados = [] }) {
       case 'Crossdocking': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#faf5ff', color: '#9333ea', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #e9d5ff' }}><ArrowUpRight size={14}/> Saída Crossdocking</span>;
       case 'Cancelado': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1' }}><XCircle size={14}/> Estorno / Cancelado</span>;
       case 'Nota Fiscal': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #bfdbfe' }}><FileText size={14}/> Nota Fiscal</span>;
-      // ✨ ADIÇÃO DO BADGE DE EDIÇÃO
       case 'Edição Manual': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fffbeb', color: '#d97706', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde68a' }}><Edit size={14}/> Edição de Item</span>;
       default: return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#64748b', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600' }}>{tipo || 'Operação Padrão'}</span>;
     }
   };
 
   const handleDuploClique = async (linha) => {
-    if (linha.tipo === 'Edição Manual') return; // ✨ IMPEDE ABERTURA DO MODAL SE FOR SÓ UMA EDIÇÃO MANUAL
+    if (linha.tipo === 'Edição Manual') return; 
 
     setItemSelecionado(linha);
     setModalAberto(true);
@@ -69,6 +76,12 @@ export default function TabelaDemandas({ dados = [] }) {
     setTipoSolicitacao(''); 
   };
 
+  // ✨ SEMPRE QUE OS FILTROS OU OS DADOS MUDAM, VOLTA PARA A PÁGINA 1
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [termoPesquisa, filtoStatus, dados]);
+
+  // Filtragem dos Dados
   const dadosFiltrados = dados.filter((linha) => {
     const termo = termoPesquisa.toLowerCase();
 
@@ -85,10 +98,15 @@ export default function TabelaDemandas({ dados = [] }) {
     return batePesquisa && bateStatus;
   });
 
+  // ✨ CÁLCULOS DA PAGINAÇÃO
+  const totalPaginas = Math.ceil(dadosFiltrados.length / itensPorPagina) || 1;
+  const indexInicio = (paginaAtual - 1) * itensPorPagina;
+  const itensPaginados = dadosFiltrados.slice(indexInicio, indexInicio + itensPorPagina);
+
   const listaStatusUnicos = ['Todos os Status', ...new Set(dados.map(item => item.status).filter(Boolean))];
 
   return (
-    <div className="tabela-cartao" style={{ position: 'relative' }}>
+    <div className="tabela-cartao" style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       <div className="tabela-controles">
         <div className="controles-esquerdos">
@@ -123,7 +141,7 @@ export default function TabelaDemandas({ dados = [] }) {
         <span className="info-target">Dica: Dê duplo clique numa linha para ver todos os itens da solicitação</span>
       </div>
 
-      <div className="tabela-scroll">
+      <div className="tabela-scroll" style={{ flex: 1 }}>
         <table className="dados-table">
           <thead>
             <tr>
@@ -138,7 +156,8 @@ export default function TabelaDemandas({ dados = [] }) {
             </tr>
           </thead>
           <tbody>
-            {dadosFiltrados.map((linha, index) => {
+            {/* ✨ AGORA RENDERIZA APENAS OS ITENS DA PÁGINA (itensPaginados) */}
+            {itensPaginados.map((linha, index) => {
               const isEntrada = linha.tipo === 'Entrada' || linha.tipo === 'Reintegracao' || linha.tipo === 'Reintegração';
 
               return (
@@ -162,7 +181,6 @@ export default function TabelaDemandas({ dados = [] }) {
 
                   <td>{renderFluxo(linha.tipo)}</td>
 
-                  {/* ✨ EXIBE AS INFORMAÇÕES DE MUDANÇA OU A QUANTIDADE */}
                   <td>
                     {linha.tipo === 'Edição Manual' ? (
                       <span style={{
@@ -210,6 +228,43 @@ export default function TabelaDemandas({ dados = [] }) {
           </tbody>
         </table>
       </div>
+
+      {/* ✨ RENDERIZAÇÃO DO RODAPÉ COM A PAGINAÇÃO */}
+      {dadosFiltrados.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', backgroundColor: '#ffffff', borderTop: '1px solid #e2e8f0', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
+          <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+            Página <strong style={{ color: '#1e293b' }}>{paginaAtual}</strong> de <strong style={{ color: '#1e293b' }}>{totalPaginas}</strong> &middot; Exibindo {indexInicio + 1} a <strong>{Math.min(indexInicio + itensPorPagina, dadosFiltrados.length)}</strong> de <strong>{dadosFiltrados.length}</strong> operações
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button 
+              onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+              disabled={paginaAtual === 1}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px',
+                backgroundColor: paginaAtual === 1 ? '#f8fafc' : '#ffffff',
+                border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '500',
+                color: paginaAtual === 1 ? '#94a3b8' : '#334155',
+                cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <ChevronLeft size={16} /> Anterior
+            </button>
+            <button 
+              onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+              disabled={paginaAtual === totalPaginas}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px',
+                backgroundColor: paginaAtual === totalPaginas ? '#f8fafc' : '#ffffff',
+                border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '500',
+                color: paginaAtual === totalPaginas ? '#94a3b8' : '#334155',
+                cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Próxima <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {modalAberto && (
         <div style={{
