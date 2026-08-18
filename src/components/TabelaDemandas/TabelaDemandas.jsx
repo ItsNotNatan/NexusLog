@@ -3,7 +3,7 @@
 // DESCRIÇÃO: Tabela de listagem com duplo-clique para ver Itens da Solicitação
 // =================================================================
 import React, { useState } from 'react';
-import { Search, X, PackageOpen, Loader } from 'lucide-react';
+import { Search, X, PackageOpen, Loader, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, RotateCcw, XCircle, FileText } from 'lucide-react';
 
 import { apiFetch } from '../../services/api';
 
@@ -12,16 +12,40 @@ export default function TabelaDemandas({ dados = [] }) {
   const [itemSelecionado, setItemSelecionado] = useState(null);
   const [historicoItem, setHistoricoItem] = useState([]);
 
-  // ✨ NOVO STATE: Guarda o tipo da solicitação (ex: "Transferencia WBS")
+  // ✨ STATE: Guarda o tipo da solicitação (ex: "Transferencia WBS")
   const [tipoSolicitacao, setTipoSolicitacao] = useState('');
-
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
-
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [filtoStatus, setFiltoStatus] = useState('Todos os Status');
 
   // ==========================================
-  // AÇÃO: Duplo clique para abrir itens
+  // FUNÇÃO AUXILIAR: RENDERIZAR FLUXO
+  // ==========================================
+  const renderFluxo = (tipo) => {
+    switch(tipo) {
+      case 'Material': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fef2f2', color: '#dc2626', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fecaca' }}><ArrowUpRight size={14}/> Retirada de Material</span>;
+      case 'Transferencia WBS':
+      case 'Transfer. WBS': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fefce8', color: '#ca8a04', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde047' }}><ArrowRightLeft size={14}/> Transferência WBS</span>;
+      case 'Reintegracao':
+      case 'Reintegração': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', color: '#059669', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #a7f3d0' }}><RotateCcw size={14}/> Reintegração de Item</span>;
+      case 'Entrada': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', color: '#059669', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #a7f3d0' }}><ArrowDownLeft size={14}/> Entrada de Estoque</span>;
+      case 'Crossdocking': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#faf5ff', color: '#9333ea', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #e9d5ff' }}><ArrowUpRight size={14}/> Saída Crossdocking</span>;
+      case 'Cancelado': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1' }}><XCircle size={14}/> Estorno / Cancelado</span>;
+      case 'Nota Fiscal': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #bfdbfe' }}><FileText size={14}/> Nota Fiscal</span>;
+      default: 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#64748b', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600' }}>{tipo || 'Operação Padrão'}</span>;
+    }
+  };
+
+  // ==========================================
+  // AÇÃO: Duplo clique para abrir itens da OS
   // ==========================================
   const handleDuploClique = async (linha) => {
     setItemSelecionado(linha);
@@ -29,21 +53,14 @@ export default function TabelaDemandas({ dados = [] }) {
     setCarregandoHistorico(true);
 
     try {
-      // 1. A linha.id tem o PS exato (ex: "PS-20260809-8331")
       const psBusca = linha.id;
-
-      // 2. Buscamos os detalhes completos da solicitação na API
       const resultado = await apiFetch(`/solicitacoes/listar?busca=${psBusca}`);
 
-      // 3. Verificamos se encontrou e extraímos os itens e o tipo
       if (resultado.sucesso && resultado.dados && resultado.dados.length > 0) {
-        // Encontra a solicitação que tem exatamente esse PS
         const solicitacaoExata = resultado.dados.find(d => d.ps === psBusca);
 
         if (solicitacaoExata && solicitacaoExata.itens) {
           setHistoricoItem(solicitacaoExata.itens);
-
-          // ✨ SALVA O TIPO DA SOLICITAÇÃO (Se for undefined, guarda string vazia)
           setTipoSolicitacao(solicitacaoExata.tipo || '');
         } else {
           setHistoricoItem([]);
@@ -65,7 +82,7 @@ export default function TabelaDemandas({ dados = [] }) {
   const fecharModal = () => {
     setModalAberto(false);
     setHistoricoItem([]);
-    setTipoSolicitacao(''); // ✨ Limpa o tipo ao fechar
+    setTipoSolicitacao(''); 
   };
 
   const dadosFiltrados = dados.filter((linha) => {
@@ -118,8 +135,8 @@ export default function TabelaDemandas({ dados = [] }) {
       </div>
 
       <div className="tabela-info">
-        <span className="info-registros">{dadosFiltrados.length} registros</span>
-        <span className="info-target">Dica: Dê duplo clique numa linha para ver os itens da solicitação</span>
+        <span className="info-registros">{dadosFiltrados.length} operações registradas</span>
+        <span className="info-target">Dica: Dê duplo clique numa linha para ver todos os itens da solicitação</span>
       </div>
 
       <div className="tabela-scroll">
@@ -129,66 +146,75 @@ export default function TabelaDemandas({ dados = [] }) {
               <th>PS ID</th>
               <th>SOLICITANTE</th>
               <th>WBS</th>
-              <th>STATUS PS</th>
               <th>PL</th>
-              <th>CRIAÇÃO DE PL</th>
-              <th>DATA E HORA DE ENTREGA</th>
-              <th>CONTAGEM</th>
+              <th>FLUXO DA OPERAÇÃO</th>
+              <th>QUANTIDADE</th>
+              <th>DATA DA OPERAÇÃO</th>
+              <th>STATUS</th>
             </tr>
           </thead>
           <tbody>
-            {dadosFiltrados.map((linha, index) => (
-              <tr
-                key={index}
-                onDoubleClick={() => handleDuploClique(linha)}
-                style={{ cursor: 'pointer' }}
-                title="Duplo clique para ver os itens da solicitação"
-              >
-                <td className="fonte-negrito">{linha.id}</td>
-                <td>{linha.solicitante}</td>
-                <td><a href="#" className="link-azul" onClick={(e) => e.preventDefault()}>{linha.wbs}</a></td>
-                <td>
-                  <span className="badge-status-simples">{linha.status}</span>
-                </td>
-                <td>
-                  {(linha.pl || linha.bs) && (linha.pl || linha.bs) !== '-' ? (
-                    <span className="link-azul">{linha.pl || linha.bs}</span>
-                  ) : (
-                    <span className="texto-cinza">-</span>
-                  )}
-                </td>
-                <td className="texto-cinza">{linha.criacaoPl || linha.criacaoBs || '—'}</td>
-                <td className={linha.dataEntrega === 'não definido' ? 'texto-amarelo' : 'texto-cinza'}>
-                  {linha.dataEntrega || '—'}
-                </td>
-<td>
-                  {linha.contagem ? (
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '4px 12px',
-                      borderRadius: '999px', /* Borda totalmente arredondada */
-                      fontWeight: '700',
-                      fontSize: '0.85rem',
-                      fontFamily: 'monospace, sans-serif',
-                      textAlign: 'center',
-                      minWidth: '100px',
-                      /* Borda e Cor dinâmicas consoante o status enviado pelo Dashboard */
-                      border: `1px solid ${linha.contagemStatus === 'vermelho' ? '#fca5a5' : (linha.contagemStatus === 'amarelo' ? '#fde047' : '#6ee7b7')}`,
-                      color: linha.contagemStatus === 'vermelho' ? '#dc2626' : (linha.contagemStatus === 'amarelo' ? '#d97706' : '#059669'),
-                      backgroundColor: linha.contagemStatus === 'vermelho' ? '#fef2f2' : (linha.contagemStatus === 'amarelo' ? '#fefce8' : '#ecfdf5')
-                    }}>
-                      {linha.contagem}
-                    </span>
-                  ) : (
-                    <span className="texto-cinza fonte-negrito">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {dadosFiltrados.map((linha, index) => {
+              const isEntrada = linha.tipo === 'Entrada' || linha.tipo === 'Reintegracao' || linha.tipo === 'Reintegração';
+
+              return (
+                <tr
+                  key={index}
+                  onDoubleClick={() => handleDuploClique(linha)}
+                  style={{ cursor: 'pointer' }}
+                  title="Duplo clique para ver todos os itens da solicitação"
+                >
+                  <td className="fonte-negrito">{linha.id}</td>
+                  <td>{linha.solicitante}</td>
+                  <td><a href="#" className="link-azul" onClick={(e) => e.preventDefault()}>{linha.wbs}</a></td>
+                  
+                  <td>
+                    {(linha.pl || linha.bs) && (linha.pl || linha.bs) !== '-' ? (
+                      <span className="link-azul">{linha.pl || linha.bs}</span>
+                    ) : (
+                      <span className="texto-cinza">-</span>
+                    )}
+                  </td>
+
+                  {/* ✨ EXIBE O TIPO DE FLUXO */}
+                  <td>{renderFluxo(linha.tipo)}</td>
+
+                  {/* ✨ EXIBE A QUANTIDADE MOVIMENTADA (COM SINAL + OU -) */}
+                  <td>
+                    {linha.qtdMovimentada ? (
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 12px',
+                        borderRadius: '6px',
+                        fontWeight: '700',
+                        fontSize: '0.85rem',
+                        fontFamily: 'monospace, sans-serif',
+                        textAlign: 'center',
+                        minWidth: '60px',
+                        backgroundColor: isEntrada ? '#ecfdf5' : '#fef2f2',
+                        color: isEntrada ? '#059669' : '#dc2626',
+                        border: `1px solid ${isEntrada ? '#a7f3d0' : '#fecaca'}`
+                      }}>
+                        {isEntrada ? '+' : '-'}{linha.qtdMovimentada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{linha.unidadeMedida}</span>
+                      </span>
+                    ) : (
+                      <span className="texto-cinza fonte-negrito">{linha.contagem || '-'}</span>
+                    )}
+                  </td>
+
+                  <td className="texto-cinza">{linha.criacaoPl || linha.dataEntrega || '—'}</td>
+                  
+                  <td>
+                    <span className="badge-status-simples">{linha.status}</span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
+      {/* MODAL COM OS ITENS DA SOLICITAÇÃO MANTIDO INTACTO! */}
       {modalAberto && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -232,14 +258,12 @@ export default function TabelaDemandas({ dados = [] }) {
                   </thead>
                   <tbody>
                     {historicoItem.map((hist, idx) => {
-                      // ✨ LÓGICA DE IDENTIFICAÇÃO: Verifica se é uma transferência WBS
                       const isTransferencia =
                         tipoSolicitacao === 'Transferencia WBS' ||
                         tipoSolicitacao === 'Transfer. WBS' ||
                         hist.is_transferencia ||
                         hist.isTransferencia;
 
-                      // ✨ NOVA LÓGICA DE CORES: Se for transferência, a linha inteira fica amarela!
                       const corFundoLinha = isTransferencia ? '#fefce8' : 'transparent';
                       const corBordaLinha = isTransferencia ? '#fde047' : '#eee';
 
@@ -253,8 +277,6 @@ export default function TabelaDemandas({ dados = [] }) {
                           </td>
                           <td style={{ padding: '8px', color: isTransferencia ? '#854d0e' : 'inherit' }}>
                             {hist.descricao_manual || '-'}
-
-                            {/* ✨ ETIQUETA MANTIDA para dar ainda mais destaque */}
                             {isTransferencia && (
                               <div style={{ marginTop: '6px' }}>
                                 <span style={{

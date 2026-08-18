@@ -89,7 +89,7 @@ export default function VisaoGeralEstoque({ perfil }) {
               (it.part_number_manual === item.part_number && it.nf_entrada === item.nf_entrada)
             );
 
-            if (temOItem) {
+  if (temOItem) {
               movimentacoes.push({
                 idOriginal: solicitacao.idOriginal || solicitacao.id,
                 id: solicitacao.ps || `PS-${solicitacao.id}`,
@@ -100,6 +100,12 @@ export default function VisaoGeralEstoque({ perfil }) {
                 bs: solicitacao.bs || '-',
                 criacaoPl: solicitacao.dataSolicitacao || formatarData(solicitacao.created_at),
                 dataEntrega: solicitacao.dataEntrega || 'não definido',
+                
+                // ✨ AQUI ESTÁ O SEGREDO PARA A TABELA DE DEMANDAS SABER O FLUXO:
+                tipo: solicitacao.tipo, 
+                qtdMovimentada: it.quantidade_solicitada || it.qtd || 0,
+                unidadeMedida: it.unidade_medida_manual || 'Un',
+                
                 contagem: `${solicitacao.itens.length} itens`,
                 contagemStatus: solicitacao.status === 'Concluído' ? 'verde' : (solicitacao.status === 'Cancelado' || solicitacao.status === 'Recusado' ? 'vermelho' : 'amarelo')
               });
@@ -151,7 +157,11 @@ export default function VisaoGeralEstoque({ perfil }) {
           method: 'PATCH',
           body: JSON.stringify({ [field]: valorFinal })
         });
-        if (!resposta.sucesso) {
+        
+        // ✨ ALERTA DE SUCESSO OU ERRO AQUI!
+        if (resposta.sucesso) {
+          showAlert("Sucesso!", "A informação foi atualizada no sistema.", "success");
+        } else {
           showAlert("Erro", "Falha ao atualizar o campo no servidor.", "error");
         }
       } catch (error) {
@@ -272,7 +282,7 @@ export default function VisaoGeralEstoque({ perfil }) {
                     onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                     onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }} title="Duplo clique na linha para ver demandas">
                       <History size={16} color="#94a3b8" />
                     </td>
 
