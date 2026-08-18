@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, Archive, Calendar, User, Box, ArrowRight, RotateCcw } from 'lucide-react';
+import { Search, Loader2, Archive, Calendar, User, Box, ArrowRight, RotateCcw, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
@@ -34,47 +34,101 @@ export default function Traceabilly({ perfil }) {
     return nome.charAt(0).toUpperCase();
   };
 
+  // ==========================================
+  // ✨ NOVO: FUNÇÃO PARA RENDERIZAR O FLUXO
+  // ==========================================
+  const renderFluxo = (tipo) => {
+    switch(tipo) {
+      case 'Material': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fef2f2', color: '#dc2626', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fecaca', whiteSpace: 'nowrap' }}><ArrowUpRight size={14}/> Retirada de Material</span>;
+      case 'Transferencia WBS':
+      case 'Transfer. WBS': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fefce8', color: '#ca8a04', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde047', whiteSpace: 'nowrap' }}><ArrowRightLeft size={14}/> Transferência WBS</span>;
+      case 'Reintegracao':
+      case 'Reintegração': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', color: '#059669', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #a7f3d0', whiteSpace: 'nowrap' }}><RotateCcw size={14}/> Reintegração de Item</span>;
+      case 'Entrada': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', color: '#059669', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #a7f3d0', whiteSpace: 'nowrap' }}><ArrowDownLeft size={14}/> Entrada de Estoque</span>;
+      case 'Crossdocking': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#faf5ff', color: '#9333ea', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #e9d5ff', whiteSpace: 'nowrap' }}><ArrowUpRight size={14}/> Saída Crossdocking</span>;
+      case 'Cancelado': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}><XCircle size={14}/> Estorno / Cancelado</span>;
+      case 'Nota Fiscal': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #bfdbfe', whiteSpace: 'nowrap' }}><FileText size={14}/> Nota Fiscal</span>;
+      default: 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#64748b', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', whiteSpace: 'nowrap' }}>{tipo || 'Operação Padrão'}</span>;
+    }
+  };
+
   useEffect(() => {
     const buscarHistorico = async () => {
       try {
         setCarregando(true);
-        const urlParams = estoqueAtual === 'TODOS' ? '?limit=1000' : `?filial=${estoqueAtual}&limit=1000`;
-        const resposta = await apiFetch(`/solicitacoes/listar${urlParams}`);
         
-        if (resposta.sucesso) {
-          const movimentos = resposta.dados.filter(sol => 
-            sol.status === 'Em Separação' || sol.status === 'Concluído' || sol.status === 'Reintegrado' || sol.status === 'Cancelado'
+        // ✨ 1. Busca TODO o estoque para ver quais estão Zerados (Quantidade = 0)
+        const urlEstoque = estoqueAtual === 'TODOS' ? '/estoque/listar?rastreabilidade=true' : `/estoque/listar?filial_id=${estoqueAtual}&rastreabilidade=true`;
+        const resEstoque = await apiFetch(urlEstoque);
+        
+        // ✨ 2. Busca todas as solicitações para pegar os fluxos
+        const urlSol = estoqueAtual === 'TODOS' ? '?limit=1000' : `?filial=${estoqueAtual}&limit=1000`;
+        const resSol = await apiFetch(`/solicitacoes/listar${urlSol}`);
+        
+        if (resEstoque.sucesso && resSol.sucesso) {
+          
+          // ✨ MÁGICA: Filtramos apenas os materiais do estoque que chegaram a ZERO!
+          const itensZerados = resEstoque.dados.filter(e => e.status === 'Zerado' || e.quantidade_disponivel <= 0);
+          
+          // Criamos um mapa super rápido com os IDs dos itens que morreram
+          const setIdsZerados = new Set(itensZerados.map(e => e.id));
+
+          const movimentos = resSol.dados.filter(sol => 
+            ['Em Separação', 'Concluído', 'Reintegrado', 'Cancelado'].includes(sol.status)
           );
 
           const itemsList = [];
           movimentos.forEach(sol => {
             if (sol.itens && sol.itens.length > 0) {
               sol.itens.forEach(it => {
-                itemsList.push({
-                  idUnico: `${sol.id}-${it.id}`,
-                  idItem: it.id, // ID real na tabela 'solicitacoes_itens' necessário para a API
-                  tipoOriginal: sol.tipo, // Necessário para bloquear a reversão de "Entradas"
-                  desenhoSAP: it.desenho_sap_manual || '-',
-                  partNumber: it.part_number_manual || '-',
-                  descricao: it.descricao_manual || 'Sem descrição',
-                  fornecedor: it.fornecedor || '-',
-                  nfEntrada: it.nf_entrada || '-',
-                  bsSaida: sol.pl || '-', 
-                  solicitacao: sol.ps || '-',
-                  solicitante: sol.solicitante || '-',
-                  alocacao: it.alocacao || sol.tipo || '-',
-                  qtd: `${it.quantidade_solicitada} ${it.unidade_medida_manual || 'Unid'}`,
-                  valorUnit: it.valor_unitario_manual,
-                  wbs: sol.wbs || '-',
-                  dataSaida: formatarData(sol.dataFinalizacaoISO || sol.dataCriacaoISO)
-                });
+                
+                // ✨ AQUI ESTÁ A REGRA DE OURO: Só passa para a tabela se o estoque_id deste movimento
+                // estiver dentro da nossa lista de itens que chegaram a 0.
+                if (it.estoque_id && setIdsZerados.has(it.estoque_id)) {
+                  
+                  const isEntrada = sol.tipo === 'Entrada' || sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração';
+
+                  itemsList.push({
+                    idUnico: `${sol.id}-${it.id}`,
+                    idItem: it.id, 
+                    tipoOriginal: sol.tipo, 
+                    desenhoSAP: it.desenho_sap_manual || '-',
+                    partNumber: it.part_number_manual || '-',
+                    descricao: it.descricao_manual || 'Sem descrição',
+                    nfEntrada: it.nf_entrada || '-',
+                    bsSaida: sol.pl || '-', 
+                    solicitacao: sol.ps || '-',
+                    solicitante: sol.solicitante || '-',
+                    alocacao: it.alocacao || sol.tipo || '-',
+                    
+                    // Dados para a Nova Lógica de Quantidade
+                    isEntrada,
+                    qtdMovimentada: it.quantidade_solicitada || 0,
+                    unidadeMedida: it.unidade_medida_manual || 'Un',
+                    
+                    wbs: sol.wbs || '-',
+                    dataSaida: formatarData(sol.dataFinalizacaoISO || sol.dataCriacaoISO),
+                    dataSort: new Date(sol.dataFinalizacaoISO || sol.dataCriacaoISO).getTime()
+                  });
+                }
               });
             }
           });
 
+          // Ordenar cronologicamente, do fluxo mais recente para o mais antigo
+          itemsList.sort((a, b) => b.dataSort - a.dataSort);
+
           setItensArquivados(itemsList);
         } else {
-          showAlert("Erro", resposta.erro, "error");
+          showAlert("Erro", resSol.erro || resEstoque.erro, "error");
         }
       } catch (error) {
         showAlert("Erro de Conexão", "Não foi possível carregar o histórico de movimentações.", "error");
@@ -160,7 +214,7 @@ export default function Traceabilly({ perfil }) {
             <User size={14} /> Quem solicitou
           </div>
           <div className="subheader-item">
-            <Calendar size={14} /> Quando saiu
+            <Calendar size={14} /> Quando foi a movimentação
           </div>
           <div className="subheader-item">
             <Box size={14} /> Qual BS/Solicitação
@@ -169,9 +223,9 @@ export default function Traceabilly({ perfil }) {
 
         <div className="tabela-container">
           {carregando ? (
-            <div className="estado-vazio"><Loader2 className="animate-spin" size={32} /> A carregar histórico...</div>
+            <div className="estado-vazio"><Loader2 className="animate-spin" size={32} /> A analisar o ciclo de vida dos materiais...</div>
           ) : historicoFiltrado.length === 0 ? (
-            <div className="estado-vazio"><Archive size={48} className="icone-vazio" /> Nenhum item arquivado encontrado.</div>
+            <div className="estado-vazio"><Archive size={48} className="icone-vazio" /> Nenhum fluxo encontrado para materiais zerados.</div>
           ) : (
             <table className="tabela-rastreabilidade">
               <thead>
@@ -179,17 +233,14 @@ export default function Traceabilly({ perfil }) {
                   <th>DESENHO SAP</th>
                   <th>PART NUMBER</th>
                   <th>DESCRIÇÃO</th>
-                  <th>FORNECEDOR</th>
                   <th>NF ENTRADA</th>
-                  <th>BS SAÍDA</th>
-                  <th>SOLICITAÇÃO</th>
+                  <th>BS / SOLICITAÇÃO</th>
                   <th>SOLICITANTE</th>
-                  <th>ALOCAÇÃO</th>
-                  <th>QTD ORIGINAL</th>
-                  <th>VALOR UNIT.</th>
-                  <th>WBS</th>
-                  <th>DATA SAÍDA</th>
-                  {/* ✨ COLUNA AÇÕES SÓ PARA LÍDER OU ADM */}
+                  {/* ✨ COLUNAS NOVAS DO FLUXO */}
+                  <th>FLUXO DA OPERAÇÃO</th>
+                  <th style={{ textAlign: 'center' }}>QUANTIDADE</th>
+                  <th>WBS / ALOCAÇÃO</th>
+                  <th>DATA DA OPERAÇÃO</th>
                   {isAdminOuLider && <th style={{ textAlign: 'center' }}>AÇÃO</th>}
                 </tr>
               </thead>
@@ -199,18 +250,14 @@ export default function Traceabilly({ perfil }) {
                     <td className="texto-azul">{item.desenhoSAP}</td>
                     <td className="texto-negrito">{item.partNumber}</td>
                     <td className="texto-truncado" title={item.descricao}>{item.descricao}</td>
-                    <td className="texto-cinza-uppercase" title={item.fornecedor}>{item.fornecedor}</td>
                     <td>
                       {item.nfEntrada !== '-' ? <span className="badge-nf">{item.nfEntrada}</span> : '-'}
                     </td>
                     <td>
-                      <div className="flex-centro">
-                        <ArrowRight size={14} className="icone-seta" />
-                        <span className="badge-bs">{item.bsSaida !== '-' ? item.bsSaida : 'S/ PL'}</span>
+                      <div className="flex-centro" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                         <span className="badge-bs" style={{ fontSize: '0.75rem' }}>{item.bsSaida !== '-' ? item.bsSaida : 'S/ PL'}</span>
+                         <span className="badge-solicitacao" style={{ fontSize: '0.7rem' }}>{item.solicitacao}</span>
                       </div>
-                    </td>
-                    <td>
-                      <span className="badge-solicitacao">{item.solicitacao}</span>
                     </td>
                     <td>
                       <div className="flex-centro-gap" title={item.solicitante}>
@@ -218,23 +265,41 @@ export default function Traceabilly({ perfil }) {
                         <span className="texto-truncado-pequeno">{item.solicitante.split(' ')[0]}</span>
                       </div>
                     </td>
-                    <td className="texto-azul">{item.alocacao}</td>
-                    <td style={{ color: '#1e293b', fontWeight: '500' }}>{item.qtd}</td>
-                    <td className="texto-pequeno">
-                       {item.valorUnit ? (
-                         <>
-                           R$<br/>
-                           <strong style={{ color: '#1e293b' }}>{item.valorUnit.toFixed(2)}</strong>
-                         </>
-                       ) : '-'}
+                    
+                    {/* ✨ EXIBE O TIPO DE FLUXO */}
+                    <td>{renderFluxo(item.tipoOriginal)}</td>
+
+                    {/* ✨ EXIBE A QUANTIDADE MOVIMENTADA (COM SINAL + OU -) */}
+                    <td style={{ textAlign: 'center' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontWeight: '700',
+                        fontSize: '0.8rem',
+                        fontFamily: 'monospace, sans-serif',
+                        textAlign: 'center',
+                        minWidth: '60px',
+                        backgroundColor: item.isEntrada ? '#ecfdf5' : '#fef2f2',
+                        color: item.isEntrada ? '#059669' : '#dc2626',
+                        border: `1px solid ${item.isEntrada ? '#a7f3d0' : '#fecaca'}`
+                      }}>
+                        {item.isEntrada ? '+' : '-'}{item.qtdMovimentada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{item.unidadeMedida}</span>
+                      </span>
                     </td>
-                    <td className="texto-azul" title={item.wbs}>{item.wbs}</td>
+
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span className="texto-azul" title={item.wbs} style={{ fontSize: '0.75rem' }}>{item.wbs}</span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{item.alocacao}</span>
+                      </div>
+                    </td>
+                    
                     <td>{item.dataSaida}</td>
                     
-                    {/* ✨ RENDERIZAÇÃO CONDICIONAL DO BOTÃO REVERTER */}
+                    {/* ✨ AÇÃO REVERTER */}
                     {isAdminOuLider && (
                       <td style={{ textAlign: 'center' }}>
-                        {/* Bloqueamos a reversão de Entradas, Notas Fiscais e Cancelamentos para não corromper o estoque */}
                         {['Material', 'Transferencia WBS', 'Crossdocking'].includes(item.tipoOriginal) ? (
                           <button 
                             onClick={() => handleReverterItem(item.idItem)} 
