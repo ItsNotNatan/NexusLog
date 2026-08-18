@@ -595,3 +595,163 @@
   font-size: 0.75rem;
   font-weight: 600;
 }
+
+/* =================================================================
+   ARQUIVO: VisaoGeralEstoque.css
+   DESCRIÇÃO: Estilos da Visão Geral (Dashboard e Tabela)
+   ================================================================= */
+
+.visao-geral-container {
+  padding: 32px;
+  background-color: #f4f5f7;
+  min-height: 100vh;
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* ── CABEÇALHO ── */
+.vg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.vg-header-titulos h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 6px 0;
+}
+
+.vg-header-titulos p {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.btn-exportar-excel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+}
+
+.btn-exportar-excel:hover {
+  background-color: #1d4ed8;
+}
+
+.btn-exportar-excel:active {
+  transform: scale(0.97);
+}
+
+/* ── DASHBOARD (CARTÃO AZUL CLARO) ── */
+.vg-dashboard-cartao {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f0f4f8; /* Fundo azul bem claro idêntico à imagem */
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.vg-dash-esquerda {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.icone-cifrao {
+  background-color: #dbeafe;
+  color: #2563eb;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vg-dash-textos {
+  display: flex;
+  flex-direction: column;
+}
+
+.vg-dash-textos span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.vg-dash-textos strong {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2563eb;
+  line-height: 1;
+}
+
+/* ── DASHBOARD (KPIS À DIREITA) ── */
+.vg-dash-direita {
+  display: flex;
+  gap: 12px;
+}
+
+.kpi-mini-card {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.kpi-mini-card span {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.kpi-mini-card strong {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.kpi-black { color: #1e293b; }
+.kpi-green { color: #10b981; }
+.kpi-red { color: #ef4444; }
+.kpi-orange { color: #f59e0b; }
+
+/* ── TABELA ── */
+.tabela-wrapper {
+  background-color: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Responsividade Básica */
+@media (max-width: 1024px) {
+  .vg-dashboard-cartao {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+}

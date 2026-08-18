@@ -1,30 +1,28 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, PackageOpen, X, History } from 'lucide-react';
+import { Search, Loader2, PackageOpen, X, History, Download, DollarSign } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import './VisaoGeralEstoque.css';
 
 export default function VisaoGeralEstoque({ perfil }) {
-  const { estoqueAtual, filiaisGlobais, usuario } = useContext(AuthContext); // ✨ USUÁRIO ADICIONADO
-  const { showAlert } = useAlert();
+  const { estoqueAtual, filiaisGlobais, usuario } = useContext(AuthContext);
+  const { showAlert, showLoading, closeAlert } = useAlert();
 
   const [estoque, setEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
 
   // ==========================================
-  // ESTADOS DO HISTÓRICO (TabelaDemandas)
+  // ESTADOS DO HISTÓRICO E EDIÇÃO INLINE
   // ==========================================
   const [modalAberto, setModalAberto] = useState(false);
   const [itemSelecionado, setItemSelecionado] = useState(null);
   const [historicoDemandas, setHistoricoDemandas] = useState([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
-
-  // ==========================================
-  // ESTADOS DE EDIÇÃO INLINE
-  // ==========================================
   const [editCell, setEditCell] = useState({ id: null, field: null });
   const [editValue, setEditValue] = useState("");
 
@@ -67,12 +65,6 @@ export default function VisaoGeralEstoque({ perfil }) {
     buscarEstoque();
   }, [estoqueAtual, showAlert]);
 
-  // ==========================================
-  // AÇÃO: DUPLO CLIQUE (Abre Histórico)
-  // ==========================================
-  // ==========================================
-  // AÇÃO: DUPLO CLIQUE (Abre Histórico Otimizado)
-  // ==========================================
   const handleDuploCliqueItem = async (item) => {
     setItemSelecionado(item);
     setModalAberto(true);
@@ -80,7 +72,6 @@ export default function VisaoGeralEstoque({ perfil }) {
     setHistoricoDemandas([]);
 
     try {
-      // 🚀 AGORA USA A ROTA DIRETA E OTIMIZADA DO BACKEND!
       const resposta = await apiFetch(`/solicitacoes/demandas/estoque/${item.id}`);
 
       if (resposta.sucesso && resposta.dados) {
@@ -102,13 +93,9 @@ export default function VisaoGeralEstoque({ perfil }) {
     setHistoricoDemandas([]);
   };
 
-  // ==========================================
-  // AÇÕES: EDIÇÃO INLINE (Clique Único)
-  // ==========================================
   const startEditing = (id, field, value, type) => {
     setEditCell({ id, field });
     let valFormatado = value || "";
-    // Ajusta o formato da data para o input type="date"
     if (type === 'date' && valFormatado && valFormatado.includes('T')) {
       valFormatado = valFormatado.split('T')[0];
     }
@@ -117,13 +104,11 @@ export default function VisaoGeralEstoque({ perfil }) {
 
   const saveEditing = async (id, field, originalValue) => {
     if (String(editValue) !== String(originalValue || '')) {
-      // Formata números se o campo exigir
       let valorFinal = editValue;
       if (field === 'quantidade_disponivel' || field === 'valor_unitario') {
         valorFinal = editValue ? Number(editValue) : 0;
       }
 
-      // Atualização otimista na interface
       setEstoque(prev => prev.map(i => i.id === id ? { ...i, [field]: valorFinal } : i));
 
       try {
@@ -131,11 +116,10 @@ export default function VisaoGeralEstoque({ perfil }) {
           method: 'PATCH',
           body: JSON.stringify({
             [field]: valorFinal,
-            usuario_editor: usuario?.nome_completo || usuario?.nome || 'Logística' // ✨ ENVIAMOS QUEM ESTÁ A EDITAR
+            usuario_editor: usuario?.nome_completo || usuario?.nome || 'Logística'
           })
         });
 
-        // ✨ ALERTA DE SUCESSO OU ERRO AQUI!
         if (resposta.sucesso) {
           showAlert("Sucesso!", "A informação foi atualizada no sistema.", "success");
         } else {
@@ -153,7 +137,6 @@ export default function VisaoGeralEstoque({ perfil }) {
     if (e.key === 'Escape') setEditCell({ id: null, field: null });
   };
 
-  // Componente interno para as células editáveis
   const CelulaEditavel = ({ item, field, type = 'text', renderFn, style = {} }) => {
     const isEditing = editCell.id === item.id && editCell.field === field;
     const val = item[field];
@@ -186,6 +169,9 @@ export default function VisaoGeralEstoque({ perfil }) {
     );
   };
 
+  // ==========================================
+  // FILTRAGEM E CÁLCULO DE KPIS
+  // ==========================================
   const estoqueFiltrado = estoque.filter(item =>
     (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
     (item.part_number && item.part_number.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
@@ -195,17 +181,138 @@ export default function VisaoGeralEstoque({ perfil }) {
     (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termoPesquisa.toLowerCase()))
   );
 
-  return (
-    <div style={{ padding: '32px', backgroundColor: '#f4f5f7', minHeight: '100vh', boxSizing: 'border-box', position: 'relative' }}>
+  const kpiTotalItens = estoqueFiltrado.length;
+  const kpiDisponiveis = estoqueFiltrado.filter(i => Number(i.quantidade_disponivel) > 0).length;
+  const kpiZerados = estoqueFiltrado.filter(i => Number(i.quantidade_disponivel) <= 0).length;
+  const kpiReservados = estoqueFiltrado.filter(i => i.alocacao && i.alocacao !== '-' && i.alocacao.toUpperCase() !== 'PENDENTE').length;
+  
+  const kpiValorTotal = estoqueFiltrado.reduce((acc, item) => {
+    const qtd = Number(item.quantidade_disponivel) || 0;
+    const valor = Number(item.valor_unitario) || 0;
+    return acc + (qtd * valor);
+  }, 0);
 
-      <header style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1e293b', margin: '0 0 8px 0' }}>Consulta de Estoque</h1>
-          <p style={{ color: '#64748b', margin: 0 }}>Dê um clique para <strong>editar um campo</strong> ou duplo clique na linha para ver o <strong>histórico de demandas</strong>.</p>
+  // ==========================================
+  // EXPORTAR EXCEL
+  // ==========================================
+  const handleExportarExcel = async () => {
+    showLoading("A Gerar Excel", "Por favor, aguarde enquanto compilamos os dados do estoque...");
+    
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Visão Geral do Estoque');
+
+      worksheet.columns = [
+        { header: 'Filial', key: 'filial', width: 20 },
+        { header: 'Desenho SAP', key: 'sap', width: 20 },
+        { header: 'Nº Peça Fabricante', key: 'pn', width: 25 },
+        { header: 'Fornecedor', key: 'fornecedor', width: 20 },
+        { header: 'Referência', key: 'ref', width: 20 },
+        { header: 'Qtd. Disponível', key: 'qtd', width: 15 },
+        { header: 'NF de Entrada', key: 'nf', width: 15 },
+        { header: 'Unid. Medida', key: 'unid', width: 15 },
+        { header: 'Descrição', key: 'desc', width: 40 },
+        { header: 'WBS', key: 'wbs', width: 20 },
+        { header: 'Data Necessidade', key: 'dtNec', width: 18 },
+        { header: 'Emissão NF', key: 'emi', width: 18 },
+        { header: 'Recebimento NF', key: 'rec', width: 18 },
+        { header: 'Doc. Compras', key: 'doc', width: 20 },
+        { header: 'Valor Unitário (R$)', key: 'val', width: 20 },
+        { header: 'Centro', key: 'centro', width: 15 },
+        { header: 'Depósito', key: 'dep', width: 15 },
+        { header: 'Alocação', key: 'aloc', width: 20 }
+      ];
+
+      worksheet.getRow(1).eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+
+      estoqueFiltrado.forEach(item => {
+        worksheet.addRow({
+          filial: obterNomeFilialDinamico(item.filial_id || item.filial),
+          sap: item.desenho_sap || '-',
+          pn: item.part_number || '-',
+          fornecedor: item.fornecedor || '-',
+          ref: item.referencia || '-',
+          qtd: Number(item.quantidade_disponivel) || 0,
+          nf: item.nf_entrada || '-',
+          unid: item.unidade_medida || '-',
+          desc: item.descricao || '-',
+          wbs: item.wbs || '-',
+          dtNec: formatarData(item.data_necessidade),
+          emi: formatarData(item.emissao_nf),
+          rec: formatarData(item.receb_nf),
+          doc: item.documento_compras || '-',
+          val: Number(item.valor_unitario) || 0,
+          centro: item.centro || '-',
+          dep: item.deposito || '-',
+          aloc: item.alocacao || '-'
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Visao_Geral_Estoque_${new Date().toISOString().split('T')[0]}.xlsx`);
+      
+    } catch (err) {
+      console.error(err);
+      showAlert("Erro na Exportação", "Houve um problema ao gerar o arquivo Excel.", "error");
+    } finally {
+      closeAlert();
+    }
+  };
+
+  return (
+    <div className="visao-geral-container">
+
+      {/* ✨ NOVO CABEÇALHO COM BOTÃO EXPORTAR */}
+      <header className="vg-header">
+        <div className="vg-header-titulos">
+          <h1>Visão Geral do Estoque</h1>
+          <p>Edição manual completa de todos os materiais — perfil {perfil === 'cliente' ? 'Cliente' : 'Logística'}</p>
         </div>
+        <button className="btn-exportar-excel" onClick={handleExportarExcel}>
+          <Download size={18} /> Exportar Excel
+        </button>
       </header>
 
-      <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+      {/* ✨ NOVO DASHBOARD KPI */}
+      <div className="vg-dashboard-cartao">
+        <div className="vg-dash-esquerda">
+          <div className="icone-cifrao">
+            <DollarSign size={28} />
+          </div>
+          <div className="vg-dash-textos">
+            <span>VALOR TOTAL DO ESTOQUE</span>
+            <strong>
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpiValorTotal)}
+            </strong>
+          </div>
+        </div>
+        
+        <div className="vg-dash-direita">
+          <div className="kpi-mini-card">
+            <span>Total de Itens</span>
+            <strong className="kpi-black">{kpiTotalItens}</strong>
+          </div>
+          <div className="kpi-mini-card">
+            <span>Disponíveis</span>
+            <strong className="kpi-green">{kpiDisponiveis}</strong>
+          </div>
+          <div className="kpi-mini-card" style={{ borderColor: kpiZerados > 0 ? '#fca5a5' : '#e2e8f0', backgroundColor: kpiZerados > 0 ? '#fef2f2' : '#f8fafc' }}>
+            <span style={{ color: kpiZerados > 0 ? '#ef4444' : '#64748b' }}>Zerados</span>
+            <strong className={kpiZerados > 0 ? 'kpi-red' : 'kpi-black'}>{kpiZerados}</strong>
+          </div>
+          <div className="kpi-mini-card">
+            <span>Reservados</span>
+            <strong className="kpi-orange">{kpiReservados}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="tabela-wrapper">
         <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ position: 'relative', width: '300px' }}>
             <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
@@ -217,7 +324,6 @@ export default function VisaoGeralEstoque({ perfil }) {
               style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#f8fafc' }}
             />
           </div>
-          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}>Total: {estoqueFiltrado.length} registos</span>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
@@ -334,7 +440,7 @@ export default function VisaoGeralEstoque({ perfil }) {
         </div>
       </div>
 
-      {/* ✨ MODAL DE HISTÓRICO DE DEMANDAS */}
+      {/* MODAL DE HISTÓRICO DE DEMANDAS */}
       {modalAberto && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '95%', maxWidth: '1400px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
