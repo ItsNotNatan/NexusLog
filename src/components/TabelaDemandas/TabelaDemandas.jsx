@@ -1,9 +1,5 @@
-// =================================================================
-// ARQUIVO: src/components/TabelaDemandas/TabelaDemandas.jsx
-// DESCRIÇÃO: Tabela de listagem com duplo-clique para ver Itens da Solicitação
-// =================================================================
 import React, { useState } from 'react';
-import { Search, X, PackageOpen, Loader, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, RotateCcw, XCircle, FileText } from 'lucide-react';
+import { Search, X, PackageOpen, Loader, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, RotateCcw, XCircle, FileText, Edit } from 'lucide-react'; // ✨ EDIT IMPORTADO
 
 import { apiFetch } from '../../services/api';
 
@@ -12,42 +8,31 @@ export default function TabelaDemandas({ dados = [] }) {
   const [itemSelecionado, setItemSelecionado] = useState(null);
   const [historicoItem, setHistoricoItem] = useState([]);
 
-  // ✨ STATE: Guarda o tipo da solicitação (ex: "Transferencia WBS")
   const [tipoSolicitacao, setTipoSolicitacao] = useState('');
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [filtoStatus, setFiltoStatus] = useState('Todos os Status');
 
-  // ==========================================
-  // FUNÇÃO AUXILIAR: RENDERIZAR FLUXO
-  // ==========================================
   const renderFluxo = (tipo) => {
     switch(tipo) {
-      case 'Material': 
-        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fef2f2', color: '#dc2626', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fecaca' }}><ArrowUpRight size={14}/> Retirada de Material</span>;
+      case 'Material': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fef2f2', color: '#dc2626', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fecaca' }}><ArrowUpRight size={14}/> Retirada de Material</span>;
       case 'Transferencia WBS':
-      case 'Transfer. WBS': 
-        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fefce8', color: '#ca8a04', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde047' }}><ArrowRightLeft size={14}/> Transferência WBS</span>;
+      case 'Transfer. WBS': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fefce8', color: '#ca8a04', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde047' }}><ArrowRightLeft size={14}/> Transferência WBS</span>;
       case 'Reintegracao':
-      case 'Reintegração': 
-        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', color: '#059669', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #a7f3d0' }}><RotateCcw size={14}/> Reintegração de Item</span>;
-      case 'Entrada': 
-        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', color: '#059669', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #a7f3d0' }}><ArrowDownLeft size={14}/> Entrada de Estoque</span>;
-      case 'Crossdocking': 
-        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#faf5ff', color: '#9333ea', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #e9d5ff' }}><ArrowUpRight size={14}/> Saída Crossdocking</span>;
-      case 'Cancelado': 
-        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1' }}><XCircle size={14}/> Estorno / Cancelado</span>;
-      case 'Nota Fiscal': 
-        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #bfdbfe' }}><FileText size={14}/> Nota Fiscal</span>;
-      default: 
-        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#64748b', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600' }}>{tipo || 'Operação Padrão'}</span>;
+      case 'Reintegração': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', color: '#059669', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #a7f3d0' }}><RotateCcw size={14}/> Reintegração de Item</span>;
+      case 'Entrada': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ecfdf5', color: '#059669', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #a7f3d0' }}><ArrowDownLeft size={14}/> Entrada de Estoque</span>;
+      case 'Crossdocking': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#faf5ff', color: '#9333ea', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #e9d5ff' }}><ArrowUpRight size={14}/> Saída Crossdocking</span>;
+      case 'Cancelado': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1' }}><XCircle size={14}/> Estorno / Cancelado</span>;
+      case 'Nota Fiscal': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #bfdbfe' }}><FileText size={14}/> Nota Fiscal</span>;
+      // ✨ ADIÇÃO DO BADGE DE EDIÇÃO
+      case 'Edição Manual': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fffbeb', color: '#d97706', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde68a' }}><Edit size={14}/> Edição de Item</span>;
+      default: return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#64748b', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600' }}>{tipo || 'Operação Padrão'}</span>;
     }
   };
 
-  // ==========================================
-  // AÇÃO: Duplo clique para abrir itens da OS
-  // ==========================================
   const handleDuploClique = async (linha) => {
+    if (linha.tipo === 'Edição Manual') return; // ✨ IMPEDE ABERTURA DO MODAL SE FOR SÓ UMA EDIÇÃO MANUAL
+
     setItemSelecionado(linha);
     setModalAberto(true);
     setCarregandoHistorico(true);
@@ -58,7 +43,6 @@ export default function TabelaDemandas({ dados = [] }) {
 
       if (resultado.sucesso && resultado.dados && resultado.dados.length > 0) {
         const solicitacaoExata = resultado.dados.find(d => d.ps === psBusca);
-
         if (solicitacaoExata && solicitacaoExata.itens) {
           setHistoricoItem(solicitacaoExata.itens);
           setTipoSolicitacao(solicitacaoExata.tipo || '');
@@ -143,12 +127,12 @@ export default function TabelaDemandas({ dados = [] }) {
         <table className="dados-table">
           <thead>
             <tr>
-              <th>PS ID</th>
-              <th>SOLICITANTE</th>
+              <th>ID (PS/ED)</th>
+              <th>USUÁRIO / SOLICITANTE</th>
               <th>WBS</th>
               <th>PL</th>
               <th>FLUXO DA OPERAÇÃO</th>
-              <th>QUANTIDADE</th>
+              <th>DETALHES / QUANTIDADE</th>
               <th>DATA DA OPERAÇÃO</th>
               <th>STATUS</th>
             </tr>
@@ -161,8 +145,8 @@ export default function TabelaDemandas({ dados = [] }) {
                 <tr
                   key={index}
                   onDoubleClick={() => handleDuploClique(linha)}
-                  style={{ cursor: 'pointer' }}
-                  title="Duplo clique para ver todos os itens da solicitação"
+                  style={{ cursor: linha.tipo === 'Edição Manual' ? 'default' : 'pointer' }}
+                  title={linha.tipo === 'Edição Manual' ? "As edições manuais não possuem itens detalhados." : "Duplo clique para ver todos os itens da solicitação"}
                 >
                   <td className="fonte-negrito">{linha.id}</td>
                   <td>{linha.solicitante}</td>
@@ -176,12 +160,25 @@ export default function TabelaDemandas({ dados = [] }) {
                     )}
                   </td>
 
-                  {/* ✨ EXIBE O TIPO DE FLUXO */}
                   <td>{renderFluxo(linha.tipo)}</td>
 
-                  {/* ✨ EXIBE A QUANTIDADE MOVIMENTADA (COM SINAL + OU -) */}
+                  {/* ✨ EXIBE AS INFORMAÇÕES DE MUDANÇA OU A QUANTIDADE */}
                   <td>
-                    {linha.qtdMovimentada ? (
+                    {linha.tipo === 'Edição Manual' ? (
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        fontFamily: 'monospace, sans-serif',
+                        backgroundColor: '#f8fafc',
+                        color: '#475569',
+                        border: '1px dashed #cbd5e1'
+                      }}>
+                        {linha.contagem}
+                      </span>
+                    ) : linha.qtdMovimentada ? (
                       <span style={{
                         display: 'inline-block',
                         padding: '4px 12px',
@@ -214,7 +211,6 @@ export default function TabelaDemandas({ dados = [] }) {
         </table>
       </div>
 
-      {/* MODAL COM OS ITENS DA SOLICITAÇÃO MANTIDO INTACTO! */}
       {modalAberto && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
