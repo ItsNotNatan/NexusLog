@@ -16,6 +16,9 @@ export default function VisaoGeralEstoque({ perfil }) {
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
 
+  // ✨ VERIFICAÇÃO DE PERMISSÃO DE EDIÇÃO
+  const podeEditar = usuario?.cargo === 'ADM' || usuario?.cargo === 'LIDER';
+
   // ==========================================
   // ESTADOS DO HISTÓRICO E EDIÇÃO INLINE
   // ==========================================
@@ -94,6 +97,8 @@ export default function VisaoGeralEstoque({ perfil }) {
   };
 
   const startEditing = (id, field, value, type) => {
+    if (!podeEditar) return; // Bloqueio de segurança
+    
     setEditCell({ id, field });
     let valFormatado = value || "";
     if (type === 'date' && valFormatado && valFormatado.includes('T')) {
@@ -142,6 +147,12 @@ export default function VisaoGeralEstoque({ perfil }) {
     const val = item[field];
     const displayVal = renderFn ? renderFn(val) : (val || '-');
 
+    // ✨ SE NÃO PODE EDITAR (Ex: Operador), MOSTRA SÓ O TEXTO NORMAL
+    if (!podeEditar) {
+      return <span style={{ display: 'inline-block', width: '100%', minHeight: '18px', ...style }}>{displayVal}</span>;
+    }
+
+    // MODO DE EDIÇÃO ATIVO (Input)
     if (isEditing) {
       return (
         <input
@@ -151,21 +162,42 @@ export default function VisaoGeralEstoque({ perfil }) {
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={() => saveEditing(item.id, field, val)}
           onKeyDown={(e) => handleKeyDown(e, item.id, field, val)}
-          style={{ width: '100%', padding: '4px 6px', boxSizing: 'border-box', border: '2px solid #3b82f6', borderRadius: '4px', outline: 'none', fontSize: '0.80rem', fontFamily: 'inherit' }}
+          style={{ width: '100%', padding: '6px 8px', boxSizing: 'border-box', border: '2px solid #3b82f6', borderRadius: '6px', outline: 'none', fontSize: '0.80rem', fontFamily: 'inherit' }}
         />
       );
     }
 
+    // ✨ MODO DE EXIBIÇÃO COM CAIXINHA (Para quem pode editar)
     return (
-      <span
+      <div
         onClick={(e) => { e.stopPropagation(); startEditing(item.id, field, val, type); }}
-        style={{ cursor: 'text', borderBottom: '1px dashed transparent', display: 'inline-block', width: '100%', minHeight: '18px', ...style }}
-        onMouseOver={(e) => e.currentTarget.style.borderBottom = '1px dashed #cbd5e1'}
-        onMouseOut={(e) => e.currentTarget.style.borderBottom = '1px dashed transparent'}
-        title="Clique para editar"
+        style={{ 
+          cursor: 'text', 
+          border: '1px solid #e2e8f0', 
+          backgroundColor: '#f8fafc',
+          borderRadius: '6px', 
+          padding: '4px 8px', 
+          display: 'inline-block', 
+          width: '100%', 
+          minHeight: '26px',
+          boxSizing: 'border-box',
+          transition: 'all 0.2s ease',
+          ...style 
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.borderColor = '#93c5fd';
+          e.currentTarget.style.backgroundColor = '#ffffff';
+          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.borderColor = '#e2e8f0';
+          e.currentTarget.style.backgroundColor = '#f8fafc';
+          e.currentTarget.style.boxShadow = 'none';
+        }}
+        title="Clique para editar este valor manualmente"
       >
         {displayVal}
-      </span>
+      </div>
     );
   };
 
@@ -267,18 +299,22 @@ export default function VisaoGeralEstoque({ perfil }) {
   return (
     <div className="visao-geral-container">
 
-      {/* ✨ NOVO CABEÇALHO COM BOTÃO EXPORTAR */}
       <header className="vg-header">
         <div className="vg-header-titulos">
           <h1>Visão Geral do Estoque</h1>
-          <p>Edição manual completa de todos os materiais — perfil {perfil === 'cliente' ? 'Cliente' : 'Logística'}</p>
+          <p style={{ color: '#64748b', margin: 0 }}>
+            {podeEditar ? (
+              <>Dê um clique nas <strong style={{color: '#2563eb'}}>caixinhas</strong> para <strong>editar um campo manualmente</strong> ou duplo clique na linha para ver o <strong>histórico de fluxos</strong>.</>
+            ) : (
+              <>Dê um duplo clique na linha para ver o <strong>histórico de fluxos</strong> detalhado do material.</>
+            )}
+          </p>
         </div>
         <button className="btn-exportar-excel" onClick={handleExportarExcel}>
           <Download size={18} /> Exportar Excel
         </button>
       </header>
 
-      {/* ✨ NOVO DASHBOARD KPI */}
       <div className="vg-dashboard-cartao">
         <div className="vg-dash-esquerda">
           <div className="icone-cifrao">
@@ -389,9 +425,13 @@ export default function VisaoGeralEstoque({ perfil }) {
                     </td>
 
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem' }}>
-                      <span style={{ backgroundColor: '#ecfdf5', padding: '4px 12px', borderRadius: '999px', border: '1px solid #a7f3d0', display: 'inline-block' }}>
-                        <CelulaEditavel item={item} field="quantidade_disponivel" type="number" style={{ color: '#10b981', fontWeight: '700' }} />
-                      </span>
+                      {podeEditar ? (
+                         <CelulaEditavel item={item} field="quantidade_disponivel" type="number" style={{ color: '#10b981', fontWeight: '700' }} />
+                      ) : (
+                        <span style={{ backgroundColor: '#ecfdf5', padding: '4px 12px', borderRadius: '999px', border: '1px solid #a7f3d0', display: 'inline-block', color: '#10b981', fontWeight: '700' }}>
+                          {item.quantidade_disponivel || 0}
+                        </span>
+                      )}
                     </td>
 
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
