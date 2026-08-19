@@ -11,44 +11,50 @@ import './Header.css';
 const Header = ({ modulo }) => {
     const { usuario, logout, estoqueAtual, setEstoqueAtual, filiaisGlobais } = useContext(AuthContext);
 
-    // ✨ CORREÇÃO E SEGURANÇA: Garante sempre o formato "ID — Nome"
     const obterNomeAmigavel = (id) => {
         if (!id) return '';
         
-        // 1. Procura a filial ignorando se está em maiúsculas ou minúsculas
         const filial = filiaisGlobais?.find(
             f => String(f.id).toUpperCase() === String(id).toUpperCase()
         );
 
-        // 2. Se por acaso ainda estiver a carregar do banco, mostra pelo menos o ID e "A carregar..."
         if (!filial) return `${String(id).toUpperCase()} — A carregar...`;
 
-        // 3. Verifica se o nome guardado no banco já tem o "BRXX" lá dentro
         const nomeUpper = String(filial.nome).toUpperCase();
         const idUpper = String(id).toUpperCase();
 
-        if (nomeUpper.includes(idUpper)) {
-            return filial.nome; // Já está como "BR04 - Goiana"
-        }
+        if (nomeUpper.includes(idUpper)) return filial.nome; 
         
-        // 4. Se no banco só estiver guardado "Goiana", nós forçamos a junção visualmente!
         return `${idUpper} — ${filial.nome}`;
     };
 
     const TOTAL_FILIAIS_SISTEMA = filiaisGlobais?.length > 0 ? filiaisGlobais.length : 3;
 
-    const filiaisPermitidas = Array.isArray(usuario?.filiais_acesso) && usuario.filiais_acesso.length > 0
+    // ✨ 1. Pega as filiais que o utilizador tem na sua conta
+    const filiaisPermitidasBrutas = Array.isArray(usuario?.filiais_acesso) && usuario.filiais_acesso.length > 0
         ? usuario.filiais_acesso 
         : (usuario?.filial ? [usuario.filial] : []);
+
+    // ✨ 2. FILTRAGEM INTELIGENTE: Remove da lista do Header qualquer filial que tenha sido deletada do sistema!
+    const filiaisPermitidas = filiaisPermitidasBrutas.filter(idPermitida => 
+        filiaisGlobais?.some(fGlobal => String(fGlobal.id).toUpperCase() === String(idPermitida).toUpperCase())
+    );
 
     const temAcessoATodas = filiaisPermitidas.length >= TOTAL_FILIAIS_SISTEMA;
     const filiaisPermitidasString = filiaisPermitidas.join(',');
 
+    // ✨ 3. PROTEÇÃO ATIVA: Se ele estiver numa filial que acabou de ser apagada, o sistema muda de filial sozinho!
     useEffect(() => {
         if (usuario && filiaisPermitidas.length > 0 && filiaisGlobais?.length > 0) {
             const podeAcessarAtual = filiaisPermitidas.includes(estoqueAtual) || (estoqueAtual === 'TODOS' && temAcessoATodas);
             if (!podeAcessarAtual) {
-                setEstoqueAtual(filiaisPermitidas[0]);
+                setEstoqueAtual(filiaisPermitidas[0]); // Pula para a primeira filial válida que sobrou
+            }
+        } else if (!usuario && estoqueAtual !== 'TODOS' && filiaisGlobais?.length > 0) {
+            // Segurança para o Cliente Público
+            const filialAindaExiste = filiaisGlobais.some(f => f.id === estoqueAtual);
+            if (!filialAindaExiste) {
+                setEstoqueAtual('TODOS');
             }
         }
     }, [usuario, estoqueAtual, filiaisPermitidasString, temAcessoATodas, setEstoqueAtual, filiaisGlobais]);
@@ -85,7 +91,6 @@ const Header = ({ modulo }) => {
                         ) : (
                             <>
                                 <option value="TODOS">Todas as Filiais</option>
-                                {/* O Cliente público vê todas as que existem */}
                                 {filiaisGlobais?.map(filial => (
                                     <option key={filial.id} value={filial.id}>
                                         {obterNomeAmigavel(filial.id)}
