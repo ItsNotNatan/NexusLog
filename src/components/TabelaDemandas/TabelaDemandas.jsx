@@ -20,7 +20,6 @@ export default function TabelaDemandas({ dados = [] }) {
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 7;
 
-  // ✨ NOVA FUNÇÃO: Formata a data e a hora para ficar com um aspeto bonito
   const formatarDataHora = (timestamp, dataAlternativa) => {
     if (timestamp) {
       const d = new Date(timestamp);
@@ -165,12 +164,16 @@ export default function TabelaDemandas({ dados = [] }) {
           <tbody>
             {itensPaginados.map((linha, index) => {
               const isEntrada = linha.tipo === 'Entrada' || linha.tipo === 'Reintegracao' || linha.tipo === 'Reintegração';
+              const isExpirado = linha.contagemStatus === 'expirado';
 
               return (
                 <tr
                   key={index}
                   onDoubleClick={() => handleDuploClique(linha)}
-                  style={{ cursor: linha.tipo === 'Edição Manual' ? 'default' : 'pointer' }}
+                  style={{ 
+                    cursor: linha.tipo === 'Edição Manual' ? 'default' : 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
                   title={linha.tipo === 'Edição Manual' ? "As edições manuais não possuem itens detalhados." : "Duplo clique para ver todos os itens da solicitação"}
                 >
                   <td className="fonte-negrito">{linha.id}</td>
@@ -187,43 +190,59 @@ export default function TabelaDemandas({ dados = [] }) {
 
                   <td>{renderFluxo(linha.tipo)}</td>
 
+                  {/* ✨ A MÁGICA DA COR DA BORDA DO CRONÔMETRO ESTÁ AQUI! */}
                   <td>
                     {linha.tipo === 'Edição Manual' ? (
                       <span style={{
-                        display: 'inline-block',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        fontFamily: 'monospace, sans-serif',
-                        backgroundColor: '#f8fafc',
-                        color: '#475569',
-                        border: '1px dashed #cbd5e1'
+                        display: 'inline-block', padding: '4px 10px', borderRadius: '6px',
+                        fontSize: '0.75rem', fontWeight: '600', fontFamily: 'monospace, sans-serif',
+                        backgroundColor: '#f8fafc', color: '#475569', border: '1px dashed #cbd5e1'
                       }}>
                         {linha.contagem}
                       </span>
                     ) : linha.qtdMovimentada ? (
                       <span style={{
-                        display: 'inline-block',
-                        padding: '4px 12px',
-                        borderRadius: '6px',
-                        fontWeight: '700',
-                        fontSize: '0.85rem',
-                        fontFamily: 'monospace, sans-serif',
-                        textAlign: 'center',
-                        minWidth: '60px',
+                        display: 'inline-block', padding: '4px 12px', borderRadius: '6px',
+                        fontWeight: '700', fontSize: '0.85rem', fontFamily: 'monospace, sans-serif',
+                        textAlign: 'center', minWidth: '60px',
                         backgroundColor: isEntrada ? '#ecfdf5' : '#fef2f2',
                         color: isEntrada ? '#059669' : '#dc2626',
                         border: `1px solid ${isEntrada ? '#a7f3d0' : '#fecaca'}`
                       }}>
                         {isEntrada ? '+' : '-'}{linha.qtdMovimentada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{linha.unidadeMedida}</span>
                       </span>
+                    ) : linha.contagemStatus ? (
+                      // 👇 AQUI APLICA A COR DE ACORDO COM O STATUS (verde, amarelo, vermelho ou expirado)
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontWeight: '800',
+                        fontSize: '0.85rem',
+                        fontFamily: 'monospace, sans-serif',
+                        textAlign: 'center',
+                        minWidth: '95px',
+                        // Se estiver expirado, o fundo do badge fica vermelho
+                        backgroundColor: linha.contagemStatus === 'expirado' ? '#fef2f2' : '#ffffff',
+                        color: linha.contagemStatus === 'verde' ? '#059669' : 
+                               linha.contagemStatus === 'amarelo' ? '#d97706' : 
+                               linha.contagemStatus === 'vermelho' ? '#dc2626' : 
+                               linha.contagemStatus === 'expirado' ? '#b91c1c' : '#475569',
+                        // A BORDA COLORIDA
+                        border: `2px solid ${
+                               linha.contagemStatus === 'verde' ? '#10b981' : 
+                               linha.contagemStatus === 'amarelo' ? '#f59e0b' : 
+                               linha.contagemStatus === 'vermelho' ? '#ef4444' : 
+                               linha.contagemStatus === 'expirado' ? '#b91c1c' : '#cbd5e1'}`,
+                        boxShadow: linha.contagemStatus === 'expirado' ? '0 0 8px rgba(220, 38, 38, 0.4)' : 'none'
+                      }}>
+                        {linha.contagem}
+                      </span>
                     ) : (
                       <span className="texto-cinza fonte-negrito">{linha.contagem || '-'}</span>
                     )}
                   </td>
 
-                  {/* ✨ AQUI ESTÁ A IMPLEMENTAÇÃO DA HORA */}
                   <td className="texto-cinza" style={{ whiteSpace: 'nowrap' }}>
                     {formatarDataHora(linha.timestamp, linha.criacaoPl)}
                   </td>

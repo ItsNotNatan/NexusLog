@@ -1,7 +1,7 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/Dashboard/Dashboard.jsx
 // DESCRIÇÃO: Dashboard de Operações com datas formatadas em PT-BR,
-//            gráficos dinâmicos e cronômetro de SLA em tempo real.
+//            gráficos dinâmicos, SLA em tempo real e Socket.io.
 // =================================================================
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import './Dashboard.css';
@@ -12,13 +12,9 @@ import {
 } from 'lucide-react';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import { apiFetch } from '../../../services/api';
-
-// ✨ NOVO: Importação do AuthContext para o Dashboard respeitar a Filial ativa
 import { AuthContext } from '../../../contexts/AuthContext';
+import { io } from 'socket.io-client'; // ✨ IMPORTAÇÃO DO SOCKET NO TOPO
 
-// ---------------------------------------------------------------------------
-// 1. LEITOR E FORMATADOR UNIVERSAL DE DATAS (ISO e PT-BR)
-// ---------------------------------------------------------------------------
 const parseDataBackend = (dataStr) => {
   if (!dataStr || typeof dataStr !== 'string') return null;
   
@@ -68,7 +64,6 @@ const formatarDataBr = (dataStr) => {
 };
 
 export default function Dashboard() {
-  // ✨ Puxa a filial selecionada no Header global
   const { estoqueAtual } = useContext(AuthContext);
 
   const [dadosTabela, setDadosTabela] = useState([]);
@@ -76,13 +71,13 @@ export default function Dashboard() {
   const [tempoAtual, setTempoAtual] = useState(new Date());
 
   // ---------------------------------------------------------------------------
-  // 2. BUSCA E TRATAMENTO DOS DADOS DA API (Agora com Filtro de Filial)
+  // 1. BUSCA DE DADOS (COM REFRESH SILENCIOSO PARA O SOCKET)
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    const buscarDados = async () => {
+    const buscarDados = async (silencioso = false) => {
       try {
-        setCarregando(true);
-        // ✨ O Dashboard agora atualiza os gráficos dependendo da filial escolhida
+        if (!silencioso) setCarregando(true);
+
         const filtroFilial = estoqueAtual && estoqueAtual !== 'TODOS' ? `&filial=${estoqueAtual}` : '';
         const resultado = await apiFetch(`/solicitacoes/listar?limit=1000${filtroFilial}`);
 
@@ -126,15 +121,27 @@ export default function Dashboard() {
       } catch (error) {
         console.error("Erro ao carregar os dados do Dashboard:", error?.message || error);
       } finally {
-        setCarregando(false);
+        if (!silencioso) setCarregando(false);
       }
     };
 
     buscarDados();
-  }, [estoqueAtual]); // ✨ Recarrega os gráficos sempre que mudar de filial
+
+    // ✨ SOCKET.IO: Atualiza gráficos e tabela em tempo real (Silenciosamente)
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    
+    socket.on('solicitacoes_atualizadas', () => {
+      console.log('⚡ Dashboard: Novo status ou pedido detetado! Atualizando métricas...');
+      buscarDados(true); 
+    });
+
+    return () => socket.disconnect();
+  }, [estoqueAtual]); 
 
   // ---------------------------------------------------------------------------
-  // 3. CRONÔMETRO EM TEMPO REAL
+  // 2. CRONÓMETRO GLOBAL QUE RODA A CADA SEGUNDO
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -144,7 +151,7 @@ export default function Dashboard() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // 4. CÁLCULO DO TEMPO RESTANTE E SLA DO TARGET (3 DIAS PÓS-PL)
+  // 3. ✨ A MATEMÁTICA DAS CORES DO SLA (50%, 20% e Expirado)
   // ---------------------------------------------------------------------------
   const calcularTempoRestante = (item, agora) => {
     const { criacaoPlRaw, prazoFinalizacao, status, tipo, dataSolicitacao, dataFinalizacaoISO, dataEntrega } = item;
@@ -166,11 +173,11 @@ export default function Dashboard() {
     }
 
     let dataLimite = parseDataBackend(prazoFinalizacao);
+    const prazoTargetMs = 3 * 24 * 60 * 60 * 1000; // SLA de 3 dias em milissegundos
     
     if (!dataLimite) {
       const dataAprovacaoPL = parseDataBackend(criacaoPlRaw) || parseDataBackend(dataSolicitacao);
       if (dataAprovacaoPL && !isNaN(dataAprovacaoPL.getTime())) {
-        const prazoTargetMs = 3 * 24 * 60 * 60 * 1000;
         dataLimite = new Date(dataAprovacaoPL.getTime() + prazoTargetMs);
       }
     }
@@ -188,36 +195,39 @@ export default function Dashboard() {
     const diferencaMs = dataLimite.getTime() - agora.getTime();
     const pad = (num) => String(num).padStart(2, '0');
 
-    if (diferencaMs < 0) {
-      const atrasoAbsoluto = Math.abs(diferencaMs);
-      const dias = Math.floor(atrasoAbsoluto / (1000 * 60 * 60 * 24));
-      const horas = Math.floor((atrasoAbsoluto / (1000 * 60 * 60)) % 24);
-      const minutos = Math.floor((atrasoAbsoluto / 1000 / 60) % 60);
-      const segundos = Math.floor((atrasoAbsoluto / 1000) % 60);
+    const atrasoAbsoluto = Math.abs(diferencaMs);
+    const dias = Math.floor(atrasoAbsoluto / (1000 * 60 * 60 * 24));
+    const horas = Math.floor((atrasoAbsoluto / (1000 * 60 * 60)) % 24);
+    const minutos = Math.floor((atrasoAbsoluto / 1000 / 60) % 60);
+    const segundos = Math.floor((atrasoAbsoluto / 1000) % 60);
 
+    const relogioFormatado = `${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`;
+
+    // ✨ REGRAS DE COR EXATAS (50% e 20%)
+    if (diferencaMs < 0) {
+      // Já passou do prazo (Expirado)
       return { 
-        texto: `-${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, 
-        cor: 'vermelho', 
+        texto: `-${relogioFormatado}`, 
+        cor: 'expirado', // Vai ativar o fundo vermelho
         dentroTarget: false 
       };
     } else {
-      const dias = Math.floor(diferencaMs / (1000 * 60 * 60 * 24));
-      const horas = Math.floor((diferencaMs / (1000 * 60 * 60)) % 24);
-      const minutos = Math.floor((diferencaMs / 1000 / 60) % 60);
-      const segundos = Math.floor((diferencaMs / 1000) % 60);
-      const corStatus = dias === 0 ? 'amarelo' : 'verde';
+      let corStatus = 'verde'; // O Padrão é Verde (Mais de 50% do tempo)
+      
+      if (diferencaMs <= (prazoTargetMs * 0.20)) {
+        corStatus = 'vermelho'; // Falta 20% ou menos do tempo
+      } else if (diferencaMs <= (prazoTargetMs * 0.50)) {
+        corStatus = 'amarelo'; // Falta entre 20% e 50% do tempo
+      }
 
       return { 
-        texto: `${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`, 
+        texto: relogioFormatado, 
         cor: corStatus, 
         dentroTarget: true 
       };
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // 5. CÁLCULO MEMOIZADO DAS MÉTRICAS E GRÁFICOS
-  // ---------------------------------------------------------------------------
   const { 
     dadosTabelaAoVivo, 
     dentroTargetCount, 
@@ -234,7 +244,7 @@ export default function Dashboard() {
       return {
         ...item,
         contagem: contagemAoVivo.texto,
-        contagemStatus: contagemAoVivo.cor,
+        contagemStatus: contagemAoVivo.cor, // Passa a cor "verde", "amarelo", "vermelho" ou "expirado"
         dentroTarget: contagemAoVivo.dentroTarget
       };
     });
@@ -269,11 +279,7 @@ export default function Dashboard() {
 
       meses.push({ 
         rotulo: `${nomesMeses[mesNum]}/${String(ano).slice(-2)}`,
-        mesNum,
-        ano,
-        totalMes,
-        pctDentro,
-        pctFora
+        mesNum, ano, totalMes, pctDentro, pctFora
       });
     }
 
