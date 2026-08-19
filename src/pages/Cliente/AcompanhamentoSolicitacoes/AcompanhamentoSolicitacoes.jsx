@@ -3,17 +3,18 @@ import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
   Search, ChevronRight, ChevronLeft, GitBranch, FileText,
-  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, Calendar
+  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
-import BotaoGerarPDF from "../../../components/BotaoGerarPDF/BotaoGerarPDF"; // ✨ IMPORTA O COMPONENTE NOVO AQUI
+import BotaoGerarPDF from "../../../components/BotaoGerarPDF/BotaoGerarPDF";
+import ScrollDuplo from "../../../components/ScrollDuplo/ScrollDuplo"; 
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
-import { io } from 'socket.io-client'; // 
+import { io } from 'socket.io-client';
 
 const renderBadgeStatus = (status) => {
   switch (status) {
@@ -49,7 +50,6 @@ const obterClasseBadgeTipo = (tipo) => {
 
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
-// ✨ CORREÇÃO AQUI: Puxamos as novas funções do AlertContext
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
   const navigate = useNavigate();
 
@@ -197,11 +197,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       }
     };
 
-if (token) {
+    if (token) {
       buscarDados();
 
-      // ✨ SOCKET.IO: Atualiza a tela do cliente quando a logística aprova algo
-      const socket = io('http://localhost:3001');
+      const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
+      const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+      
       socket.on('solicitacoes_atualizadas', () => {
         console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
         buscarDados();
@@ -215,7 +217,6 @@ if (token) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  // KPIs
   const kpiTotal = dadosTabela.length;
   const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
   const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
@@ -421,8 +422,9 @@ if (token) {
           </div>
         </div>
 
-        <div className="tabela-scroll-horizontal">
-          <table className="tabela-solicitacoes">
+        {/* ✨ USANDO O SCROLL DUPLO AQUI E REMOVENDO A DIV COM OVERFLOW NATIVO */}
+        <ScrollDuplo larguraConteudo="1100px">
+          <table className="tabela-solicitacoes" style={{ width: '100%', minWidth: '1100px' }}>
             <thead>
               <tr>
                 <th className="col-chevron"></th>
@@ -480,10 +482,8 @@ if (token) {
                           </div>
                         </td>
 
-                        {/* ✨ INSERÇÃO DO COMPONENTE LIMPO QUE GERA PDF NA NOVA ABA */}
                         <td>
                           {linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
-                            // Substitua as propriedades que estava a enviar ao BotaoGerarPDF (na linha 373) por estas:
                             <BotaoGerarPDF
                               linha={linha}
                               nomeFilial={obterNomeFilialDinamico(linha.filial || linha.estoque)}
@@ -503,7 +503,6 @@ if (token) {
                         </td>
                         <td className="texto-data">{linha.dataSolicitacao}</td>
 
-                        {/* ✨ REGRA APLICADA: SÓ MOSTRA O INPUT SE O STATUS FOR DIFERENTE DE PENDENTE */}
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
@@ -584,20 +583,20 @@ if (token) {
               )}
             </tbody>
           </table>
+        </ScrollDuplo>
 
-          <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
-            </div>
-            <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}><ChevronLeft size={16} /> Anterior</button>
-              {Array.from({ length: totalPaginas }, (_, index) => {
-                const numeroPagina = index + 1;
-                const ehAtiva = paginaAtual === numeroPagina;
-                return (<button key={numeroPagina} onClick={() => setPaginaAtual(numeroPagina)} disabled={carregando} style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: carregando ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease' }}>{numeroPagina}</button>);
-              })}
-              <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 0.6 : 1 }}>Próxima <ChevronRight size={16} /></button>
-            </div>
+        <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
+          <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+            Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
+          </div>
+          <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}><ChevronLeft size={16} /> Anterior</button>
+            {Array.from({ length: totalPaginas }, (_, index) => {
+              const numeroPagina = index + 1;
+              const ehAtiva = paginaAtual === numeroPagina;
+              return (<button key={numeroPagina} onClick={() => setPaginaAtual(numeroPagina)} disabled={carregando} style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: carregando ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease' }}>{numeroPagina}</button>);
+            })}
+            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 0.6 : 1 }}>Próxima <ChevronRight size={16} /></button>
           </div>
         </div>
       </div>
