@@ -115,11 +115,18 @@ export default function PainelAprovacao() {
     };
 
     // 1. Carrega os dados normalmente ao abrir a página
+// ... código do buscarDados() acima disto ...
+
+    // 1. Carrega os dados normalmente ao abrir a página
     buscarDados();
 
-    // ✨ 2. MAGIA DO TEMPO REAL: Liga o "radar" ao nosso servidor
-    const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const socket = io(BACKEND_URL, {
+    // ✨ 2. MAGIA DO TEMPO REAL: Extrai a raiz do URL corretamente!
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    
+    // ATENÇÃO AQUI: Remove o "/api" do final para conectar ao socket na raiz
+    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+
+    const socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling']
     });
 
@@ -129,7 +136,7 @@ export default function PainelAprovacao() {
 
     socket.on('solicitacoes_atualizadas', () => {
       console.log('⚡ Novo pedido chegou! A atualizar a tela silenciosamente...');
-      buscarDados(true); // O true faz com que atualize sem piscar o "Loader" no ecrã!
+      buscarDados(true); // O true faz com que atualize sem piscar o "Loader" no ecrã
     });
 
     return () => {
