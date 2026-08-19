@@ -1,7 +1,6 @@
 import React, { useState, useContext } from 'react'; 
-import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText } from 'lucide-react'; 
+import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText, MapPin } from 'lucide-react'; // ✨ Adicionado MapPin
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -14,49 +13,31 @@ export default function Crossdocking() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
-  const [formDados, setFormDados] = useState({
-    nome: '',
-    wbs: '',
-    observacoes: '',
-    nf: '' 
-  });
-  
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', observacoes: '', nf: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
   const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
   const [anexos, setAnexos] = useState([]);
 
-  const adicionarItemParcial = () => {
-    setItensParciais([...itensParciais, { id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
-  };
-
+  const adicionarItemParcial = () => setItensParciais([...itensParciais, { id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
   const removerItemParcial = (id) => {
-    if (itensParciais.length > 1) {
-      setItensParciais(itensParciais.filter(item => item.id !== id));
-    } else {
-      showAlert("Atenção", "Para Saída Parcial, deve manter pelo menos 1 item na lista.", "warning");
-    }
+    if (itensParciais.length > 1) setItensParciais(itensParciais.filter(item => item.id !== id));
+    else showAlert("Atenção", "Para Saída Parcial, deve manter pelo menos 1 item na lista.", "warning");
   };
-
-  const atualizarItemParcial = (id, campo, valor) => {
-    setItensParciais(itensParciais.map(item => item.id === id ? { ...item, [campo]: valor } : item));
-  };
+  const atualizarItemParcial = (id, campo, valor) => setItensParciais(itensParciais.map(item => item.id === id ? { ...item, [campo]: valor } : item));
 
   const handleEnviar = async () => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       showAlert("Atenção", "Por favor, selecione uma filial no topo da página antes de prosseguir.", "warning");
       return;
     }
-
     if (!formDados.nome || !formDados.wbs || !formDados.nf || !tipoSaida) {
       showAlert("Campos Obrigatórios", "Por favor, preencha o Nome, WBS, Número da NF e selecione o Tipo de Saída.", "warning");
       return;
     }
-
     if (anexos.length === 0) {
       showAlert("Anexo Obrigatório", "A anexação do documento da Nota Fiscal (PDF ou imagem) é obrigatória para operações de Crossdocking.", "warning");
       return;
     }
-
     if (tipoSaida === 'parcial') {
       const temItemIncompleto = itensParciais.some(i => !i.desenhoSAP || !i.quantidade);
       if (temItemIncompleto) {
@@ -74,57 +55,39 @@ export default function Crossdocking() {
       const { error: erroUpload } = await supabase.storage.from('documentos').upload(caminhoNoStorage, arquivo);
 
       if (erroUpload) {
-        console.error("Erro ao subir arquivo:", erroUpload);
         showAlert("Erro no Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
         return; 
       }
-
       const { data: linkPublico } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
-
-      anexosProcessados.push({
-        nome_arquivo: arquivo.name,
-        url_arquivo: linkPublico.publicUrl
-      });
+      anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
     }
 
-    const listaItensFinais = tipoSaida === 'total' 
-      ? [] 
-      : itensParciais.map(i => ({
-          desenho_sap_manual: i.desenhoSAP,
-          quantidade_solicitada: parseFloat(i.quantidade),
-          unidade_medida_manual: i.unidade
-        }));
+    const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
+      desenho_sap_manual: i.desenhoSAP,
+      quantidade_solicitada: parseFloat(i.quantidade),
+      unidade_medida_manual: i.unidade
+    }));
 
     const payload = {
       solicitante: {
-        nome: formDados.nome,
-        wbs: formDados.wbs,
-        nf: formDados.nf, 
+        nome: formDados.nome, wbs: formDados.wbs, nf: formDados.nf, 
         observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'}] ${formDados.observacoes}`,
-        tipo: 'Crossdocking',
-        filial_origem: estoqueAtual // ✨ CORREÇÃO: Removido o fallback 'BR06'
+        tipo: 'Crossdocking', filial_origem: estoqueAtual 
       },
-      itens: listaItensFinais,
-      anexos: anexosProcessados 
+      itens: listaItensFinais, anexos: anexosProcessados 
     };
 
     try {
-      const dados = await apiFetch('/solicitacoes/crossdocking', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
+      const dados = await apiFetch('/solicitacoes/crossdocking', { method: 'POST', body: JSON.stringify(payload) });
 
       if (dados.sucesso || dados.ps) {
         showAlert("Sucesso!", `Solicitação de Crossdocking enviada com sucesso. ID: ${dados.ps}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '', nf: '' });
-        setTipoSaida(null);
-        setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
-        setAnexos([]); 
+        setTipoSaida(null); setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]); setAnexos([]); 
       } else {
         showAlert("Erro do Servidor", dados.erro, "error");
       }
     } catch (error) {
-      console.error("Erro na requisição:", error.message);
       showAlert("Falha de Conexão", "Não foi possível ligar ao servidor. Verifica a tua internet.", "error");
     }
   };
@@ -158,6 +121,15 @@ export default function Crossdocking() {
           <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} color="#2563eb" /> NÚMERO DA NOTA FISCAL *</label>
             <input type="text" className="input-campo foco-ciano" placeholder="Ex: 123456" value={formDados.nf} onChange={(e) => setFormDados({...formDados, nf: e.target.value})} />
+          </div>
+          {/* ✨ FILIAL DE ORIGEM */}
+          <div className="input-grupo">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
+            <div className="input-wrapper-fixo">
+              <MapPin size={16} className="icone-dentro-input" color="#0891b2" />
+              <input type="text" className="input-campo" value={estoqueAtual} readOnly />
+              <span className="badge-fixo">Fixo</span>
+            </div>
           </div>
         </div>
       </div>

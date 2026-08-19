@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { User, Send, Paperclip, X } from 'lucide-react';
+import { User, Send, Paperclip, X, MapPin } from 'lucide-react'; // ✨ Adicionado MapPin
 
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
@@ -18,10 +18,7 @@ export default function EntradaMaterial() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useContext(AlertContext);
 
-  const [formDados, setFormDados] = useState({
-    nome: '', wbs: '', observacoes: ''
-  });
-
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', observacoes: '' });
   const [dataMinima, setDataMinima] = useState('');
 
   useEffect(() => {
@@ -32,24 +29,9 @@ export default function EntradaMaterial() {
   }, []);
 
   const gerarLinhaVazia = () => ({
-    id: `linha-vazia-${Date.now()}-${Math.random()}`,
-    desenhoSAP: '',
-    numPecaFabricante: '',
-    fornecedor: '',
-    referencia: '', // ✨ Campo adicionado na linha vazia
-    qtdFornecida: 1,
-    nfEntrada: '',
-    unidadeMedida: 'Unid',
-    vendorDescription: '',
-    wbsElement: '',
-    dataNecessidade: '',
-    emissaoNF: '',
-    recebNF: '',
-    docCompras: '',
-    poNetPrice: '',
-    centro: '',
-    deposito: '',
-    alocacao: ''
+    id: `linha-vazia-${Date.now()}-${Math.random()}`, desenhoSAP: '', numPecaFabricante: '', fornecedor: '',
+    referencia: '', qtdFornecida: 1, nfEntrada: '', unidadeMedida: 'Unid', vendorDescription: '',
+    wbsElement: '', dataNecessidade: '', emissaoNF: '', recebNF: '', docCompras: '', poNetPrice: '', centro: '', deposito: '', alocacao: ''
   });
 
   const [itens, setItens] = useState([]);
@@ -64,10 +46,7 @@ export default function EntradaMaterial() {
         desenhoSAP: item['Desenho SAP'] || item.desenhoSAP || '',
         numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
         fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
-        
-        // ✨ LEITURA DA REFERÊNCIA NO EXCEL IMPORTADO
         referencia: item['REFERÊNCIA'] || item['Referência'] || item.referencia || '',
-        
         qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
         nfEntrada: item['NF DE ENTRADA'] || '',
         unidadeMedida: item['Unidade de medida'] || item.unidadeMedida || 'Unid',
@@ -86,27 +65,18 @@ export default function EntradaMaterial() {
       setItens(prev => {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
         const novaLista = [...listaLimpa, ...novosItensFormatados];
-
         if (novaLista.length > LIMITE_CLIENTE) {
-          showAlert(
-            "Limite de Linhas Excedido",
-            `A planilha contém mais itens do que o limite permitido de ${LIMITE_CLIENTE}. Apenas as primeiras ${LIMITE_CLIENTE} linhas foram importadas.`,
-            "warning"
-          );
+          showAlert("Limite de Linhas Excedido", `A planilha contém mais itens do que o limite permitido de ${LIMITE_CLIENTE}. Apenas as primeiras ${LIMITE_CLIENTE} linhas foram importadas.`, "warning");
           return novaLista.slice(0, LIMITE_CLIENTE);
         }
-
         return novaLista;
       });
     }
   };
 
   const adicionarLinhaEmBranco = () => {
-    if (itens.length < LIMITE_CLIENTE) {
-      setItens([...itens, gerarLinhaVazia()]);
-    } else {
-      showAlert("Limite Atingido", `O limite máximo é de ${LIMITE_CLIENTE} itens por solicitação.`, "warning");
-    }
+    if (itens.length < LIMITE_CLIENTE) setItens([...itens, gerarLinhaVazia()]);
+    else showAlert("Limite Atingido", `O limite máximo é de ${LIMITE_CLIENTE} itens por solicitação.`, "warning");
   };
 
   const removerItem = (idParaRemover) => setItens(itens.filter(item => item.id !== idParaRemover));
@@ -152,25 +122,17 @@ export default function EntradaMaterial() {
       const payload = {
         solicitante: { ...formDados, filial_id: estoqueAtual, tipo: 'Entrada' },
         itens: itens.map(item => ({
-          ...item,
-          qtd: item.qtdFornecida,
-          desenhoSAP: item.desenhoSAP || '-',
-          referencia: item.referencia || null, // ✨ ENVIO DO CAMPO REFERÊNCIA PARA A API
-          materialDescription: item.vendorDescription || 'Sem descrição'
+          ...item, qtd: item.qtdFornecida, desenhoSAP: item.desenhoSAP || '-', referencia: item.referencia || null, materialDescription: item.vendorDescription || 'Sem descrição'
         })),
         anexos: anexosProcessados
       };
 
-      const dados = await apiFetch('/solicitacoes/entrada', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
+      const dados = await apiFetch('/solicitacoes/entrada', { method: 'POST', body: JSON.stringify(payload) });
 
       if (dados.sucesso || dados.ps || dados.ps_id) {
         showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps || dados.ps_id}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
-        setItens([]);
-        setAnexos([]);
+        setItens([]); setAnexos([]);
       } else {
         showAlert("Erro no Servidor", dados.erro, "error");
       }
@@ -194,7 +156,16 @@ export default function EntradaMaterial() {
         <div className="form-grid">
           <div className="input-grupo"><label>NOME *</label><input type="text" className="input-campo foco-verde" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} /></div>
           <div className="input-grupo"><label>WBS *</label><input type="text" className="input-campo foco-verde" placeholder="Ex: WBS-PRJ-2024-001" value={formDados.wbs} onChange={(e) => setFormDados({ ...formDados, wbs: e.target.value })} /></div>
-          <div className="input-grupo span-2"><label>OBSERVAÇÕES</label><textarea className="input-campo foco-verde" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea></div>
+          {/* ✨ FILIAL DE ORIGEM */}
+          <div className="input-grupo">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
+            <div className="input-wrapper-fixo">
+              <MapPin size={16} className="icone-dentro-input" color="#10b981" />
+              <input type="text" className="input-campo" value={estoqueAtual} readOnly />
+              <span className="badge-fixo">Fixo</span>
+            </div>
+          </div>
+          <div className="input-grupo"><label>OBSERVAÇÕES</label><textarea className="input-campo foco-verde" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea></div>
         </div>
       </div>
       
@@ -218,15 +189,9 @@ export default function EntradaMaterial() {
       </div>
 
       <TabelaInsercaoItens
-        itens={itens}
-        dataMinima={dataMinima}
-        mostrarDataNecessidade={true}
-        mostrarExemploExcel={true}
-        limiteLinhas={LIMITE_CLIENTE}
-        onAtualizarCampo={atualizarCampo}
-        onRemoverItem={removerItem}
-        onAdicionarLinha={adicionarLinhaEmBranco}
-        onImportarExcel={handleImportarExcel}
+        itens={itens} dataMinima={dataMinima} mostrarDataNecessidade={true} mostrarExemploExcel={true}
+        limiteLinhas={LIMITE_CLIENTE} onAtualizarCampo={atualizarCampo} onRemoverItem={removerItem}
+        onAdicionarLinha={adicionarLinhaEmBranco} onImportarExcel={handleImportarExcel}
       />
 
       <BotaoAcaoGlobal texto="Registrar Entrada" icone={<Send size={16} />} cor="verde" onClick={handleEnviar} />

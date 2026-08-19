@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { User, FileText, Paperclip, Send } from 'lucide-react';
+import { User, FileText, Paperclip, Send, MapPin } from 'lucide-react'; // ✨ Adicionado MapPin
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 import { formatarDinheiroTempoReal } from '../../../utils/formatadores';
@@ -7,31 +7,21 @@ import GerenciadorAnexos from '../../../components/GerenciadorAnexos/Gerenciador
 import { supabase } from '../../../supabaseClient';
 import { apiFetch } from '../../../services/api';
 
-// ✨ IMPORTAÇÃO DOS CONTEXTOS NECESSÁRIOS
 import { useAlert } from '../../../contexts/AlertContext';
 import { AuthContext } from '../../../contexts/AuthContext';
 
 export default function SolicitarNotaFiscal() {
   const { showAlert } = useAlert();
-  const { estoqueAtual } = useContext(AuthContext); // ✨ CORREÇÃO: Buscar a filial ativa
+  const { estoqueAtual } = useContext(AuthContext); 
 
-  const [formDados, setFormDados] = useState({
-    nome: '',
-    wbs: '',
-    valorEstimado: '',
-    descricao: '',
-    observacoes: ''
-  });
-
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', valorEstimado: '', descricao: '', observacoes: '' });
   const [anexos, setAnexos] = useState([]);
 
   const handleEnviar = async () => {
-    // ✨ CORREÇÃO: Validação de segurança para a filial
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       showAlert("Atenção", "Por favor, selecione uma filial no topo da página antes de prosseguir.", "warning");
       return;
     }
-
     if (!formDados.nome || !formDados.wbs || !formDados.descricao) {
       showAlert("Campos Obrigatórios", "Por favor, preencha os campos obrigatórios (*).", "warning");
       return;
@@ -47,7 +37,6 @@ export default function SolicitarNotaFiscal() {
         const { error: erroUpload } = await supabase.storage.from('documentos').upload(caminhoNoStorage, arquivo);
 
         if (erroUpload) {
-          console.error("Erro ao subir arquivo:", erroUpload);
           showAlert("Erro no Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
           return; 
         }
@@ -59,22 +48,15 @@ export default function SolicitarNotaFiscal() {
 
     const payload = {
       solicitante: {
-        nome: formDados.nome,
-        wbs: formDados.wbs,
-        valorEstimado: formDados.valorEstimado,
-        descricao: formDados.descricao,
-        observacoes: formDados.observacoes,
-        tipo: 'Nota Fiscal',
-        filial_origem: estoqueAtual // ✨ CORREÇÃO: Injetar a filial na requisição
+        nome: formDados.nome, wbs: formDados.wbs, valorEstimado: formDados.valorEstimado,
+        descricao: formDados.descricao, observacoes: formDados.observacoes,
+        tipo: 'Nota Fiscal', filial_origem: estoqueAtual 
       },
       anexos: anexosProcessados 
     };
 
     try {
-      const dados = await apiFetch('/solicitacoes/nota-fiscal', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
+      const dados = await apiFetch('/solicitacoes/nota-fiscal', { method: 'POST', body: JSON.stringify(payload) });
 
       if (dados.sucesso || dados.ps_id) {
         showAlert("Sucesso!", `Solicitação de NF enviada. ID: ${dados.ps_id || dados.ps}`, "success");
@@ -84,7 +66,6 @@ export default function SolicitarNotaFiscal() {
         showAlert("Erro do Servidor", dados.erro, "error");
       }
     } catch (error) {
-      console.error("Erro na requisição:", error.message);
       showAlert("Falha de Conexão", "Não foi possível ligar ao servidor. Verifica a tua internet.", "error");
     }
   };
@@ -111,6 +92,15 @@ export default function SolicitarNotaFiscal() {
             <div className="input-grupo">
               <label>VALOR ESTIMADO (R$)</label>
               <input type="text" className="input-campo foco-roxo" placeholder="R$ 0,00" value={formDados.valorEstimado} onChange={(e) => { const valorFormatado = formatarDinheiroTempoReal(e.target.value); setFormDados({ ...formDados, valorEstimado: valorFormatado }); }} />
+            </div>
+            {/* ✨ FILIAL DE ORIGEM */}
+            <div className="input-grupo">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
+              <div className="input-wrapper-fixo">
+                <MapPin size={16} className="icone-dentro-input" color="#9333ea" />
+                <input type="text" className="input-campo" value={estoqueAtual} readOnly />
+                <span className="badge-fixo">Fixo</span>
+              </div>
             </div>
           </div>
         </div>
