@@ -2,12 +2,27 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Building, Plus, MapPin, Trash2, Edit, Save, X } from 'lucide-react';
 import { apiFetch } from '../../../../services/api';
 import { AuthContext } from '../../../../contexts/AuthContext';
-// ✨ IMPORTA O NOSSO ALERTA
 import { useAlert } from '../../../../contexts/AlertContext'; 
 
-export default function CadastroFiliais({ refreshKey }) { // ✨ RECEBE A CHAVE DO TEMPO REAL
+// ✨ Lista das principais cidades para a ComboBox
+const CIDADES_OPCOES = [
+  "",
+  "Santo André, SP",
+  "Goiana, PE",
+  "Betim, MG",
+  "Manaus, AM",
+  "Curitiba, PR",
+  "Joinville, PR",
+  "São Bernardo do Campo, SP",
+  "Campinas, SP",
+  "Resende, RJ",
+  "Taubaté, RJ",
+  "Camaçari, BA"
+];
+
+export default function CadastroFiliais({ refreshKey }) { 
   const { atualizarFiliaisGlobais } = useContext(AuthContext);
-  const { showAlert, showConfirm } = useAlert(); // ✨ INICIA O ALERTA
+  const { showAlert, showConfirm } = useAlert(); 
 
   const [filiais, setFiliais] = useState([]);
   const [novaFilial, setNovaFilial] = useState({ id: '', nome: '', cidade: '' });
@@ -15,7 +30,6 @@ export default function CadastroFiliais({ refreshKey }) { // ✨ RECEBE A CHAVE 
   const [filialEditando, setFilialEditando] = useState(null);
   const [dadosEdicao, setDadosEdicao] = useState({ nome: '', cidade: '' });
 
-  // ✨ ATUALIZA SEMPRE QUE O REFRESH KEY MUDAR (Tempo Real)
   useEffect(() => {
     carregarFiliais();
   }, [refreshKey]);
@@ -164,15 +178,21 @@ export default function CadastroFiliais({ refreshKey }) { // ✨ RECEBE A CHAVE 
               onChange={(e) => setNovaFilial({...novaFilial, nome: e.target.value})}
             />
           </div>
+
+          {/* ✨ COMBOBOX DE CIDADES (NOVO) */}
           <div className="form-grupo" style={{ marginBottom: 0 }}>
             <label>Cidade/UF</label>
-            <input 
-              type="text" 
+            <select 
               className="input-padrao" 
-              placeholder="ex: Manaus, AM" 
               value={novaFilial.cidade}
               onChange={(e) => setNovaFilial({...novaFilial, cidade: e.target.value})}
-            />
+              style={{ backgroundColor: '#f8fafc', appearance: 'auto' }}
+            >
+              <option value="" disabled>Selecione a cidade...</option>
+              {CIDADES_OPCOES.filter(c => c !== "").map(cidade => (
+                <option key={cidade} value={cidade}>{cidade}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -206,13 +226,19 @@ export default function CadastroFiliais({ refreshKey }) { // ✨ RECEBE A CHAVE 
                       onChange={(e) => setDadosEdicao({...dadosEdicao, nome: e.target.value})} 
                       placeholder="Nome da Filial"
                     />
-                    <input 
+
+                    {/* ✨ COMBOBOX NA EDIÇÃO (NOVO) */}
+                    <select 
                       className="input-padrao" 
-                      style={{ padding: '8px', fontSize: '0.875rem' }} 
+                      style={{ padding: '8px', fontSize: '0.875rem', appearance: 'auto' }} 
                       value={dadosEdicao.cidade} 
-                      onChange={(e) => setDadosEdicao({...dadosEdicao, cidade: e.target.value})} 
-                      placeholder="Cidade"
-                    />
+                      onChange={(e) => setDadosEdicao({...dadosEdicao, cidade: e.target.value})}
+                    >
+                      <option value="">Sem Cidade</option>
+                      {CIDADES_OPCOES.filter(c => c !== "").map(cidade => (
+                        <option key={cidade} value={cidade}>{cidade}</option>
+                      ))}
+                    </select>
                   </div>
                 ) : (
                   <div className="filial-info">

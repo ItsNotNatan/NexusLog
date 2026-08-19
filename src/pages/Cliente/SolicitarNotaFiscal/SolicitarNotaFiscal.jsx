@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { User, FileText, Paperclip, Send, MapPin } from 'lucide-react'; // ✨ Adicionado MapPin
+import { User, FileText, Paperclip, Send, MapPin } from 'lucide-react'; 
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 import { formatarDinheiroTempoReal } from '../../../utils/formatadores';
@@ -9,6 +9,14 @@ import { apiFetch } from '../../../services/api';
 
 import { useAlert } from '../../../contexts/AlertContext';
 import { AuthContext } from '../../../contexts/AuthContext';
+
+// ✨ FUNÇÃO: Formata o WBS em tempo real
+const formatarWBS = (valor) => {
+  if (!valor) return '';
+  const limpo = valor.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (limpo.length > 5) return `${limpo.slice(0, 5)}-${limpo.slice(5)}`;
+  return limpo;
+};
 
 export default function SolicitarNotaFiscal() {
   const { showAlert } = useAlert();
@@ -87,13 +95,19 @@ export default function SolicitarNotaFiscal() {
             </div>
             <div className="input-grupo">
               <label>WBS / CENTRO DE CUSTO *</label>
-              <input type="text" className="input-campo foco-roxo" placeholder="Ex: WBS-PRJ-2024-001" value={formDados.wbs} onChange={(e) => setFormDados({ ...formDados, wbs: e.target.value })} />
+              <input 
+                type="text" 
+                className="input-campo foco-roxo" 
+                placeholder="Ex: ABCDE-12345" 
+                value={formDados.wbs} 
+                // ✨ Formatação em tempo real
+                onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} 
+              />
             </div>
             <div className="input-grupo">
               <label>VALOR ESTIMADO (R$)</label>
               <input type="text" className="input-campo foco-roxo" placeholder="R$ 0,00" value={formDados.valorEstimado} onChange={(e) => { const valorFormatado = formatarDinheiroTempoReal(e.target.value); setFormDados({ ...formDados, valorEstimado: valorFormatado }); }} />
             </div>
-            {/* ✨ FILIAL DE ORIGEM */}
             <div className="input-grupo">
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
               <div className="input-wrapper-fixo">

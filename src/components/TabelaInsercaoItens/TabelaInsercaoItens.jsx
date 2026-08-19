@@ -9,6 +9,9 @@ import CarregarArquivo from '../CarregarArquivo/CarregarArquivo';
 import ExemploExcel from '../ExemploExcel/ExemploExcel';
 import ScrollDuplo from '../ScrollDuplo/ScrollDuplo';
 
+// ✨ IMPORTAÇÃO DO FORMATADOR DE DINHEIRO ADICIONADA AQUI
+import { formatarDinheiroTempoReal } from '../../utils/formatadores';
+
 export default function TabelaInsercaoItens({
   itens,
   dataMinima = '',
@@ -129,7 +132,6 @@ export default function TabelaInsercaoItens({
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESENHO SAP</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>Nº PEÇA FABRICANTE</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR</th>
-                {/* ✨ NOVA COLUNA DE CABEÇALHO */}
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ width: '120px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>QTD. FORNECIDA</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NF DE ENTRADA</th>
@@ -166,7 +168,6 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                   </td>
 
-                  {/* ✨ NOVO INPUT DE REFERÊNCIA */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.referencia || ''} onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Referência" />
                   </td>
@@ -209,9 +210,22 @@ export default function TabelaInsercaoItens({
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.docCompras} onChange={(e) => onAtualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
                   </td>
+
+                  {/* ✨ CAMPO DE VALOR MONETÁRIO FORMATADO EM TEMPO REAL! */}
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-preto" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} value={item.poNetPrice} onChange={(e) => onAtualizarCampo(item.id, 'poNetPrice', e.target.value)} placeholder="R$ 0,00" />
+                    <input 
+                      className="input-editavel-tabela texto-preto" 
+                      style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} 
+                      value={item.poNetPrice} 
+                      onChange={(e) => {
+                        // Aplica a magia do formatador antes de gravar!
+                        const valorFormatado = formatarDinheiroTempoReal(e.target.value);
+                        onAtualizarCampo(item.id, 'poNetPrice', valorFormatado);
+                      }} 
+                      placeholder="R$ 0,00" 
+                    />
                   </td>
+
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.centro} onChange={(e) => onAtualizarCampo(item.id, 'centro', e.target.value)} placeholder="Centro" />
                   </td>
@@ -226,7 +240,6 @@ export default function TabelaInsercaoItens({
               
               {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
                 <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
-                  {/* ✨ COLSPAN ATUALIZADO (18 com data de necessidade, 17 sem) */}
                   <td colSpan={mostrarDataNecessidade ? 18 : 17} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
                 </tr>
               ))}

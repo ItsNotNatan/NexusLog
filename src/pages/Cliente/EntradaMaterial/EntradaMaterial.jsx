@@ -14,6 +14,14 @@ import { apiFetch } from '../../../services/api';
 
 const LIMITE_CLIENTE = 20;
 
+// ✨ FUNÇÃO: Formata o WBS em tempo real (Ex: ABCDE-12345)
+const formatarWBS = (valor) => {
+  if (!valor) return '';
+  const limpo = valor.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (limpo.length > 5) return `${limpo.slice(0, 5)}-${limpo.slice(5)}`;
+  return limpo;
+};
+
 export default function EntradaMaterial() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useContext(AlertContext);
@@ -154,8 +162,21 @@ export default function EntradaMaterial() {
         </div>
 
         <div className="form-grid">
-          <div className="input-grupo"><label>NOME *</label><input type="text" className="input-campo foco-verde" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} /></div>
-          <div className="input-grupo"><label>WBS *</label><input type="text" className="input-campo foco-verde" placeholder="Ex: WBS-PRJ-2024-001" value={formDados.wbs} onChange={(e) => setFormDados({ ...formDados, wbs: e.target.value })} /></div>
+          <div className="input-grupo">
+            <label>NOME *</label>
+            <input type="text" className="input-campo foco-verde" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} />
+          </div>
+          <div className="input-grupo">
+            <label>WBS *</label>
+            <input 
+              type="text" 
+              className="input-campo foco-verde" 
+              placeholder="Ex: ABCDE-12345" 
+              value={formDados.wbs} 
+              // ✨ Formatação em tempo real!
+              onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} 
+            />
+          </div>
           {/* ✨ FILIAL DE ORIGEM */}
           <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
@@ -165,7 +186,10 @@ export default function EntradaMaterial() {
               <span className="badge-fixo">Fixo</span>
             </div>
           </div>
-          <div className="input-grupo"><label>OBSERVAÇÕES</label><textarea className="input-campo foco-verde" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea></div>
+          <div className="input-grupo">
+            <label>OBSERVAÇÕES</label>
+            <textarea className="input-campo foco-verde" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea>
+          </div>
         </div>
       </div>
       
