@@ -3,7 +3,7 @@
 // DESCRIÇÃO: Tabela de listagem com duplo-clique para ver Itens da Solicitação
 // =================================================================
 import React, { useState, useEffect } from 'react';
-import { Search, X, PackageOpen, Loader, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, RotateCcw, XCircle, FileText, Edit, ChevronLeft, ChevronRight } from 'lucide-react'; // ✨ CHEVRONS IMPORTADOS PARA A PAGINAÇÃO
+import { Search, X, PackageOpen, Loader, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, RotateCcw, XCircle, FileText, Edit, ChevronLeft, ChevronRight } from 'lucide-react'; 
 
 import { apiFetch } from '../../services/api';
 
@@ -17,9 +17,19 @@ export default function TabelaDemandas({ dados = [] }) {
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [filtoStatus, setFiltoStatus] = useState('Todos os Status');
 
-  // ✨ NOVOS ESTADOS: Controle de Paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 7;
+
+  // ✨ NOVA FUNÇÃO: Formata a data e a hora para ficar com um aspeto bonito
+  const formatarDataHora = (timestamp, dataAlternativa) => {
+    if (timestamp) {
+      const d = new Date(timestamp);
+      const data = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      return `${data} às ${hora}`;
+    }
+    return dataAlternativa || '—';
+  };
 
   const renderFluxo = (tipo) => {
     switch(tipo) {
@@ -76,12 +86,10 @@ export default function TabelaDemandas({ dados = [] }) {
     setTipoSolicitacao(''); 
   };
 
-  // ✨ SEMPRE QUE OS FILTROS OU OS DADOS MUDAM, VOLTA PARA A PÁGINA 1
   useEffect(() => {
     setPaginaAtual(1);
   }, [termoPesquisa, filtoStatus, dados]);
 
-  // Filtragem dos Dados
   const dadosFiltrados = dados.filter((linha) => {
     const termo = termoPesquisa.toLowerCase();
 
@@ -98,7 +106,6 @@ export default function TabelaDemandas({ dados = [] }) {
     return batePesquisa && bateStatus;
   });
 
-  // ✨ CÁLCULOS DA PAGINAÇÃO
   const totalPaginas = Math.ceil(dadosFiltrados.length / itensPorPagina) || 1;
   const indexInicio = (paginaAtual - 1) * itensPorPagina;
   const itensPaginados = dadosFiltrados.slice(indexInicio, indexInicio + itensPorPagina);
@@ -151,12 +158,11 @@ export default function TabelaDemandas({ dados = [] }) {
               <th>PL</th>
               <th>FLUXO DA OPERAÇÃO</th>
               <th>DETALHES / QUANTIDADE</th>
-              <th>DATA DA OPERAÇÃO</th>
+              <th>DATA E HORA</th>
               <th>STATUS</th>
             </tr>
           </thead>
           <tbody>
-            {/* ✨ AGORA RENDERIZA APENAS OS ITENS DA PÁGINA (itensPaginados) */}
             {itensPaginados.map((linha, index) => {
               const isEntrada = linha.tipo === 'Entrada' || linha.tipo === 'Reintegracao' || linha.tipo === 'Reintegração';
 
@@ -217,7 +223,10 @@ export default function TabelaDemandas({ dados = [] }) {
                     )}
                   </td>
 
-                  <td className="texto-cinza">{linha.criacaoPl || linha.dataEntrega || '—'}</td>
+                  {/* ✨ AQUI ESTÁ A IMPLEMENTAÇÃO DA HORA */}
+                  <td className="texto-cinza" style={{ whiteSpace: 'nowrap' }}>
+                    {formatarDataHora(linha.timestamp, linha.criacaoPl)}
+                  </td>
                   
                   <td>
                     <span className="badge-status-simples">{linha.status}</span>
@@ -229,7 +238,6 @@ export default function TabelaDemandas({ dados = [] }) {
         </table>
       </div>
 
-      {/* ✨ RENDERIZAÇÃO DO RODAPÉ COM A PAGINAÇÃO */}
       {dadosFiltrados.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', backgroundColor: '#ffffff', borderTop: '1px solid #e2e8f0', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
           <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
