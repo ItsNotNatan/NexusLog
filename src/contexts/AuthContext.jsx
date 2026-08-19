@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiFetch } from '../services/api';
+import { io } from 'socket.io-client'; // ✨ IMPORTAÇÃO DO SOCKET NO CONTEXTO GLOBAL
 
 export const AuthContext = createContext({});
 
@@ -16,7 +17,6 @@ export const AuthProvider = ({ children }) => {
   
   const [filiaisGlobais, setFiliaisGlobais] = useState([]);
 
-  // ✨ EXTRAÍMOS A FUNÇÃO PARA PODER SER CHAMADA DE FORA
   const atualizarFiliaisGlobais = async () => {
     try {
       const resFiliais = await apiFetch('/filiais/listar');
@@ -28,12 +28,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // 1. CARREGAMENTO INICIAL DO SISTEMA
   useEffect(() => {
     const iniciarSistema = async () => {
-      // 1. Vai buscar as filiais à base de dados logo de início
       await atualizarFiliaisGlobais();
 
-      // 2. Lê a sessão do utilizador
       const tokenSalvo = localStorage.getItem('@NexusLog:token');
       const usuarioSalvo = localStorage.getItem('@NexusLog:usuario');
       const filialSalva = localStorage.getItem('@NexusLog:filialAtiva');
@@ -53,11 +52,24 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('@NexusLog:token');
         }
       }
-
       setCarregandoInicial(false);
     };
 
     iniciarSistema();
+  }, []);
+
+  // ✨ 2. RADAR GLOBAL: Ouve as filiais em tempo real de qualquer ecrã!
+  useEffect(() => {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    
+    socket.on('filiais_atualizadas', () => {
+      console.log('⚡ AuthContext: Uma filial foi adicionada ou apagada! A sincronizar...');
+      atualizarFiliaisGlobais();
+    });
+
+    return () => socket.disconnect();
   }, []);
 
   const login = async (dadosUsuario, tokenRecebido) => {
@@ -98,7 +110,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       carregandoInicial,
       filiaisGlobais,
-      atualizarFiliaisGlobais // ✨ AGORA A FUNÇÃO ESTÁ DISPONÍVEL GLOBALMENTE
+      atualizarFiliaisGlobais 
     }}>
       {children}
     </AuthContext.Provider>
