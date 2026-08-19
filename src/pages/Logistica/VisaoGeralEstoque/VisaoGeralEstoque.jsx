@@ -6,6 +6,7 @@ import { apiFetch } from '../../../services/api';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import { io } from 'socket.io-client';
 import './VisaoGeralEstoque.css';
 
 export default function VisaoGeralEstoque({ perfil }) {

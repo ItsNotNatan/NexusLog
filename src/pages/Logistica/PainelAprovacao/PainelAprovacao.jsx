@@ -1,22 +1,16 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/PainelAprovacao/PainelAprovacao.jsx
-// DESCRIÇÃO: Painel de Aprovação com edição condicional apenas para Entradas
+// DESCRIÇÃO: Painel de Aprovação com edição condicional e Sincronização em Tempo Real
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './PainelAprovacao.css';
 import {
-  Search,
-  Clock,
-  FileText,
-  Check,
-  X,
-  Eye,
-  Loader2,
-  AlertCircle,
-  Plus,
-  Trash2,
-  Save
+  Search, Clock, FileText, Check, X, Eye, Loader2,
+  AlertCircle, Plus, Trash2, Save
 } from 'lucide-react';
+
+// ✨ IMPORTAÇÃO DO SOCKET.IO AQUI NO TOPO!
+import { io } from 'socket.io-client';
 
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
@@ -24,9 +18,7 @@ import { apiFetch } from '../../../services/api';
 
 const obterNomeFilial = (codigo) => {
   if (!codigo || codigo === '-') return 'N/D';
-
   const codLimpo = String(codigo).toUpperCase().trim();
-
   switch (codLimpo) {
     case "BR02": return "Santo André";
     case "BR04": return "Goiana";
@@ -36,7 +28,6 @@ const obterNomeFilial = (codigo) => {
   }
 };
 
-// ✨ FUNÇÃO ADICIONADA: Define as cores conforme o tipo da solicitação
 const obterClasseBadgeTipo = (tipo) => {
   switch (tipo) {
     case "Transfer. WBS":
@@ -69,10 +60,11 @@ export default function PainelAprovacao() {
   const [paginaEntradas, setPaginaEntradas] = useState(1);
   const itensPorPagina = 5;
 
- useEffect(() => {
-    const buscarDados = async () => {
+  useEffect(() => {
+    const buscarDados = async (silencioso = false) => {
       try {
-        setCarregando(true);
+        if (!silencioso) setCarregando(true);
+
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual || ''}&t=${Date.now()}`;
         const urlEstoque = `/estoque/listar?t=${Date.now()}`;
 
@@ -81,7 +73,9 @@ export default function PainelAprovacao() {
           apiFetch(urlEstoque)
         ]);
 
-        if (resultadoEst.sucesso) setEstoque(resultadoEst.dados);
+        if (resultadoEst.sucesso) {
+          setEstoque(resultadoEst.dados);
+        }
 
         if (resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados
@@ -98,33 +92,49 @@ export default function PainelAprovacao() {
               }
 
               return {
-                ...item, idOriginal: item.id, ps: item.ps || 'PS-Pendente',
-                pl: item.pl || item.bs || null, dataSolicitacao: item.dataSolicitacao || '-',
+                ...item,
+                idOriginal: item.id,
+                ps: item.ps || 'PS-Pendente',
+                pl: item.pl || item.bs || null,
+                dataSolicitacao: item.dataSolicitacao || '-',
                 valorTotalFormatado: valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : null,
-                centro, deposito: dep, filial: item.filial || '-'
+                centro,
+                deposito: dep,
+                filial: item.filial || '-'
               };
             });
+
           setDadosTabela(dadosFormatados);
         }
       } catch (error) {
-        showAlert("Erro de Conexão", "Não foi possível carregar as solicitações do servidor.", "error");
+        console.error("Falha ao conectar à API do NexusLog:", error.message);
+        if (!silencioso) showAlert("Erro de Conexão", "Não foi possível carregar as solicitações do servidor.", "error");
       } finally {
-        setCarregando(false);
+        if (!silencioso) setCarregando(false);
       }
     };
 
+    // 1. Carrega os dados normalmente ao abrir a página
     buscarDados();
 
-    // ✨ SOCKET.IO: Ouvinte de Tempo Real
-    // Coloque a URL do seu backend aqui (a mesma que usa no apiFetch)
-    const socket = io('http://localhost:3001'); 
-
-    socket.on('solicitacoes_atualizadas', () => {
-      console.log('⚡ Nova solicitação detetada! Atualizando painel...');
-      buscarDados();
+    // ✨ 2. MAGIA DO TEMPO REAL: Liga o "radar" ao nosso servidor
+    const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const socket = io(BACKEND_URL, {
+      transports: ['websocket', 'polling']
     });
 
-    return () => socket.disconnect();
+    socket.on('connect', () => {
+      console.log('🟢 Painel de Aprovação conectado ao Tempo Real!');
+    });
+
+    socket.on('solicitacoes_atualizadas', () => {
+      console.log('⚡ Novo pedido chegou! A atualizar a tela silenciosamente...');
+      buscarDados(true); // O true faz com que atualize sem piscar o "Loader" no ecrã!
+    });
+
+    return () => {
+      socket.disconnect(); // Desliga o radar ao sair da página
+    };
   }, [estoqueAtual]);
 
   const dadosFiltrados = dadosTabela.filter((linha) => {
