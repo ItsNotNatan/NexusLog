@@ -5,6 +5,9 @@ import { Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import { useAuth } from '../../contexts/AuthContext';
 
+// ✨ IMPORTAÇÃO DO CONTEXTO DE ALERTAS
+import { useAlert } from '../../contexts/AlertContext';
+
 import { apiFetch } from '../../services/api';
 import logoComau from '../../assets/logo-comau.png';
 
@@ -16,6 +19,9 @@ export default function LoginLogistica() {
 
   const navigate = useNavigate();
   const { login } = useAuth();
+  
+  // ✨ INICIALIZAÇÃO DO HOOK DE ALERTAS
+  const { showAlert } = useAlert();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -50,6 +56,15 @@ export default function LoginLogistica() {
     navigate('/');
   };
 
+  // ✨ FUNÇÃO PARA A RECUPERAÇÃO DE SENHA
+  const handleRecuperarSenha = () => {
+    showAlert(
+      "Recuperação de Senha", 
+      "Para redefinir a sua senha de acesso, por favor contacte o Administrador do sistema ou o Líder da sua equipa.", 
+      "info"
+    );
+  };
+
   return (
     <div className="login-page-wrapper">
       <div className="login-card">
@@ -79,7 +94,6 @@ export default function LoginLogistica() {
 
         <div className="login-logo-seccao">
           <img src={logoComau} alt="Logo COMAU" className="login-logo-img" />
-          {/* ✨ NOME ATUALIZADO AQUI */}
           <h2>STOCKLog</h2>
           <p>Controle Operacional &bull; Back-Office</p>
         </div>
@@ -104,6 +118,28 @@ export default function LoginLogistica() {
             <div className="input-login-wrapper">
               <Lock className="input-login-icone" size={18} />
               <input type="password" className="input-login-campo" placeholder="••••••••" required value={senha} onChange={(e) => setSenha(e.target.value)} />
+            </div>
+            
+            {/* ✨ NOVO LINK DE RECUPERAÇÃO DE SENHA */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={handleRecuperarSenha}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#2563eb',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'color 0.2s ease'
+                }}
+                onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
+                onMouseOut={(e) => e.target.style.textDecoration = 'none'}
+              >
+                Esqueceu a senha?
+              </button>
             </div>
           </div>
 

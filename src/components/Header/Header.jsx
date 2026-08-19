@@ -12,10 +12,11 @@ const Header = ({ modulo }) => {
     // ✨ Consome as filiaisGlobais do Contexto
     const { usuario, logout, estoqueAtual, setEstoqueAtual, filiaisGlobais } = useContext(AuthContext);
 
-    // Função que formata o nome para ficar bonito no select
+    // ✨ CORREÇÃO: Como o nome na base de dados já inclui o código (ex: "BR06 — Betim"),
+    // retornamos apenas filial.nome para evitar duplicação.
     const obterNomeAmigavel = (id) => {
         const filial = filiaisGlobais.find(f => f.id === id);
-        return filial ? `${filial.id} — ${filial.nome}` : id;
+        return filial ? filial.nome : id;
     };
 
     // A lógica de "Todas as Filiais" adapta-se automaticamente à quantidade de filiais na BD
@@ -69,10 +70,10 @@ const Header = ({ modulo }) => {
                         ) : (
                             <>
                                 <option value="TODOS">Todas as Filiais</option>
-                                {/* Clientes públicos vêem todas as filiais existentes */}
+                                {/* ✨ CORREÇÃO: Renderizamos apenas filial.nome aqui também */}
                                 {filiaisGlobais.map(filial => (
                                     <option key={filial.id} value={filial.id}>
-                                        {filial.id} — {filial.nome}
+                                        {filial.nome}
                                     </option>
                                 ))}
                             </>
