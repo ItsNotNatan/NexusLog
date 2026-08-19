@@ -13,6 +13,7 @@ import GerenciadorAnexos from "../../../components/GerenciadorAnexos/Gerenciador
 import BotaoGerarPDF from "../../../components/BotaoGerarPDF/BotaoGerarPDF"; // ✨ IMPORTA O COMPONENTE NOVO AQUI
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
+import { io } from 'socket.io-client'; // 
 
 const renderBadgeStatus = (status) => {
   switch (status) {
