@@ -2,19 +2,23 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Building, Plus, MapPin, Trash2, Edit, Save, X } from 'lucide-react';
 import { apiFetch } from '../../../../services/api';
 import { AuthContext } from '../../../../contexts/AuthContext';
+// ✨ IMPORTA O NOSSO ALERTA
+import { useAlert } from '../../../../contexts/AlertContext'; 
 
-export default function CadastroFiliais() {
+export default function CadastroFiliais({ refreshKey }) { // ✨ RECEBE A CHAVE DO TEMPO REAL
   const { atualizarFiliaisGlobais } = useContext(AuthContext);
+  const { showAlert, showConfirm } = useAlert(); // ✨ INICIA O ALERTA
+
   const [filiais, setFiliais] = useState([]);
   const [novaFilial, setNovaFilial] = useState({ id: '', nome: '', cidade: '' });
 
-  // ✨ ESTADOS PARA A EDIÇÃO
   const [filialEditando, setFilialEditando] = useState(null);
   const [dadosEdicao, setDadosEdicao] = useState({ nome: '', cidade: '' });
 
+  // ✨ ATUALIZA SEMPRE QUE O REFRESH KEY MUDAR (Tempo Real)
   useEffect(() => {
     carregarFiliais();
-  }, []);
+  }, [refreshKey]);
 
   const carregarFiliais = async () => {
     try {
@@ -29,7 +33,7 @@ export default function CadastroFiliais() {
 
   const cadastrarFilial = async () => {
     if (!novaFilial.id || !novaFilial.nome) {
-      alert("⚠️ Preencha o Código (ex: BR08) e o Nome da filial.");
+      showAlert("Campos Obrigatórios", "Preencha o Código (ex: BR08) e o Nome da filial.", "warning");
       return;
     }
 
@@ -49,16 +53,23 @@ export default function CadastroFiliais() {
         setFiliais([...filiais, payload]);
         setNovaFilial({ id: '', nome: '', cidade: '' });
         atualizarFiliaisGlobais(); 
+        showAlert("Sucesso!", "A filial foi cadastrada com sucesso no sistema.", "success");
       } else {
-        alert("Erro ao criar filial: " + data.erro);
+        showAlert("Erro ao Cadastrar", data.erro, "error");
       }
     } catch (error) {
-      alert("Falha de conexão com o servidor ao criar filial.");
+      showAlert("Falha de Conexão", "Não foi possível conectar ao servidor para criar a filial.", "error");
     }
   };
 
   const excluirFilial = async (idFilial) => {
-    const confirmar = window.confirm(`Tem certeza que deseja apagar a filial ${idFilial}? Isso pode afetar o acesso de utilizadores a esta filial.`);
+    const confirmar = await showConfirm(
+      "Apagar Filial", 
+      `Tem certeza que deseja apagar a filial ${idFilial}? Isto pode afetar o acesso de utilizadores a esta filial.`,
+      "error",
+      "Sim, Apagar"
+    );
+    
     if (!confirmar) return;
 
     try {
@@ -66,15 +77,15 @@ export default function CadastroFiliais() {
       if (data.sucesso) {
         setFiliais(filiais.filter(f => f.id !== idFilial));
         atualizarFiliaisGlobais();
+        showAlert("Filial Removida", "A filial foi removida do sistema com sucesso.", "success");
       } else {
-        alert("Erro ao apagar filial: " + data.erro);
+        showAlert("Erro ao Remover", data.erro, "error");
       }
     } catch (error) {
-      alert("Falha de conexão ao apagar filial.");
+      showAlert("Falha de Conexão", "Não foi possível conectar ao servidor para apagar a filial.", "error");
     }
   };
 
-  // ✨ FUNÇÕES DE EDIÇÃO
   const iniciarEdicao = (filial) => {
     setFilialEditando(filial.id);
     setDadosEdicao({ nome: filial.nome, cidade: filial.cidade || '' });
@@ -87,7 +98,7 @@ export default function CadastroFiliais() {
 
   const salvarEdicao = async (idFilial) => {
     if (!dadosEdicao.nome) {
-      alert("O nome da filial não pode estar vazio.");
+      showAlert("Nome Inválido", "O nome da filial não pode estar vazio.", "warning");
       return;
     }
 
@@ -106,11 +117,12 @@ export default function CadastroFiliais() {
         setFiliais(filiais.map(f => f.id === idFilial ? { ...f, ...payload } : f));
         cancelarEdicao();
         atualizarFiliaisGlobais();
+        showAlert("Sucesso!", "Os dados da filial foram atualizados.", "success");
       } else {
-        alert("Erro ao atualizar filial: " + data.erro);
+        showAlert("Erro na Edição", data.erro, "error");
       }
     } catch (error) {
-      alert("Falha de conexão com o servidor ao atualizar filial.");
+      showAlert("Falha de Conexão", "Não foi possível conectar ao servidor para atualizar a filial.", "error");
     }
   };
 
@@ -186,7 +198,6 @@ export default function CadastroFiliais() {
                 </div>
                 
                 {filialEditando === filial.id ? (
-                  // ✨ MODO DE EDIÇÃO
                   <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
                     <input 
                       className="input-padrao" 
@@ -204,7 +215,6 @@ export default function CadastroFiliais() {
                     />
                   </div>
                 ) : (
-                  // ✨ MODO NORMAL
                   <div className="filial-info">
                     <span className="filial-codigo">{filial.id}</span>
                     <span className="filial-detalhes">

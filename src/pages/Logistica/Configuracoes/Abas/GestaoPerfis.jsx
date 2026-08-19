@@ -2,17 +2,23 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Users, Search, Edit, Trash2, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import { apiFetch } from '../../../../services/api';
 import { AuthContext } from '../../../../contexts/AuthContext';
+// ✨ IMPORTA O NOSSO ALERTA
+import { useAlert } from '../../../../contexts/AlertContext'; 
 
-export default function GestaoPerfis() {
+export default function GestaoPerfis({ refreshKey }) { // ✨ RECEBE A CHAVE DO TEMPO REAL
   const { filiaisGlobais } = useContext(AuthContext);
   const TODAS_AS_FILIAIS = filiaisGlobais.map(f => f.id);
+  const { showAlert } = useAlert(); // ✨ INICIA O ALERTA
 
   const [usuarios, setUsuarios] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [modoEdicao, setModoEdicao] = useState(false);
+  
+  // Mantemos o modal customizado pois a exclusão de user exige digitação de senha
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [usuarioParaExcluir, setUsuarioParaExcluir] = useState(null);
   const [senhaConfirmacao, setSenhaConfirmacao] = useState('');
+  
   const [termoPesquisa, setTermoPesquisa] = useState('');
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 10;
@@ -21,9 +27,10 @@ export default function GestaoPerfis() {
     id: '', nome: '', email: '', senha: '', cargo: 'OPERADOR', filiais_acesso: []
   });
 
+  // ✨ ATUALIZA SEMPRE QUE O REFRESH KEY MUDAR (Tempo Real)
   useEffect(() => {
     carregarUsuarios();
-  }, []);
+  }, [refreshKey]);
 
   const carregarUsuarios = async () => {
     try {
@@ -32,21 +39,21 @@ export default function GestaoPerfis() {
         setUsuarios(data.dados);
         setPaginaAtual(1); 
       } else {
-        alert("O servidor recusou o pedido. Motivo: " + data.erro);
+        showAlert("Erro", "O servidor recusou o pedido. Motivo: " + data.erro, "error");
       }
     } catch (erro) {
-      alert("Erro de conexão! Detalhe: " + erro.message);
+      showAlert("Erro de Conexão", "Detalhe: " + erro.message, "error");
     }
   };
 
   const guardarUsuario = async () => {
     try {
       if (usuarioAtual.filiais_acesso.length === 0) {
-        alert("⚠️ AÇÃO BLOQUEADA: Por favor, selecione pelo menos uma filial de acesso.");
+        showAlert("Ação Bloqueada", "Por favor, selecione pelo menos uma filial de acesso.", "warning");
         return; 
       }
       if (!modoEdicao && usuarioAtual.senha.length < 6) {
-        alert("⚠️ A senha deve ter no mínimo 6 caracteres.");
+        showAlert("Senha Curta", "A senha de acesso deve ter no mínimo 6 caracteres.", "warning");
         return;
       }
       
@@ -70,19 +77,19 @@ export default function GestaoPerfis() {
       if (data.sucesso) {
         setModalAberto(false);
         carregarUsuarios(); 
-        alert("Utilizador guardado com sucesso!"); 
+        showAlert("Sucesso!", "Utilizador guardado com sucesso!", "success"); 
       } else {
-        alert("Erro ao guardar: " + data.erro);
+        showAlert("Erro ao Guardar", data.erro, "error");
       }
     } catch (erro) {
       console.error("Erro ao guardar utilizador:", erro);
-      alert("Falha de conexão com o servidor.");
+      showAlert("Falha de Conexão", "Falha de conexão com o servidor ao salvar o utilizador.", "error");
     }
   };
 
   const excluirUsuario = async () => {
     if (!senhaConfirmacao) {
-      alert("Por favor, digite a sua senha para confirmar a exclusão.");
+      showAlert("Senha Necessária", "Por favor, digite a sua senha de acesso para confirmar a exclusão.", "warning");
       return;
     }
 
@@ -93,16 +100,16 @@ export default function GestaoPerfis() {
       });
 
       if (data.sucesso) {
-        alert("Utilizador excluído com sucesso!");
+        showAlert("Sucesso!", "Utilizador excluído permanentemente do sistema.", "success");
         setModalExcluirAberto(false);
         setSenhaConfirmacao('');
         carregarUsuarios(); 
       } else {
-        alert("Erro: " + data.erro);
+        showAlert("Erro de Validação", data.erro, "error");
       }
     } catch (erro) {
       console.error("Erro ao excluir utilizador:", erro);
-      alert("Falha na conexão ao tentar excluir.");
+      showAlert("Falha de Conexão", "Falha na conexão ao tentar excluir o utilizador.", "error");
     }
   };
 
@@ -344,6 +351,7 @@ export default function GestaoPerfis() {
         </div>
       )}
 
+      {/* O NOSSO MODAL CUSTOMIZADO (Usamos ele aqui pois precisa do input da senha) */}
       {modalExcluirAberto && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div className="modal-conteudo" style={{ background: '#fff', padding: '24px', borderRadius: '8px', width: '400px', maxWidth: '90%' }}>
