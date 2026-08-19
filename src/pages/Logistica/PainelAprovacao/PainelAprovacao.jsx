@@ -69,11 +69,10 @@ export default function PainelAprovacao() {
   const [paginaEntradas, setPaginaEntradas] = useState(1);
   const itensPorPagina = 5;
 
-  useEffect(() => {
+ useEffect(() => {
     const buscarDados = async () => {
       try {
         setCarregando(true);
-
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual || ''}&t=${Date.now()}`;
         const urlEstoque = `/estoque/listar?t=${Date.now()}`;
 
@@ -82,9 +81,7 @@ export default function PainelAprovacao() {
           apiFetch(urlEstoque)
         ]);
 
-        if (resultadoEst.sucesso) {
-          setEstoque(resultadoEst.dados);
-        }
+        if (resultadoEst.sucesso) setEstoque(resultadoEst.dados);
 
         if (resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados
@@ -101,22 +98,15 @@ export default function PainelAprovacao() {
               }
 
               return {
-                ...item,
-                idOriginal: item.id,
-                ps: item.ps || 'PS-Pendente',
-                pl: item.pl || item.bs || null,
-                dataSolicitacao: item.dataSolicitacao || '-',
+                ...item, idOriginal: item.id, ps: item.ps || 'PS-Pendente',
+                pl: item.pl || item.bs || null, dataSolicitacao: item.dataSolicitacao || '-',
                 valorTotalFormatado: valorTotal > 0 ? `R$ ${valorTotal.toFixed(2)}` : null,
-                centro,
-                deposito: dep,
-                filial: item.filial || '-'
+                centro, deposito: dep, filial: item.filial || '-'
               };
             });
-
           setDadosTabela(dadosFormatados);
         }
       } catch (error) {
-        console.error("Falha ao conectar à API do NexusLog:", error.message);
         showAlert("Erro de Conexão", "Não foi possível carregar as solicitações do servidor.", "error");
       } finally {
         setCarregando(false);
@@ -124,6 +114,17 @@ export default function PainelAprovacao() {
     };
 
     buscarDados();
+
+    // ✨ SOCKET.IO: Ouvinte de Tempo Real
+    // Coloque a URL do seu backend aqui (a mesma que usa no apiFetch)
+    const socket = io('http://localhost:3001'); 
+
+    socket.on('solicitacoes_atualizadas', () => {
+      console.log('⚡ Nova solicitação detetada! Atualizando painel...');
+      buscarDados();
+    });
+
+    return () => socket.disconnect();
   }, [estoqueAtual]);
 
   const dadosFiltrados = dadosTabela.filter((linha) => {

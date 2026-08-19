@@ -196,8 +196,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       }
     };
 
-    if (token) {
+if (token) {
       buscarDados();
+
+      // ✨ SOCKET.IO: Atualiza a tela do cliente quando a logística aprova algo
+      const socket = io('http://localhost:3001');
+      socket.on('solicitacoes_atualizadas', () => {
+        console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
+        buscarDados();
+      });
+
+      return () => socket.disconnect();
     } else {
       setCarregando(false);
     }

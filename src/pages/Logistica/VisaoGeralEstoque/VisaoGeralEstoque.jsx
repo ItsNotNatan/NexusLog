@@ -47,25 +47,30 @@ export default function VisaoGeralEstoque({ perfil }) {
     }
   };
 
-  useEffect(() => {
+useEffect(() => {
     const buscarEstoque = async () => {
       try {
         setCarregando(true);
         const urlEstoque = estoqueAtual === 'TODOS' ? '/estoque/listar' : `/estoque/listar?filial_id=${estoqueAtual}`;
         const resposta = await apiFetch(urlEstoque);
-
-        if (resposta.sucesso) {
-          setEstoque(resposta.dados || []);
-        } else {
-          showAlert("Erro", resposta.erro || "Falha ao buscar estoque", "error");
-        }
+        if (resposta.sucesso) setEstoque(resposta.dados || []);
       } catch (error) {
-        showAlert("Erro de Conexão", "Não foi possível carregar os dados.", "error");
+        showAlert("Erro", "Não foi possível carregar os dados.", "error");
       } finally {
         setCarregando(false);
       }
     };
+    
     buscarEstoque();
+
+    // ✨ SOCKET.IO: Atualiza o saldo instantaneamente se alguém der entrada/saída
+    const socket = io('http://localhost:3001');
+    socket.on('estoque_atualizado', () => {
+      console.log('⚡ Saldo de estoque alterado! Atualizando números...');
+      buscarEstoque();
+    });
+
+    return () => socket.disconnect();
   }, [estoqueAtual, showAlert]);
 
   const handleDuploCliqueItem = async (item) => {
