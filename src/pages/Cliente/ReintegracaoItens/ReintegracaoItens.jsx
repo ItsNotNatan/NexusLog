@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
-import { User, RefreshCcw, Search, Send, Box, ChevronDown, ChevronUp, MapPin } from 'lucide-react'; // ✨ Adicionado MapPin
+import { User, RefreshCcw, Search, Send, Box, ChevronDown, ChevronUp, MapPin, ArrowRightLeft } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { AlertContext } from '../../../contexts/AlertContext';
@@ -12,6 +12,10 @@ export default function ReintegracaoItens() {
 
   const [nome, setNome] = useState('');
   const [pesquisa, setPesquisa] = useState('');
+  
+  // ✨ ESTADO NOVO: Alterna entre Reintegrar Material ou Transferência
+  const [abaReintegracao, setAbaReintegracao] = useState('Material'); 
+  
   const [listaDePl, setListaDePl] = useState([]);
   const [listaReintegracoes, setListaReintegracoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -26,19 +30,37 @@ export default function ReintegracaoItens() {
       const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
 
       if (resultado.sucesso) {
-        const plsValidas = resultado.dados.filter(sol => sol.tipo === 'Material' && (sol.status === 'Em Separação' || sol.status === 'Concluído') && sol.pl && sol.pl !== '-');
-        const reints = resultado.dados.filter(sol => (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') && (sol.status === 'Em Separação' || sol.status === 'Concluído'));
+        // ✨ AGORA FILTRA TANTO MATERIAL COMO TRANSFERÊNCIA WBS
+        const plsValidas = resultado.dados.filter(sol => 
+          (sol.tipo === 'Material' || sol.tipo === 'Transferencia WBS' || sol.tipo === 'Transfer. WBS') && 
+          (sol.status === 'Em Separação' || sol.status === 'Concluído') && 
+          sol.pl && sol.pl !== '-'
+        );
+        
+        const reints = resultado.dados.filter(sol => 
+          (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') && 
+          (sol.status === 'Em Separação' || sol.status === 'Concluído')
+        );
+        
         setListaReintegracoes(reints);
 
         const plsFormatadas = plsValidas.map(plOriginal => {
           const qtdJaDevolvida = {};
           reints.forEach(reint => {
             if (reint.observacoes && reint.observacoes.includes(plOriginal.pl)) {
-              (reint.itens || []).forEach(it => { qtdJaDevolvida[it.estoque_id] = (qtdJaDevolvida[it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0); });
+              (reint.itens || []).forEach(it => { 
+                qtdJaDevolvida[it.estoque_id] = (qtdJaDevolvida[it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0); 
+              });
             }
           });
-          const itensRestantes = (plOriginal.itens || []).filter(item => { return (Number(item.quantidade_solicitada) - (qtdJaDevolvida[item.estoque_id] || 0)) > 0; });
-          return { ...plOriginal, statusExibicao: itensRestantes.length === 0 && (plOriginal.itens || []).length > 0 ? 'Reintegrado' : plOriginal.status };
+          const itensRestantes = (plOriginal.itens || []).filter(item => { 
+            return (Number(item.quantidade_solicitada) - (qtdJaDevolvida[item.estoque_id] || 0)) > 0; 
+          });
+          
+          return { 
+            ...plOriginal, 
+            statusExibicao: itensRestantes.length === 0 && (plOriginal.itens || []).length > 0 ? 'Reintegrado' : plOriginal.status 
+          };
         });
 
         setListaDePl(plsFormatadas);
@@ -68,7 +90,11 @@ export default function ReintegracaoItens() {
     });
 
     const itensMapeados = (plOriginal.itens || []).map(item => {
-      return { ...item, quantidade_maxima_permitida: Math.max(0, Number(item.quantidade_solicitada) - (qtdJaDevolvida[item.estoque_id] || 0)), quantidade_devolvida: 0 };
+      return { 
+        ...item, 
+        quantidade_maxima_permitida: Math.max(0, Number(item.quantidade_solicitada) - (qtdJaDevolvida[item.estoque_id] || 0)), 
+        quantidade_devolvida: 0 
+      };
     }).filter(item => item.quantidade_maxima_permitida > 0); 
 
     setPlSelecionada(plOriginal.id);
@@ -92,7 +118,22 @@ export default function ReintegracaoItens() {
     if (itensParaDevolver.length === 0) { showAlert("Nenhum item selecionado", "Tem de informar a quantidade a devolver de pelo menos 1 item da lista.", "warning"); return; }
 
     const plDados = listaDePl.find(p => p.id === plSelecionada);
-    const payload = { solicitante: { nome: nome, pl_origem: plDados.pl, wbs: plDados.wbs, filial_origem: estoqueAtual }, itens: itensParaDevolver };
+    
+    // ✨ Adiciona um identificador visual se for transferência para a logística saber
+    const observacaoCustomizada = abaReintegracao === 'Transferencia' 
+      ? `[Reintegração de Transferência WBS] Retornar os itens ao WBS Original.` 
+      : '';
+
+    const payload = { 
+      solicitante: { 
+        nome: nome, 
+        pl_origem: plDados.pl, 
+        wbs: plDados.wbs, 
+        filial_origem: estoqueAtual,
+        observacoes: observacaoCustomizada
+      }, 
+      itens: itensParaDevolver 
+    };
 
     try {
       const dados = await apiFetch('/solicitacoes/reintegracao', { method: 'POST', body: JSON.stringify(payload) });
@@ -108,7 +149,13 @@ export default function ReintegracaoItens() {
     }
   };
 
-  const listaFiltrada = listaDePl.filter(pl => 
+  // ✨ FILTRA A LISTA PELA ABA ATIVA E DEPOIS PELA PESQUISA
+  const listaPorAba = listaDePl.filter(pl => {
+    if (abaReintegracao === 'Material') return pl.tipo === 'Material';
+    return pl.tipo === 'Transferencia WBS' || pl.tipo === 'Transfer. WBS';
+  });
+
+  const listaFiltrada = listaPorAba.filter(pl => 
     (pl.pl && pl.pl.toLowerCase().includes(pesquisa.toLowerCase())) || 
     (pl.id && pl.id.toLowerCase().includes(pesquisa.toLowerCase())) || 
     (pl.solicitante && pl.solicitante.toLowerCase().includes(pesquisa.toLowerCase())) ||
@@ -129,7 +176,6 @@ export default function ReintegracaoItens() {
             <label>NOME *</label>
             <input type="text" className="input-campo foco-laranja" placeholder="Seu nome completo" value={nome} onChange={(e) => setNome(e.target.value)} />
           </div>
-          {/* ✨ FILIAL DE ORIGEM */}
           <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
             <div className="input-wrapper-fixo">
@@ -148,6 +194,43 @@ export default function ReintegracaoItens() {
             <h2>Selecionar PL de Origem</h2>
           </div>
         </div>
+
+        {/* ✨ NOVOS BOTÕES PARA ALTERNAR ENTRE MATERIAL E TRANSFERÊNCIA */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+          <button 
+            style={{ 
+              flex: 1, padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              border: `1px solid ${abaReintegracao === 'Material' ? '#f97316' : '#e2e8f0'}`, 
+              backgroundColor: abaReintegracao === 'Material' ? '#fff7ed' : '#f8fafc', 
+              color: abaReintegracao === 'Material' ? '#ea580c' : '#64748b', 
+              fontWeight: abaReintegracao === 'Material' ? '600' : '500', 
+              cursor: 'pointer', transition: 'all 0.2s' 
+            }}
+            onClick={() => { setAbaReintegracao('Material'); setPlSelecionada(null); setPesquisa(''); }}
+          >
+            <Box size={18} /> Retirada de Material
+          </button>
+          <button 
+            style={{ 
+              flex: 1, padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              border: `1px solid ${abaReintegracao === 'Transferencia' ? '#f97316' : '#e2e8f0'}`, 
+              backgroundColor: abaReintegracao === 'Transferencia' ? '#fff7ed' : '#f8fafc', 
+              color: abaReintegracao === 'Transferencia' ? '#ea580c' : '#64748b', 
+              fontWeight: abaReintegracao === 'Transferencia' ? '600' : '500', 
+              cursor: 'pointer', transition: 'all 0.2s' 
+            }}
+            onClick={() => { setAbaReintegracao('Transferencia'); setPlSelecionada(null); setPesquisa(''); }}
+          >
+            <ArrowRightLeft size={18} /> Transferência WBS
+          </button>
+        </div>
+
+        {/* Aviso amigável caso seja transferência */}
+        {abaReintegracao === 'Transferencia' && (
+          <div style={{ padding: '10px 14px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '16px' }}>
+            <strong>Atenção:</strong> Ao reintegrar uma Transferência WBS, as quantidades voltarão para o <strong>WBS de Origem</strong> (estoque original onde o material estava antes da transferência).
+          </div>
+        )}
         
         <div className="pesquisa-wrapper">
           <Search size={18} className="icone-pesquisa" />
@@ -158,7 +241,9 @@ export default function ReintegracaoItens() {
           {carregando ? (
             <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}><RefreshCcw className="animate-spin" size={24} style={{ display: 'block', margin: '0 auto 10px auto' }} /></div>
           ) : listaFiltrada.length === 0 ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>Nenhuma PL de Material concluída encontrada.</div>
+            <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>
+              {abaReintegracao === 'Material' ? 'Nenhuma PL de Material concluída encontrada.' : 'Nenhuma PL de Transferência concluída encontrada.'}
+            </div>
           ) : (
             listaFiltrada.map((pl) => (
               <React.Fragment key={pl.id}>
