@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, Archive, Calendar, User, Box, ArrowRight, RotateCcw, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText } from 'lucide-react';
+import { Search, Loader2, Archive, Calendar, User, Box, ArrowRight, RotateCcw, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText, X } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
@@ -7,16 +7,20 @@ import './Traceabilly.css';
 
 export default function Traceabilly({ perfil }) {
   const { estoqueAtual, filiaisGlobais, usuario } = useContext(AuthContext);
-  const { showAlert, showConfirm } = useAlert();
+  const { showAlert } = useAlert();
 
   const [itensArquivados, setItensArquivados] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
   
-  // Gatilho para recarregar a tabela após uma reversão bem sucedida
   const [recarregar, setRecarregar] = useState(0);
 
-  // ✨ VERIFICAÇÃO DE PERMISSÃO: Apenas ADM e LÍDER no perfil logística podem reverter
+  // ✨ NOVOS ESTADOS PARA O MODAL DE REVERSÃO
+  const [modalReverter, setModalReverter] = useState(false);
+  const [itemReverter, setItemReverter] = useState(null);
+  const [qtdReverter, setQtdReverter] = useState(1);
+
+  // VERIFICAÇÃO DE PERMISSÃO: Apenas ADM e LÍDER no perfil logística podem reverter
   const isAdminOuLider = perfil !== 'cliente' && (usuario?.cargo === 'ADM' || usuario?.cargo === 'LIDER');
 
   const formatarData = (dataISO) => {
@@ -34,9 +38,6 @@ export default function Traceabilly({ perfil }) {
     return nome.charAt(0).toUpperCase();
   };
 
-  // ==========================================
-  // ✨ NOVO: FUNÇÃO PARA RENDERIZAR O FLUXO
-  // ==========================================
   const renderFluxo = (tipo) => {
     switch(tipo) {
       case 'Material': 
@@ -65,20 +66,15 @@ export default function Traceabilly({ perfil }) {
       try {
         setCarregando(true);
         
-        // ✨ 1. Busca TODO o estoque para ver quais estão Zerados (Quantidade = 0)
         const urlEstoque = estoqueAtual === 'TODOS' ? '/estoque/listar?rastreabilidade=true' : `/estoque/listar?filial_id=${estoqueAtual}&rastreabilidade=true`;
         const resEstoque = await apiFetch(urlEstoque);
         
-        // ✨ 2. Busca todas as solicitações para pegar os fluxos
         const urlSol = estoqueAtual === 'TODOS' ? '?limit=1000' : `?filial=${estoqueAtual}&limit=1000`;
         const resSol = await apiFetch(`/solicitacoes/listar${urlSol}`);
         
         if (resEstoque.sucesso && resSol.sucesso) {
           
-          // ✨ MÁGICA: Filtramos apenas os materiais do estoque que chegaram a ZERO!
           const itensZerados = resEstoque.dados.filter(e => e.status === 'Zerado' || e.quantidade_disponivel <= 0);
-          
-          // Criamos um mapa super rápido com os IDs dos itens que morreram
           const setIdsZerados = new Set(itensZerados.map(e => e.id));
 
           const movimentos = resSol.dados.filter(sol => 
@@ -90,8 +86,6 @@ export default function Traceabilly({ perfil }) {
             if (sol.itens && sol.itens.length > 0) {
               sol.itens.forEach(it => {
                 
-                // ✨ AQUI ESTÁ A REGRA DE OURO: Só passa para a tabela se o estoque_id deste movimento
-                // estiver dentro da nossa lista de itens que chegaram a 0.
                 if (it.estoque_id && setIdsZerados.has(it.estoque_id)) {
                   
                   const isEntrada = sol.tipo === 'Entrada' || sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração';
@@ -109,9 +103,8 @@ export default function Traceabilly({ perfil }) {
                     solicitante: sol.solicitante || '-',
                     alocacao: it.alocacao || sol.tipo || '-',
                     
-                    // Dados para a Nova Lógica de Quantidade
                     isEntrada,
-                    qtdMovimentada: it.quantidade_solicitada || 0,
+                    qtdMovimentada: Number(it.quantidade_solicitada || 0),
                     unidadeMedida: it.unidade_medida_manual || 'Un',
                     
                     wbs: sol.wbs || '-',
@@ -123,9 +116,7 @@ export default function Traceabilly({ perfil }) {
             }
           });
 
-          // Ordenar cronologicamente, do fluxo mais recente para o mais antigo
           itemsList.sort((a, b) => b.dataSort - a.dataSort);
-
           setItensArquivados(itemsList);
         } else {
           showAlert("Erro", resSol.erro || resEstoque.erro, "error");
@@ -142,31 +133,34 @@ export default function Traceabilly({ perfil }) {
     }
   }, [estoqueAtual, showAlert, recarregar]);
 
-  // ✨ LÓGICA DE REVERTER ITEM AO ESTOQUE
-  const handleReverterItem = async (idItem) => {
-    if (!idItem) {
-      showAlert("Erro", "ID do item não encontrado.", "error");
+  // ✨ ABRE O MODAL DE REVERSÃO COM OS DADOS DO ITEM
+  const abrirModalReverter = (item) => {
+    setItemReverter(item);
+    setQtdReverter(item.qtdMovimentada); // Define o valor máximo como padrão
+    setModalReverter(true);
+  };
+
+  // ✨ LÓGICA DE CONFIRMAR A REVERSÃO PARA A API
+  const confirmarReversao = async () => {
+    const qtdNum = Number(qtdReverter);
+    if (!qtdNum || qtdNum <= 0 || qtdNum > itemReverter.qtdMovimentada) {
+      showAlert("Quantidade Inválida", `A quantidade a devolver deve ser maior que 0 e no máximo ${itemReverter.qtdMovimentada}.`, "warning");
       return;
     }
-
-    const confirmar = await showConfirm(
-      "Reverter Item",
-      "Tem a certeza que deseja devolver este item ao estoque? A quantidade será reposta e o registo de saída apagado permanentemente.",
-      "warning",
-      "Sim, Reverter"
-    );
-
-    if (!confirmar) return;
 
     try {
       setCarregando(true);
       const resposta = await apiFetch('/solicitacoes/reverter', {
         method: 'POST',
-        body: JSON.stringify({ id_item: idItem })
+        body: JSON.stringify({ 
+          id_item: itemReverter.idItem,
+          quantidade: qtdNum // ✨ ENVIAMOS A QUANTIDADE AGORA!
+        })
       });
 
       if (resposta.sucesso) {
-        showAlert("Sucesso", "Item revertido para o estoque com sucesso!", "success");
+        showAlert("Sucesso", "A quantidade foi revertida para o estoque com sucesso!", "success");
+        setModalReverter(false);
         setRecarregar(prev => prev + 1); // Dispara a recarga da tabela
       } else {
         showAlert("Erro de Servidor", resposta.erro, "error");
@@ -236,7 +230,6 @@ export default function Traceabilly({ perfil }) {
                   <th>NF ENTRADA</th>
                   <th>BS / SOLICITAÇÃO</th>
                   <th>SOLICITANTE</th>
-                  {/* ✨ COLUNAS NOVAS DO FLUXO */}
                   <th>FLUXO DA OPERAÇÃO</th>
                   <th style={{ textAlign: 'center' }}>QUANTIDADE</th>
                   <th>WBS / ALOCAÇÃO</th>
@@ -266,10 +259,8 @@ export default function Traceabilly({ perfil }) {
                       </div>
                     </td>
                     
-                    {/* ✨ EXIBE O TIPO DE FLUXO */}
                     <td>{renderFluxo(item.tipoOriginal)}</td>
 
-                    {/* ✨ EXIBE A QUANTIDADE MOVIMENTADA (COM SINAL + OU -) */}
                     <td style={{ textAlign: 'center' }}>
                       <span style={{
                         display: 'inline-block',
@@ -297,14 +288,14 @@ export default function Traceabilly({ perfil }) {
                     
                     <td>{item.dataSaida}</td>
                     
-                    {/* ✨ AÇÃO REVERTER */}
+                    {/* ✨ O BOTÃO AGORA ABRE A CAIXA (MODAL) */}
                     {isAdminOuLider && (
                       <td style={{ textAlign: 'center' }}>
                         {['Material', 'Transferencia WBS', 'Crossdocking'].includes(item.tipoOriginal) ? (
                           <button 
-                            onClick={() => handleReverterItem(item.idItem)} 
+                            onClick={() => abrirModalReverter(item)} 
                             className="btn-reverter"
-                            title="Reverter item para o estoque"
+                            title="Devolver quantidade ao estoque"
                           >
                             <RotateCcw size={18} />
                           </button>
@@ -319,8 +310,63 @@ export default function Traceabilly({ perfil }) {
             </table>
           )}
         </div>
-
       </div>
+
+      {/* ==============================================
+          ✨ MODAL DE REVERSÃO COM CAMPO DE QUANTIDADE
+          ============================================== */}
+      {modalReverter && itemReverter && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, animation: 'fadeIn 0.2s ease-out' }}>
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '450px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b', fontSize: '1.125rem' }}>
+                <RotateCcw size={20} color="#2563eb" /> Reverter ao Estoque
+              </h3>
+              <button onClick={() => setModalReverter(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '20px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '0.875rem', color: '#475569' }}>
+                Vai devolver itens retirados pela solicitação <strong>{itemReverter.solicitacao}</strong>.
+              </p>
+              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>
+                {itemReverter.partNumber} — {itemReverter.descricao}
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '8px' }}>
+                QUANTIDADE A DEVOLVER (MÁX: {itemReverter.qtdMovimentada})
+              </label>
+              <input
+                type="number"
+                min="1"
+                max={itemReverter.qtdMovimentada}
+                value={qtdReverter}
+                onChange={(e) => setQtdReverter(e.target.value)}
+                style={{ 
+                  width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', 
+                  fontSize: '1rem', outline: 'none', boxSizing: 'border-box', color: '#2563eb', fontWeight: 'bold'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button onClick={() => setModalReverter(false)} style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
+                Cancelar
+              </button>
+              <button onClick={confirmarReversao} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <RotateCcw size={16} /> Confirmar Devolução
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
