@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/FazerSolicitacao/MaterialEstoque.jsx
+// DESCRIÇÃO: Ecrã para solicitar material do estoque com TEMPO REAL
+// =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { User, MapPin, Calendar, Send, Zap } from "lucide-react";
 
@@ -8,6 +12,7 @@ import GerenciadorAnexos from "../../../components/GerenciadorAnexos/Gerenciador
 import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral";
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
+import { io } from 'socket.io-client'; // ✨ IMPORTAÇÃO DO SOCKET.IO
 
 const formatarWBS = (valor) => {
   if (!valor) return '';
@@ -37,6 +42,7 @@ export default function MaterialEstoque() {
     setDataMinima(new Date(hoje.getTime() - timezoneOffset).toISOString().split("T")[0]);
   }, []);
 
+  // ✨ ATUALIZADO: Buscar dados e ligar o radar em tempo real
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
@@ -59,12 +65,55 @@ export default function MaterialEstoque() {
               alocacao: item.alocacao || "-",
               isTransferencia: item.is_transferencia || false
             }));
+
           setEstoqueDisponivel(itensComSaldo);
+
+          // ✨ SINCRONIZA O CARRINHO EM TEMPO REAL: Atualiza a lista da direita se houver mudanças no backend
+          setItensSelecionados(prevSelecionados => 
+            prevSelecionados.map(selecionado => {
+              const itemFresco = itensComSaldo.find(i => i.idBD === selecionado.estoque_id);
+              if (itemFresco) {
+                const saldoLivreNovo = itemFresco.qtdFornecida - (itemFresco.qtdReservada || 0);
+                let novaQtdSelecionada = selecionado.qtdSelecionada;
+                
+                // Se a quantidade nova livre for menor que o que estava digitado, corrige o input automaticamente
+                if (novaQtdSelecionada > saldoLivreNovo) {
+                  novaQtdSelecionada = saldoLivreNovo > 0 ? saldoLivreNovo : 1;
+                }
+
+                return { 
+                  ...selecionado, 
+                  qtdFornecida: itemFresco.qtdFornecida, 
+                  qtdReservada: itemFresco.qtdReservada,
+                  qtdSelecionada: novaQtdSelecionada
+                };
+              }
+              return selecionado;
+            })
+          );
         }
       } catch (error) { console.error("Falha:", error.message); } 
       finally { setCarregandoEstoque(false); }
     };
+    
     buscarEstoqueReal();
+
+    // ✨ CONFIGURAÇÃO DO SOCKET.IO (ESCUTA ATIVA)
+    const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    
+    socket.on('estoque_atualizado', () => {
+      console.log('⚡ Tempo Real: Estoque atualizado no servidor!');
+      buscarEstoqueReal();
+    });
+
+    socket.on('solicitacoes_atualizadas', () => {
+      console.log('⚡ Tempo Real: Reservas atualizadas no servidor!');
+      buscarEstoqueReal();
+    });
+
+    return () => socket.disconnect();
   }, []);
 
   const removerItem = (idParaRemover) => {
@@ -133,6 +182,8 @@ export default function MaterialEstoque() {
     } catch (error) { showAlert("Erro Conexão", "Falha no servidor.", "error"); }
   };
 
+  const listaSegura = Array.isArray(itensSelecionados) ? itensSelecionados : [];
+
   return (
     <>
       <div className="form-cartao">
@@ -157,7 +208,6 @@ export default function MaterialEstoque() {
         </div>
       </div>
 
-      {/* ✨ A MÁGICA: O SeletorEstoqueLateral AGORA FAZ TUDO (Lado esquerdo e tabela da direita)! */}
       <div style={{ marginTop: "24px", marginBottom: "24px" }}>
         <SeletorEstoqueLateral
           estoque={estoqueDisponivel}

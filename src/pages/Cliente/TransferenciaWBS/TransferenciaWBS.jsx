@@ -8,6 +8,7 @@ import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext'; 
+import { io } from 'socket.io-client'; // ✨ IMPORTAÇÃO DO SOCKET.IO
 
 export default function TransferenciaWBS() {
   const { estoqueAtual } = useContext(AuthContext);
@@ -19,25 +20,74 @@ export default function TransferenciaWBS() {
   const [estoqueReal, setEstoqueReal] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
+  // ✨ ATUALIZADO: Buscar dados e ligar o radar em tempo real
   useEffect(() => {
-    if (!estoqueAtual || estoqueAtual === 'TODOS') { setEstoqueReal([]); setCarregandoEstoque(false); return; }
+    if (!estoqueAtual || estoqueAtual === 'TODOS') {
+      setEstoqueReal([]); setCarregandoEstoque(false); return;
+    }
+
     const carregarEstoque = async () => {
       try {
-        setCarregandoEstoque(true);
         const resultado = await apiFetch(`/estoque/listar?filial_id=${estoqueAtual}`);
         if (resultado.sucesso) {
-          setEstoqueReal(resultado.dados.filter(item => item.quantidade_disponivel > 0));
+          const itensComSaldo = resultado.dados.filter(item => item.quantidade_disponivel > 0);
+          setEstoqueReal(itensComSaldo);
+
+          // ✨ SINCRONIZA O CARRINHO EM TEMPO REAL
+          setItensSelecionados(prevSelecionados => 
+            prevSelecionados.map(selecionado => {
+              const itemFresco = itensComSaldo.find(i => i.id === selecionado.id);
+              if (itemFresco) {
+                const saldoLivreNovo = itemFresco.quantidade_disponivel - (itemFresco.quantidade_reservada || 0);
+                let novaQtd = selecionado.qtdTransferencia;
+                
+                if (novaQtd > saldoLivreNovo) {
+                  novaQtd = saldoLivreNovo > 0 ? saldoLivreNovo : 1;
+                }
+
+                return { 
+                  ...selecionado, 
+                  quantidade_disponivel: itemFresco.quantidade_disponivel, 
+                  quantidade_reservada: itemFresco.quantidade_reservada,
+                  qtdTransferencia: novaQtd
+                };
+              }
+              return selecionado;
+            })
+          );
         }
       } catch (error) { console.error("Falha ao buscar estoque:", error.message); } 
       finally { setCarregandoEstoque(false); }
     };
+    
     carregarEstoque();
+
+    // ✨ CONFIGURAÇÃO DO SOCKET.IO
+    const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    
+    socket.on('estoque_atualizado', () => {
+      console.log('⚡ Tempo Real: Estoque atualizado!');
+      carregarEstoque();
+    });
+
+    socket.on('solicitacoes_atualizadas', () => {
+      console.log('⚡ Tempo Real: Solicitações/Reservas atualizadas!');
+      carregarEstoque();
+    });
+
+    return () => socket.disconnect();
   }, [estoqueAtual]); 
 
   const adicionarItem = (itemOriginal) => {
     if (itensSelecionados.length >= 25) { showAlert("Limite Atingido", "Limite máximo de 25 itens.", "warning"); return; }
+    
     const saldoLivre = itemOriginal.quantidade_disponivel - (itemOriginal.quantidade_reservada || 0);
-    if (saldoLivre <= 0) { showAlert("Estoque Reservado", "100% reservado para outras solicitações.", "warning"); return; }
+    if (saldoLivre <= 0) {
+      showAlert("Estoque Reservado", "A quantidade deste item já se encontra 100% reservada para outras solicitações.", "warning");
+      return;
+    }
 
     if (!itensSelecionados.find(i => i.id === itemOriginal.id)) {
       setItensSelecionados([...itensSelecionados, { ...itemOriginal, qtdTransferencia: 1 }]);
@@ -49,6 +99,7 @@ export default function TransferenciaWBS() {
   const atualizarQuantidade = (idOriginal, novaQtd) => {
     const itemEstoque = estoqueReal.find(i => i.id === idOriginal);
     if (!itemEstoque) return;
+    
     const maxPermitido = itemEstoque.quantidade_disponivel - (itemEstoque.quantidade_reservada || 0);
 
     let qtdFormatada = parseInt(novaQtd, 10);
@@ -59,9 +110,9 @@ export default function TransferenciaWBS() {
   };
 
   const handleEnviar = async () => {
-    if (!estoqueAtual || estoqueAtual === 'TODOS') { showAlert("Atenção", "Selecione a filial.", "warning"); return; }
-    if (!formDados.nome || !formDados.wbsDestino) { showAlert("Campos", "Preencha Nome e WBS.", "warning"); return; }
-    if (itensSelecionados.length === 0) { showAlert("Vazio", "Selecione um item.", "warning"); return; }
+    if (!estoqueAtual || estoqueAtual === 'TODOS') { showAlert("Atenção", "Selecione uma filial de origem.", "warning"); return; }
+    if (!formDados.nome || !formDados.wbsDestino) { showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS de Destino.", "warning"); return; }
+    if (itensSelecionados.length === 0) { showAlert("Carrinho Vazio", "Selecione pelo menos um item para transferir.", "warning"); return; }
 
     const anexosProcessados = [];
     if (anexos.length > 0) {
@@ -69,7 +120,7 @@ export default function TransferenciaWBS() {
         const extensao = arquivo.name.split('.').pop();
         const caminhoNoStorage = `uploads/${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
         const { error: erroUpload } = await supabase.storage.from('documentos').upload(caminhoNoStorage, arquivo);
-        if (erroUpload) { showAlert("Falha", `Erro anexo: ${arquivo.name}`, "error"); return; }
+        if (erroUpload) { showAlert("Falha no Anexo", `Erro: ${arquivo.name}`, "error"); return; }
         const { data: linkPublico } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
         anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
       }
@@ -89,11 +140,11 @@ export default function TransferenciaWBS() {
     try {
       const dados = await apiFetch('/solicitacoes/transferencia', { method: 'POST', body: JSON.stringify(payload) });
       if (dados.sucesso || dados.ps) {
-        showAlert("Sucesso!", `Transferência PS: ${dados.ps}`, "success");
+        showAlert("Sucesso!", `Transferência solicitada com sucesso. PS Gerada: ${dados.ps}`, "success");
         setFormDados({ nome: '', wbsDestino: '', justificativa: '', entregaUrgente: false });
         setItensSelecionados([]); setAnexos([]); 
-      } else { showAlert("Erro", dados.erro, "error"); }
-    } catch (error) { showAlert("Falha", "Erro servidor.", "error"); }
+      } else { showAlert("Erro do Servidor", dados.erro, "error"); }
+    } catch (error) { showAlert("Falha de Conexão", "Não foi possível ligar ao servidor.", "error"); }
   };
 
   return (
@@ -108,7 +159,6 @@ export default function TransferenciaWBS() {
         <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} />
       </div>
 
-      {/* ✨ O SELETOR FAZ TODO O TRABALHO PESADO! */}
       <div style={{ marginTop: "24px", marginBottom: "24px" }}>
         <SeletorEstoqueLateral 
           estoque={estoqueReal} 
