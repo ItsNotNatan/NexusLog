@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react'; 
-import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText, MapPin } from 'lucide-react'; // ✨ Adicionado MapPin
+import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText, MapPin } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { supabase } from '../../../supabaseClient';
@@ -15,14 +15,18 @@ export default function Crossdocking() {
 
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', observacoes: '', nf: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
-  const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
+  
+  // ✨ Tabela limpa: Apenas Desenho SAP e Quantidade!
+  const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: '' }]);
   const [anexos, setAnexos] = useState([]);
 
-  const adicionarItemParcial = () => setItensParciais([...itensParciais, { id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]);
+  const adicionarItemParcial = () => setItensParciais([...itensParciais, { id: Date.now(), desenhoSAP: '', quantidade: '' }]);
+  
   const removerItemParcial = (id) => {
     if (itensParciais.length > 1) setItensParciais(itensParciais.filter(item => item.id !== id));
     else showAlert("Atenção", "Para Saída Parcial, deve manter pelo menos 1 item na lista.", "warning");
   };
+  
   const atualizarItemParcial = (id, campo, valor) => setItensParciais(itensParciais.map(item => item.id === id ? { ...item, [campo]: valor } : item));
 
   const handleEnviar = async () => {
@@ -39,6 +43,7 @@ export default function Crossdocking() {
       return;
     }
     if (tipoSaida === 'parcial') {
+      // ✨ Validação foca exclusivamente no Desenho SAP
       const temItemIncompleto = itensParciais.some(i => !i.desenhoSAP || !i.quantidade);
       if (temItemIncompleto) {
         showAlert("Itens Incompletos", "Preencha o Desenho SAP e a Quantidade em todas as linhas da Saída Parcial.", "warning");
@@ -62,10 +67,11 @@ export default function Crossdocking() {
       anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
     }
 
+    // Prepara os itens para enviar ao backend
     const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
       desenho_sap_manual: i.desenhoSAP,
       quantidade_solicitada: parseFloat(i.quantidade),
-      unidade_medida_manual: i.unidade
+      unidade_medida_manual: 'Unid'
     }));
 
     const payload = {
@@ -83,7 +89,9 @@ export default function Crossdocking() {
       if (dados.sucesso || dados.ps) {
         showAlert("Sucesso!", `Solicitação de Crossdocking enviada com sucesso. ID: ${dados.ps}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '', nf: '' });
-        setTipoSaida(null); setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '', unidade: 'Unid' }]); setAnexos([]); 
+        setTipoSaida(null); 
+        setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '' }]); 
+        setAnexos([]); 
       } else {
         showAlert("Erro do Servidor", dados.erro, "error");
       }
@@ -98,7 +106,7 @@ export default function Crossdocking() {
         <Package size={24} />
         <div>
           <strong>Crossdocking</strong>
-          <p>Saída Total processa toda a NF. Saída Parcial permite informar múltiplos itens por Desenho SAP + quantidade.</p>
+          <p>Saída Total processa toda a NF. Saída Parcial permite informar múltiplos itens (Desenho SAP + Qtd) para serem descontados automaticamente na entrada.</p>
         </div>
       </div>
 
@@ -122,7 +130,6 @@ export default function Crossdocking() {
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} color="#2563eb" /> NÚMERO DA NOTA FISCAL *</label>
             <input type="text" className="input-campo foco-ciano" placeholder="Ex: 123456" value={formDados.nf} onChange={(e) => setFormDados({...formDados, nf: e.target.value})} />
           </div>
-          {/* ✨ FILIAL DE ORIGEM */}
           <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
             <div className="input-wrapper-fixo">
@@ -156,8 +163,11 @@ export default function Crossdocking() {
 
           {tipoSaida === 'parcial' && (
             <div style={{ marginTop: '16px', animation: 'fadeIn 0.2s ease-in-out' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '0.85rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={16} /> Saída Parcial — adicione todos os itens da NF que serão separados</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
+                <span style={{ fontSize: '0.85rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '75%' }}>
+                  <AlertTriangle size={16} /> 
+                  Os itens abaixo serão descontados automaticamente pela combinação de NF e Desenho SAP durante a Entrada.
+                </span>
                 <button onClick={adicionarItemParcial} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', color: '#2563eb', cursor: 'pointer' }}><Plus size={14} /> Adicionar Item</button>
               </div>
 
@@ -168,7 +178,6 @@ export default function Crossdocking() {
                       <th style={{ width: '40px', padding: '8px' }}>#</th>
                       <th>DESENHO SAP *</th>
                       <th style={{ width: '150px' }}>QUANTIDADE *</th>
-                      <th style={{ width: '120px' }}>UNIDADE</th>
                       <th style={{ width: '50px', textAlign: 'center' }}></th>
                     </tr>
                   </thead>
@@ -176,16 +185,8 @@ export default function Crossdocking() {
                     {itensParciais.map((item, index) => (
                       <tr key={item.id}>
                         <td style={{ color: '#64748b', fontSize: '0.875rem', fontWeight: '500', padding: '8px' }}>{index + 1}</td>
-                        <td><input type="text" className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff' }} placeholder="Ex: 12345-A" value={item.desenhoSAP} onChange={(e) => atualizarItemParcial(item.id, 'desenhoSAP', e.target.value)} /></td>
-                        <td><input type="number" className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff' }} min="1" placeholder="0" value={item.quantidade} onChange={(e) => atualizarItemParcial(item.id, 'quantidade', e.target.value)} /></td>
-                        <td>
-                          <select className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff', appearance: 'auto', padding: '8px' }} value={item.unidade} onChange={(e) => atualizarItemParcial(item.id, 'unidade', e.target.value)}>
-                            <option value="Unid">Unid</option>
-                            <option value="Kg">Kg</option>
-                            <option value="Metro">Metro</option>
-                            <option value="Caixa">Caixa</option>
-                          </select>
-                        </td>
+                        <td><input type="text" className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff', fontFamily: 'monospace', fontWeight: '600' }} placeholder="Ex: 12345-A" value={item.desenhoSAP} onChange={(e) => atualizarItemParcial(item.id, 'desenhoSAP', e.target.value)} /></td>
+                        <td><input type="number" className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff', color: '#2563eb', fontWeight: 'bold' }} min="1" placeholder="0" value={item.quantidade} onChange={(e) => atualizarItemParcial(item.id, 'quantidade', e.target.value)} /></td>
                         <td style={{ textAlign: 'center' }}>
                           <button onClick={() => removerItemParcial(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={16} /></button>
                         </td>

@@ -190,7 +190,6 @@ export default function TabelaDemandas({ dados = [] }) {
 
                   <td>{renderFluxo(linha.tipo)}</td>
 
-                  {/* ✨ A MÁGICA DA COR DA BORDA DO CRONÔMETRO ESTÁ AQUI! */}
                   <td>
                     {linha.tipo === 'Edição Manual' ? (
                       <span style={{
@@ -212,7 +211,6 @@ export default function TabelaDemandas({ dados = [] }) {
                         {isEntrada ? '+' : '-'}{linha.qtdMovimentada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{linha.unidadeMedida}</span>
                       </span>
                     ) : linha.contagemStatus ? (
-                      // 👇 AQUI APLICA A COR DE ACORDO COM O STATUS (verde, amarelo, vermelho ou expirado)
                       <span style={{
                         display: 'inline-block',
                         padding: '6px 12px',
@@ -222,13 +220,11 @@ export default function TabelaDemandas({ dados = [] }) {
                         fontFamily: 'monospace, sans-serif',
                         textAlign: 'center',
                         minWidth: '95px',
-                        // Se estiver expirado, o fundo do badge fica vermelho
                         backgroundColor: linha.contagemStatus === 'expirado' ? '#fef2f2' : '#ffffff',
                         color: linha.contagemStatus === 'verde' ? '#059669' : 
                                linha.contagemStatus === 'amarelo' ? '#d97706' : 
                                linha.contagemStatus === 'vermelho' ? '#dc2626' : 
                                linha.contagemStatus === 'expirado' ? '#b91c1c' : '#475569',
-                        // A BORDA COLORIDA
                         border: `2px solid ${
                                linha.contagemStatus === 'verde' ? '#10b981' : 
                                linha.contagemStatus === 'amarelo' ? '#f59e0b' : 
@@ -293,6 +289,9 @@ export default function TabelaDemandas({ dados = [] }) {
         </div>
       )}
 
+      {/* ==============================================================
+          MODAL DE ITENS (ABRE COM DUPLO CLIQUE)
+          ============================================================== */}
       {modalAberto && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -336,25 +335,45 @@ export default function TabelaDemandas({ dados = [] }) {
                   </thead>
                   <tbody>
                     {historicoItem.map((hist, idx) => {
+                      // ✨ LÓGICA DE CORES PARA OS DESTAQUES
                       const isTransferencia =
                         tipoSolicitacao === 'Transferencia WBS' ||
                         tipoSolicitacao === 'Transfer. WBS' ||
                         hist.is_transferencia ||
                         hist.isTransferencia;
 
-                      const corFundoLinha = isTransferencia ? '#fefce8' : 'transparent';
-                      const corBordaLinha = isTransferencia ? '#fde047' : '#eee';
+                      const isCrossdocking = tipoSolicitacao === 'Crossdocking';
+
+                      // Variáveis dinâmicas para o visual da linha
+                      let corFundoLinha = 'transparent';
+                      let corBordaLinha = '#eee';
+                      let corTextoPadrao = 'inherit';
+                      let corTextoSap = '#666';
+
+                      if (isTransferencia) {
+                        corFundoLinha = '#fefce8';
+                        corBordaLinha = '#fde047';
+                        corTextoPadrao = '#854d0e'; // Marrom/Laranja Escuro
+                        corTextoSap = '#a16207';
+                      } else if (isCrossdocking) {
+                        corFundoLinha = '#faf5ff';
+                        corBordaLinha = '#e9d5ff';
+                        corTextoPadrao = '#6b21a8'; // Roxo Escuro
+                        corTextoSap = '#7e22ce';
+                      }
 
                       return (
                         <tr key={idx} style={{ backgroundColor: corFundoLinha, borderBottom: `1px solid ${corBordaLinha}`, transition: 'background-color 0.2s' }}>
-                          <td style={{ padding: '8px', color: isTransferencia ? '#a16207' : '#666', fontFamily: 'monospace' }}>
+                          <td style={{ padding: '8px', color: corTextoSap, fontFamily: 'monospace' }}>
                             {hist.desenho_sap_manual || '-'}
                           </td>
-                          <td style={{ padding: '8px', fontWeight: 'bold', color: isTransferencia ? '#854d0e' : 'inherit', fontFamily: 'monospace' }}>
+                          <td style={{ padding: '8px', fontWeight: 'bold', color: corTextoPadrao, fontFamily: 'monospace' }}>
                             {hist.part_number_manual || '-'}
                           </td>
-                          <td style={{ padding: '8px', color: isTransferencia ? '#854d0e' : 'inherit' }}>
+                          <td style={{ padding: '8px', color: corTextoPadrao }}>
                             {hist.descricao_manual || '-'}
+                            
+                            {/* TAG TRANSFERÊNCIA */}
                             {isTransferencia && (
                               <div style={{ marginTop: '6px' }}>
                                 <span style={{
@@ -372,8 +391,28 @@ export default function TabelaDemandas({ dados = [] }) {
                                 </span>
                               </div>
                             )}
+
+                            {/* ✨ TAG CROSSDOCKING */}
+                            {isCrossdocking && (
+                              <div style={{ marginTop: '6px' }}>
+                                <span style={{
+                                  fontSize: '0.65rem',
+                                  backgroundColor: '#f3e8ff',
+                                  color: '#7e22ce',
+                                  border: '1px solid #d8b4fe',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: 'bold',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em'
+                                }}>
+                                  📦 Saída Crossdocking
+                                </span>
+                              </div>
+                            )}
+
                           </td>
-                          <td style={{ padding: '8px', textAlign: 'center', color: isTransferencia ? '#a16207' : '#0056b3', fontWeight: 'bold' }}>
+                          <td style={{ padding: '8px', textAlign: 'center', color: isCrossdocking ? '#9333ea' : (isTransferencia ? '#a16207' : '#0056b3'), fontWeight: 'bold' }}>
                             {hist.quantidade_solicitada || hist.qtd || 1} <span style={{ fontSize: '12px', fontWeight: 'normal' }}>{hist.unidade_medida_manual || 'Un'}</span>
                           </td>
                         </tr>
