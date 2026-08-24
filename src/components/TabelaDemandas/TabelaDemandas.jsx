@@ -343,6 +343,9 @@ export default function TabelaDemandas({ dados = [] }) {
                         hist.isTransferencia;
 
                       const isCrossdocking = tipoSolicitacao === 'Crossdocking';
+                      
+                      // ✨ LÓGICA PARA VERIFICAR SE O CROSSDOCKING FOI PARCIAL
+                      const isCrossdockingParcial = isCrossdocking && hist.alocacao && hist.alocacao.toUpperCase().includes('PARCIAL');
 
                       // Variáveis dinâmicas para o visual da linha
                       let corFundoLinha = 'transparent';
@@ -392,9 +395,9 @@ export default function TabelaDemandas({ dados = [] }) {
                               </div>
                             )}
 
-                            {/* ✨ TAG CROSSDOCKING */}
+                            {/* ✨ TAG CROSSDOCKING COM VALIDAÇÃO DE "PARCIAL" OU "TOTAL" */}
                             {isCrossdocking && (
-                              <div style={{ marginTop: '6px' }}>
+                              <div style={{ marginTop: '6px', display: 'flex', gap: '6px', alignItems: 'center' }}>
                                 <span style={{
                                   fontSize: '0.65rem',
                                   backgroundColor: '#f3e8ff',
@@ -408,6 +411,22 @@ export default function TabelaDemandas({ dados = [] }) {
                                 }}>
                                   📦 Saída Crossdocking
                                 </span>
+                                
+                                {isCrossdockingParcial && (
+                                  <span style={{
+                                    fontSize: '0.65rem',
+                                    backgroundColor: '#fffbeb',
+                                    color: '#d97706',
+                                    border: '1px solid #fde68a',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontWeight: 'bold',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em'
+                                  }}>
+                                    Parcial
+                                  </span>
+                                )}
                               </div>
                             )}
 
