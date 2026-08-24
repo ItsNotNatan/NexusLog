@@ -48,6 +48,27 @@ const obterClasseBadgeTipo = (tipo) => {
   }
 };
 
+// ✨ FUNÇÃO AUXILIAR: Transforma o texto (Ex: 24/08/2026 às 14:30) no formato do input datetime-local
+const converterParaInputDateTime = (dataString) => {
+  if (!dataString || dataString === '-' || dataString === '—' || dataString === 'Disponível') return '';
+  
+  const partes = dataString.split(' ');
+  if (partes[0].includes('/')) {
+    const [dia, mes, ano] = partes[0].split('/');
+    let hora = '00:00';
+    
+    // Verifica se tem hora na string
+    if (partes.length >= 3 && partes[2].includes(':')) {
+       hora = partes[2]; // Pega o "14:30"
+    } else if (partes.length === 2 && partes[1].includes(':')) {
+       hora = partes[1]; 
+    }
+    
+    return `${ano}-${mes}-${dia}T${hora}`;
+  }
+  return '';
+};
+
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
@@ -292,22 +313,34 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
+  // ✨ ATUALIZADA: A função agora constrói a data e a hora bonitinhas!
   const lidarComMudancaDataEntrega = async (idSolicitacao, novaData) => {
     try {
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/local`, {
         method: 'PATCH',
-        body: JSON.stringify({ data_entrega: novaData })
+        // Transforma o YYYY-MM-DDTHH:mm numa ISO completa para a base de dados
+        body: JSON.stringify({ data_entrega: novaData ? new Date(novaData).toISOString() : null })
       });
 
       if (dados.sucesso) {
-        const dataFormatada = novaData ? new Date(`${novaData}T00:00:00`).toLocaleDateString('pt-BR') : '—';
+        let dataFormatada = '—';
+        if (novaData) {
+          const dataObj = new Date(novaData);
+          const dia = String(dataObj.getDate()).padStart(2, '0');
+          const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+          const ano = dataObj.getFullYear();
+          const hora = String(dataObj.getHours()).padStart(2, '0');
+          const min = String(dataObj.getMinutes()).padStart(2, '0');
+          dataFormatada = `${dia}/${mes}/${ano} às ${hora}:${min}`;
+        }
+
         setDadosTabela(prev => prev.map(sol => {
           if (sol.idOriginal === idSolicitacao) {
             return { ...sol, dataEntrega: dataFormatada };
           }
           return sol;
         }));
-        showAlert("Data Atualizada", "Data de entrega atualizada com sucesso!", "success");
+        showAlert("Data Atualizada", "A data e hora de entrega foram atualizadas com sucesso!", "success");
       } else {
         showAlert("Erro", dados.erro || "Falha ao salvar a data de entrega.", "error");
       }
@@ -422,7 +455,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </div>
         </div>
 
-        {/* ✨ USANDO O SCROLL DUPLO AQUI E REMOVENDO A DIV COM OVERFLOW NATIVO */}
         <ScrollDuplo larguraConteudo="1100px">
           <table className="tabela-solicitacoes" style={{ width: '100%', minWidth: '1100px' }}>
             <thead>
@@ -504,11 +536,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         <td className="texto-data">{linha.dataSolicitacao}</td>
 
                         <td>
+                          {/* ✨ O INPUT FOI ATUALIZADO PARA TYPE="DATETIME-LOCAL" */}
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                               <input
-                                type="date"
-                                value={linha.dataEntrega && linha.dataEntrega.includes('/') ? linha.dataEntrega.split('/').reverse().join('-') : ''}
+                                type="datetime-local"
+                                value={converterParaInputDateTime(linha.dataEntrega)}
                                 onChange={(e) => lidarComMudancaDataEntrega(linha.idOriginal, e.target.value)}
                                 style={{
                                   padding: '4px 8px',
@@ -521,7 +554,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                   outline: 'none',
                                   cursor: 'pointer'
                                 }}
-                                title="Altere a data de entrega"
+                                title="Altere a data e hora de entrega"
                               />
                             </div>
                           ) : (

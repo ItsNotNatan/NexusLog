@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Logistica/EntradaEstoque/EntradaEstoque.jsx
+// DESCRIÇÃO: Registo de Entrada de Estoque (Back-Office) utilizando a Tabela Componentizada
+// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './EntradaEstoque.css';
 import { User, Send, Paperclip, X, Truck } from 'lucide-react';
@@ -21,7 +25,23 @@ export default function EntradaEstoque() {
   });
 
   const gerarLinhaVazia = () => ({
-    id: `linha-vazia-${Date.now()}-${Math.random()}`, numPecaFabricante: '', fornecedor: '', qtdFornecida: 1, nfEntrada: '', unidadeMedida: 'Unid', vendorDescription: '', wbsElement: '', emissaoNF: '', recebNF: '', docCompras: '', poNetPrice: '', centro: '', deposito: '', alocacao: ''
+    id: `linha-vazia-${Date.now()}-${Math.random()}`, 
+    desenhoSAP: '', 
+    numPecaFabricante: '', 
+    fornecedor: '', 
+    referencia: '', 
+    qtdFornecida: 1, 
+    nfEntrada: '', 
+    unidadeMedida: 'Unid', 
+    vendorDescription: '', 
+    wbsElement: '', 
+    emissaoNF: '', 
+    recebNF: '', 
+    docCompras: '', 
+    poNetPrice: '', 
+    centro: '', 
+    deposito: '', 
+    alocacao: ''
   });
 
   const [itens, setItens] = useState([]);
@@ -64,9 +84,10 @@ export default function EntradaEstoque() {
     if (itensProcessados && Array.isArray(itensProcessados)) {
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: item.desenhoSAP || '',
+        desenhoSAP: item['Desenho SAP'] || item.desenhoSAP || '',
         numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
         fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
+        referencia: item['REFERÊNCIA'] || item['Referência'] || item.referencia || '',
         qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
         nfEntrada: item['NF DE ENTRADA'] || '',
         unidadeMedida: item['Unidade de medida'] || item.unidadeMedida || 'Unid',
@@ -118,7 +139,7 @@ export default function EntradaEstoque() {
     }
 
     if (!formDados.nome || !formDados.wbs) {
-      alert("Preencha o Nome e o WBS do solicitante.");
+      alert("Preencha o Nome e o WBS do operador.");
       return;
     }
     
@@ -203,18 +224,27 @@ export default function EntradaEstoque() {
       <div className="estoque-cartao form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
-            <div className="icone-fundo-azul" style={{ width: '32px', height: '32px' }}><User size={18} className="icone-azul" /></div>
-            <h2>Operador Responsável</h2>
+            <div className="icone-fundo-azul" style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', backgroundColor: '#eff6ff', color: '#2563eb' }}><User size={18} /></div>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, color: '#0f172a' }}>Operador Responsável</h2>
           </div>
         </div>
-        <div className="form-grid">
-          <div className="input-grupo"><label>NOME *</label><input type="text" className="input-campo" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} /></div>
-          <div className="input-grupo"><label>WBS *</label><input type="text" className="input-campo" placeholder="Ex: WBS-PRJ-2024-001" value={formDados.wbs} onChange={(e) => setFormDados({...formDados, wbs: e.target.value})} /></div>
-          <div className="input-grupo"><label>OBSERVAÇÕES</label><textarea className="input-campo" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})} style={{ minHeight: '42px' }}></textarea></div>
+        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>NOME *</label>
+            <input type="text" className="input-campo" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none' }} />
+          </div>
+          <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>WBS *</label>
+            <input type="text" className="input-campo" placeholder="Ex: WBS-PRJ-2024-001" value={formDados.wbs} onChange={(e) => setFormDados({...formDados, wbs: e.target.value})} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none' }} />
+          </div>
+          <div className="input-grupo" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>OBSERVAÇÕES</label>
+            <textarea className="input-campo" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})} style={{ minHeight: '42px', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none', resize: 'vertical' }}></textarea>
+          </div>
         </div>
       </div>
 
-      {/* ✨ BANNER ANIMADO DE AVISO DE CROSSDOCKING MOVIDO PARA CÁ */}
+      {/* ✨ BANNER ANIMADO DE AVISO DE CROSSDOCKING */}
       {temCrossdockingAguardando && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '16px',
@@ -236,10 +266,10 @@ export default function EntradaEstoque() {
         </div>
       )}
 
+      {/* COMPONENTE DA TABELA */}
       <TabelaInsercaoItens 
         itens={itens}
-        mostrarDataNecessidade={false}
-        mostrarExemploExcel={false}
+        mostrarDataNecessidade={true}
         limiteLinhas={LIMITE_LOGISTICA} 
         onAtualizarCampo={atualizarCampo}
         onRemoverItem={removerItem}
@@ -247,9 +277,9 @@ export default function EntradaEstoque() {
         onImportarExcel={handleImportarExcel}
       />
 
-      <div className="form-cartao">
-        <div className="input-grupo">
-          <label>ANEXOS (OPCIONAL - Notas Fiscais, Manuais, Fotos)</label>
+      <div className="form-cartao" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', marginTop: '24px' }}>
+        <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>ANEXOS (OPCIONAL - Notas Fiscais, Manuais, Fotos)</label>
           <div style={{ marginTop: '8px' }}>
             <CarregarArquivo variante="botao" accept=".pdf, .jpg, .png, .xlsx" label="Anexar Arquivo" icone={<Paperclip size={16} />} onFileSelect={handleAnexar} />
           </div>
