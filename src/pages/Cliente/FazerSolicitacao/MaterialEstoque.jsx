@@ -3,7 +3,7 @@
 // DESCRIÇÃO: Ecrã para solicitar material do estoque com TEMPO REAL
 // =================================================================
 import React, { useState, useEffect, useContext } from "react";
-import { User, MapPin, Calendar, Send, Zap } from "lucide-react";
+import { User, MapPin, Calendar, Send, Zap, AlertTriangle } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
 import { AlertContext } from '../../../contexts/AlertContext';
@@ -114,7 +114,7 @@ export default function MaterialEstoque() {
     });
 
     return () => socket.disconnect();
-  }, []);
+  }, [estoqueAtual]);
 
   const removerItem = (idParaRemover) => {
     setItensSelecionados((prev) => prev.filter((item) => item.id !== idParaRemover));
@@ -196,13 +196,86 @@ export default function MaterialEstoque() {
           <div className="input-grupo"><label><Calendar size={14} /> DATA *</label><input type="date" className="input-campo" value={formDados.dataNecessidade} min={dataMinima} onChange={(e) => setFormDados({ ...formDados, dataNecessidade: e.target.value })} /></div>
           <div className="input-grupo span-2"><label>OBSERVAÇÕES</label><textarea className="input-campo" rows="2" value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea></div>
         </div>
+        
         <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} />
-        <div style={{ padding: "16px", border: "1px solid #cbd5e1", borderRadius: "8px", backgroundColor: "#f8fafc", marginTop: "20px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", width: "100%" }}>
-            <input type="checkbox" id="checkbox-urgente" checked={formDados.entregaUrgente} onChange={(e) => setFormDados({ ...formDados, entregaUrgente: e.target.checked, justificativaUrgencia: "" })} style={{ marginTop: "4px", width: "16px", height: "16px" }} />
+        
+        {/* ✨ CAIXA DE URGÊNCIA - MODO TERROR CORPORATIVO */}
+        <div style={{ 
+          padding: "20px", 
+          border: formDados.entregaUrgente ? "2px dashed #dc2626" : "1px solid #cbd5e1", 
+          borderRadius: "8px", 
+          backgroundColor: formDados.entregaUrgente ? "#fef2f2" : "#f8fafc", 
+          marginTop: "20px", 
+          transition: "all 0.3s ease" 
+        }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", width: "100%" }}>
+            <input 
+              type="checkbox" 
+              id="checkbox-urgente" 
+              checked={formDados.entregaUrgente} 
+              onChange={(e) => setFormDados({ ...formDados, entregaUrgente: e.target.checked, justificativaUrgencia: "" })} 
+              style={{ 
+                marginTop: "4px", 
+                width: "20px", 
+                height: "20px", 
+                cursor: "pointer", 
+                accentColor: "#dc2626" 
+              }} 
+            />
             <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><Zap size={16} color={formDados.entregaUrgente ? "#ef4444" : "#475569"} /><label htmlFor="checkbox-urgente" style={{ fontWeight: "600", color: formDados.entregaUrgente ? "#ef4444" : "#0f172a" }}> Entrega Urgente / Atraso </label></div>
-              {formDados.entregaUrgente && (<div style={{ marginTop: "16px", width: "100%" }}><label style={{ fontSize: "0.75rem", fontWeight: "600", color: "#ef4444" }}> JUSTIFICATIVA * </label><textarea className="input-campo" placeholder="Motivo..." rows="2" value={formDados.justificativaUrgencia} onChange={(e) => setFormDados({ ...formDados, justificativaUrgencia: e.target.value })} style={{ borderColor: "#fca5a5", backgroundColor: "#fef2f2" }}></textarea></div>)}
+              
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {formDados.entregaUrgente ? <AlertTriangle size={20} color="#dc2626" /> : <Zap size={18} color="#475569" />}
+                <label 
+                  htmlFor="checkbox-urgente" 
+                  style={{ 
+                    fontWeight: formDados.entregaUrgente ? "900" : "600", 
+                    color: formDados.entregaUrgente ? "#991b1b" : "#0f172a", 
+                    cursor: "pointer",
+                    fontSize: formDados.entregaUrgente ? "1.1rem" : "0.9rem",
+                    textTransform: formDados.entregaUrgente ? "uppercase" : "none"
+                  }}
+                > 
+                  {formDados.entregaUrgente ? "Sinalizar Falha de Planejamento (URGÊNCIA)" : "Entrega Urgente / Atraso"} 
+                </label>
+              </div>
+
+              {!formDados.entregaUrgente && (
+                <span style={{ fontSize: "0.85rem", color: "#64748b", marginTop: "4px" }}> 
+                  Marque apenas se houver uma urgência real ou atraso na obra.
+                </span>
+              )}
+
+              {formDados.entregaUrgente && (
+                <div style={{ marginTop: "16px", width: "100%", animation: "fadeIn 0.3s ease" }}>
+                  
+                  {/* Bloco de advertência severa */}
+                  <div style={{ backgroundColor: "#fee2e2", borderLeft: "4px solid #dc2626", padding: "12px 16px", marginBottom: "20px", borderRadius: "0 4px 4px 0" }}>
+                    <p style={{ margin: 0, fontSize: "0.85rem", color: "#7f1d1d", fontWeight: "600", lineHeight: "1.5" }}>
+                      ATENÇÃO: A marcação de urgência fura a fila padrão de processamento logístico e será tratada como uma quebra do fluxo normal. Este registo será diretamente reportado aos Administradores.
+                    </p>
+                  </div>
+
+                  <label style={{ fontSize: "0.80rem", fontWeight: "800", color: "#991b1b", marginBottom: "8px", display: "block" }}> 
+                    JUSTIFIQUE A FALHA DE PLANEJAMENTO * 
+                  </label>
+                  <textarea 
+                    className="input-campo" 
+                    placeholder="Por que você não conseguiu se planejar a tempo? Justifique detalhadamente o motivo da falha." 
+                    rows="4" 
+                    value={formDados.justificativaUrgencia} 
+                    onChange={(e) => setFormDados({ ...formDados, justificativaUrgencia: e.target.value })} 
+                    style={{ 
+                      borderColor: "#ef4444", 
+                      backgroundColor: "#ffffff",
+                      color: "#450a0a",
+                      outlineColor: "#dc2626",
+                      boxShadow: "inset 0 1px 3px rgba(220,38,38,0.1)",
+                      fontWeight: "500"
+                    }}
+                  ></textarea>
+                </div>
+              )}
             </div>
           </div>
         </div>

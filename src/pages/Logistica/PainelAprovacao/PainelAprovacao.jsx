@@ -1,15 +1,15 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/PainelAprovacao/PainelAprovacao.jsx
-// DESCRIÇÃO: Painel de Aprovação com edição condicional e Sincronização em Tempo Real
+// DESCRIÇÃO: Painel de Aprovação com edição condicional, Modal de Recusa e Sincronização em Tempo Real
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './PainelAprovacao.css';
 import {
   Search, Clock, FileText, Check, X, Eye, Loader2,
-  AlertCircle, Plus, Trash2, Save
+  AlertCircle, Plus, Trash2, Save, XCircle
 } from 'lucide-react';
 
-// ✨ IMPORTAÇÃO DO SOCKET.IO AQUI NO TOPO!
+// ✨ IMPORTAÇÃO DO SOCKET.IO
 import { io } from 'socket.io-client';
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -55,6 +55,9 @@ export default function PainelAprovacao() {
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [solicitacaoSendoEditada, setSolicitacaoSendoEditada] = useState(null);
   const [itensEdicao, setItensEdicao] = useState([]);
+
+  // ✨ NOVO ESTADO: Controla o Modal de Recusa
+  const [modalRecusa, setModalRecusa] = useState({ aberto: false, idOriginal: null, motivo: '' });
 
   const [paginaGeral, setPaginaGeral] = useState(1);
   const [paginaEntradas, setPaginaEntradas] = useState(1);
@@ -115,15 +118,10 @@ export default function PainelAprovacao() {
     };
 
     // 1. Carrega os dados normalmente ao abrir a página
-// ... código do buscarDados() acima disto ...
-
-    // 1. Carrega os dados normalmente ao abrir a página
     buscarDados();
 
-    // ✨ 2. MAGIA DO TEMPO REAL: Extrai a raiz do URL corretamente!
+    // ✨ 2. MAGIA DO TEMPO REAL
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    
-    // ATENÇÃO AQUI: Remove o "/api" do final para conectar ao socket na raiz
     const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
 
     const socket = io(SOCKET_URL, {
@@ -257,6 +255,7 @@ export default function PainelAprovacao() {
     }
   };
 
+  // ✨ LÓGICA DE APROVAÇÃO (USA O ALERTA CUSTOMIZADO)
   const handleAprovar = async (e, idOriginal) => {
     e.stopPropagation();
 
@@ -297,28 +296,36 @@ export default function PainelAprovacao() {
     }
   };
 
-  const handleRecusar = async (e, idOriginal) => {
+  // ✨ NOVA LÓGICA DE RECUSA (ABRE O MODAL)
+  const abrirModalRecusa = (e, idOriginal) => {
     e.stopPropagation();
-    
-    const motivo = window.prompt(`Motivo da recusa para esta solicitação?`);
-    if (motivo) {
-      try {
-        const resposta = await apiFetch(`/solicitacoes/${idOriginal}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'Recusado', motivo_recusa: motivo })
-        });
+    setModalRecusa({ aberto: true, idOriginal, motivo: '' });
+  };
 
-        if (resposta.sucesso) {
-          setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
-          setLinhaExpandida(null);
-          showAlert("Solicitação Recusada", "A solicitação foi recusada com sucesso.", "info");
-        } else {
-          showAlert("Erro no Servidor", resposta.erro || "Não foi possível recusar a solicitação.", "error");
-        }
-      } catch (error) {
-        console.error("Erro na recusa:", error.message);
-        showAlert("Erro de Conexão", "Falha de comunicação com o servidor.", "error");
+  // ✨ CONFIRMAÇÃO DO MODAL DE RECUSA
+  const confirmarRecusa = async () => {
+    if (!modalRecusa.motivo.trim()) {
+      showAlert("Atenção", "Por favor, informe um motivo para recusar esta solicitação.", "warning");
+      return;
+    }
+
+    try {
+      const resposta = await apiFetch(`/solicitacoes/${modalRecusa.idOriginal}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'Recusado', motivo_recusa: modalRecusa.motivo })
+      });
+
+      if (resposta.sucesso) {
+        setDadosTabela(prev => prev.filter(item => item.idOriginal !== modalRecusa.idOriginal));
+        setLinhaExpandida(null);
+        setModalRecusa({ aberto: false, idOriginal: null, motivo: '' }); // Fecha o modal
+        showAlert("Solicitação Recusada", "A solicitação foi recusada e o solicitante será notificado.", "info");
+      } else {
+        showAlert("Erro no Servidor", resposta.erro || "Não foi possível recusar a solicitação.", "error");
       }
+    } catch (error) {
+      console.error("Erro na recusa:", error.message);
+      showAlert("Erro de Conexão", "Falha de comunicação com o servidor.", "error");
     }
   };
 
@@ -566,7 +573,6 @@ export default function PainelAprovacao() {
                           <div className="item-info-principal">
                             <div className="item-linha-id">
                               {linha.ps}
-                              {/* ✨ AQUI ESTÁ A CHAMADA DA CLASSE DE COR DINÂMICA */}
                               <span className={`badge-tipo-lista ${obterClasseBadgeTipo(linha.tipo)}`}>{linha.tipo}</span>
                             </div>
                             <div className="item-meta-info">
@@ -587,7 +593,7 @@ export default function PainelAprovacao() {
                               </div>
                             ) : (
                               <>
-                                <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
+                                <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => abrirModalRecusa(e, linha.idOriginal)}>
                                   <X size={16} /> Recusar
                                 </button>
                                 <button className="btn-acao-lista btn-aprovar-solid azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
@@ -658,7 +664,6 @@ export default function PainelAprovacao() {
                           <div className="item-info-principal">
                             <div className="item-linha-id">
                               {linha.ps}
-                              {/* ✨ AQUI ESTÁ A CHAMADA DA CLASSE DE COR DINÂMICA */}
                               <span className={`badge-tipo-lista ${obterClasseBadgeTipo(linha.tipo)}`}>{linha.tipo}</span>
                             </div>
                             <div className="item-meta-info">
@@ -673,7 +678,7 @@ export default function PainelAprovacao() {
                               <Eye size={16} /> {isExpandida ? "Fechar Itens" : "Ver / Editar Itens"}
                             </button>
 
-                            <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => handleRecusar(e, linha.idOriginal)}>
+                            <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => abrirModalRecusa(e, linha.idOriginal)}>
                               <X size={16} /> Recusar
                             </button>
                             <button className="btn-acao-lista btn-aprovar-solid" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
@@ -712,6 +717,66 @@ export default function PainelAprovacao() {
             )}
           </div>
         </>
+      )}
+
+      {/* ✨ O NOVO MODAL DE RECUSA */}
+      {modalRecusa.aberto && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px',
+            width: '90%', maxWidth: '420px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', color: '#dc2626' }}>
+              <div style={{ backgroundColor: '#fef2f2', padding: '8px', borderRadius: '50%' }}>
+                <XCircle size={24} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>Recusar Solicitação</h3>
+            </div>
+            
+            <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '16px', marginTop: 0, lineHeight: '1.5' }}>
+              Por favor, informe o motivo da recusa. Esta informação será enviada e ficará visível para o solicitante.
+            </p>
+            
+            <textarea
+              autoFocus
+              value={modalRecusa.motivo}
+              onChange={(e) => setModalRecusa({ ...modalRecusa, motivo: e.target.value })}
+              placeholder="Digite o motivo aqui..."
+              style={{
+                width: '100%', minHeight: '120px', padding: '12px', borderRadius: '8px',
+                border: '1px solid #cbd5e1', outline: 'none', resize: 'vertical',
+                fontSize: '0.875rem', color: '#334155', boxSizing: 'border-box',
+                marginBottom: '24px', backgroundColor: '#f8fafc'
+              }}
+            />
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setModalRecusa({ aberto: false, idOriginal: null, motivo: '' })}
+                style={{
+                  padding: '10px 16px', borderRadius: '8px', border: 'none',
+                  backgroundColor: '#f1f5f9', color: '#475569', fontWeight: '600', cursor: 'pointer', transition: 'background-color 0.2s'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarRecusa}
+                style={{
+                  padding: '10px 16px', borderRadius: '8px', border: 'none',
+                  backgroundColor: '#dc2626', color: '#fff', fontWeight: '600', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '6px', transition: 'background-color 0.2s'
+                }}
+              >
+                <X size={16} /> Confirmar Recusa
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
