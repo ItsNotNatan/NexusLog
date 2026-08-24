@@ -5,9 +5,6 @@ import { FileText } from 'lucide-react';
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 
-// Importação apenas do logo
-import logoComau from '../../assets/logo-comau.png';
-
 try {
   pdfMake.vfs = pdfFonts.pdfMake.vfs;
 } catch (e) {
@@ -19,28 +16,9 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
 
   if (!linha) return null;
 
-  // Função auxiliar para converter imagens em Base64
-  const getBase64ImageFromURL = (url) => {
-    return new Promise((resolve, reject) => {
-      var img = new Image();
-      img.setAttribute("crossOrigin", "anonymous");
-      img.onload = function () {
-        var canvas = document.createElement("canvas");
-        canvas.width = this.width;
-        canvas.height = this.height;
-        var ctx = canvas.getContext("2d");
-        ctx.drawImage(this, 0, 0);
-        var dataURL = canvas.toDataURL("image/png");
-        resolve(dataURL);
-      };
-      img.onerror = (error) => reject(error);
-      img.src = url;
-    });
-  };
-
-  // Trata a formatação de datas que vêm do banco (DD/MM/AAAA)
+  // Trata a formatação de datas
   const formatarDataSimples = (data) => {
-    if (!data) return '-';
+    if (!data) return '';
     if (data.includes('/')) return data;
     try {
       return new Date(data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
@@ -50,7 +28,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
   };
 
   const handleGerarPdf = async (e) => {
-    e.stopPropagation(); // Impede a expansão da linha na tabela
+    e.stopPropagation(); 
     setGerando(true);
     
     if (showLoading) {
@@ -58,228 +36,192 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     }
 
     try {
-      // Carregar a imagem do logo em Base64
-      const [logoBase64] = await Promise.all([
-        getBase64ImageFromURL(logoComau).catch(() => null)
-      ]);
-
-      // ✨ IDENTIFICAÇÃO DOS TIPOS ESPECIAIS DE SOLICITAÇÃO
-      const isCrossdocking = linha.tipo === 'Crossdocking';
       const isReintegracao = linha.tipo === 'Reintegracao' || linha.tipo === 'Reintegração';
       const isCancelamento = linha.tipo === 'Cancelado';
 
-      // A data de necessidade está vinculada à solicitação global (linha)
-      const dataNecessidadeFormatada = formatarDataSimples(linha.data_necessidade || linha.dataNecessidade);
+      // Título Principal Baseado no Tipo
+      let tituloPrincipal = 'BOLETIM DE SAÍDA - COMUNICAÇÃO INTERNA: SAÍDA DE MATERIAIS DA COMAU';
+      if (isReintegracao) tituloPrincipal = 'BOLETIM DE ENTRADA - COMUNICAÇÃO INTERNA: REINTEGRAÇÃO DE MATERIAIS';
+      if (isCancelamento) tituloPrincipal = 'BOLETIM DE CANCELAMENTO - COMUNICAÇÃO INTERNA: ESTORNO DE SOLICITAÇÃO';
 
-      // Monta as linhas da tabela mapeando os campos exatos do banco
-      let linhasItens = [];
+      // Datas
+      const dataSolicitacao = linha.dataSolicitacao ? linha.dataSolicitacao.split(' ')[0] : '';
+      const dataEntrega = formatarDataSimples(linha.data_entrega || linha.dataEntrega);
 
+      // ==========================================
+      // CONSTRUÇÃO DA TABELA DE ITENS (Igual à imagem)
+      // ==========================================
+      const colWidths = ['4%', '12%', '14%', '5%', '6%', '23%', '10%', '6%', '7%', '7%', '6%'];
+      
+      const headerRow = [
+        { text: 'ITEM', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'DESENHO', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'PART NUMBER', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'QTD', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'UNID', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'DESCRIÇÃO', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'FORNECEDOR', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'NF ENTRADA', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'ALOCAÇÃO', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'VLOR UNIT', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'WBS', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] }
+      ];
+
+      let bodyRows = [headerRow];
+      
       if (linha.itens && linha.itens.length > 0) {
-        linhasItens = linha.itens.map((it) => [
-          { text: it.desenho_sap_manual || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.part_number_manual || '-', margin: [0, 4], fontSize: 6, bold: true, color: '#1e293b' },
-          { text: it.fornecedor || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.referencia || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.quantidade_solicitada || '-', alignment: 'center', margin: [0, 4], fontSize: 6, bold: true, color: '#2563eb' },
-          // Se for Crossdocking e não tiver NF no item, puxa a NF global da solicitação
-          { text: it.nf_entrada || linha.nfCrossdocking || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.unidade_medida_manual || 'Un', alignment: 'center', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.descricao_manual || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.wbs_element || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: dataNecessidadeFormatada, margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: formatarDataSimples(it.emissao_nf), margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: formatarDataSimples(it.receb_nf), margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.documento_compras || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.centro || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.deposito || '-', margin: [0, 4], fontSize: 6, color: '#475569' },
-          { text: it.alocacao || '-', margin: [0, 4], fontSize: 6, color: '#475569' }
-        ]);
-      } else if (isCrossdocking) {
-        linhasItens = [[{ text: `Saída Total (Crossdocking). Todos os volumes referentes à NF ${linha.nfCrossdocking || ''} estão incluídos. Consulte o anexo.`, colSpan: 17, alignment: 'center', margin: [0, 10], color: '#d97706', bold: true }, ...Array(16).fill({})]];
-      } else if (isCancelamento) {
-        linhasItens = [[{ text: 'Cancelamento Geral sem itens especificados. Consulte as observações.', colSpan: 17, alignment: 'center', margin: [0, 10], color: '#dc2626' }, ...Array(16).fill({})]];
-      } else {
-        // Padrão vazio genérico
-        linhasItens = [[{ text: 'Nenhum item individual detalhado nesta solicitação.', colSpan: 17, alignment: 'center', margin: [0, 10], color: '#94a3b8' }, ...Array(16).fill({})]];
+        linha.itens.forEach((it, index) => {
+          bodyRows.push([
+            { text: (index + 1).toString(), fontSize: 6, alignment: 'center', margin: [0, 3] },
+            { text: it.desenho_sap_manual || '-', fontSize: 6, margin: [0, 3] },
+            { text: it.part_number_manual || '-', fontSize: 6, bold: true, margin: [0, 3] },
+            { text: it.quantidade_solicitada || '-', fontSize: 6, alignment: 'center', margin: [0, 3] },
+            { text: it.unidade_medida_manual || 'Un', fontSize: 6, alignment: 'center', margin: [0, 3] },
+            { text: it.descricao_manual || '-', fontSize: 6, margin: [0, 3] },
+            { text: it.fornecedor || '-', fontSize: 6, margin: [0, 3] },
+            { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 6, alignment: 'center', margin: [0, 3] },
+            { text: it.alocacao || '-', fontSize: 6, margin: [0, 3] },
+            { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', fontSize: 6, alignment: 'center', margin: [0, 3] },
+            { text: it.wbs_element || '-', fontSize: 6, color: '#2563eb', alignment: 'center', margin: [0, 3], bold: true }
+          ]);
+        });
       }
 
-      // ✨ TÍTULOS DINÂMICOS
-      let tituloPrincipal = `BOLETIM DETALHADO / ${linha.tipo ? linha.tipo.toUpperCase() : 'DOCUMENTO'}`;
-      if (isReintegracao) tituloPrincipal = 'BOLETIM DE REINTEGRAÇÃO DE ESTOQUE';
-      if (isCancelamento) tituloPrincipal = 'BOLETIM DE CANCELAMENTO DE SOLICITAÇÃO';
+      // Preencher linhas vazias para criar a grelha estilo formulário físico
+      const minRows = 20;
+      for (let i = bodyRows.length; i <= minRows; i++) {
+        bodyRows.push([
+          { text: '', fontSize: 6, margin: [0, 5] }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
+          { text: '', fontSize: 6 }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
+          { text: '', fontSize: 6 }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
+          { text: '', fontSize: 6 }, { text: '', fontSize: 6 }
+        ]);
+      }
 
-      let tituloTabela = `DETALHAMENTO DE ITENS DA SOLICITAÇÃO`;
-      if (isReintegracao) tituloTabela = 'ITENS DEVOLVIDOS AO ESTOQUE';
-      if (isCancelamento) tituloTabela = 'ITENS CANCELADOS';
-
-      let nomeColunaQuantidade = 'QTD. FORN.';
-      if (isReintegracao) nomeColunaQuantidade = 'QTD. DEVOLVIDA';
-      if (isCancelamento) nomeColunaQuantidade = 'QTD. CANCELADA';
-
+      // ==========================================
+      // DEFINIÇÃO DO PDF
+      // ==========================================
       const docDefinition = {
-        // Folha A4 na horizontal para caber as 17 colunas
         pageSize: 'A4',
         pageOrientation: 'landscape',
-        pageMargins: [30, 30, 30, 30], 
+        pageMargins: [15, 15, 15, 15], 
         content: [
           
-          // ==========================================
-          // CABEÇALHO DO DOCUMENTO
-          // ==========================================
-          logoBase64 ? {
-            image: logoBase64,
-            width: 85,
-            alignment: 'center',
-            margin: [0, 0, 0, 8] 
-          } : { 
-            text: 'STOCKLog', 
-            style: 'headerMain', 
-            color: isCancelamento ? '#dc2626' : '#2563eb', 
-            margin: [0, 0, 0, 5] 
-          },
-          { text: tituloPrincipal, style: 'headerSub', color: isCancelamento ? '#ef4444' : '#64748b' },
-          // Linha divisória adaptada para o tamanho landscape
-          { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 781, y2: 3, lineWidth: 1.5, lineColor: isCancelamento ? '#ef4444' : '#2563eb' }] },
-          
-          // ==========================================
-          // NÚMEROS E IDENTIFICAÇÃO BÁSICA
-          // ==========================================
-          {
-            margin: [0, 15, 0, 15],
-            columns: [
-              { text: [{ text: (isReintegracao || isCancelamento) ? 'Nº DOCUMENTO ORIGEM: ' : 'Nº PL / DOCUMENTO: ', bold: true, color: '#1e293b' }, { text: linha.pl || 'N/A', color: isCancelamento ? '#dc2626' : '#2563eb', fontSize: 12, bold: true }] },
-              { text: [{ text: 'Identificador (PS): ', bold: true, color: '#1e293b' }, `${linha.prefixo}:${linha.id}`], alignment: 'right' }
-            ]
-          },
-
-          // ==========================================
-          // DADOS DA SOLICITAÇÃO
-          // ==========================================
-          {
-            table: { widths: ['*'], body: [[{ text: 'INFORMAÇÕES DA SOLICITAÇÃO', style: 'sectionTitle', fillColor: isCancelamento ? '#fef2f2' : '#f1f5f9', color: isCancelamento ? '#991b1b' : '#1e293b' }]] },
-            layout: 'noBorders',
-            margin: [0, 0, 0, 4]
-          },
+          // --- BLOCO 1: CABEÇALHO (Grid Igual à Imagem) ---
           {
             table: {
-              widths: [150, '*'],
+              widths: ['15%', '35%', '15%', '20%', '15%'],
               body: [
-                [{ text: isReintegracao ? 'Devolvido Por:' : (isCancelamento ? 'Cancelamento Solicitado Por:' : 'Solicitante:'), bold: true, margin: [0, 4] }, { text: linha.solicitante || 'N/A', margin: [0, 4] }],
-                [{ text: 'WBS / Destino Geral:', bold: true, margin: [0, 4] }, { text: linha.wbs || 'N/A', margin: [0, 4] }],
-                [{ text: 'Filial / Base:', bold: true, margin: [0, 4] }, { text: nomeFilial || 'N/A', margin: [0, 4] }],
-                [{ text: 'Data do Registo:', bold: true, margin: [0, 4] }, { text: linha.dataSolicitacao || 'N/A', margin: [0, 4] }],
-                [{ text: 'Tipo Operação:', bold: true, margin: [0, 4] }, { text: linha.tipo || 'N/A', margin: [0, 4] }],
-                // SE FOR CROSSDOCKING, ADICIONA A NF VINCULADA NAS INFORMAÇÕES PRINCIPAIS
-                ...(linha.nfCrossdocking ? [
-                  [{ text: 'NF Vinculada (Crossdocking):', bold: true, margin: [0, 4], color: '#b45309' }, { text: linha.nfCrossdocking, margin: [0, 4], bold: true, color: '#d97706' }]
-                ] : [])
+                // Linha 1: Título e Caixa Verde
+                [
+                  { text: 'Formulário       PASTA DRIVE', fontSize: 7, color: '#2563eb', alignment: 'center', decoration: 'underline', margin: [0, 5], fillColor: '#e2e8f0' },
+                  { text: tituloPrincipal, colSpan: 3, alignment: 'center', bold: true, fontSize: 11, fillColor: '#e2e8f0', margin: [0, 5] },
+                  {}, {},
+                  { text: linha.pl ? linha.pl.replace('PL #', '') : 'S/ PL', alignment: 'center', bold: true, fontSize: 18, fillColor: '#00FF00', margin: [0, 2] }
+                ],
+                // Linha 2
+                [
+                  { text: 'APROVAÇÃO:', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: 'GESTÃO DA SEGURANÇA E PATRIMONIO / LOGÍSTICA E PROJETOS', colSpan: 2, alignment: 'center', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  {},
+                  { text: 'NÚMERO DO BS (SEQUENCIAL):', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: `PS:${linha.ps || linha.id}`, alignment: 'center', bold: true, fontSize: 10, fillColor: '#00FFFF', margin: [0, 2] }
+                ],
+                // Linha 3
+                [
+                  { text: 'ORIGEM MATERIAL:', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: nomeFilial || 'N/A', fontSize: 7, color: '#dc2626', bold: true },
+                  { text: 'DATA INÍCIO SEPARAÇÃO', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: 'NÚMERO FORMULÁRIO P & S / CROSS DOCKING / LOGISTICA', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: linha.dataSolicitacao || '', alignment: 'center', fontSize: 7, fillColor: '#00FFFF' }
+                ],
+                // Linha 4
+                [
+                  { text: 'DESTINO MATERIAL:', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: linha.destino || linha.observacoes || 'N/A', fontSize: 7, color: '#dc2626', bold: true },
+                  { text: 'DATA FIM SEPARAÇÃO', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: 'DATA DO SOLICITAÇÃO FORMULÁRIO', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: dataSolicitacao, alignment: 'center', fontSize: 7 }
+                ],
+                // Linha 5
+                [
+                  { text: 'PROJETO TAREFA WBS:', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: linha.wbs || 'N/A', fontSize: 7, bold: true },
+                  { text: '', fontSize: 7, fillColor: '#e2e8f0' },
+                  { text: 'DATA DA ENTREGA', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: dataEntrega, alignment: 'center', fontSize: 7, bold: true, color: '#2563eb' }
+                ],
+                // Linha 6
+                [
+                  { text: 'NOME DA WBS:', fontSize: 7, fillColor: '#e2e8f0', bold: true },
+                  { text: '', fontSize: 7 },
+                  { text: '', fontSize: 7, fillColor: '#e2e8f0' },
+                  { text: '', fontSize: 7, fillColor: '#e2e8f0' },
+                  { text: '', alignment: 'center', fontSize: 7 }
+                ]
               ]
             },
-            layout: 'lightHorizontalLines',
-            margin: [0, 0, 0, 20]
+            margin: [0, 0, 0, 5]
           },
 
-          // ==========================================
-          // TABELA DE ITENS EXTREMAMENTE DETALHADA
-          // ==========================================
-          {
-            table: { widths: ['*'], body: [[{ text: tituloTabela, style: 'sectionTitle', fillColor: isCancelamento ? '#fef2f2' : '#f1f5f9', color: isCancelamento ? '#991b1b' : '#1e293b' }]] },
-            layout: 'noBorders',
-            margin: [0, 0, 0, 4]
-          },
+          // --- BLOCO 2: APROVAÇÕES ---
           {
             table: {
-              widths: ['auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', '*', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
-              headerRows: 1,
+              widths: ['33.3%', '33.3%', '33.4%'],
               body: [
                 [
-                  { text: 'DESENHO SAP', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'Nº PEÇA FAB.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'FORNECEDOR', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'REFERÊNCIA', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  // ✨ COLUNA DINÂMICA DE QUANTIDADE
-                  { text: nomeColunaQuantidade, bold: true, alignment: 'center', fillColor: isCancelamento ? '#fef2f2' : '#f8fafc', margin: [0, 4], fontSize: 5, color: isCancelamento ? '#dc2626' : '#475569' },
-                  { text: 'NF DE ENT.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'UNID.', bold: true, alignment: 'center', fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'VENDOR DESC.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'WBS', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'DT NEC.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'EMIS. NF', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'REC. NF', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'DOC COMPRAS', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'PO PRICE', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'CENTRO', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'DEP.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' },
-                  { text: 'ALOC.', bold: true, fillColor: '#f8fafc', margin: [0, 4], fontSize: 5, color: '#475569' }
+                  { text: 'Aprovação / Recebimento', colSpan: 3, fontSize: 7, bold: true, fillColor: '#e2e8f0' },
+                  {}, {}
                 ],
-                ...linhasItens
+                [
+                  {
+                    stack: [
+                      { text: 'Solicitado por:', fontSize: 7 },
+                      { text: linha.solicitante || 'N/A', fontSize: 9, bold: true, alignment: 'center', fillColor: '#FFFF00', margin: [30, 8, 30, 8] },
+                      { text: '________________________________', alignment: 'center', fontSize: 7 },
+                      { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 7 },
+                      { text: 'Matrícula:', fontSize: 7, margin: [0, 5, 0, 0] }
+                    ],
+                    margin: [2, 2, 2, 2]
+                  },
+                  {
+                    stack: [
+                      { text: 'Separado e Double Check por:', fontSize: 7 },
+                      { text: '\n\n\n' },
+                      { text: '________________________________', alignment: 'center', fontSize: 7 },
+                      { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 7 },
+                      { text: 'Matrícula:', fontSize: 7, margin: [0, 5, 0, 0] }
+                    ],
+                    margin: [2, 2, 2, 2]
+                  },
+                  {
+                    stack: [
+                      { text: 'Recebido por:', fontSize: 7 },
+                      { text: '\n\n\n' },
+                      { text: '________________________________', alignment: 'center', fontSize: 7 },
+                      { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 7 },
+                      { text: 'Matrícula:', fontSize: 7, margin: [0, 5, 0, 0] }
+                    ],
+                    margin: [2, 2, 2, 2]
+                  }
+                ]
               ]
             },
-            margin: [0, 0, 0, 20]
+            margin: [0, 0, 0, 5]
           },
 
-          // ==========================================
-          // OBSERVAÇÕES
-          // ==========================================
-          linha.observacoes ? {
-            table: { widths: ['*'], body: [[{ text: 'OBSERVAÇÕES / JUSTIFICATIVA', style: 'sectionTitle', fillColor: isCancelamento ? '#fef2f2' : '#fefce8', color: isCancelamento ? '#991b1b' : '#b45309' }]] },
-            layout: 'noBorders',
-            margin: [0, 0, 0, 4]
-          } : {},
-          linha.observacoes ? {
-            table: { widths: ['*'], body: [[{ text: linha.observacoes, margin: [5, 4, 5, 4], color: isCancelamento ? '#7f1d1d' : '#78350f' }]] },
-            margin: [0, 0, 0, 20]
-          } : {},
-
-          // ==========================================
-          // ASSINATURAS
-          // ==========================================
+          // --- BLOCO 3: TABELA DE ITENS ---
           {
-            margin: [0, 60, 0, 0], 
-            columns: [
-              {
-                width: '*',
-                stack: [
-                  { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
-                  { text: isCancelamento ? 'Solicitante do Cancelamento' : (isReintegracao ? 'Entregue por (Solicitante)' : 'Solicitante'), style: 'signatureLabel', margin: [0, 5, 0, 2] },
-                  { text: linha.solicitante, fontSize: 9, color: '#64748b' }
-                ],
-                alignment: 'center'
-              },
-              {
-                width: '*',
-                stack: [
-                  { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
-                  { text: isCancelamento ? 'Aprovado por (Logística)' : (isReintegracao ? 'Recebido por (Almoxarifado)' : 'Responsável Almoxarifado / Logística'), style: 'signatureLabel', margin: [0, 5, 0, 2] },
-                  { text: 'Data e Assinatura', fontSize: 9, color: '#64748b' }
-                ],
-                alignment: 'center'
-              }
-            ]
-          },
-          
-          // ==========================================
-          // RODAPÉ DO SISTEMA
-          // ==========================================
-          {
-            text: `Documento gerado automaticamente pelo sistema STOCKLog em ${new Date().toLocaleString('pt-BR')}`,
-            alignment: 'center',
-            fontSize: 8,
-            color: '#94a3b8',
-            margin: [0, 40, 0, 0]
+            table: {
+              widths: colWidths,
+              headerRows: 1,
+              body: bodyRows
+            }
           }
         ],
-        styles: {
-          headerMain: { fontSize: 24, bold: true, alignment: 'center' },
-          headerSub: { fontSize: 11, alignment: 'center', margin: [0, 1, 0, 6], color: '#64748b', bold: true, characterSpacing: 1 },
-          sectionTitle: { fontSize: 10, bold: true, color: '#1e293b', margin: [5, 4, 5, 4] },
-          signatureLabel: { fontSize: 10, bold: true, color: '#1e293b' }
-        },
         defaultStyle: { 
-          fontSize: 9.5, 
-          color: '#334155',
-          font: 'Roboto' 
+          font: 'Roboto',
+          color: '#1e293b'
         }
       };
 
@@ -290,11 +232,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       console.error("Erro ao gerar PDF:", error);
       if (showAlert) showAlert("Erro", "Ocorreu um problema ao compilar os dados para o PDF.", "error");
     } finally {
-      // Retira o estado de gerar e fecha o loader
       setGerando(false);
-      if (closeAlert) {
-        closeAlert();
-      }
+      if (closeAlert) closeAlert();
     }
   };
 
@@ -326,7 +265,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       }}
     >
       <FileText size={14} /> 
-      {gerando ? 'A Gerar...' : (linha.pl || 'Gerar PDF')}
+      {gerando ? 'A Gerar...' : (linha.pl && linha.pl !== '-' && linha.pl !== '—' ? linha.pl : 'Gerar PDF')}
     </span>
   );
 }
