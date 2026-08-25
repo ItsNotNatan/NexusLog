@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/components/TabelaInsercaoItens/TabelaInsercaoItens.jsx
-// DESCRIÇÃO: Tabela componentizada para entrada de itens (Nova Ordem de Colunas)
+// DESCRIÇÃO: Tabela componentizada para entrada de itens (Limpa e sem Data de Necessidade)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
@@ -13,8 +13,6 @@ import { formatarDinheiroTempoReal } from '../../utils/formatadores';
 
 export default function TabelaInsercaoItens({
   itens,
-  dataMinima = '',
-  mostrarDataNecessidade = false,
   limiteLinhas = 20, 
   onAtualizarCampo,
   onRemoverItem,
@@ -40,8 +38,9 @@ export default function TabelaInsercaoItens({
   const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
 
   const limiteAtingido = itens.length >= limiteLinhas;
-  // ✨ Tabela alargada para comportar a nova coluna confortavelmente
-  const larguraMinimaTabela = mostrarDataNecessidade ? '2900px' : '2750px';
+  
+  // Largura reajustada após remoção da coluna
+  const larguraMinimaTabela = '2750px';
 
   return (
     <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
@@ -112,7 +111,6 @@ export default function TabelaInsercaoItens({
               <tr>
                 <th style={{ width: '60px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
                 
-                {/* ✨ NOVA ORDEM DE CABEÇALHOS */}
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ minWidth: '200px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESCRIÇÃO</th>
@@ -123,7 +121,7 @@ export default function TabelaInsercaoItens({
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>CENTRO DE CUSTO - WBS</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NOME CENTRO DE CUSTO / PROJETO</th>
-                {mostrarDataNecessidade && <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DATA DE NECESSIDADE</th>}
+                {/* ✨ Coluna de Data de Necessidade foi apagada daqui */}
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>EMISSÃO NF</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>RECEB. NF</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>Nº PEDIDO DE COMPRA / CPV</th>
@@ -142,34 +140,26 @@ export default function TabelaInsercaoItens({
                     </button>
                   </td>
                   
-                  {/* ✨ INPUTS REORGANIZADOS NA NOVA ORDEM */}
-                  
-                  {/* 1. NUM SAP | DESENHO */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.desenhoSAP || ''} onChange={(e) => onAtualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP / Desenho" />
                   </td>
 
-                  {/* 2. REFERÊNCIA */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.referencia || ''} onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Referência" />
                   </td>
 
-                  {/* 3. DESCRIÇÃO */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.vendorDescription} onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição" />
                   </td>
 
-                  {/* 4. FABRICANTE */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela badge-partnumber" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', fontWeight: '600' }} value={item.numPecaFabricante} onChange={(e) => onAtualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
                   </td>
 
-                  {/* 5. QTDE ENTRADA */}
                   <td className="qtd-solicitada-destaque" style={{ padding: '8px', textAlign: 'center' }}>
                     <input type="number" className="input-inline-tabela" style={{ width: '60px', padding: '4px 8px', border: '1px solid transparent', borderRadius: '4px', color: '#2563eb', fontWeight: '700', textAlign: 'center', backgroundColor: '#eff6ff', outline: 'none' }} value={item.qtdFornecida} onChange={(e) => onAtualizarCampo(item.id, 'qtdFornecida', e.target.value)} placeholder="0" min="1" />
                   </td>
 
-                  {/* 6. UNID. MEDIDA */}
                   <td style={{ padding: '8px' }}>
                     <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida} onChange={(e) => onAtualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
                       <option value="Unid">Unid</option>
@@ -181,49 +171,35 @@ export default function TabelaInsercaoItens({
                     </select>
                   </td>
 
-                  {/* 7. NUM DA NOTA FISCAL */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-preto" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} value={item.nfEntrada} onChange={(e) => onAtualizarCampo(item.id, 'nfEntrada', e.target.value)} placeholder="NF" />
                   </td>
 
-                  {/* 8. FORNECEDOR / REGISTRO */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                   </td>
 
-                  {/* 9. CENTRO DE CUSTO - WBS */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela link-azul-fake" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#2563eb', fontFamily: 'monospace' }} value={item.wbsElement} onChange={(e) => onAtualizarCampo(item.id, 'wbsElement', e.target.value)} placeholder="WBS" />
                   </td>
 
-                  {/* 10. NOME CENTRO DE CUSTO / PROJETO (NOVO!) */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.nomeProjeto || ''} onChange={(e) => onAtualizarCampo(item.id, 'nomeProjeto', e.target.value)} placeholder="Nome Projeto" />
                   </td>
-                  
-                  {/* 11. DATA DE NECESSIDADE (Condicional) */}
-                  {mostrarDataNecessidade && (
-                    <td style={{ padding: '8px' }}>
-                      <input type="date" className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} value={item.dataNecessidade} min={dataMinima} onChange={(e) => onAtualizarCampo(item.id, 'dataNecessidade', e.target.value)} onKeyDown={(e) => e.preventDefault()} onClick={(e) => e.target.showPicker && e.target.showPicker()} />
-                    </td>
-                  )}
 
-                  {/* 12. EMISSÃO NF */}
+                  {/* ✨ Datas de NF corrigidas: Agora permitem qualquer data no passado sem restrições! */}
                   <td style={{ padding: '8px' }}>
-                    <input type={mostrarDataNecessidade ? 'date' : 'text'} className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: mostrarDataNecessidade ? 'pointer' : 'text' }} value={item.emissaoNF} min={dataMinima} onChange={(e) => onAtualizarCampo(item.id, 'emissaoNF', e.target.value)} onKeyDown={(e) => mostrarDataNecessidade && e.preventDefault()} onClick={(e) => mostrarDataNecessidade && e.target.showPicker && e.target.showPicker()} placeholder="DD/MM/AAAA" />
+                    <input type="date" className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} value={item.emissaoNF} onChange={(e) => onAtualizarCampo(item.id, 'emissaoNF', e.target.value)} onClick={(e) => e.target.showPicker && e.target.showPicker()} />
                   </td>
 
-                  {/* 13. RECEB. NF */}
                   <td style={{ padding: '8px' }}>
-                    <input type={mostrarDataNecessidade ? 'date' : 'text'} className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: mostrarDataNecessidade ? 'pointer' : 'text' }} value={item.recebNF} min={dataMinima} onChange={(e) => onAtualizarCampo(item.id, 'recebNF', e.target.value)} onKeyDown={(e) => mostrarDataNecessidade && e.preventDefault()} onClick={(e) => mostrarDataNecessidade && e.target.showPicker && e.target.showPicker()} placeholder="DD/MM/AAAA" />
+                    <input type="date" className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} value={item.recebNF} onChange={(e) => onAtualizarCampo(item.id, 'recebNF', e.target.value)} onClick={(e) => e.target.showPicker && e.target.showPicker()} />
                   </td>
 
-                  {/* 14. Nº PEDIDO DE COMPRA / CPV */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.docCompras} onChange={(e) => onAtualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
                   </td>
 
-                  {/* 15. VLR. UNITÁRIO NOTA FISCAL */}
                   <td style={{ padding: '8px' }}>
                     <input 
                       className="input-editavel-tabela texto-preto" 
@@ -237,17 +213,14 @@ export default function TabelaInsercaoItens({
                     />
                   </td>
 
-                  {/* 16. FILIAL */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.centro} onChange={(e) => onAtualizarCampo(item.id, 'centro', e.target.value)} placeholder="Filial" />
                   </td>
 
-                  {/* 17. DEPÓSITO */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.deposito} onChange={(e) => onAtualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
                   </td>
 
-                  {/* 18. ALOCAÇÃO */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela link-azul-fake" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#2563eb', fontFamily: 'monospace' }} value={item.alocacao} onChange={(e) => onAtualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
                   </td>
@@ -256,7 +229,8 @@ export default function TabelaInsercaoItens({
               
               {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
                 <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
-                  <td colSpan={mostrarDataNecessidade ? 19 : 18} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
+                  {/* ✨ colSpan ajustado para 18 colunas totais */}
+                  <td colSpan={18} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
                 </tr>
               ))}
             </tbody>
