@@ -483,8 +483,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   }
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
                   
-                  // ✨ AQUI COMEÇA A LÓGICA DO MODO VERMELHO
-                  const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado';
+                  // ✨ AQUI ESTÁ A LÓGICA DO MODO VERMELHO CORRIGIDA! 
+                  // Agora engloba tanto o STATUS "Cancelado" quanto o TIPO "Cancelado" (o pedido de cancelamento de PL)
+                  const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado' || linha.tipo === 'Cancelado';
                   
                   const corTextoForte = isRecusadoOuCancelado ? "#991b1b" : "#1e293b";
                   const corTextoMedio = isRecusadoOuCancelado ? "#dc2626" : "#475569";

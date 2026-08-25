@@ -48,7 +48,7 @@ export default function VisaoGeralEstoque({ perfil }) {
     }
   };
 
-useEffect(() => {
+  useEffect(() => {
     const buscarEstoque = async () => {
       try {
         setCarregando(true);
@@ -64,8 +64,10 @@ useEffect(() => {
     
     buscarEstoque();
 
-    // ✨ SOCKET.IO: Atualiza o saldo instantaneamente se alguém der entrada/saída
-    const socket = io('http://localhost:3001');
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    
     socket.on('estoque_atualizado', () => {
       console.log('⚡ Saldo de estoque alterado! Atualizando números...');
       buscarEstoque();
@@ -117,7 +119,14 @@ useEffect(() => {
     if (String(editValue) !== String(originalValue || '')) {
       let valorFinal = editValue;
       if (field === 'quantidade_disponivel' || field === 'valor_unitario') {
-        valorFinal = editValue ? Number(editValue) : 0;
+        if (field === 'valor_unitario' && typeof editValue === 'string') {
+           let v = editValue.replace(/[^\d.,-]/g, '');
+           if (v.includes('.') && v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
+           else if (v.includes(',')) v = v.replace(',', '.');
+           valorFinal = parseFloat(v) || 0;
+        } else {
+           valorFinal = editValue ? Number(editValue) : 0;
+        }
       }
 
       setEstoque(prev => prev.map(i => i.id === id ? { ...i, [field]: valorFinal } : i));
@@ -148,17 +157,15 @@ useEffect(() => {
     if (e.key === 'Escape') setEditCell({ id: null, field: null });
   };
 
-  const CelulaEditavel = ({ item, field, type = 'text', renderFn, style = {} }) => {
+  const CelulaEditavel = ({ item, field, type = 'text', renderFn, style = {}, placeholder = "" }) => {
     const isEditing = editCell.id === item.id && editCell.field === field;
     const val = item[field];
     const displayVal = renderFn ? renderFn(val) : (val || '-');
 
-    // ✨ SE NÃO PODE EDITAR (Ex: Operador), MOSTRA SÓ O TEXTO NORMAL
     if (!podeEditar) {
       return <span style={{ display: 'inline-block', width: '100%', minHeight: '18px', ...style }}>{displayVal}</span>;
     }
 
-    // MODO DE EDIÇÃO ATIVO (Input)
     if (isEditing) {
       return (
         <input
@@ -168,27 +175,20 @@ useEffect(() => {
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={() => saveEditing(item.id, field, val)}
           onKeyDown={(e) => handleKeyDown(e, item.id, field, val)}
+          placeholder={placeholder}
           style={{ width: '100%', padding: '6px 8px', boxSizing: 'border-box', border: '2px solid #3b82f6', borderRadius: '6px', outline: 'none', fontSize: '0.80rem', fontFamily: 'inherit' }}
         />
       );
     }
 
-    // ✨ MODO DE EXIBIÇÃO COM CAIXINHA (Para quem pode editar)
     return (
       <div
         onClick={(e) => { e.stopPropagation(); startEditing(item.id, field, val, type); }}
         style={{ 
-          cursor: 'text', 
-          border: '1px solid #e2e8f0', 
-          backgroundColor: '#f8fafc',
-          borderRadius: '6px', 
-          padding: '4px 8px', 
-          display: 'inline-block', 
-          width: '100%', 
-          minHeight: '26px',
-          boxSizing: 'border-box',
-          transition: 'all 0.2s ease',
-          ...style 
+          cursor: 'text', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc',
+          borderRadius: '6px', padding: '4px 8px', display: 'inline-block', 
+          width: '100%', minHeight: '26px', boxSizing: 'border-box',
+          transition: 'all 0.2s ease', ...style 
         }}
         onMouseOver={(e) => {
           e.currentTarget.style.borderColor = '#93c5fd';
@@ -216,12 +216,12 @@ useEffect(() => {
     (item.descricao && item.descricao.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
     (item.wbs && item.wbs.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
     (item.fornecedor && item.fornecedor.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termoPesquisa.toLowerCase()))
+    (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
+    (item.nome_projeto && item.nome_projeto.toLowerCase().includes(termoPesquisa.toLowerCase()))
   );
 
   const kpiTotalItens = estoqueFiltrado.length;
   const kpiDisponiveis = estoqueFiltrado.filter(i => Number(i.quantidade_disponivel) > 0).length;
-  const kpiZerados = estoqueFiltrado.filter(i => Number(i.quantidade_disponivel) <= 0).length;
   const kpiReservados = estoqueFiltrado.filter(i => i.alocacao && i.alocacao !== '-' && i.alocacao.toUpperCase() !== 'PENDENTE').length;
   
   const kpiValorTotal = estoqueFiltrado.reduce((acc, item) => {
@@ -231,7 +231,7 @@ useEffect(() => {
   }, 0);
 
   // ==========================================
-  // EXPORTAR EXCEL
+  // EXPORTAR EXCEL NA NOVA ORDEM
   // ==========================================
   const handleExportarExcel = async () => {
     showLoading("A Gerar Excel", "Por favor, aguarde enquanto compilamos os dados do estoque...");
@@ -240,25 +240,25 @@ useEffect(() => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Visão Geral do Estoque');
 
+      // ✨ EXCEL: MAPEAMENTO CIRÚRGICO (SEM DATA DE NECESSIDADE)
       worksheet.columns = [
-        { header: 'Filial', key: 'filial', width: 20 },
-        { header: 'Desenho SAP', key: 'sap', width: 20 },
-        { header: 'Nº Peça Fabricante', key: 'pn', width: 25 },
-        { header: 'Fornecedor', key: 'fornecedor', width: 20 },
-        { header: 'Referência', key: 'ref', width: 20 },
-        { header: 'Qtd. Disponível', key: 'qtd', width: 15 },
-        { header: 'NF de Entrada', key: 'nf', width: 15 },
-        { header: 'Unid. Medida', key: 'unid', width: 15 },
-        { header: 'Descrição', key: 'desc', width: 40 },
-        { header: 'WBS', key: 'wbs', width: 20 },
-        { header: 'Data Necessidade', key: 'dtNec', width: 18 },
-        { header: 'Emissão NF', key: 'emi', width: 18 },
-        { header: 'Recebimento NF', key: 'rec', width: 18 },
-        { header: 'Doc. Compras', key: 'doc', width: 20 },
-        { header: 'Valor Unitário (R$)', key: 'val', width: 20 },
-        { header: 'Centro', key: 'centro', width: 15 },
-        { header: 'Depósito', key: 'dep', width: 15 },
-        { header: 'Alocação', key: 'aloc', width: 20 }
+        { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
+        { header: 'REFERÊNCIA', key: 'ref', width: 20 },
+        { header: 'DESCRIÇÃO', key: 'desc', width: 40 },
+        { header: 'FABRICANTE', key: 'pn', width: 25 },
+        { header: 'QTDE ENTRADA', key: 'qtd', width: 15 },
+        { header: 'UNID. MEDIDA', key: 'unid', width: 15 },
+        { header: 'NUM DA NOTA FISCAL', key: 'nf', width: 15 },
+        { header: 'FORNECEDOR / REGISTRO', key: 'fornecedor', width: 25 },
+        { header: 'CENTRO DE CUSTO - WBS', key: 'wbs', width: 25 },
+        { header: 'NOME CENTRO DE CUSTO / PROJETO', key: 'projeto', width: 30 },
+        { header: 'EMISSÃO NF', key: 'emi', width: 18 },
+        { header: 'RECEB. NF', key: 'rec', width: 18 },
+        { header: 'Nº PEDIDO DE COMPRA / CPV', key: 'doc', width: 25 },
+        { header: 'VLR. UNITÁRIO NOTA FISCAL', key: 'val', width: 20 },
+        { header: 'FILIAL', key: 'filial', width: 15 },
+        { header: 'DEPÓSITO', key: 'dep', width: 15 },
+        { header: 'ALOCAÇÃO', key: 'aloc', width: 20 }
       ];
 
       worksheet.getRow(1).eachCell((cell) => {
@@ -269,22 +269,21 @@ useEffect(() => {
 
       estoqueFiltrado.forEach(item => {
         worksheet.addRow({
-          filial: obterNomeFilialDinamico(item.filial_id || item.filial),
           sap: item.desenho_sap || '-',
-          pn: item.part_number || '-',
-          fornecedor: item.fornecedor || '-',
           ref: item.referencia || '-',
-          qtd: Number(item.quantidade_disponivel) || 0,
-          nf: item.nf_entrada || '-',
-          unid: item.unidade_medida || '-',
           desc: item.descricao || '-',
+          pn: item.part_number || '-',
+          qtd: Number(item.quantidade_disponivel) || 0,
+          unid: item.unidade_medida || '-',
+          nf: item.nf_entrada || '-',
+          fornecedor: item.fornecedor || '-',
           wbs: item.wbs || '-',
-          dtNec: formatarData(item.data_necessidade),
+          projeto: item.nome_projeto || '-',
           emi: formatarData(item.emissao_nf),
           rec: formatarData(item.receb_nf),
           doc: item.documento_compras || '-',
-          val: Number(item.valor_unitario) || 0,
-          centro: item.centro || '-',
+          val: item.valor_unitario ? `R$ ${Number(item.valor_unitario).toFixed(2)}` : '-',
+          filial: obterNomeFilialDinamico(item.filial_id || item.filial),
           dep: item.deposito || '-',
           aloc: item.alocacao || '-'
         });
@@ -343,10 +342,7 @@ useEffect(() => {
             <span>Disponíveis</span>
             <strong className="kpi-green">{kpiDisponiveis}</strong>
           </div>
-          <div className="kpi-mini-card" style={{ borderColor: kpiZerados > 0 ? '#fca5a5' : '#e2e8f0', backgroundColor: kpiZerados > 0 ? '#fef2f2' : '#f8fafc' }}>
-            <span style={{ color: kpiZerados > 0 ? '#ef4444' : '#64748b' }}>Zerados</span>
-            <strong className={kpiZerados > 0 ? 'kpi-red' : 'kpi-black'}>{kpiZerados}</strong>
-          </div>
+          {/* ✨ CARTÃO ZERADOS REMOVIDO! */}
           <div className="kpi-mini-card">
             <span>Reservados</span>
             <strong className="kpi-orange">{kpiReservados}</strong>
@@ -369,35 +365,35 @@ useEffect(() => {
         </div>
 
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2200px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2400px' }}>
             <thead>
+              {/* ✨ NOVA ORDEM DE CABEÇALHOS (SEM DATA DE NECESSIDADE) */}
               <tr style={{ backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', width: '40px', textAlign: 'center' }}></th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Filial</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Desenho SAP</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Nº Peça Fabricante</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Fornecedor</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Referência</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>Qtd. Fornecida (Saldo)</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NF de Entrada</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>Un. Medida</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Vendor Description</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>WBS Element</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Data de Necessidade</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Emissão NF</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Receb. NF</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Documento Compras</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>PO Net Price</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Centro</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Depósito</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Alocação</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', minWidth: '200px' }}>DESCRIÇÃO</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>QTDE ENTRADA (SALDO)</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>UNID. MEDIDA</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>CENTRO DE CUSTO - WBS</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NOME CENTRO DE CUSTO / PROJETO</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>EMISSÃO NF</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>RECEB. NF</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Nº PEDIDO DE COMPRA / CPV</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>VLR. UNITÁRIO NOTA FISCAL</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FILIAL</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>DEPÓSITO</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>ALOCAÇÃO</th>
               </tr>
             </thead>
             <tbody>
               {carregando ? (
-                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><Loader2 className="animate-spin" size={28} style={{ margin: '0 auto' }} /></td></tr>
+                <tr><td colSpan="18" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><Loader2 className="animate-spin" size={28} style={{ margin: '0 auto' }} /></td></tr>
               ) : estoqueFiltrado.length === 0 ? (
-                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
+                <tr><td colSpan="18" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
               ) : (
                 estoqueFiltrado.map(item => (
                   <tr
@@ -411,23 +407,18 @@ useEffect(() => {
                       <History size={16} color="#94a3b8" />
                     </td>
 
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontWeight: '600', border: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
-                        <CelulaEditavel item={item} field="filial_id" renderFn={obterNomeFilialDinamico} />
-                      </span>
-                    </td>
-
+                    {/* ✨ COLUNAS REORGANIZADAS PARA A NOVA ORDEM */}
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
                       <CelulaEditavel item={item} field="desenho_sap" style={{ fontFamily: 'monospace', color: '#2563eb', fontWeight: '600' }} />
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="part_number" style={{ fontFamily: 'monospace', fontWeight: '600', color: '#1e293b' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="fornecedor" style={{ color: '#475569', textTransform: 'uppercase' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
                       <CelulaEditavel item={item} field="referencia" style={{ color: '#475569' }} />
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                      <CelulaEditavel item={item} field="descricao" style={{ color: '#475569' }} />
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                      <CelulaEditavel item={item} field="part_number" style={{ fontFamily: 'monospace', fontWeight: '600', color: '#1e293b' }} />
                     </td>
 
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem' }}>
@@ -440,21 +431,22 @@ useEffect(() => {
                       )}
                     </td>
 
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="nf_entrada" style={{ color: '#475569', fontFamily: 'monospace' }} />
-                    </td>
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem', textAlign: 'center' }}>
                       <CelulaEditavel item={item} field="unidade_medida" style={{ color: '#64748b' }} />
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem', minWidth: '200px' }}>
-                      <CelulaEditavel item={item} field="descricao" style={{ color: '#475569' }} />
+                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                      <CelulaEditavel item={item} field="nf_entrada" style={{ color: '#475569', fontFamily: 'monospace' }} />
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                      <CelulaEditavel item={item} field="fornecedor" style={{ color: '#475569', textTransform: 'uppercase' }} />
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
                       <CelulaEditavel item={item} field="wbs" style={{ color: '#2563eb', fontFamily: 'monospace', fontWeight: '500' }} />
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="data_necessidade" type="date" renderFn={formatarData} style={{ color: '#64748b' }} />
+                      <CelulaEditavel item={item} field="nome_projeto" style={{ color: '#475569' }} placeholder="Nome do Projeto..." />
                     </td>
+
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
                       <CelulaEditavel item={item} field="emissao_nf" type="date" renderFn={formatarData} style={{ color: '#64748b' }} />
                     </td>
@@ -466,11 +458,13 @@ useEffect(() => {
                     </td>
 
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="valor_unitario" type="number" renderFn={(val) => val ? `R$ ${Number(val).toFixed(2)}` : '-'} style={{ color: '#1e293b', fontWeight: '500' }} />
+                      <CelulaEditavel item={item} field="valor_unitario" type="text" renderFn={(val) => val ? `R$ ${Number(val).toFixed(2)}` : '-'} style={{ color: '#1e293b', fontWeight: '500' }} />
                     </td>
 
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="centro" style={{ color: '#475569' }} />
+                      <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontWeight: '600', border: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
+                        <CelulaEditavel item={item} field="filial_id" renderFn={obterNomeFilialDinamico} />
+                      </span>
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
                       <CelulaEditavel item={item} field="deposito" style={{ color: '#475569' }} />
