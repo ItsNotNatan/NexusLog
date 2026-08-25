@@ -12,9 +12,8 @@ import GerenciadorAnexos from "../../../components/GerenciadorAnexos/Gerenciador
 import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral";
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
-import { io } from 'socket.io-client';
+import { io } from 'socket.io-client'; 
 
-// ✨ IMPORTAÇÃO DO NOSSO FORMATADOR CENTRALIZADO
 import { formatarWBS } from '../../../utils/formatadores';
 
 export default function MaterialEstoque() {
@@ -28,7 +27,7 @@ export default function MaterialEstoque() {
 
   const [dataMinima, setDataMinima] = useState("");
   const [itensSelecionados, setItensSelecionados] = useState([]);
-  const [anexos, setAnexos] = useState([]); // Apenas UM estado para anexos gere tudo!
+  const [anexos, setAnexos] = useState([]); 
   
   const [estoqueDisponivel, setEstoqueDisponivel] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
@@ -39,22 +38,15 @@ export default function MaterialEstoque() {
     setDataMinima(new Date(hoje.getTime() - timezoneOffset).toISOString().split("T")[0]);
   }, []);
 
-  // ✨ LÓGICA DE DIVERGÊNCIA: Compara apenas o que está antes do primeiro hífen "-"
   const prefixoWbsPrincipal = formDados.wbs.split('-')[0].trim().toUpperCase();
   
   const temWbsDivergente = itensSelecionados.some(item => {
     const itemWbs = (item.wbs || item.wbs_element || '').trim().toUpperCase();
-    
-    // Se o item não tem WBS definido, ignora a divergência
     if (itemWbs === '' || itemWbs === '-') return false;
-    
     const prefixoItemWbs = itemWbs.split('-')[0].trim().toUpperCase();
-    
-    // Só acusa divergência se o form tiver WBS e os prefixos forem efetivamente diferentes
     return prefixoWbsPrincipal !== '' && prefixoItemWbs !== prefixoWbsPrincipal;
   });
 
-  // Buscar dados e ligar o radar em tempo real
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
@@ -80,18 +72,15 @@ export default function MaterialEstoque() {
 
           setEstoqueDisponivel(itensComSaldo);
 
-          // Sincroniza o carrinho
           setItensSelecionados(prevSelecionados => 
             prevSelecionados.map(selecionado => {
               const itemFresco = itensComSaldo.find(i => i.idBD === selecionado.estoque_id);
               if (itemFresco) {
                 const saldoLivreNovo = itemFresco.qtdFornecida - (itemFresco.qtdReservada || 0);
                 let novaQtdSelecionada = selecionado.qtdSelecionada;
-                
                 if (novaQtdSelecionada > saldoLivreNovo) {
                   novaQtdSelecionada = saldoLivreNovo > 0 ? saldoLivreNovo : 1;
                 }
-
                 return { 
                   ...selecionado, 
                   qtdFornecida: itemFresco.qtdFornecida, 
@@ -143,7 +132,8 @@ export default function MaterialEstoque() {
   };
 
   const adicionarItemDoEstoque = (item, index) => {
-    if (itensSelecionados.length >= 25) { showAlert("Limite Atingido", "Atingiu o limite.", "warning"); return; }
+    // ✨ LIMITE REDUZIDO PARA 20!
+    if (itensSelecionados.length >= 20) { showAlert("Limite Atingido", "Limite máximo de 20 itens.", "warning"); return; }
     if (itensSelecionados.some(i => i.estoque_id === item.idBD)) { showAlert("Item Duplicado", "Material já adicionado.", "info"); return; }
     
     const saldoLivre = item.qtdFornecida - (item.qtdReservada || 0);
@@ -158,7 +148,6 @@ export default function MaterialEstoque() {
     if (itensSelecionados.length === 0) { showAlert("Lista Vazia", "Adicione um item.", "warning"); return; }
     if (itensSelecionados.some(i => !i.qtdSelecionada)) { showAlert("Incompleto", "Verifique as quantidades.", "warning"); return; }
 
-    // ✨ TRAVA DE SEGURANÇA MANTIDA: Exige o anexo geral caso haja divergência
     if (temWbsDivergente && anexos.length === 0) {
       showAlert("Autorização Pendente", "Como existe divergência no prefixo da WBS, é OBRIGATÓRIO incluir o documento de autorização na área de Anexos.", "warning");
       return;
@@ -178,7 +167,6 @@ export default function MaterialEstoque() {
           const { data: linkPublico } = supabase.storage.from("documentos").getPublicUrl(caminhoNoStorage);
           
           let nomeFicheiro = arquivo.name;
-          // ✨ Marca o 1º anexo adicionado como "Autorização" se houver divergência!
           if (temWbsDivergente && i === 0) {
             nomeFicheiro = `[AUTORIZAÇÃO WBS] ${arquivo.name}`;
           }
@@ -219,7 +207,6 @@ export default function MaterialEstoque() {
         </div>
       </div>
 
-      {/* ✨ MÁGICA VISUAL AQUI: A área de anexos engloba o aviso e muda de cor consoante o estado! */}
       <div style={{ 
         padding: "24px", 
         border: temWbsDivergente ? "2px dashed #f59e0b" : "1px solid #e2e8f0", 
@@ -311,6 +298,7 @@ export default function MaterialEstoque() {
           estoque={estoqueDisponivel}
           carregando={carregandoEstoque}
           itensSelecionados={listaSegura} 
+          limiteMaximo={20} // ✨ INJETADO O NOVO LIMITE NO SELETOR!
           onAdicionarItem={adicionarItemDoEstoque}
           onRemoverItem={removerItem}
           onAtualizarQuantidade={atualizarCampo}

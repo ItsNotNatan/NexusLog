@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { User, Send, Paperclip, X, MapPin, AlertTriangle, Upload } from 'lucide-react'; 
+import { User, Send, Paperclip, X, MapPin } from 'lucide-react'; 
 
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
@@ -30,7 +30,6 @@ export default function EntradaMaterial() {
     setDataMinima(localISOTime);
   }, []);
 
-  // ✨ ATUALIZADO COM O NOME_PROJETO
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`, desenhoSAP: '', numPecaFabricante: '', fornecedor: '',
     referencia: '', qtdFornecida: 1, nfEntrada: '', unidadeMedida: 'Unid', vendorDescription: '',
@@ -39,30 +38,13 @@ export default function EntradaMaterial() {
 
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
-  const [anexoAutorizacao, setAnexoAutorizacao] = useState(null); 
   
   const processador = useProcessadorExcel();
-
-  const prefixoWbsPrincipal = formDados.wbs.split('-')[0].trim().toUpperCase();
-  
-  const temWbsDivergente = itens.some(item => {
-    const itemWbs = (item.wbsElement || '').trim().toUpperCase();
-    if (itemWbs === '' || itemWbs === '-') return false;
-    const prefixoItemWbs = itemWbs.split('-')[0].trim().toUpperCase();
-    return prefixoWbsPrincipal !== '' && prefixoItemWbs !== prefixoWbsPrincipal;
-  });
-
-  useEffect(() => {
-    if (!temWbsDivergente && anexoAutorizacao) {
-      setAnexoAutorizacao(null);
-    }
-  }, [temWbsDivergente, anexoAutorizacao]);
 
   const handleImportarExcel = async (arquivo) => {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
     if (itensProcessados && Array.isArray(itensProcessados)) {
       
-      // ✨ MAPEAMENTO INTELIGENTE DA NOVA ORDEM/NOMES EXATOS!
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
         desenhoSAP: item['NUM SAP | DESENHO'] || item['Desenho SAP'] || item.desenhoSAP || '',
@@ -124,11 +106,6 @@ export default function EntradaMaterial() {
       showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.", "warning");
       return;
     }
-    
-    if (temWbsDivergente && !anexoAutorizacao) {
-      showAlert("Autorização Pendente", "Como existe divergência no prefixo da WBS nos itens, é obrigatório anexar a autorização do responsável no banner amarelo.", "warning");
-      return;
-    }
 
     try {
       const anexosProcessados = [];
@@ -148,47 +125,28 @@ export default function EntradaMaterial() {
         }
       }
 
-      if (temWbsDivergente && anexoAutorizacao) {
-        const extensao = anexoAutorizacao.name.split('.').pop();
-        const caminhoNoStorage = `uploads/auth-wbs-${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
-        const { error: erroUploadAuth } = await supabase.storage.from('documentos').upload(caminhoNoStorage, anexoAutorizacao);
-
-        if (erroUploadAuth) {
-          showAlert("Erro de Autorização", `Falha ao anexar o documento de autorização.`, "error");
-          return;
-        }
-        const { data: linkAuth } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
-        anexosProcessados.push({ nome_arquivo: `[AUTORIZAÇÃO WBS] ${anexoAutorizacao.name}`, url_arquivo: linkAuth.publicUrl });
-      }
-
-const payload = {
+      const payload = {
         solicitante: { 
           ...formDados, 
           filial_id: estoqueAtual, 
           tipo: 'Entrada' 
         },
-        // ✨ MAPEAMENTO CIRÚRGICO: Traduz o Frontend para o idioma do Backend
         itens: itens.map(item => ({
           desenho_sap: item.desenhoSAP || '-',
           part_number: item.numPecaFabricante || '-',
           fornecedor: item.fornecedor || null,
           referencia: item.referencia || null,
-          
-          qtd: item.qtdFornecida || 1, // A quantidade real
+          qtd: item.qtdFornecida || 1,
           unidade_medida: item.unidadeMedida || 'Unid',
-          
           nf_entrada: item.nfEntrada || null,
           descricao: item.vendorDescription || 'Sem descrição',
-          materialDescription: item.vendorDescription || 'Sem descrição', // Mantemos os dois por segurança caso o backend use este
-          
+          materialDescription: item.vendorDescription || 'Sem descrição', 
           wbs_element: item.wbsElement || '-',
           nome_projeto: item.nomeProjeto || null,
-          
           emissao_nf: item.emissaoNF || null,
           receb_nf: item.recebNF || null,
           documento_compras: item.docCompras || null,
           valor_unitario: item.poNetPrice || null,
-          
           centro: item.centro || null,
           deposito: item.deposito || null,
           alocacao: item.alocacao || null
@@ -201,7 +159,7 @@ const payload = {
       if (dados.sucesso || dados.ps || dados.ps_id) {
         showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps || dados.ps_id}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
-        setItens([]); setAnexos([]); setAnexoAutorizacao(null);
+        setItens([]); setAnexos([]);
       } else {
         showAlert("Erro no Servidor", dados.erro, "error");
       }
@@ -270,35 +228,6 @@ const payload = {
           )}
         </div>
       </div>
-
-      {temWbsDivergente && (
-        <div style={{ 
-          backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', 
-          padding: '16px', marginBottom: '24px', animation: 'fadeIn 0.3s ease-in-out'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', marginBottom: '8px' }}>
-            <AlertTriangle size={20} />
-            <strong style={{ fontSize: '1rem' }}>Atenção: WBS Divergente</strong>
-          </div>
-          <p style={{ color: '#78350f', fontSize: '0.875rem', marginBottom: '16px', marginTop: 0 }}>
-            Um ou mais itens pertencem a um macro-projeto (prefixo) diferente da WBS informada. É necessário anexar a autorização do responsável.
-          </p>
-          
-          {!anexoAutorizacao ? (
-            <div style={{ border: '1px dashed #fcd34d', borderRadius: '8px', backgroundColor: '#fffbeb', transition: 'all 0.2s', overflow: 'hidden' }}>
-              <CarregarArquivo 
-                variante="area" accept=".pdf, .jpg, .png, .jpeg, .msg" label="Anexar autorização do responsável (obrigatório)" 
-                icone={<Upload size={20} color="#f59e0b" />} onFileSelect={(file) => setAnexoAutorizacao(file)} 
-              />
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '8px', border: '1px solid #fcd34d' }}>
-              <span style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: '600' }}>{anexoAutorizacao.name}</span>
-              <button onClick={() => setAnexoAutorizacao(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }} title="Remover autorização"><X size={18} /></button>
-            </div>
-          )}
-        </div>
-      )}
 
       <TabelaInsercaoItens
         itens={itens} dataMinima={dataMinima} mostrarDataNecessidade={true} mostrarExemploExcel={true}

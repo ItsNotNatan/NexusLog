@@ -78,7 +78,8 @@ export default function TransferenciaWBS() {
   }, [estoqueAtual]); 
 
   const adicionarItem = (itemOriginal) => {
-    if (itensSelecionados.length >= 25) { showAlert("Limite Atingido", "Limite máximo de 25 itens.", "warning"); return; }
+    // ✨ LIMITE REDUZIDO PARA 20!
+    if (itensSelecionados.length >= 20) { showAlert("Limite Atingido", "Limite máximo de 20 itens.", "warning"); return; }
     
     const saldoLivre = itemOriginal.quantidade_disponivel - (itemOriginal.quantidade_reservada || 0);
     if (saldoLivre <= 0) {
@@ -176,7 +177,6 @@ export default function TransferenciaWBS() {
           </div>
         </div>
         
-        {/* ✨ ANEXOS OPCIONAIS NOVAMENTE */}
         <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} titulo="ANEXOS (OPCIONAL)" />
       </div>
 
@@ -186,6 +186,7 @@ export default function TransferenciaWBS() {
           carregando={carregandoEstoque} 
           itensSelecionados={itensSelecionados} 
           bloquearTransferidos={true} 
+          limiteMaximo={20} // ✨ INJETADO O NOVO LIMITE NO SELETOR!
           onAdicionarItem={adicionarItem} 
           onRemoverItem={removerItem}
           onAtualizarQuantidade={atualizarQuantidade}

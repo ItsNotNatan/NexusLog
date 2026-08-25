@@ -12,6 +12,7 @@ export default function SeletorEstoqueLateral({
   onAdicionarItem, 
   itensSelecionados = [], 
   bloquearTransferidos = false,
+  limiteMaximo = 20, // ✨ NOVA PROP DE LIMITE
   onRemoverItem, 
   onAtualizarQuantidade 
 }) {
@@ -123,7 +124,6 @@ export default function SeletorEstoqueLateral({
               const textoSAP = item.desenhoSAP || item.desenho_sap || "SEM SAP";
               const temSAP = textoSAP !== "SEM SAP" && textoSAP !== "-";
               
-              // ✨ MÁGICA DOS RESERVADOS NA LISTA
               const saldo = item.quantidade_disponivel ?? item.qtdFornecida ?? 0;
               const reservado = item.quantidade_reservada ?? item.qtdReservada ?? 0;
 
@@ -208,7 +208,6 @@ export default function SeletorEstoqueLateral({
                       Saldo: {saldo} {item.unidade_medida || item.unidadeMedida || 'Unid'}
                     </span>
                     
-                    {/* ✨ AGORA O RESERVADO APARECE NA LISTA LATERAL SE EXISTIR! */}
                     {reservado > 0 && (
                       <span style={{ color: '#f59e0b', fontWeight: '600' }}>
                         Reservado: {reservado}
@@ -267,8 +266,9 @@ export default function SeletorEstoqueLateral({
           <div style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "700", color: "#0f172a", fontSize: "1.05rem" }}>
             <Box size={20} color="#2563eb" /> Itens Selecionados
           </div>
+          {/* ✨ CONTADOR VISUAL ATUALIZADO */}
           <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#64748b', border: '1px solid #e2e8f0', padding: '4px 14px', borderRadius: '16px' }}>
-            {itensSelecionados.length} / 25
+            {itensSelecionados.length} / {limiteMaximo}
           </span>
         </div>
 
@@ -296,53 +296,39 @@ export default function SeletorEstoqueLateral({
               </thead>
               <tbody>
                 {itensSelecionados.map((item) => {
-                  // ✨ MÁGICA DA TABELA
                   const qtdDesejada = item.qtdSelecionada !== undefined ? item.qtdSelecionada : (item.qtdTransferencia !== undefined ? item.qtdTransferencia : 1);
                   const unidade = item.unidade_medida || item.unidadeMedida || 'Unid';
                   
-                  // Centralização de variáveis para não falhar nunca
                   const saldo = item.quantidade_disponivel ?? item.qtdFornecida ?? 0;
                   const reservado = item.quantidade_reservada ?? item.qtdReservada ?? 0;
                   const saldoLivreReal = Math.max(1, saldo - reservado);
 
                   return (
                     <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      
                       <td style={{ padding: "16px", backgroundColor: "#f8fafc", color: "#2563eb", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {item.desenho_sap || item.desenhoSAP || "-"}
                       </td>
-                      
                       <td style={{ padding: "16px", fontWeight: "700", color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
                         {item.part_number || item.numPecaFabricante || "-"}
                       </td>
-                      
                       <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", minWidth: "200px" }}>
                         {item.descricao || item.materialDescription || "-"}
                       </td>
-                      
                       <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {item.nf_entrada || item.nf || "-"}
                       </td>
-                      
                       <td style={{ padding: "16px", color: "#2563eb", fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", whiteSpace: "nowrap" }}>
                         {item.alocacao || "CROSSDOCKING"}
                       </td>
-                      
                       <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {item.wbs_element || item.wbs || "-"}
                       </td>
-                      
-                      {/* SALDO (Verde) */}
                       <td style={{ padding: "16px", color: "#10b981", fontWeight: "600", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {saldo} <span style={{ fontSize: "0.75rem", fontWeight: "normal" }}>{unidade}</span>
                       </td>
-                      
-                      {/* RESERVADO (Laranja) */}
                       <td style={{ padding: "16px", color: "#f59e0b", fontWeight: "600", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {reservado} <span style={{ fontSize: "0.75rem", fontWeight: "normal" }}>{unidade}</span>
                       </td>
-                      
-                      {/* QTD (Input limitador Inteligente) */}
                       <td style={{ padding: "16px", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <input
@@ -360,8 +346,6 @@ export default function SeletorEstoqueLateral({
                           <span style={{ fontSize: "0.85rem", color: "#64748b" }}>{unidade}</span>
                         </div>
                       </td>
-
-                      {/* AÇÕES (Botão X) */}
                       <td style={{ textAlign: "center", padding: "16px" }}>
                         <button
                           onClick={() => onRemoverItem && onRemoverItem(item.id)}
@@ -372,7 +356,6 @@ export default function SeletorEstoqueLateral({
                           <X size={18} strokeWidth={2.5} />
                         </button>
                       </td>
-                      
                     </tr>
                   );
                 })}
