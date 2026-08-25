@@ -10,24 +10,25 @@ export default function ExemploExcel() {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Modelo SAP');
 
-      // ✨ COLUNAS ATUALIZADAS (Com Desenho SAP e Referência)
+      // ✨ COLUNAS EXATAMENTE NA ORDEM E NOME REQUERIDOS
       const colunas = [
-        'Desenho SAP',
-        'Nº peça fabricante',
-        'FORNECEDOR',
-        'REFERÊNCIA', // ✨ Nova coluna adicionada
-        'Qtd.fornecida',
-        'NF DE ENTRADA',
-        'Unidade de medida',
-        'Vendor Description',
-        'WBS Element',
+        'NUM SAP | DESENHO',
+        'REFERÊNCIA',
+        'DESCRIÇÃO',
+        'FABRICANTE',
+        'QTDE ENTRADA',
+        'UNID. MEDIDA',
+        'NUM DA NOTA FISCAL',
+        'FORNECEDOR / REGISTRO',
+        'CENTRO DE CUSTO - WBS',
+        'NOME CENTRO DE CUSTO / PROJETO',
         'EMISSÃO NF',
         'RECEB. NF',
-        'Documento de compras',
-        'PO Net Price',
-        'Centro',
-        'Depósito',
-        'Alocação'
+        'Nº PEDIDO DE COMPRA / CPV',
+        'VLR. UNITÁRIO NOTA FISCAL',
+        'FILIAL',
+        'DEPÓSITO',
+        'ALOCAÇÃO'
       ];
 
       worksheet.columns = colunas.map(col => ({ header: col, key: col, width: 20 }));
@@ -44,24 +45,25 @@ export default function ExemploExcel() {
       });
       linhaCabecalho.height = 25;
 
-      // ✨ EXEMPLO PREENCHIDO COM A NOVA COLUNA
+      // ✨ EXEMPLO PREENCHIDO COM A NOVA COLUNA E NOVA ESTRUTURA
       worksheet.addRow({
-        'Desenho SAP': 'DS-778899',
-        'Nº peça fabricante': 'PN-12345',
-        'FORNECEDOR': 'Fornecedor A',
-        'REFERÊNCIA': 'REF-9988', // ✨ Exemplo de referência
-        'Qtd.fornecida': 10,
-        'NF DE ENTRADA': 'NF-001',
-        'Unidade de medida': 'Unid',
-        'Vendor Description': 'Desc Vendor',
-        'WBS Element': 'WBS-EX-001',
+        'NUM SAP | DESENHO': 'DS-778899',
+        'REFERÊNCIA': 'REF-9988', 
+        'DESCRIÇÃO': 'Desc Vendor Exemplo',
+        'FABRICANTE': 'PN-12345',
+        'QTDE ENTRADA': 10,
+        'UNID. MEDIDA': 'Unid',
+        'NUM DA NOTA FISCAL': 'NF-001',
+        'FORNECEDOR / REGISTRO': 'Fornecedor A',
+        'CENTRO DE CUSTO - WBS': 'WBS-EX-001',
+        'NOME CENTRO DE CUSTO / PROJETO': 'Projeto Stellantis',
         'EMISSÃO NF': '01/01/2026',
         'RECEB. NF': '05/01/2026',
-        'Documento de compras': 'DOC-999',
-        'PO Net Price': 'R$ 100,00',
-        'Centro': 'BR01',
-        'Depósito': '0010',
-        'Alocação': 'A-01'
+        'Nº PEDIDO DE COMPRA / CPV': 'DOC-999',
+        'VLR. UNITÁRIO NOTA FISCAL': 'R$ 100,00',
+        'FILIAL': 'BR01',
+        'DEPÓSITO': '0010',
+        'ALOCAÇÃO': 'A-01'
       });
 
       const buffer = await workbook.xlsx.writeBuffer();

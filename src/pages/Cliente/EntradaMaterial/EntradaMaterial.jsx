@@ -12,7 +12,6 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { AlertContext } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 
-// ✨ IMPORTAÇÃO DO NOSSO FORMATADOR CENTRALIZADO
 import { formatarWBS } from '../../../utils/formatadores';
 
 const LIMITE_CLIENTE = 20;
@@ -31,10 +30,11 @@ export default function EntradaMaterial() {
     setDataMinima(localISOTime);
   }, []);
 
+  // ✨ ATUALIZADO COM O NOME_PROJETO
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`, desenhoSAP: '', numPecaFabricante: '', fornecedor: '',
     referencia: '', qtdFornecida: 1, nfEntrada: '', unidadeMedida: 'Unid', vendorDescription: '',
-    wbsElement: '', dataNecessidade: '', emissaoNF: '', recebNF: '', docCompras: '', poNetPrice: '', centro: '', deposito: '', alocacao: ''
+    wbsElement: '', nomeProjeto: '', dataNecessidade: '', emissaoNF: '', recebNF: '', docCompras: '', poNetPrice: '', centro: '', deposito: '', alocacao: ''
   });
 
   const [itens, setItens] = useState([]);
@@ -43,7 +43,6 @@ export default function EntradaMaterial() {
   
   const processador = useProcessadorExcel();
 
-  // ✨ LÓGICA DE DIVERGÊNCIA: Compara apenas o que está antes do primeiro hífen "-"
   const prefixoWbsPrincipal = formDados.wbs.split('-')[0].trim().toUpperCase();
   
   const temWbsDivergente = itens.some(item => {
@@ -53,7 +52,6 @@ export default function EntradaMaterial() {
     return prefixoWbsPrincipal !== '' && prefixoItemWbs !== prefixoWbsPrincipal;
   });
 
-  // Limpa o anexo se a divergência for resolvida
   useEffect(() => {
     if (!temWbsDivergente && anexoAutorizacao) {
       setAnexoAutorizacao(null);
@@ -63,25 +61,28 @@ export default function EntradaMaterial() {
   const handleImportarExcel = async (arquivo) => {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
     if (itensProcessados && Array.isArray(itensProcessados)) {
+      
+      // ✨ MAPEAMENTO INTELIGENTE DA NOVA ORDEM/NOMES EXATOS!
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: item['Desenho SAP'] || item.desenhoSAP || '',
-        numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
-        fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
+        desenhoSAP: item['NUM SAP | DESENHO'] || item['Desenho SAP'] || item.desenhoSAP || '',
         referencia: item['REFERÊNCIA'] || item['Referência'] || item.referencia || '',
-        qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
-        nfEntrada: item['NF DE ENTRADA'] || '',
-        unidadeMedida: item['Unidade de medida'] || item.unidadeMedida || 'Unid',
-        vendorDescription: item['Vendor Description'] || item.vendorDescription || '',
-        wbsElement: item['WBS Element'] || item.wbs || '',
+        vendorDescription: item['DESCRIÇÃO'] || item['Vendor Description'] || item.vendorDescription || '',
+        numPecaFabricante: item['FABRICANTE'] || item['Nº peça fabricante'] || item.numPecaFabricante || '',
+        qtdFornecida: item['QTDE ENTRADA'] || item['Qtd.fornecida'] || item.qtdFornecida || 1,
+        unidadeMedida: item['UNID. MEDIDA'] || item['Unidade de medida'] || item.unidadeMedida || 'Unid',
+        nfEntrada: item['NUM DA NOTA FISCAL'] || item['NF DE ENTRADA'] || item.nfEntrada || '',
+        fornecedor: item['FORNECEDOR / REGISTRO'] || item['FORNECEDOR'] || item.fornecedor || '',
+        wbsElement: item['CENTRO DE CUSTO - WBS'] || item['WBS Element'] || item.wbs || '',
+        nomeProjeto: item['NOME CENTRO DE CUSTO / PROJETO'] || item.nomeProjeto || '',
         dataNecessidade: item['Data de Necessidade'] || item.dataNecessidade || '',
         emissaoNF: item['EMISSÃO NF'] || item.emissaoNF || '',
         recebNF: item['RECEB. NF'] || item.recebNF || '',
-        docCompras: item['Documento de compras'] || item.docCompras || '',
-        poNetPrice: item['PO Net Price'] || item.poNetPrice || '',
-        centro: item['Centro'] || item.centro || '',
-        deposito: item['Depósito'] || item.deposito || '',
-        alocacao: item['Alocação'] || item.alocacao || ''
+        docCompras: item['Nº PEDIDO DE COMPRA / CPV'] || item['Documento de compras'] || item.docCompras || '',
+        poNetPrice: item['VLR. UNITÁRIO NOTA FISCAL'] || item['PO Net Price'] || item.poNetPrice || '',
+        centro: item['FILIAL'] || item['Centro'] || item.centro || '',
+        deposito: item['DEPÓSITO'] || item['Depósito'] || item.deposito || '',
+        alocacao: item['ALOCAÇÃO'] || item['Alocação'] || item.alocacao || ''
       }));
 
       setItens(prev => {
@@ -124,7 +125,6 @@ export default function EntradaMaterial() {
       return;
     }
     
-    // ✨ TRAVA DE SEGURANÇA
     if (temWbsDivergente && !anexoAutorizacao) {
       showAlert("Autorização Pendente", "Como existe divergência no prefixo da WBS nos itens, é obrigatório anexar a autorização do responsável no banner amarelo.", "warning");
       return;
@@ -133,7 +133,6 @@ export default function EntradaMaterial() {
     try {
       const anexosProcessados = [];
       
-      // 1. Sobe os anexos normais
       if (anexos.length > 0) {
         for (const arquivo of anexos) {
           const extensao = arquivo.name.split('.').pop();
@@ -149,7 +148,6 @@ export default function EntradaMaterial() {
         }
       }
 
-      // ✨ 2. Sobe o anexo de autorização WBS
       if (temWbsDivergente && anexoAutorizacao) {
         const extensao = anexoAutorizacao.name.split('.').pop();
         const caminhoNoStorage = `uploads/auth-wbs-${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
@@ -166,7 +164,12 @@ export default function EntradaMaterial() {
       const payload = {
         solicitante: { ...formDados, filial_id: estoqueAtual, tipo: 'Entrada' },
         itens: itens.map(item => ({
-          ...item, qtd: item.qtdFornecida, desenhoSAP: item.desenhoSAP || '-', referencia: item.referencia || null, materialDescription: item.vendorDescription || 'Sem descrição'
+          ...item, 
+          qtd: item.qtdFornecida, 
+          desenhoSAP: item.desenhoSAP || '-', 
+          referencia: item.referencia || null, 
+          materialDescription: item.vendorDescription || 'Sem descrição',
+          nomeProjeto: item.nomeProjeto || '-' // ✨ INCLUÍDO AQUI
         })),
         anexos: anexosProcessados
       };
@@ -246,15 +249,10 @@ export default function EntradaMaterial() {
         </div>
       </div>
 
-      {/* ✨ BANNER DE WBS DIVERGENTE COM O EXATO VISUAL DA IMAGEM */}
       {temWbsDivergente && (
         <div style={{ 
-          backgroundColor: '#fffbeb', 
-          border: '1px solid #fde68a', 
-          borderRadius: '8px', 
-          padding: '16px', 
-          marginBottom: '24px',
-          animation: 'fadeIn 0.3s ease-in-out'
+          backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', 
+          padding: '16px', marginBottom: '24px', animation: 'fadeIn 0.3s ease-in-out'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', marginBottom: '8px' }}>
             <AlertTriangle size={20} />
@@ -265,37 +263,16 @@ export default function EntradaMaterial() {
           </p>
           
           {!anexoAutorizacao ? (
-            <div style={{ 
-              border: '1px dashed #fcd34d', 
-              borderRadius: '8px', 
-              backgroundColor: '#fffbeb',
-              transition: 'all 0.2s',
-              overflow: 'hidden'
-            }}>
+            <div style={{ border: '1px dashed #fcd34d', borderRadius: '8px', backgroundColor: '#fffbeb', transition: 'all 0.2s', overflow: 'hidden' }}>
               <CarregarArquivo 
-                variante="area" 
-                accept=".pdf, .jpg, .png, .jpeg, .msg" 
-                label="Anexar autorização do responsável (obrigatório)" 
-                icone={<Upload size={20} color="#f59e0b" />} 
-                onFileSelect={(file) => setAnexoAutorizacao(file)} 
+                variante="area" accept=".pdf, .jpg, .png, .jpeg, .msg" label="Anexar autorização do responsável (obrigatório)" 
+                icone={<Upload size={20} color="#f59e0b" />} onFileSelect={(file) => setAnexoAutorizacao(file)} 
               />
             </div>
           ) : (
-            <div style={{ 
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-              backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '8px', 
-              border: '1px solid #fcd34d' 
-            }}>
-              <span style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: '600' }}>
-                {anexoAutorizacao.name}
-              </span>
-              <button 
-                onClick={() => setAnexoAutorizacao(null)} 
-                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }}
-                title="Remover autorização"
-              >
-                <X size={18} />
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '8px', border: '1px solid #fcd34d' }}>
+              <span style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: '600' }}>{anexoAutorizacao.name}</span>
+              <button onClick={() => setAnexoAutorizacao(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }} title="Remover autorização"><X size={18} /></button>
             </div>
           )}
         </div>
