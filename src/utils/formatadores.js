@@ -46,3 +46,9 @@ export const formatarDinheiroTempoReal = (valorOriginal) => {
     currency: 'BRL',
   }).format(valorDecimal);
 };
+
+// ✨ Formata WBS: Força maiúsculas e permite apenas letras, números e hífens
+export const formatarWBS = (valor) => {
+  if (!valor) return '';
+  return String(valor).toUpperCase().replace(/[^A-Z0-9-]/g, '');
+};
