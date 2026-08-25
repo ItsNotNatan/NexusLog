@@ -2,8 +2,8 @@ import React, { useState, useContext } from 'react';
 import { User, FileText, Paperclip, Send, MapPin } from 'lucide-react'; 
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
-// ✨ IMPORTAÇÃO CENTRALIZADA
-import { formatarDinheiroTempoReal, formatarWBS } from '../../../utils/formatadores';
+// ✨ IMPORTAÇÃO CENTRALIZADA (formatarDinheiro removido)
+import { formatarWBS } from '../../../utils/formatadores';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { supabase } from '../../../supabaseClient';
 import { apiFetch } from '../../../services/api';
@@ -15,7 +15,8 @@ export default function SolicitarNotaFiscal() {
   const { showAlert } = useAlert();
   const { estoqueAtual } = useContext(AuthContext); 
 
-  const [formDados, setFormDados] = useState({ nome: '', wbs: '', valorEstimado: '', descricao: '', observacoes: '' });
+  // Removido o campo valorEstimado do estado inicial
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', descricao: '', observacoes: '' });
   const [anexos, setAnexos] = useState([]);
 
   const handleEnviar = async () => {
@@ -49,7 +50,7 @@ export default function SolicitarNotaFiscal() {
 
     const payload = {
       solicitante: {
-        nome: formDados.nome, wbs: formDados.wbs, valorEstimado: formDados.valorEstimado,
+        nome: formDados.nome, wbs: formDados.wbs,
         descricao: formDados.descricao, observacoes: formDados.observacoes,
         tipo: 'Nota Fiscal', filial_origem: estoqueAtual 
       },
@@ -61,7 +62,7 @@ export default function SolicitarNotaFiscal() {
 
       if (dados.sucesso || dados.ps_id) {
         showAlert("Sucesso!", `Solicitação de NF enviada. ID: ${dados.ps_id || dados.ps}`, "success");
-        setFormDados({ nome: '', wbs: '', valorEstimado: '', descricao: '', observacoes: '' });
+        setFormDados({ nome: '', wbs: '', descricao: '', observacoes: '' });
         setAnexos([]);
       } else {
         showAlert("Erro do Servidor", dados.erro, "error");
@@ -93,14 +94,10 @@ export default function SolicitarNotaFiscal() {
                 className="input-campo foco-roxo" 
                 placeholder="Ex: ABCDE-12345" 
                 value={formDados.wbs} 
-                // ✨ Formatação em tempo real centralizada
                 onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} 
               />
             </div>
-            <div className="input-grupo">
-              <label>VALOR ESTIMADO (R$)</label>
-              <input type="text" className="input-campo foco-roxo" placeholder="R$ 0,00" value={formDados.valorEstimado} onChange={(e) => { const valorFormatado = formatarDinheiroTempoReal(e.target.value); setFormDados({ ...formDados, valorEstimado: valorFormatado }); }} />
-            </div>
+            {/* ✨ Campo "Valor Estimado" removido daqui */}
             <div className="input-grupo">
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
               <div className="input-wrapper-fixo">

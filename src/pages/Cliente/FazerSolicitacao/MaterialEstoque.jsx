@@ -28,7 +28,8 @@ export default function MaterialEstoque() {
 
   const [dataMinima, setDataMinima] = useState("");
   const [itensSelecionados, setItensSelecionados] = useState([]);
-  const [anexos, setAnexos] = useState([]);
+  const [anexos, setAnexos] = useState([]); // Apenas UM estado para anexos gere tudo!
+  
   const [estoqueDisponivel, setEstoqueDisponivel] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
@@ -48,6 +49,8 @@ export default function MaterialEstoque() {
     if (itemWbs === '' || itemWbs === '-') return false;
     
     const prefixoItemWbs = itemWbs.split('-')[0].trim().toUpperCase();
+    
+    // Só acusa divergência se o form tiver WBS e os prefixos forem efetivamente diferentes
     return prefixoWbsPrincipal !== '' && prefixoItemWbs !== prefixoWbsPrincipal;
   });
 
@@ -155,7 +158,7 @@ export default function MaterialEstoque() {
     if (itensSelecionados.length === 0) { showAlert("Lista Vazia", "Adicione um item.", "warning"); return; }
     if (itensSelecionados.some(i => !i.qtdSelecionada)) { showAlert("Incompleto", "Verifique as quantidades.", "warning"); return; }
 
-    // ✨ TRAVA DE SEGURANÇA: Exige o anexo geral caso haja divergência
+    // ✨ TRAVA DE SEGURANÇA MANTIDA: Exige o anexo geral caso haja divergência
     if (temWbsDivergente && anexos.length === 0) {
       showAlert("Autorização Pendente", "Como existe divergência no prefixo da WBS, é OBRIGATÓRIO incluir o documento de autorização na área de Anexos.", "warning");
       return;
@@ -175,7 +178,7 @@ export default function MaterialEstoque() {
           const { data: linkPublico } = supabase.storage.from("documentos").getPublicUrl(caminhoNoStorage);
           
           let nomeFicheiro = arquivo.name;
-          // ✨ Marca o 1º anexo como autorização se houver divergência
+          // ✨ Marca o 1º anexo adicionado como "Autorização" se houver divergência!
           if (temWbsDivergente && i === 0) {
             nomeFicheiro = `[AUTORIZAÇÃO WBS] ${arquivo.name}`;
           }
@@ -214,78 +217,91 @@ export default function MaterialEstoque() {
           <div className="input-grupo"><label><Calendar size={14} /> DATA *</label><input type="date" className="input-campo" value={formDados.dataNecessidade} min={dataMinima} onChange={(e) => setFormDados({ ...formDados, dataNecessidade: e.target.value })} /></div>
           <div className="input-grupo span-2"><label>OBSERVAÇÕES</label><textarea className="input-campo" rows="2" value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea></div>
         </div>
+      </div>
+
+      {/* ✨ MÁGICA VISUAL AQUI: A área de anexos engloba o aviso e muda de cor consoante o estado! */}
+      <div style={{ 
+        padding: "24px", 
+        border: temWbsDivergente ? "2px dashed #f59e0b" : "1px solid #e2e8f0", 
+        borderRadius: "12px", 
+        backgroundColor: temWbsDivergente ? "#fffbeb" : "#ffffff", 
+        marginTop: "24px", 
+        transition: "all 0.3s ease" 
+      }}>
         
-        {/* ✨ BANNER VISUAL DE AVISO (Apenas visual, sem botão de upload) */}
         {temWbsDivergente && (
-          <div style={{ 
-            backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', 
-            padding: '16px', marginTop: '24px', animation: 'fadeIn 0.3s ease-in-out'
-          }}>
+          <div style={{ marginBottom: '20px', animation: 'fadeIn 0.3s ease-in-out' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', marginBottom: '8px' }}>
               <AlertTriangle size={20} />
               <strong style={{ fontSize: '1rem' }}>Atenção: WBS Divergente</strong>
             </div>
             <p style={{ color: '#78350f', fontSize: '0.875rem', margin: 0 }}>
-              Um ou mais itens no carrinho pertencem a um macro-projeto (prefixo) diferente da WBS informada. <strong style={{color: '#92400e'}}>É obrigatório anexar a autorização do responsável na área de anexos abaixo.</strong>
+              Um ou mais itens no carrinho pertencem a um macro-projeto (prefixo) diferente da WBS informada. <strong style={{color: '#92400e'}}>É obrigatório anexar a autorização do responsável na área abaixo.</strong>
             </p>
           </div>
         )}
-
-        {/* ✨ ÁREA DE ANEXOS PADRÃO (Com título dinâmico) */}
-        <GerenciadorAnexos 
-          anexos={anexos} 
-          setAnexos={setAnexos} 
-          titulo={temWbsDivergente ? "ANEXOS (OBRIGATÓRIO: AUTORIZAÇÃO WBS DIVERGENTE)" : "ANEXOS GERAIS (OPCIONAL)"} 
-        />
         
         <div style={{ 
-          padding: "20px", border: formDados.entregaUrgente ? "2px dashed #dc2626" : "1px solid #cbd5e1", 
-          borderRadius: "8px", backgroundColor: formDados.entregaUrgente ? "#fef2f2" : "#f8fafc", 
-          marginTop: "20px", transition: "all 0.3s ease" 
+          backgroundColor: temWbsDivergente ? '#ffffff' : 'transparent', 
+          padding: temWbsDivergente ? '16px' : '0', 
+          borderRadius: temWbsDivergente ? '8px' : '0',
+          border: temWbsDivergente ? '1px solid #fde68a' : 'none'
         }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", width: "100%" }}>
-            <input 
-              type="checkbox" id="checkbox-urgente" checked={formDados.entregaUrgente} 
-              onChange={(e) => setFormDados({ ...formDados, entregaUrgente: e.target.checked, justificativaUrgencia: "" })} 
-              style={{ marginTop: "4px", width: "20px", height: "20px", cursor: "pointer", accentColor: "#dc2626" }} 
-            />
-            <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {formDados.entregaUrgente ? <AlertTriangle size={20} color="#dc2626" /> : <Zap size={18} color="#475569" />}
-                <label 
-                  htmlFor="checkbox-urgente" 
-                  style={{ 
-                    fontWeight: formDados.entregaUrgente ? "900" : "600", color: formDados.entregaUrgente ? "#991b1b" : "#0f172a", 
-                    cursor: "pointer", fontSize: formDados.entregaUrgente ? "1.1rem" : "0.9rem", textTransform: formDados.entregaUrgente ? "uppercase" : "none"
-                  }}
-                > 
-                  {formDados.entregaUrgente ? "Sinalizar Falha de Planejamento (URGÊNCIA)" : "Entrega Urgente / Atraso"} 
-                </label>
-              </div>
-              {!formDados.entregaUrgente && (
-                <span style={{ fontSize: "0.85rem", color: "#64748b", marginTop: "4px" }}> 
-                  Marque apenas se houver uma urgência real ou atraso na obra.
-                </span>
-              )}
-              {formDados.entregaUrgente && (
-                <div style={{ marginTop: "16px", width: "100%", animation: "fadeIn 0.3s ease" }}>
-                  <div style={{ backgroundColor: "#fee2e2", borderLeft: "4px solid #dc2626", padding: "12px 16px", marginBottom: "20px", borderRadius: "0 4px 4px 0" }}>
-                    <p style={{ margin: 0, fontSize: "0.85rem", color: "#7f1d1d", fontWeight: "600", lineHeight: "1.5" }}>
-                      ATENÇÃO: A marcação de urgência fura a fila padrão de processamento logístico e será tratada como uma quebra do fluxo normal. Este registo será diretamente reportado aos Administradores.
-                    </p>
-                  </div>
-                  <label style={{ fontSize: "0.80rem", fontWeight: "800", color: "#991b1b", marginBottom: "8px", display: "block" }}> 
-                    JUSTIFIQUE A FALHA DE PLANEJAMENTO * 
-                  </label>
-                  <textarea 
-                    className="input-campo" 
-                    placeholder="Por que você não conseguiu se planejar a tempo? Justifique detalhadamente o motivo da falha e o impacto direto caso o material não seja entregue." 
-                    rows="4" value={formDados.justificativaUrgencia} onChange={(e) => setFormDados({ ...formDados, justificativaUrgencia: e.target.value })} 
-                    style={{ borderColor: "#ef4444", backgroundColor: "#ffffff", color: "#450a0a", outlineColor: "#dc2626", boxShadow: "inset 0 1px 3px rgba(220,38,38,0.1)", fontWeight: "500" }}
-                  ></textarea>
-                </div>
-              )}
+          <GerenciadorAnexos 
+            anexos={anexos} 
+            setAnexos={setAnexos} 
+            titulo={temWbsDivergente ? "ANEXAR AUTORIZAÇÃO E OUTROS DOCUMENTOS (OBRIGATÓRIO)" : "ANEXOS GERAIS (OPCIONAL - Notas Fiscais, Manuais, Fotos)"} 
+          />
+        </div>
+      </div>
+
+      <div style={{ 
+        padding: "20px", border: formDados.entregaUrgente ? "2px dashed #dc2626" : "1px solid #cbd5e1", 
+        borderRadius: "8px", backgroundColor: formDados.entregaUrgente ? "#fef2f2" : "#ffffff", 
+        marginTop: "24px", transition: "all 0.3s ease" 
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", width: "100%" }}>
+          <input 
+            type="checkbox" id="checkbox-urgente" checked={formDados.entregaUrgente} 
+            onChange={(e) => setFormDados({ ...formDados, entregaUrgente: e.target.checked, justificativaUrgencia: "" })} 
+            style={{ marginTop: "4px", width: "20px", height: "20px", cursor: "pointer", accentColor: "#dc2626" }} 
+          />
+          <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {formDados.entregaUrgente ? <AlertTriangle size={20} color="#dc2626" /> : <Zap size={18} color="#475569" />}
+              <label 
+                htmlFor="checkbox-urgente" 
+                style={{ 
+                  fontWeight: formDados.entregaUrgente ? "900" : "600", color: formDados.entregaUrgente ? "#991b1b" : "#0f172a", 
+                  cursor: "pointer", fontSize: formDados.entregaUrgente ? "1.1rem" : "0.9rem", textTransform: formDados.entregaUrgente ? "uppercase" : "none"
+                }}
+              > 
+                {formDados.entregaUrgente ? "Sinalizar Falha de Planejamento (URGÊNCIA)" : "Entrega Urgente / Atraso"} 
+              </label>
             </div>
+            {!formDados.entregaUrgente && (
+              <span style={{ fontSize: "0.85rem", color: "#64748b", marginTop: "4px" }}> 
+                Marque apenas se houver uma urgência real ou atraso na obra.
+              </span>
+            )}
+            {formDados.entregaUrgente && (
+              <div style={{ marginTop: "16px", width: "100%", animation: "fadeIn 0.3s ease" }}>
+                <div style={{ backgroundColor: "#fee2e2", borderLeft: "4px solid #dc2626", padding: "12px 16px", marginBottom: "20px", borderRadius: "0 4px 4px 0" }}>
+                  <p style={{ margin: 0, fontSize: "0.85rem", color: "#7f1d1d", fontWeight: "600", lineHeight: "1.5" }}>
+                    ATENÇÃO: A marcação de urgência fura a fila padrão de processamento logístico e será tratada como uma quebra do fluxo normal. Este registo será diretamente reportado aos Administradores.
+                  </p>
+                </div>
+                <label style={{ fontSize: "0.80rem", fontWeight: "800", color: "#991b1b", marginBottom: "8px", display: "block" }}> 
+                  JUSTIFIQUE A FALHA DE PLANEJAMENTO * 
+                </label>
+                <textarea 
+                  className="input-campo" 
+                  placeholder="Por que você não conseguiu se planejar a tempo? Justifique detalhadamente o motivo da falha e o impacto direto caso o material não seja entregue." 
+                  rows="4" value={formDados.justificativaUrgencia} onChange={(e) => setFormDados({ ...formDados, justificativaUrgencia: e.target.value })} 
+                  style={{ borderColor: "#ef4444", backgroundColor: "#ffffff", color: "#450a0a", outlineColor: "#dc2626", boxShadow: "inset 0 1px 3px rgba(220,38,38,0.1)", fontWeight: "500" }}
+                ></textarea>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/TransferenciaWBS/TransferenciaWBS.jsx
+// DESCRIÇÃO: Ecrã de transferência com anexo OBRIGATÓRIO e formatação WBS
+// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './TransferenciaWBS.css';
 import { Send, MapPin } from 'lucide-react'; 
@@ -8,7 +12,10 @@ import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext'; 
-import { io } from 'socket.io-client'; // ✨ IMPORTAÇÃO DO SOCKET.IO
+import { io } from 'socket.io-client';
+
+// ✨ IMPORTAÇÃO DO FORMATADOR CENTRALIZADO
+import { formatarWBS } from '../../../utils/formatadores';
 
 export default function TransferenciaWBS() {
   const { estoqueAtual } = useContext(AuthContext);
@@ -20,7 +27,7 @@ export default function TransferenciaWBS() {
   const [estoqueReal, setEstoqueReal] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
-  // ✨ ATUALIZADO: Buscar dados e ligar o radar em tempo real
+  // Buscar dados e ligar o radar em tempo real
   useEffect(() => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       setEstoqueReal([]); setCarregandoEstoque(false); return;
@@ -33,7 +40,7 @@ export default function TransferenciaWBS() {
           const itensComSaldo = resultado.dados.filter(item => item.quantidade_disponivel > 0);
           setEstoqueReal(itensComSaldo);
 
-          // ✨ SINCRONIZA O CARRINHO EM TEMPO REAL
+          // SINCRONIZA O CARRINHO EM TEMPO REAL
           setItensSelecionados(prevSelecionados => 
             prevSelecionados.map(selecionado => {
               const itemFresco = itensComSaldo.find(i => i.id === selecionado.id);
@@ -62,20 +69,13 @@ export default function TransferenciaWBS() {
     
     carregarEstoque();
 
-    // ✨ CONFIGURAÇÃO DO SOCKET.IO
+    // CONFIGURAÇÃO DO SOCKET.IO
     const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
-    socket.on('estoque_atualizado', () => {
-      console.log('⚡ Tempo Real: Estoque atualizado!');
-      carregarEstoque();
-    });
-
-    socket.on('solicitacoes_atualizadas', () => {
-      console.log('⚡ Tempo Real: Solicitações/Reservas atualizadas!');
-      carregarEstoque();
-    });
+    socket.on('estoque_atualizado', () => { carregarEstoque(); });
+    socket.on('solicitacoes_atualizadas', () => { carregarEstoque(); });
 
     return () => socket.disconnect();
   }, [estoqueAtual]); 
@@ -114,6 +114,12 @@ export default function TransferenciaWBS() {
     if (!formDados.nome || !formDados.wbsDestino) { showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS de Destino.", "warning"); return; }
     if (itensSelecionados.length === 0) { showAlert("Carrinho Vazio", "Selecione pelo menos um item para transferir.", "warning"); return; }
 
+    // ✨ VALIDAÇÃO: Bloqueia o envio se o anexo não for colocado
+    if (anexos.length === 0) {
+      showAlert("Anexo Obrigatório", "É obrigatório anexar o documento de suporte ou autorização para realizar a Transferência de WBS.", "warning");
+      return;
+    }
+
     const anexosProcessados = [];
     if (anexos.length > 0) {
       for (const arquivo of anexos) {
@@ -151,12 +157,37 @@ export default function TransferenciaWBS() {
     <>
       <div className="form-cartao">
         <div className="form-grid">
-          <div className="input-grupo"><label>SOLICITANTE *</label><input type="text" className="input-campo" placeholder="Seu nome" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} /></div>
-          <div className="input-grupo"><label>WBS DE DESTINO *</label><input type="text" className="input-campo" placeholder="WBS do projeto destino" value={formDados.wbsDestino} onChange={(e) => setFormDados({...formDados, wbsDestino: e.target.value})} /></div>
-          <div className="input-grupo"><label><MapPin size={14} /> FILIAL ORIGEM</label><div className="input-wrapper-fixo"><MapPin size={16} className="icone-dentro-input" color="#2563eb" /><input type="text" className="input-campo" value={estoqueAtual} readOnly /><span className="badge-fixo">Fixo</span></div></div>
-          <div className="input-grupo span-2"><label>JUSTIFICATIVA</label><textarea className="input-campo" placeholder="Motivo..." rows="2" value={formDados.justificativa} onChange={(e) => setFormDados({...formDados, justificativa: e.target.value})}></textarea></div>
+          <div className="input-grupo">
+            <label>SOLICITANTE *</label>
+            <input type="text" className="input-campo" placeholder="Seu nome" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} />
+          </div>
+          <div className="input-grupo">
+            <label>WBS DE DESTINO *</label>
+            <input 
+              type="text" 
+              className="input-campo" 
+              placeholder="WBS do projeto destino" 
+              value={formDados.wbsDestino} 
+              // ✨ UTILIZAÇÃO DO FORMATADOR AUTOMÁTICO AQUI
+              onChange={(e) => setFormDados({...formDados, wbsDestino: formatarWBS(e.target.value)})} 
+            />
+          </div>
+          <div className="input-grupo">
+            <label><MapPin size={14} /> FILIAL ORIGEM</label>
+            <div className="input-wrapper-fixo">
+              <MapPin size={16} className="icone-dentro-input" color="#2563eb" />
+              <input type="text" className="input-campo" value={estoqueAtual} readOnly />
+              <span className="badge-fixo">Fixo</span>
+            </div>
+          </div>
+          <div className="input-grupo span-2">
+            <label>JUSTIFICATIVA</label>
+            <textarea className="input-campo" placeholder="Motivo..." rows="2" value={formDados.justificativa} onChange={(e) => setFormDados({...formDados, justificativa: e.target.value})}></textarea>
+          </div>
         </div>
-        <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} />
+        
+        {/* ✨ TÍTULO ATUALIZADO PARA DEIXAR CLARO QUE É OBRIGATÓRIO */}
+        <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} titulo="ANEXOS (OBRIGATÓRIO)" />
       </div>
 
       <div style={{ marginTop: "24px", marginBottom: "24px" }}>

@@ -7,16 +7,19 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
+// ✨ IMPORTAÇÃO DO FORMATADOR CENTRALIZADO
+import { formatarWBS } from '../../../utils/formatadores';
+
 import './Crossdocking.css';
 
 export default function Crossdocking() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
-  const [formDados, setFormDados] = useState({ nome: '', wbs: '', observacoes: '', nf: '' });
+  // ✨ Adicionado o campo "destino" ao estado inicial
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
   
-  // ✨ Tabela limpa: Apenas Desenho SAP e Quantidade!
   const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: '' }]);
   const [anexos, setAnexos] = useState([]);
 
@@ -34,8 +37,9 @@ export default function Crossdocking() {
       showAlert("Atenção", "Por favor, selecione uma filial no topo da página antes de prosseguir.", "warning");
       return;
     }
-    if (!formDados.nome || !formDados.wbs || !formDados.nf || !tipoSaida) {
-      showAlert("Campos Obrigatórios", "Por favor, preencha o Nome, WBS, Número da NF e selecione o Tipo de Saída.", "warning");
+    // ✨ Validação atualizada para exigir o Destino
+    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.nf || !tipoSaida) {
+      showAlert("Campos Obrigatórios", "Por favor, preencha o Nome, WBS, Destino, Número da NF e selecione o Tipo de Saída.", "warning");
       return;
     }
     if (anexos.length === 0) {
@@ -43,7 +47,6 @@ export default function Crossdocking() {
       return;
     }
     if (tipoSaida === 'parcial') {
-      // ✨ Validação foca exclusivamente no Desenho SAP
       const temItemIncompleto = itensParciais.some(i => !i.desenhoSAP || !i.quantidade);
       if (temItemIncompleto) {
         showAlert("Itens Incompletos", "Preencha o Desenho SAP e a Quantidade em todas as linhas da Saída Parcial.", "warning");
@@ -67,7 +70,6 @@ export default function Crossdocking() {
       anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
     }
 
-    // Prepara os itens para enviar ao backend
     const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
       desenho_sap_manual: i.desenhoSAP,
       quantidade_solicitada: parseFloat(i.quantidade),
@@ -76,7 +78,7 @@ export default function Crossdocking() {
 
     const payload = {
       solicitante: {
-        nome: formDados.nome, wbs: formDados.wbs, nf: formDados.nf, 
+        nome: formDados.nome, wbs: formDados.wbs, nf: formDados.nf, destino: formDados.destino, 
         observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'}] ${formDados.observacoes}`,
         tipo: 'Crossdocking', filial_origem: estoqueAtual 
       },
@@ -88,7 +90,7 @@ export default function Crossdocking() {
 
       if (dados.sucesso || dados.ps) {
         showAlert("Sucesso!", `Solicitação de Crossdocking enviada com sucesso. ID: ${dados.ps}`, "success");
-        setFormDados({ nome: '', wbs: '', observacoes: '', nf: '' });
+        setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
         setTipoSaida(null); 
         setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '' }]); 
         setAnexos([]); 
@@ -124,7 +126,14 @@ export default function Crossdocking() {
           </div>
           <div className="input-grupo">
             <label>WBS *</label>
-            <input type="text" className="input-campo foco-ciano" placeholder="WBS do projeto" value={formDados.wbs} onChange={(e) => setFormDados({...formDados, wbs: e.target.value})} />
+            <input 
+              type="text" 
+              className="input-campo foco-ciano" 
+              placeholder="WBS do projeto" 
+              value={formDados.wbs} 
+              // ✨ Formatador de WBS em tempo real
+              onChange={(e) => setFormDados({...formDados, wbs: formatarWBS(e.target.value)})} 
+            />
           </div>
           <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} color="#2563eb" /> NÚMERO DA NOTA FISCAL *</label>
@@ -137,6 +146,17 @@ export default function Crossdocking() {
               <input type="text" className="input-campo" value={estoqueAtual} readOnly />
               <span className="badge-fixo">Fixo</span>
             </div>
+          </div>
+          {/* ✨ NOVA CAIXA: DESTINO (Ocupa as duas colunas inteiras) */}
+          <div className="input-grupo" style={{ gridColumn: '1 / -1' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> DESTINO *</label>
+            <textarea 
+              className="input-campo foco-ciano" 
+              placeholder="Local de destino do material..." 
+              rows="2" 
+              value={formDados.destino} 
+              onChange={(e) => setFormDados({...formDados, destino: e.target.value})}
+            ></textarea>
           </div>
         </div>
       </div>

@@ -48,7 +48,7 @@ const obterClasseBadgeTipo = (tipo) => {
   }
 };
 
-// ✨ FUNÇÃO AUXILIAR: Transforma o texto (Ex: 24/08/2026 às 14:30) no formato do input datetime-local
+// ✨ FUNÇÃO AUXILIAR: Transforma o texto no formato do input datetime-local
 const converterParaInputDateTime = (dataString) => {
   if (!dataString || dataString === '-' || dataString === '—' || dataString === 'Disponível') return '';
   
@@ -57,9 +57,8 @@ const converterParaInputDateTime = (dataString) => {
     const [dia, mes, ano] = partes[0].split('/');
     let hora = '00:00';
     
-    // Verifica se tem hora na string
     if (partes.length >= 3 && partes[2].includes(':')) {
-       hora = partes[2]; // Pega o "14:30"
+       hora = partes[2]; 
     } else if (partes.length === 2 && partes[1].includes(':')) {
        hora = partes[1]; 
     }
@@ -313,12 +312,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  // ✨ ATUALIZADA: A função agora constrói a data e a hora bonitinhas!
   const lidarComMudancaDataEntrega = async (idSolicitacao, novaData) => {
     try {
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/local`, {
         method: 'PATCH',
-        // Transforma o YYYY-MM-DDTHH:mm numa ISO completa para a base de dados
         body: JSON.stringify({ data_entrega: novaData ? new Date(novaData).toISOString() : null })
       });
 
@@ -485,7 +482,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                     nfNoEstoque = estoque.some(itemEstoque => String(itemEstoque.nf_entrada || '').trim() === String(linha.nfCrossdocking || '').trim() && String(itemEstoque.nf_entrada || '').trim() !== '');
                   }
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
+                  
+                  // ✨ AQUI COMEÇA A LÓGICA DO MODO VERMELHO
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado';
+                  
+                  const corTextoForte = isRecusadoOuCancelado ? "#991b1b" : "#1e293b";
+                  const corTextoMedio = isRecusadoOuCancelado ? "#dc2626" : "#475569";
+                  const corTextoFraco = isRecusadoOuCancelado ? "#ef4444" : "#64748b";
+                  const corDestaque = isRecusadoOuCancelado ? "#dc2626" : "#2563eb";
+                  const classeBadgeTipoAtual = isRecusadoOuCancelado ? "badge-tipo-vermelho" : obterClasseBadgeTipo(linha.tipo);
 
                   return (
                     <React.Fragment key={idUnico}>
@@ -493,24 +498,26 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         className={isExpandida ? "tr-expandida" : ""}
                         style={{
                           backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '',
-                          borderBottom: '1px solid #f1f5f9',
-                          opacity: isRecusadoOuCancelado ? 0.8 : 1
+                          borderBottom: isRecusadoOuCancelado ? '1px solid #fecaca' : '1px solid #f1f5f9',
+                          transition: 'background-color 0.2s'
                         }}
                       >
-                        <td className="col-chevron" onClick={() => toggleLinha(idUnico)}><ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: "#94a3b8" }} /></td>
+                        <td className="col-chevron" onClick={() => toggleLinha(idUnico)}>
+                          <ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: corTextoFraco }} />
+                        </td>
                         <td>
                           <div className="bloco-tipo-id">
-                            <span className={`badge-tipo ${obterClasseBadgeTipo(linha.tipo)} ${linha.entregaUrgente ? "badge-urgente-critico" : ""}`}>
-                              {linha.entregaUrgente ? <Zap size={13} color="#ef4444" fill="#ef4444" /> : <GitBranch size={13} />}
+                            <span className={`badge-tipo ${classeBadgeTipoAtual} ${linha.entregaUrgente ? "badge-urgente-critico" : ""}`}>
+                              {linha.entregaUrgente ? <Zap size={13} color="#ef4444" fill="#ef4444" /> : (isRecusadoOuCancelado ? <XCircle size={13} /> : <GitBranch size={13} />)}
                               {linha.tipo}
                             </span>
-                            <span style={{ fontSize: "0.875rem", fontWeight: "700", color: "#1e293b", marginTop: "4px", display: "block", fontFamily: "monospace" }}>{linha.prefixo}:{linha.id}</span>
+                            <span style={{ fontSize: "0.875rem", fontWeight: "700", color: corTextoForte, marginTop: "4px", display: "block", fontFamily: "monospace" }}>{linha.prefixo}:{linha.id}</span>
                           </div>
                         </td>
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                            <span style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "uppercase", fontWeight: "600" }}>{linha.solicitante}</span>
-                            {linha.wbs && <span style={{ fontSize: "0.75rem", color: "#2563eb", fontWeight: "500" }}>{linha.wbs}</span>}
+                            <span style={{ fontSize: "0.75rem", color: corTextoMedio, textTransform: "uppercase", fontWeight: "600" }}>{linha.solicitante}</span>
+                            {linha.wbs && <span style={{ fontSize: "0.75rem", color: corDestaque, fontWeight: "500" }}>{linha.wbs}</span>}
                           </div>
                         </td>
 
@@ -524,19 +531,18 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               closeAlert={closeAlert}
                             />
                           ) : (
-                            <span className="traco-vazio">—</span>
+                            <span className="traco-vazio" style={{ color: corTextoFraco }}>—</span>
                           )}
                         </td>
 
                         <td>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f1f5f9', color: corTextoMedio, padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#cbd5e1'}`, whiteSpace: 'nowrap' }}>
                             <MapPin size={12} /> {obterNomeFilialDinamico(linha.filial || linha.estoque)}
                           </span>
                         </td>
-                        <td className="texto-data">{linha.dataSolicitacao}</td>
+                        <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
 
                         <td>
-                          {/* ✨ O INPUT FOI ATUALIZADO PARA TYPE="DATETIME-LOCAL" */}
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                               <input
@@ -558,9 +564,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               />
                             </div>
                           ) : (
-                            linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—"
-                              ? <span className="texto-data-verde">{linha.dataEntrega}</span>
-                              : <span className="traco-vazio">—</span>
+                            <span style={{ color: linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? (isRecusadoOuCancelado ? "#dc2626" : "#10b981") : corTextoFraco }}>
+                              {linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? linha.dataEntrega : "—"}
+                            </span>
                           )}
                         </td>
 
