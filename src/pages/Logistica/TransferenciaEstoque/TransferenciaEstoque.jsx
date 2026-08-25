@@ -41,13 +41,14 @@ export default function TransferenciaEstoque() {
   // 1. BUSCA DE DADOS & TEMPO REAL
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (carregandoInicial) return; // Aguarda o contexto decidir a filial correta
+    if (carregandoInicial) return;
 
     const buscarTransferencias = async (silencioso = false) => {
       try {
         if (!silencioso) setCarregando(true);
         const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
         
+        // ✨ CORREÇÃO: Removemos o filtro de tipo da API para apanhar 'Transfer. WBS' e 'Transferencia WBS' e filtramos no frontend
         const resultado = await apiFetch(`/solicitacoes/listar?limit=1000&filial=${filialFiltro}&t=${Date.now()}`);
 
         if (resultado.sucesso) {
@@ -75,8 +76,8 @@ export default function TransferenciaEstoque() {
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
     socket.on('solicitacoes_atualizadas', () => {
-      console.log('⚡ Tempo Real: Uma transferência foi aprovada! A atualizar...');
-      buscarTransferencias(true); // Atualiza silenciosamente sem piscar a tela
+      console.log('⚡ Tempo Real: Uma transferência foi atualizada! A atualizar...');
+      buscarTransferencias(true); 
     });
 
     return () => socket.disconnect();
@@ -103,17 +104,17 @@ export default function TransferenciaEstoque() {
   // ---------------------------------------------------------------------------
   // 3. SELEÇÃO DE ITENS (CAIXAS DE SELEÇÃO)
   // ---------------------------------------------------------------------------
-  const toggleSelecao = (id, isAprovada) => {
+  const toggleSelecao = (idOriginal, isAprovada) => {
     if (!isAprovada) {
       showAlert("Atenção", "Esta transferência ainda está 'Pendente'. Vá ao Painel de Aprovação para a libertar antes de exportar.", "warning");
       return;
     }
 
     const novoSet = new Set(selecionadosIds);
-    if (novoSet.has(id)) {
-      novoSet.delete(id);
+    if (novoSet.has(idOriginal)) {
+      novoSet.delete(idOriginal);
     } else {
-      novoSet.add(id);
+      novoSet.add(idOriginal);
     }
     setSelecionadosIds(novoSet);
   };
@@ -122,7 +123,7 @@ export default function TransferenciaEstoque() {
     // Só seleciona as que já foram aprovadas pela logística
     const idsAprovados = transferenciasFiltradas
       .filter(t => t.status === 'Concluído' || t.status === 'Em Separação')
-      .map(t => t.id);
+      .map(t => t.idOriginal || t.id); // ✨ Garante que pega a ID correta!
     
     setSelecionadosIds(new Set(idsAprovados));
   };
@@ -137,7 +138,8 @@ export default function TransferenciaEstoque() {
   const itensConsolidados = useMemo(() => {
     const itens = [];
     solicitacoes.forEach(sol => {
-      if (selecionadosIds.has(sol.id) && sol.itens) {
+      const idReal = sol.idOriginal || sol.id;
+      if (selecionadosIds.has(idReal) && sol.itens) {
         sol.itens.forEach(item => {
           // Extraímos a origem e o destino do WBS
           const origemWBS = sol.wbs && sol.wbs.includes('➔') ? sol.wbs.split('➔')[0]?.trim() : '-';
@@ -234,7 +236,7 @@ export default function TransferenciaEstoque() {
       saveAs(blob, `Transferencias_Expedidas_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
       showAlert("Sucesso!", "O ficheiro Excel foi gerado. Use-o na página de 'Entrada de Estoque' da filial de destino.", "success");
-      limparSelecao(); 
+      limparSelecao(); // Limpa a seleção ao terminar
       
     } catch (error) {
       console.error("Erro ao gerar Excel:", error);
@@ -262,7 +264,7 @@ export default function TransferenciaEstoque() {
         <div className="transf-banner-conteudo">
           <h3>Como funciona a exportação?</h3>
           <ol>
-            <li>Selecione as transferências na lista à esquerda. <strong>(Pedidos Pendentes precisam ser aprovados primeiro)</strong></li>
+            <li>Selecione as transferências na lista à esquerda. <strong>(Pedidos Pendentes precisam ser aprovados primeiro no Painel de Aprovação)</strong></li>
             <li>Os itens de todas as transferências selecionadas são consolidados no painel à direita.</li>
             <li>Ao Exportar, o sistema gera o Excel no formato exato da página de <strong>Entrada de Estoque</strong>.</li>
             <li>Na filial de destino, basta fazer upload do Excel que a WBS e os rastreios são herdados automaticamente.</li>
@@ -316,18 +318,20 @@ export default function TransferenciaEstoque() {
               </div>
             ) : (
               transferenciasFiltradas.map(sol => {
+                const idReal = sol.idOriginal || sol.id;
                 const isAprovada = sol.status === 'Concluído' || sol.status === 'Em Separação';
-                const isSelected = isAprovada && selecionadosIds.has(sol.id);
+                const isSelected = isAprovada && selecionadosIds.has(idReal);
+                
                 const filialOrigem = sol.filial || 'N/D';
                 const wbsOrig = sol.wbs && sol.wbs.includes('➔') ? sol.wbs.split('➔')[0]?.trim() : '';
                 const destinoVisivel = sol.wbs && sol.wbs.includes('➔') ? sol.wbs.split('➔')[1]?.trim() : sol.wbs;
 
                 return (
                   <div 
-                    key={sol.id} 
+                    key={idReal} 
                     className={`transf-item ${isSelected ? 'selecionado' : ''}`}
                     style={{ opacity: isAprovada ? 1 : 0.65 }}
-                    onClick={() => toggleSelecao(sol.id, isAprovada)}
+                    onClick={() => toggleSelecao(idReal, isAprovada)}
                   >
                     <div className="transf-checkbox-container">
                       <input 
@@ -352,7 +356,6 @@ export default function TransferenciaEstoque() {
                       <div className="transf-linha-badges">
                         <span className="badge-item-count">{sol.itens?.length || 0} item(ns)</span>
                         
-                        {/* ✨ BADGE INTELIGENTE DE STATUS */}
                         {isAprovada ? (
                           <span className="badge-status-concluido" style={{ backgroundColor: '#ecfdf5', color: '#10b981', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '4px', fontSize: '0.70rem', fontWeight: '600' }}>{sol.status}</span>
                         ) : (

@@ -15,12 +15,8 @@ import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
 import { io } from 'socket.io-client';
 
-// ✨ FUNÇÃO: Força maiúsculas e permite que o utilizador coloque o hífen onde quiser
-const formatarWBS = (valor) => {
-  if (!valor) return '';
-  // Transforma em maiúsculas e aceita apenas letras, números e hífens
-  return valor.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-};
+// ✨ IMPORTAÇÃO DO NOSSO FORMATADOR CENTRALIZADO
+import { formatarWBS } from '../../../utils/formatadores';
 
 export default function MaterialEstoque() {
   const { estoqueAtual } = useContext(AuthContext);

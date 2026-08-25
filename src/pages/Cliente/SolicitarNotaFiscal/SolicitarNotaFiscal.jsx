@@ -2,21 +2,14 @@ import React, { useState, useContext } from 'react';
 import { User, FileText, Paperclip, Send, MapPin } from 'lucide-react'; 
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
-import { formatarDinheiroTempoReal } from '../../../utils/formatadores';
+// ✨ IMPORTAÇÃO CENTRALIZADA
+import { formatarDinheiroTempoReal, formatarWBS } from '../../../utils/formatadores';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { supabase } from '../../../supabaseClient';
 import { apiFetch } from '../../../services/api';
 
 import { useAlert } from '../../../contexts/AlertContext';
 import { AuthContext } from '../../../contexts/AuthContext';
-
-// ✨ FUNÇÃO: Formata o WBS em tempo real
-const formatarWBS = (valor) => {
-  if (!valor) return '';
-  const limpo = valor.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  if (limpo.length > 5) return `${limpo.slice(0, 5)}-${limpo.slice(5)}`;
-  return limpo;
-};
 
 export default function SolicitarNotaFiscal() {
   const { showAlert } = useAlert();
@@ -100,7 +93,7 @@ export default function SolicitarNotaFiscal() {
                 className="input-campo foco-roxo" 
                 placeholder="Ex: ABCDE-12345" 
                 value={formDados.wbs} 
-                // ✨ Formatação em tempo real
+                // ✨ Formatação em tempo real centralizada
                 onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} 
               />
             </div>

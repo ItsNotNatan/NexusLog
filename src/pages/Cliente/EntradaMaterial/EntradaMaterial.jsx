@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { User, Send, Paperclip, X, MapPin } from 'lucide-react'; // ✨ Adicionado MapPin
+import { User, Send, Paperclip, X, MapPin, AlertTriangle, Upload } from 'lucide-react'; 
 
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
@@ -12,15 +12,10 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { AlertContext } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 
-const LIMITE_CLIENTE = 20;
+// ✨ IMPORTAÇÃO DO NOSSO FORMATADOR CENTRALIZADO
+import { formatarWBS } from '../../../utils/formatadores';
 
-// ✨ FUNÇÃO: Formata o WBS em tempo real (Ex: ABCDE-12345)
-const formatarWBS = (valor) => {
-  if (!valor) return '';
-  const limpo = valor.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  if (limpo.length > 5) return `${limpo.slice(0, 5)}-${limpo.slice(5)}`;
-  return limpo;
-};
+const LIMITE_CLIENTE = 20;
 
 export default function EntradaMaterial() {
   const { estoqueAtual } = useContext(AuthContext);
@@ -44,7 +39,26 @@ export default function EntradaMaterial() {
 
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
+  const [anexoAutorizacao, setAnexoAutorizacao] = useState(null); 
+  
   const processador = useProcessadorExcel();
+
+  // ✨ LÓGICA DE DIVERGÊNCIA: Compara apenas o que está antes do primeiro hífen "-"
+  const prefixoWbsPrincipal = formDados.wbs.split('-')[0].trim().toUpperCase();
+  
+  const temWbsDivergente = itens.some(item => {
+    const itemWbs = (item.wbsElement || '').trim().toUpperCase();
+    if (itemWbs === '' || itemWbs === '-') return false;
+    const prefixoItemWbs = itemWbs.split('-')[0].trim().toUpperCase();
+    return prefixoWbsPrincipal !== '' && prefixoItemWbs !== prefixoWbsPrincipal;
+  });
+
+  // Limpa o anexo se a divergência for resolvida
+  useEffect(() => {
+    if (!temWbsDivergente && anexoAutorizacao) {
+      setAnexoAutorizacao(null);
+    }
+  }, [temWbsDivergente, anexoAutorizacao]);
 
   const handleImportarExcel = async (arquivo) => {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
@@ -109,9 +123,17 @@ export default function EntradaMaterial() {
       showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.", "warning");
       return;
     }
+    
+    // ✨ TRAVA DE SEGURANÇA
+    if (temWbsDivergente && !anexoAutorizacao) {
+      showAlert("Autorização Pendente", "Como existe divergência no prefixo da WBS nos itens, é obrigatório anexar a autorização do responsável no banner amarelo.", "warning");
+      return;
+    }
 
     try {
       const anexosProcessados = [];
+      
+      // 1. Sobe os anexos normais
       if (anexos.length > 0) {
         for (const arquivo of anexos) {
           const extensao = arquivo.name.split('.').pop();
@@ -127,6 +149,20 @@ export default function EntradaMaterial() {
         }
       }
 
+      // ✨ 2. Sobe o anexo de autorização WBS
+      if (temWbsDivergente && anexoAutorizacao) {
+        const extensao = anexoAutorizacao.name.split('.').pop();
+        const caminhoNoStorage = `uploads/auth-wbs-${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
+        const { error: erroUploadAuth } = await supabase.storage.from('documentos').upload(caminhoNoStorage, anexoAutorizacao);
+
+        if (erroUploadAuth) {
+          showAlert("Erro de Autorização", `Falha ao anexar o documento de autorização.`, "error");
+          return;
+        }
+        const { data: linkAuth } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
+        anexosProcessados.push({ nome_arquivo: `[AUTORIZAÇÃO WBS] ${anexoAutorizacao.name}`, url_arquivo: linkAuth.publicUrl });
+      }
+
       const payload = {
         solicitante: { ...formDados, filial_id: estoqueAtual, tipo: 'Entrada' },
         itens: itens.map(item => ({
@@ -140,7 +176,7 @@ export default function EntradaMaterial() {
       if (dados.sucesso || dados.ps || dados.ps_id) {
         showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps || dados.ps_id}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
-        setItens([]); setAnexos([]);
+        setItens([]); setAnexos([]); setAnexoAutorizacao(null);
       } else {
         showAlert("Erro no Servidor", dados.erro, "error");
       }
@@ -173,11 +209,9 @@ export default function EntradaMaterial() {
               className="input-campo foco-verde" 
               placeholder="Ex: ABCDE-12345" 
               value={formDados.wbs} 
-              // ✨ Formatação em tempo real!
               onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} 
             />
           </div>
-          {/* ✨ FILIAL DE ORIGEM */}
           <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
             <div className="input-wrapper-fixo">
@@ -211,6 +245,61 @@ export default function EntradaMaterial() {
           )}
         </div>
       </div>
+
+      {/* ✨ BANNER DE WBS DIVERGENTE COM O EXATO VISUAL DA IMAGEM */}
+      {temWbsDivergente && (
+        <div style={{ 
+          backgroundColor: '#fffbeb', 
+          border: '1px solid #fde68a', 
+          borderRadius: '8px', 
+          padding: '16px', 
+          marginBottom: '24px',
+          animation: 'fadeIn 0.3s ease-in-out'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', marginBottom: '8px' }}>
+            <AlertTriangle size={20} />
+            <strong style={{ fontSize: '1rem' }}>Atenção: WBS Divergente</strong>
+          </div>
+          <p style={{ color: '#78350f', fontSize: '0.875rem', marginBottom: '16px', marginTop: 0 }}>
+            Um ou mais itens pertencem a um macro-projeto (prefixo) diferente da WBS informada. É necessário anexar a autorização do responsável.
+          </p>
+          
+          {!anexoAutorizacao ? (
+            <div style={{ 
+              border: '1px dashed #fcd34d', 
+              borderRadius: '8px', 
+              backgroundColor: '#fffbeb',
+              transition: 'all 0.2s',
+              overflow: 'hidden'
+            }}>
+              <CarregarArquivo 
+                variante="area" 
+                accept=".pdf, .jpg, .png, .jpeg, .msg" 
+                label="Anexar autorização do responsável (obrigatório)" 
+                icone={<Upload size={20} color="#f59e0b" />} 
+                onFileSelect={(file) => setAnexoAutorizacao(file)} 
+              />
+            </div>
+          ) : (
+            <div style={{ 
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+              backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '8px', 
+              border: '1px solid #fcd34d' 
+            }}>
+              <span style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: '600' }}>
+                {anexoAutorizacao.name}
+              </span>
+              <button 
+                onClick={() => setAnexoAutorizacao(null)} 
+                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }}
+                title="Remover autorização"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <TabelaInsercaoItens
         itens={itens} dataMinima={dataMinima} mostrarDataNecessidade={true} mostrarExemploExcel={true}
