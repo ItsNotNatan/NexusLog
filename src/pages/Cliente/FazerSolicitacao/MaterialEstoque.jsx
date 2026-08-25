@@ -1,24 +1,25 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/FazerSolicitacao/MaterialEstoque.jsx
-// DESCRIÇÃO: Ecrã para solicitar material do estoque com TEMPO REAL
+// DESCRIÇÃO: Ecrã para solicitar material do estoque com TEMPO REAL e Verificação de WBS (Prefixo)
 // =================================================================
 import React, { useState, useEffect, useContext } from "react";
-import { User, MapPin, Calendar, Send, Zap, AlertTriangle } from "lucide-react";
+import { User, MapPin, Calendar, Send, Zap, AlertTriangle, Upload, X } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
 import { AlertContext } from '../../../contexts/AlertContext';
 
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral";
+import CarregarArquivo from "../../../components/CarregarArquivo/CarregarArquivo"; 
 import { supabase } from "../../../supabaseClient";
 import { apiFetch } from '../../../services/api';
-import { io } from 'socket.io-client'; // ✨ IMPORTAÇÃO DO SOCKET.IO
+import { io } from 'socket.io-client';
 
+// ✨ FUNÇÃO: Força maiúsculas e permite que o utilizador coloque o hífen onde quiser
 const formatarWBS = (valor) => {
   if (!valor) return '';
-  const limpo = valor.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  if (limpo.length > 5) return `${limpo.slice(0, 5)}-${limpo.slice(5)}`;
-  return limpo;
+  // Transforma em maiúsculas e aceita apenas letras, números e hífens
+  return valor.toUpperCase().replace(/[^A-Z0-9-]/g, '');
 };
 
 export default function MaterialEstoque() {
@@ -33,6 +34,7 @@ export default function MaterialEstoque() {
   const [dataMinima, setDataMinima] = useState("");
   const [itensSelecionados, setItensSelecionados] = useState([]);
   const [anexos, setAnexos] = useState([]);
+  const [anexoAutorizacao, setAnexoAutorizacao] = useState(null); 
   const [estoqueDisponivel, setEstoqueDisponivel] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
@@ -42,7 +44,29 @@ export default function MaterialEstoque() {
     setDataMinima(new Date(hoje.getTime() - timezoneOffset).toISOString().split("T")[0]);
   }, []);
 
-  // ✨ ATUALIZADO: Buscar dados e ligar o radar em tempo real
+  // ✨ NOVA LÓGICA DE DIVERGÊNCIA: Compara apenas o que está antes do primeiro hífen "-"
+  const prefixoWbsPrincipal = formDados.wbs.split('-')[0].trim().toUpperCase();
+  
+  const temWbsDivergente = itensSelecionados.some(item => {
+    const itemWbs = (item.wbs || item.wbs_element || '').trim().toUpperCase();
+    
+    // Se o item não tem WBS definido, ignora a divergência
+    if (itemWbs === '' || itemWbs === '-') return false;
+    
+    const prefixoItemWbs = itemWbs.split('-')[0].trim().toUpperCase();
+    
+    // Só acusa divergência se o form tiver WBS e os prefixos forem efetivamente diferentes
+    return prefixoWbsPrincipal !== '' && prefixoItemWbs !== prefixoWbsPrincipal;
+  });
+
+  // Limpa o anexo se a divergência for resolvida (ex: cliente remove o item divergente)
+  useEffect(() => {
+    if (!temWbsDivergente && anexoAutorizacao) {
+      setAnexoAutorizacao(null);
+    }
+  }, [temWbsDivergente, anexoAutorizacao]);
+
+  // Buscar dados e ligar o radar em tempo real
   useEffect(() => {
     const buscarEstoqueReal = async () => {
       try {
@@ -68,7 +92,7 @@ export default function MaterialEstoque() {
 
           setEstoqueDisponivel(itensComSaldo);
 
-          // ✨ SINCRONIZA O CARRINHO EM TEMPO REAL: Atualiza a lista da direita se houver mudanças no backend
+          // Sincroniza o carrinho
           setItensSelecionados(prevSelecionados => 
             prevSelecionados.map(selecionado => {
               const itemFresco = itensComSaldo.find(i => i.idBD === selecionado.estoque_id);
@@ -76,7 +100,6 @@ export default function MaterialEstoque() {
                 const saldoLivreNovo = itemFresco.qtdFornecida - (itemFresco.qtdReservada || 0);
                 let novaQtdSelecionada = selecionado.qtdSelecionada;
                 
-                // Se a quantidade nova livre for menor que o que estava digitado, corrige o input automaticamente
                 if (novaQtdSelecionada > saldoLivreNovo) {
                   novaQtdSelecionada = saldoLivreNovo > 0 ? saldoLivreNovo : 1;
                 }
@@ -98,20 +121,12 @@ export default function MaterialEstoque() {
     
     buscarEstoqueReal();
 
-    // ✨ CONFIGURAÇÃO DO SOCKET.IO (ESCUTA ATIVA)
     const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
-    socket.on('estoque_atualizado', () => {
-      console.log('⚡ Tempo Real: Estoque atualizado no servidor!');
-      buscarEstoqueReal();
-    });
-
-    socket.on('solicitacoes_atualizadas', () => {
-      console.log('⚡ Tempo Real: Reservas atualizadas no servidor!');
-      buscarEstoqueReal();
-    });
+    socket.on('estoque_atualizado', () => { buscarEstoqueReal(); });
+    socket.on('solicitacoes_atualizadas', () => { buscarEstoqueReal(); });
 
     return () => socket.disconnect();
   }, [estoqueAtual]);
@@ -155,29 +170,53 @@ export default function MaterialEstoque() {
     if (itensSelecionados.length === 0) { showAlert("Lista Vazia", "Adicione um item.", "warning"); return; }
     if (itensSelecionados.some(i => !i.qtdSelecionada)) { showAlert("Incompleto", "Verifique as quantidades.", "warning"); return; }
 
-    const anexosProcessados = [];
-    if (anexos.length > 0) {
-      for (const arquivo of anexos) {
-        const extensao = arquivo.name.split(".").pop();
-        const caminhoNoStorage = `uploads/${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
-        const { error: erroUpload } = await supabase.storage.from("documentos").upload(caminhoNoStorage, arquivo);
-        if (erroUpload) { showAlert("Erro Anexo", `Falha: ${arquivo.name}`, "error"); return; }
-        const { data: linkPublico } = supabase.storage.from("documentos").getPublicUrl(caminhoNoStorage);
-        anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
-      }
+    // Trava de Segurança da Autorização WBS
+    if (temWbsDivergente && !anexoAutorizacao) {
+      showAlert("Autorização Pendente", "Como existe divergência no prefixo da WBS nos itens, é obrigatório anexar a autorização do responsável no banner amarelo.", "warning");
+      return;
     }
 
-    let observacoesFinais = formDados.observacoes;
-    if (formDados.entregaUrgente) observacoesFinais = `[URGÊNCIA: ${formDados.justificativaUrgencia}] ${observacoesFinais}`;
-
-    const payload = { solicitante: { ...formDados, observacoes: observacoesFinais, filial_origem: estoqueAtual }, itens: itensSelecionados, anexos: anexosProcessados };
-
+    const anexosProcessados = [];
+    
     try {
+      // 1. Sobe os anexos normais
+      if (anexos.length > 0) {
+        for (const arquivo of anexos) {
+          const extensao = arquivo.name.split(".").pop();
+          const caminhoNoStorage = `uploads/${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
+          const { error: erroUpload } = await supabase.storage.from("documentos").upload(caminhoNoStorage, arquivo);
+          if (erroUpload) { showAlert("Erro Anexo", `Falha: ${arquivo.name}`, "error"); return; }
+          const { data: linkPublico } = supabase.storage.from("documentos").getPublicUrl(caminhoNoStorage);
+          anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
+        }
+      }
+
+      // 2. Sobe o anexo de autorização WBS com uma tag especial no nome
+      if (temWbsDivergente && anexoAutorizacao) {
+        const extensao = anexoAutorizacao.name.split('.').pop();
+        const caminhoNoStorage = `uploads/auth-wbs-${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
+        const { error: erroUploadAuth } = await supabase.storage.from('documentos').upload(caminhoNoStorage, anexoAutorizacao);
+
+        if (erroUploadAuth) {
+          showAlert("Erro de Autorização", `Falha ao anexar o documento de autorização.`, "error");
+          return;
+        }
+        const { data: linkAuth } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
+        anexosProcessados.push({ nome_arquivo: `[AUTORIZAÇÃO WBS] ${anexoAutorizacao.name}`, url_arquivo: linkAuth.publicUrl });
+      }
+
+      let observacoesFinais = formDados.observacoes;
+      if (formDados.entregaUrgente) observacoesFinais = `[URGÊNCIA: ${formDados.justificativaUrgencia}] ${observacoesFinais}`;
+
+      const payload = { solicitante: { ...formDados, observacoes: observacoesFinais, filial_origem: estoqueAtual }, itens: itensSelecionados, anexos: anexosProcessados };
+
       const dados = await apiFetch("/solicitacoes/material", { method: "POST", body: JSON.stringify(payload) });
       if (dados.sucesso || dados.ps) {
         showAlert("Sucesso!", `Solicitação criada: ${dados.ps || dados.ps_id}`, "success");
         setFormDados({ nome: "", wbs: "", destino: "", dataNecessidade: "", observacoes: "", entregaUrgente: false, justificativaUrgencia: "" });
-        setItensSelecionados([]); setAnexos([]);
+        setItensSelecionados([]); 
+        setAnexos([]);
+        setAnexoAutorizacao(null);
       } else { showAlert("Erro Servidor", dados.erro, "error"); }
     } catch (error) { showAlert("Erro Conexão", "Falha no servidor.", "error"); }
   };
@@ -199,80 +238,50 @@ export default function MaterialEstoque() {
         
         <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} />
         
-        {/* ✨ CAIXA DE URGÊNCIA - MODO TERROR CORPORATIVO */}
         <div style={{ 
-          padding: "20px", 
-          border: formDados.entregaUrgente ? "2px dashed #dc2626" : "1px solid #cbd5e1", 
-          borderRadius: "8px", 
-          backgroundColor: formDados.entregaUrgente ? "#fef2f2" : "#f8fafc", 
-          marginTop: "20px", 
-          transition: "all 0.3s ease" 
+          padding: "20px", border: formDados.entregaUrgente ? "2px dashed #dc2626" : "1px solid #cbd5e1", 
+          borderRadius: "8px", backgroundColor: formDados.entregaUrgente ? "#fef2f2" : "#f8fafc", 
+          marginTop: "20px", transition: "all 0.3s ease" 
         }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", width: "100%" }}>
             <input 
-              type="checkbox" 
-              id="checkbox-urgente" 
-              checked={formDados.entregaUrgente} 
+              type="checkbox" id="checkbox-urgente" checked={formDados.entregaUrgente} 
               onChange={(e) => setFormDados({ ...formDados, entregaUrgente: e.target.checked, justificativaUrgencia: "" })} 
-              style={{ 
-                marginTop: "4px", 
-                width: "20px", 
-                height: "20px", 
-                cursor: "pointer", 
-                accentColor: "#dc2626" 
-              }} 
+              style={{ marginTop: "4px", width: "20px", height: "20px", cursor: "pointer", accentColor: "#dc2626" }} 
             />
             <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-              
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 {formDados.entregaUrgente ? <AlertTriangle size={20} color="#dc2626" /> : <Zap size={18} color="#475569" />}
                 <label 
                   htmlFor="checkbox-urgente" 
                   style={{ 
-                    fontWeight: formDados.entregaUrgente ? "900" : "600", 
-                    color: formDados.entregaUrgente ? "#991b1b" : "#0f172a", 
-                    cursor: "pointer",
-                    fontSize: formDados.entregaUrgente ? "1.1rem" : "0.9rem",
-                    textTransform: formDados.entregaUrgente ? "uppercase" : "none"
+                    fontWeight: formDados.entregaUrgente ? "900" : "600", color: formDados.entregaUrgente ? "#991b1b" : "#0f172a", 
+                    cursor: "pointer", fontSize: formDados.entregaUrgente ? "1.1rem" : "0.9rem", textTransform: formDados.entregaUrgente ? "uppercase" : "none"
                   }}
                 > 
                   {formDados.entregaUrgente ? "Sinalizar Falha de Planejamento (URGÊNCIA)" : "Entrega Urgente / Atraso"} 
                 </label>
               </div>
-
               {!formDados.entregaUrgente && (
                 <span style={{ fontSize: "0.85rem", color: "#64748b", marginTop: "4px" }}> 
                   Marque apenas se houver uma urgência real ou atraso na obra.
                 </span>
               )}
-
               {formDados.entregaUrgente && (
                 <div style={{ marginTop: "16px", width: "100%", animation: "fadeIn 0.3s ease" }}>
-                  
-                  {/* Bloco de advertência severa */}
                   <div style={{ backgroundColor: "#fee2e2", borderLeft: "4px solid #dc2626", padding: "12px 16px", marginBottom: "20px", borderRadius: "0 4px 4px 0" }}>
                     <p style={{ margin: 0, fontSize: "0.85rem", color: "#7f1d1d", fontWeight: "600", lineHeight: "1.5" }}>
                       ATENÇÃO: A marcação de urgência fura a fila padrão de processamento logístico e será tratada como uma quebra do fluxo normal. Este registo será diretamente reportado aos Administradores.
                     </p>
                   </div>
-
                   <label style={{ fontSize: "0.80rem", fontWeight: "800", color: "#991b1b", marginBottom: "8px", display: "block" }}> 
                     JUSTIFIQUE A FALHA DE PLANEJAMENTO * 
                   </label>
                   <textarea 
                     className="input-campo" 
-                    placeholder="Por que você não conseguiu se planejar a tempo? Justifique detalhadamente o motivo da falha." 
-                    rows="4" 
-                    value={formDados.justificativaUrgencia} 
-                    onChange={(e) => setFormDados({ ...formDados, justificativaUrgencia: e.target.value })} 
-                    style={{ 
-                      borderColor: "#ef4444", 
-                      backgroundColor: "#ffffff",
-                      color: "#450a0a",
-                      outlineColor: "#dc2626",
-                      boxShadow: "inset 0 1px 3px rgba(220,38,38,0.1)",
-                      fontWeight: "500"
-                    }}
+                    placeholder="Por que você não conseguiu se planejar a tempo? Justifique detalhadamente o motivo da falha e o impacto direto caso o material não seja entregue." 
+                    rows="4" value={formDados.justificativaUrgencia} onChange={(e) => setFormDados({ ...formDados, justificativaUrgencia: e.target.value })} 
+                    style={{ borderColor: "#ef4444", backgroundColor: "#ffffff", color: "#450a0a", outlineColor: "#dc2626", boxShadow: "inset 0 1px 3px rgba(220,38,38,0.1)", fontWeight: "500" }}
                   ></textarea>
                 </div>
               )}
@@ -281,11 +290,66 @@ export default function MaterialEstoque() {
         </div>
       </div>
 
+      {/* ✨ BANNER DE WBS DIVERGENTE COM LÓGICA DE PREFIXO */}
+      {temWbsDivergente && (
+        <div style={{ 
+          backgroundColor: '#fffbeb', 
+          border: '1px solid #fde68a', 
+          borderRadius: '8px', 
+          padding: '16px', 
+          marginTop: '24px',
+          animation: 'fadeIn 0.3s ease-in-out'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', marginBottom: '8px' }}>
+            <AlertTriangle size={20} />
+            <strong style={{ fontSize: '1rem' }}>Atenção: WBS Divergente</strong>
+          </div>
+          <p style={{ color: '#78350f', fontSize: '0.875rem', marginBottom: '16px', marginTop: 0 }}>
+            Um ou mais itens pertencem a um macro-projeto (prefixo) diferente da WBS informada. É necessário anexar a autorização do responsável.
+          </p>
+          
+          {!anexoAutorizacao ? (
+            <div style={{ 
+              border: '1px dashed #fcd34d', 
+              borderRadius: '8px', 
+              backgroundColor: '#fffbeb',
+              transition: 'all 0.2s',
+              overflow: 'hidden'
+            }}>
+              <CarregarArquivo 
+                variante="area" 
+                accept=".pdf, .jpg, .png, .jpeg, .msg" 
+                label="Anexar autorização do responsável (obrigatório)" 
+                icone={<Upload size={20} color="#f59e0b" />} 
+                onFileSelect={(file) => setAnexoAutorizacao(file)} 
+              />
+            </div>
+          ) : (
+            <div style={{ 
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+              backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '8px', 
+              border: '1px solid #fcd34d' 
+            }}>
+              <span style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: '600' }}>
+                {anexoAutorizacao.name}
+              </span>
+              <button 
+                onClick={() => setAnexoAutorizacao(null)} 
+                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }}
+                title="Remover autorização"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ marginTop: "24px", marginBottom: "24px" }}>
         <SeletorEstoqueLateral
           estoque={estoqueDisponivel}
           carregando={carregandoEstoque}
-          itensSelecionados={itensSelecionados} 
+          itensSelecionados={listaSegura} 
           onAdicionarItem={adicionarItemDoEstoque}
           onRemoverItem={removerItem}
           onAtualizarQuantidade={atualizarCampo}
