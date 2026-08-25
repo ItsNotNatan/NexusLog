@@ -161,15 +161,37 @@ export default function EntradaMaterial() {
         anexosProcessados.push({ nome_arquivo: `[AUTORIZAÇÃO WBS] ${anexoAutorizacao.name}`, url_arquivo: linkAuth.publicUrl });
       }
 
-      const payload = {
-        solicitante: { ...formDados, filial_id: estoqueAtual, tipo: 'Entrada' },
+const payload = {
+        solicitante: { 
+          ...formDados, 
+          filial_id: estoqueAtual, 
+          tipo: 'Entrada' 
+        },
+        // ✨ MAPEAMENTO CIRÚRGICO: Traduz o Frontend para o idioma do Backend
         itens: itens.map(item => ({
-          ...item, 
-          qtd: item.qtdFornecida, 
-          desenhoSAP: item.desenhoSAP || '-', 
-          referencia: item.referencia || null, 
-          materialDescription: item.vendorDescription || 'Sem descrição',
-          nomeProjeto: item.nomeProjeto || '-' // ✨ INCLUÍDO AQUI
+          desenho_sap: item.desenhoSAP || '-',
+          part_number: item.numPecaFabricante || '-',
+          fornecedor: item.fornecedor || null,
+          referencia: item.referencia || null,
+          
+          qtd: item.qtdFornecida || 1, // A quantidade real
+          unidade_medida: item.unidadeMedida || 'Unid',
+          
+          nf_entrada: item.nfEntrada || null,
+          descricao: item.vendorDescription || 'Sem descrição',
+          materialDescription: item.vendorDescription || 'Sem descrição', // Mantemos os dois por segurança caso o backend use este
+          
+          wbs_element: item.wbsElement || '-',
+          nome_projeto: item.nomeProjeto || null,
+          
+          emissao_nf: item.emissaoNF || null,
+          receb_nf: item.recebNF || null,
+          documento_compras: item.docCompras || null,
+          valor_unitario: item.poNetPrice || null,
+          
+          centro: item.centro || null,
+          deposito: item.deposito || null,
+          alocacao: item.alocacao || null
         })),
         anexos: anexosProcessados
       };

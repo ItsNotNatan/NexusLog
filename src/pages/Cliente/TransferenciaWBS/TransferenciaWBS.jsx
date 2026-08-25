@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/TransferenciaWBS/TransferenciaWBS.jsx
-// DESCRIÇÃO: Ecrã de transferência com anexo OBRIGATÓRIO e formatação WBS
+// DESCRIÇÃO: Ecrã de transferência com anexo opcional e formatação WBS
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './TransferenciaWBS.css';
@@ -27,7 +27,6 @@ export default function TransferenciaWBS() {
   const [estoqueReal, setEstoqueReal] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
-  // Buscar dados e ligar o radar em tempo real
   useEffect(() => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       setEstoqueReal([]); setCarregandoEstoque(false); return;
@@ -40,7 +39,6 @@ export default function TransferenciaWBS() {
           const itensComSaldo = resultado.dados.filter(item => item.quantidade_disponivel > 0);
           setEstoqueReal(itensComSaldo);
 
-          // SINCRONIZA O CARRINHO EM TEMPO REAL
           setItensSelecionados(prevSelecionados => 
             prevSelecionados.map(selecionado => {
               const itemFresco = itensComSaldo.find(i => i.id === selecionado.id);
@@ -69,7 +67,6 @@ export default function TransferenciaWBS() {
     
     carregarEstoque();
 
-    // CONFIGURAÇÃO DO SOCKET.IO
     const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
@@ -113,12 +110,6 @@ export default function TransferenciaWBS() {
     if (!estoqueAtual || estoqueAtual === 'TODOS') { showAlert("Atenção", "Selecione uma filial de origem.", "warning"); return; }
     if (!formDados.nome || !formDados.wbsDestino) { showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS de Destino.", "warning"); return; }
     if (itensSelecionados.length === 0) { showAlert("Carrinho Vazio", "Selecione pelo menos um item para transferir.", "warning"); return; }
-
-    // ✨ VALIDAÇÃO: Bloqueia o envio se o anexo não for colocado
-    if (anexos.length === 0) {
-      showAlert("Anexo Obrigatório", "É obrigatório anexar o documento de suporte ou autorização para realizar a Transferência de WBS.", "warning");
-      return;
-    }
 
     const anexosProcessados = [];
     if (anexos.length > 0) {
@@ -168,7 +159,6 @@ export default function TransferenciaWBS() {
               className="input-campo" 
               placeholder="WBS do projeto destino" 
               value={formDados.wbsDestino} 
-              // ✨ UTILIZAÇÃO DO FORMATADOR AUTOMÁTICO AQUI
               onChange={(e) => setFormDados({...formDados, wbsDestino: formatarWBS(e.target.value)})} 
             />
           </div>
@@ -186,8 +176,8 @@ export default function TransferenciaWBS() {
           </div>
         </div>
         
-        {/* ✨ TÍTULO ATUALIZADO PARA DEIXAR CLARO QUE É OBRIGATÓRIO */}
-        <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} titulo="ANEXOS (OBRIGATÓRIO)" />
+        {/* ✨ ANEXOS OPCIONAIS NOVAMENTE */}
+        <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} titulo="ANEXOS (OPCIONAL)" />
       </div>
 
       <div style={{ marginTop: "24px", marginBottom: "24px" }}>
