@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/components/TabelaInsercaoItens/TabelaInsercaoItens.jsx
-// DESCRIÇÃO: Tabela componentizada para entrada de itens (Limpa e Segura)
+// DESCRIÇÃO: Tabela componentizada para entrada de itens
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
@@ -14,6 +14,7 @@ import { formatarDinheiroTempoReal } from '../../utils/formatadores';
 export default function TabelaInsercaoItens({
   itens,
   limiteLinhas = 20, 
+  bloquearWBS = false, // ✨ NOVA PROP: Define se a coluna WBS pode ser editada ou não
   onAtualizarCampo,
   onRemoverItem,
   onAdicionarLinha,
@@ -108,7 +109,6 @@ export default function TabelaInsercaoItens({
             <thead>
               <tr>
                 <th style={{ width: '60px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
-                
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ minWidth: '200px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESCRIÇÃO</th>
@@ -153,7 +153,6 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela badge-partnumber" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', fontWeight: '600' }} value={item.numPecaFabricante} onChange={(e) => onAtualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
                   </td>
 
-                  {/* ✨ CAMPO DE QUANTIDADE REFORMULADO: SETINHAS VISÍVEIS E BLOQUEIOS RÍGIDOS */}
                   <td style={{ padding: '8px', textAlign: 'center' }}>
                     <input 
                       type="number" 
@@ -167,20 +166,14 @@ export default function TabelaInsercaoItens({
                       }} 
                       value={item.qtdFornecida} 
                       onKeyDown={(e) => {
-                        // Bloqueia ponto, vírgula, sinal de menos, 'e' e 'E'
-                        if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') {
-                          e.preventDefault();
-                        }
+                        if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
                       }}
                       onBlur={(e) => {
-                        // Se o utilizador apagar o número e sair do campo, volta a 1 automaticamente
-                        if (!e.target.value || parseInt(e.target.value, 10) < 1) {
-                          onAtualizarCampo(item.id, 'qtdFornecida', 1);
-                        }
+                        if (!e.target.value || parseInt(e.target.value, 10) < 1) onAtualizarCampo(item.id, 'qtdFornecida', 1);
                       }}
                       onChange={(e) => {
                         let val = e.target.value;
-                        if (val === '0') val = '1'; // Não permite que o utilizador comece a digitar 0
+                        if (val === '0') val = '1';
                         onAtualizarCampo(item.id, 'qtdFornecida', val);
                       }} 
                       placeholder="1" 
@@ -206,8 +199,21 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                   </td>
 
+                  {/* ✨ COLUNA WBS COM BLOQUEIO CONDICIONAL */}
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela link-azul-fake" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#2563eb', fontFamily: 'monospace' }} value={item.wbsElement} onChange={(e) => onAtualizarCampo(item.id, 'wbsElement', e.target.value)} placeholder="WBS" />
+                    <input 
+                      className="input-editavel-tabela link-azul-fake" 
+                      style={{ 
+                        width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', 
+                        color: '#2563eb', fontFamily: 'monospace',
+                        cursor: bloquearWBS ? 'not-allowed' : 'text', 
+                        opacity: bloquearWBS ? 0.6 : 1
+                      }} 
+                      value={item.wbsElement || ''} 
+                      readOnly={bloquearWBS}
+                      onChange={(e) => !bloquearWBS && onAtualizarCampo(item.id, 'wbsElement', e.target.value)} 
+                      placeholder="WBS" 
+                    />
                   </td>
 
                   <td style={{ padding: '8px' }}>

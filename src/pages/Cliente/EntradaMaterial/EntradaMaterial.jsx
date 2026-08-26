@@ -1,4 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
+// =================================================================
+// ARQUIVO: src/pages/Cliente/EntradaMaterial/EntradaMaterial.jsx
+// DESCRIÇÃO: Ecrã para solicitar Entrada de Material no Estoque
+// =================================================================
+import React, { useState, useContext } from 'react';
 import { User, Send, Paperclip, X, MapPin } from 'lucide-react'; 
 
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
@@ -21,25 +25,51 @@ export default function EntradaMaterial() {
   const { showAlert } = useContext(AlertContext);
 
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', observacoes: '' });
-  const [dataMinima, setDataMinima] = useState('');
-
-  useEffect(() => {
-    const hoje = new Date();
-    const timezoneOffset = hoje.getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(hoje.getTime() - timezoneOffset)).toISOString().split('T')[0];
-    setDataMinima(localISOTime);
-  }, []);
-
-  const gerarLinhaVazia = () => ({
-    id: `linha-vazia-${Date.now()}-${Math.random()}`, desenhoSAP: '', numPecaFabricante: '', fornecedor: '',
-    referencia: '', qtdFornecida: 1, nfEntrada: '', unidadeMedida: 'Unid', vendorDescription: '',
-    wbsElement: '', nomeProjeto: '', dataNecessidade: '', emissaoNF: '', recebNF: '', docCompras: '', poNetPrice: '', centro: '', deposito: '', alocacao: ''
-  });
-
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
   
   const processador = useProcessadorExcel();
+
+  // ✨ ESTRUTURA ATUALIZADA: Sem data de necessidade
+  const gerarLinhaVazia = () => ({
+    id: `linha-vazia-${Date.now()}-${Math.random()}`, 
+    desenhoSAP: '', 
+    numPecaFabricante: '', 
+    fornecedor: '',
+    referencia: '', 
+    qtdFornecida: 1, 
+    nfEntrada: '', 
+    unidadeMedida: 'Unid', 
+    vendorDescription: '',
+    wbsElement: formDados.wbs || '', // Nasce logo com o WBS que estiver em cima
+    nomeProjeto: '', 
+    emissaoNF: '', 
+    recebNF: '', 
+    docCompras: '', 
+    poNetPrice: '', 
+    centro: '', 
+    deposito: '', 
+    alocacao: ''
+  });
+
+  // ✨ ESPELHAMENTO WBS 1: Quando o cliente altera o WBS principal, atualiza a tabela inteira!
+  const handleWbsGlobalChange = (e) => {
+    const novoWbs = formatarWBS(e.target.value);
+    setFormDados({ ...formDados, wbs: novoWbs });
+    setItens(prevItens => prevItens.map(it => ({ ...it, wbsElement: novoWbs })));
+  };
+
+  // ✨ FUNÇÃO "À PROVA DE BALAS": Encontra a coluna independentemente de espaços ou acentos!
+  const obterValor = (itemExcel, palavrasChave) => {
+    const chavesReais = Object.keys(itemExcel);
+    for (const palavra of palavrasChave) {
+      const chaveEncontrada = chavesReais.find(k => k.trim().toUpperCase().includes(palavra));
+      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined) {
+        return itemExcel[chaveEncontrada];
+      }
+    }
+    return '';
+  };
 
   const handleImportarExcel = async (arquivo) => {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
@@ -47,29 +77,43 @@ export default function EntradaMaterial() {
       
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: item['NUM SAP | DESENHO'] || item['Desenho SAP'] || item.desenhoSAP || '',
-        referencia: item['REFERÊNCIA'] || item['Referência'] || item.referencia || '',
-        vendorDescription: item['DESCRIÇÃO'] || item['Vendor Description'] || item.vendorDescription || '',
-        numPecaFabricante: item['FABRICANTE'] || item['Nº peça fabricante'] || item.numPecaFabricante || '',
-        qtdFornecida: item['QTDE ENTRADA'] || item['Qtd.fornecida'] || item.qtdFornecida || 1,
-        unidadeMedida: item['UNID. MEDIDA'] || item['Unidade de medida'] || item.unidadeMedida || 'Unid',
-        nfEntrada: item['NUM DA NOTA FISCAL'] || item['NF DE ENTRADA'] || item.nfEntrada || '',
-        fornecedor: item['FORNECEDOR / REGISTRO'] || item['FORNECEDOR'] || item.fornecedor || '',
-        wbsElement: item['CENTRO DE CUSTO - WBS'] || item['WBS Element'] || item.wbs || '',
-        nomeProjeto: item['NOME CENTRO DE CUSTO / PROJETO'] || item.nomeProjeto || '',
-        dataNecessidade: item['Data de Necessidade'] || item.dataNecessidade || '',
-        emissaoNF: item['EMISSÃO NF'] || item.emissaoNF || '',
-        recebNF: item['RECEB. NF'] || item.recebNF || '',
-        docCompras: item['Nº PEDIDO DE COMPRA / CPV'] || item['Documento de compras'] || item.docCompras || '',
-        poNetPrice: item['VLR. UNITÁRIO NOTA FISCAL'] || item['PO Net Price'] || item.poNetPrice || '',
-        centro: item['FILIAL'] || item['Centro'] || item.centro || '',
-        deposito: item['DEPÓSITO'] || item['Depósito'] || item.deposito || '',
-        alocacao: item['ALOCAÇÃO'] || item['Alocação'] || item.alocacao || ''
+        desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO SAP', 'SAP']),
+        referencia: obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
+        vendorDescription: obterValor(item, ['DESCRIÇÃO', 'DESCRICAO']),
+        numPecaFabricante: obterValor(item, ['FABRICANTE', 'Nº PEÇA', 'PART NUMBER', 'PN']),
+        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
+        unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid',
+        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']),
+        fornecedor: obterValor(item, ['FORNECEDOR']),
+        wbsElement: obterValor(item, ['CENTRO DE CUSTO - WBS', 'WBS']),
+        nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
+        emissaoNF: obterValor(item, ['EMISSÃO NF', 'EMISSAO']),
+        recebNF: obterValor(item, ['RECEB. NF', 'RECEBIMENTO']),
+        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'COMPRAS']),
+        poNetPrice: obterValor(item, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']),
+        centro: obterValor(item, ['FILIAL', 'CENTRO']),
+        deposito: obterValor(item, ['DEPÓSITO', 'DEPOSITO']),
+        alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
       }));
+
+      // ✨ ESPELHAMENTO WBS 2: Se a planilha trouxer WBS, sobrepõe o Formulário e todos os Itens
+      const wbsDaPlanilha = novosItensFormatados.find(i => i.wbsElement !== '')?.wbsElement || '';
+      
+      if (wbsDaPlanilha) {
+        const wbsFormatado = formatarWBS(wbsDaPlanilha);
+        setFormDados(prev => ({ ...prev, wbs: wbsFormatado }));
+        novosItensFormatados.forEach(i => i.wbsElement = wbsFormatado);
+      } else {
+        novosItensFormatados.forEach(i => i.wbsElement = formDados.wbs);
+      }
 
       setItens(prev => {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
-        const novaLista = [...listaLimpa, ...novosItensFormatados];
+        
+        // Garante que os antigos também recebem a atualização da planilha
+        const listaAntigaAtualizada = listaLimpa.map(i => ({ ...i, wbsElement: wbsDaPlanilha ? formatarWBS(wbsDaPlanilha) : formDados.wbs }));
+        
+        const novaLista = [...listaAntigaAtualizada, ...novosItensFormatados];
         if (novaLista.length > LIMITE_CLIENTE) {
           showAlert("Limite de Linhas Excedido", `A planilha contém mais itens do que o limite permitido de ${LIMITE_CLIENTE}. Apenas as primeiras ${LIMITE_CLIENTE} linhas foram importadas.`, "warning");
           return novaLista.slice(0, LIMITE_CLIENTE);
@@ -80,12 +124,36 @@ export default function EntradaMaterial() {
   };
 
   const adicionarLinhaEmBranco = () => {
-    if (itens.length < LIMITE_CLIENTE) setItens([...itens, gerarLinhaVazia()]);
-    else showAlert("Limite Atingido", `O limite máximo é de ${LIMITE_CLIENTE} itens por solicitação.`, "warning");
+    if (itens.length < LIMITE_CLIENTE) {
+      // ✨ ESPELHAMENTO WBS 3: Nova linha já nasce com a WBS Global preenchida
+      const novaLinha = gerarLinhaVazia();
+      novaLinha.wbsElement = formDados.wbs;
+      setItens([...itens, novaLinha]);
+    } else {
+      showAlert("Limite Atingido", `O limite máximo é de ${LIMITE_CLIENTE} itens por solicitação.`, "warning");
+    }
   };
 
   const removerItem = (idParaRemover) => setItens(itens.filter(item => item.id !== idParaRemover));
-  const atualizarCampo = (id, campo, novoValor) => setItens(itens.map(item => item.id === id ? { ...item, [campo]: novoValor } : item));
+  
+  const atualizarCampo = (id, campo, novoValor) => {
+    setItens(itens.map(item => {
+      if (item.id === id) {
+        let valorValidado = novoValor;
+        if (campo === 'qtdFornecida') {
+          if (novoValor === '') {
+            valorValidado = ''; 
+          } else {
+            valorValidado = parseInt(novoValor, 10);
+            if (isNaN(valorValidado) || valorValidado < 1) valorValidado = 1;
+          }
+        }
+        return { ...item, [campo]: valorValidado };
+      }
+      return item;
+    }));
+  };
+
   const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
   const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
 
@@ -102,8 +170,8 @@ export default function EntradaMaterial() {
       showAlert("Lista Vazia", "Adicione pelo menos um item à tabela para dar entrada.", "warning");
       return;
     }
-    if (itens.some(i => !i.numPecaFabricante || !i.qtdFornecida)) {
-      showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.", "warning");
+    if (itens.some(i => !i.numPecaFabricante || !i.qtdFornecida || i.qtdFornecida === '')) {
+      showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
       return;
     }
 
@@ -136,12 +204,12 @@ export default function EntradaMaterial() {
           part_number: item.numPecaFabricante || '-',
           fornecedor: item.fornecedor || null,
           referencia: item.referencia || null,
-          qtd: item.qtdFornecida || 1,
+          qtd: parseInt(item.qtdFornecida, 10) || 1,
           unidade_medida: item.unidadeMedida || 'Unid',
           nf_entrada: item.nfEntrada || null,
           descricao: item.vendorDescription || 'Sem descrição',
           materialDescription: item.vendorDescription || 'Sem descrição', 
-          wbs_element: item.wbsElement || '-',
+          wbs_element: formDados.wbs || '-', // ✨ FORÇA SEMPRE O WBS PRINCIPAL DO FORMULÁRIO (IGNORANDO POSSÍVEIS FALHAS NO EXCEL)
           nome_projeto: item.nomeProjeto || null,
           emissao_nf: item.emissaoNF || null,
           receb_nf: item.recebNF || null,
@@ -192,7 +260,7 @@ export default function EntradaMaterial() {
               className="input-campo foco-verde" 
               placeholder="Ex: ABCDE-12345" 
               value={formDados.wbs} 
-              onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} 
+              onChange={handleWbsGlobalChange} // ✨ CHAMA A FUNÇÃO DE ESPELHAMENTO
             />
           </div>
           <div className="input-grupo">
@@ -230,9 +298,13 @@ export default function EntradaMaterial() {
       </div>
 
       <TabelaInsercaoItens
-        itens={itens} dataMinima={dataMinima} mostrarDataNecessidade={true} mostrarExemploExcel={true}
-        limiteLinhas={LIMITE_CLIENTE} onAtualizarCampo={atualizarCampo} onRemoverItem={removerItem}
-        onAdicionarLinha={adicionarLinhaEmBranco} onImportarExcel={handleImportarExcel}
+        itens={itens} 
+        limiteLinhas={LIMITE_CLIENTE} 
+        wbsGlobal={formDados.wbs} // ✨ AQUI PASSAMOS A PROP PARA O COMPONENTE BLOQUEAR A COLUNA WBS
+        onAtualizarCampo={atualizarCampo} 
+        onRemoverItem={removerItem}
+        onAdicionarLinha={adicionarLinhaEmBranco} 
+        onImportarExcel={handleImportarExcel}
       />
 
       <BotaoAcaoGlobal texto="Registrar Entrada" icone={<Send size={16} />} cor="verde" onClick={handleEnviar} />

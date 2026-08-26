@@ -10,28 +10,26 @@ export default function ExemploExcel() {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Modelo SAP');
 
-      // ✨ COLUNAS EXATAMENTE NA ORDEM E NOME REQUERIDOS
-      const colunas = [
-        'NUM SAP | DESENHO',
-        'REFERÊNCIA',
-        'DESCRIÇÃO',
-        'FABRICANTE',
-        'QTDE ENTRADA',
-        'UNID. MEDIDA',
-        'NUM DA NOTA FISCAL',
-        'FORNECEDOR / REGISTRO',
-        'CENTRO DE CUSTO - WBS',
-        'NOME CENTRO DE CUSTO / PROJETO',
-        'EMISSÃO NF',
-        'RECEB. NF',
-        'Nº PEDIDO DE COMPRA / CPV',
-        'VLR. UNITÁRIO NOTA FISCAL',
-        'FILIAL',
-        'DEPÓSITO',
-        'ALOCAÇÃO'
+      // ✨ COLUNAS DEFINIDAS COM CHAVES CLARAS PARA EVITAR BUGS
+      worksheet.columns = [
+        { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
+        { header: 'REFERÊNCIA', key: 'ref', width: 20 },
+        { header: 'DESCRIÇÃO', key: 'desc', width: 40 },
+        { header: 'FABRICANTE', key: 'pn', width: 25 },
+        { header: 'QTDE ENTRADA', key: 'qtd', width: 15 },
+        { header: 'UNID. MEDIDA', key: 'unid', width: 15 },
+        { header: 'NUM DA NOTA FISCAL', key: 'nf', width: 20 },
+        { header: 'FORNECEDOR / REGISTRO', key: 'fornecedor', width: 25 },
+        { header: 'CENTRO DE CUSTO - WBS', key: 'wbs', width: 25 },
+        { header: 'NOME CENTRO DE CUSTO / PROJETO', key: 'projeto', width: 35 },
+        { header: 'EMISSÃO NF', key: 'emi', width: 15 },
+        { header: 'RECEB. NF', key: 'rec', width: 15 },
+        { header: 'Nº PEDIDO DE COMPRA / CPV', key: 'doc', width: 25 },
+        { header: 'VLR. UNITÁRIO NOTA FISCAL', key: 'val', width: 25 },
+        { header: 'FILIAL', key: 'filial', width: 15 },
+        { header: 'DEPÓSITO', key: 'dep', width: 15 },
+        { header: 'ALOCAÇÃO', key: 'aloc', width: 20 }
       ];
-
-      worksheet.columns = colunas.map(col => ({ header: col, key: col, width: 20 }));
 
       const linhaCabecalho = worksheet.getRow(1);
       linhaCabecalho.eachCell((cell) => {
@@ -45,30 +43,29 @@ export default function ExemploExcel() {
       });
       linhaCabecalho.height = 25;
 
-      // ✨ EXEMPLO PREENCHIDO COM A NOVA COLUNA E NOVA ESTRUTURA
       worksheet.addRow({
-        'NUM SAP | DESENHO': 'DS-778899',
-        'REFERÊNCIA': 'REF-9988', 
-        'DESCRIÇÃO': 'Desc Vendor Exemplo',
-        'FABRICANTE': 'PN-12345',
-        'QTDE ENTRADA': 10,
-        'UNID. MEDIDA': 'Unid',
-        'NUM DA NOTA FISCAL': 'NF-001',
-        'FORNECEDOR / REGISTRO': 'Fornecedor A',
-        'CENTRO DE CUSTO - WBS': 'WBS-EX-001',
-        'NOME CENTRO DE CUSTO / PROJETO': 'Projeto Stellantis',
-        'EMISSÃO NF': '01/01/2026',
-        'RECEB. NF': '05/01/2026',
-        'Nº PEDIDO DE COMPRA / CPV': 'DOC-999',
-        'VLR. UNITÁRIO NOTA FISCAL': 'R$ 100,00',
-        'FILIAL': 'BR01',
-        'DEPÓSITO': '0010',
-        'ALOCAÇÃO': 'A-01'
+        sap: 'DS-778899',
+        ref: 'REF-9988', 
+        desc: 'Parafuso Sextavado Exemplo',
+        pn: 'PN-12345',
+        qtd: 10,
+        unid: 'Unid',
+        nf: 'NF-001',
+        fornecedor: 'Fornecedor A',
+        wbs: 'WBS-EX-001',
+        projeto: 'Projeto Stellantis',
+        emi: '01/01/2026',
+        rec: '05/01/2026',
+        doc: 'DOC-999',
+        val: 'R$ 100,00',
+        filial: 'BR01',
+        dep: '0010',
+        aloc: 'A-01'
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      saveAs(blob, "Modelo_Importacao_SAP.xlsx");
+      saveAs(blob, "Modelo_Importacao_Estoque.xlsx");
 
     } catch (error) {
       console.error("Erro ao gerar o Excel:", error);
