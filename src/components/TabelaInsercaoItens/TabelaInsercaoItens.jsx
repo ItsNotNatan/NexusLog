@@ -1,6 +1,5 @@
 // =================================================================
 // ARQUIVO: src/components/TabelaInsercaoItens/TabelaInsercaoItens.jsx
-// DESCRIÇÃO: Tabela componentizada para entrada de itens (Com WBS visualmente bloqueada)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
@@ -120,7 +119,6 @@ export default function TabelaInsercaoItens({
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
                 
-                {/* CABEÇALHO WBS BLOQUEADO E CINZENTO */}
                 <th style={{ 
                   padding: '12px', 
                   backgroundColor: isWbsBloqueada ? '#f1f5f9' : '#fafafa', 
@@ -160,11 +158,11 @@ export default function TabelaInsercaoItens({
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.vendorDescription} onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição" />
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.vendorDescription || ''} onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição" />
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela badge-partnumber" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', fontWeight: '600' }} value={item.numPecaFabricante} onChange={(e) => onAtualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
+                    <input className="input-editavel-tabela badge-partnumber" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', fontWeight: '600' }} value={item.numPecaFabricante || ''} onChange={(e) => onAtualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
                   </td>
 
                   <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -195,7 +193,7 @@ export default function TabelaInsercaoItens({
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida} onChange={(e) => onAtualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
+                    <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida || 'Unid'} onChange={(e) => onAtualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
                       <option value="Unid">Unid</option>
                       <option value="Kg">Kg</option>
                       <option value="Metro">Metro</option>
@@ -206,14 +204,13 @@ export default function TabelaInsercaoItens({
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-preto" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} value={item.nfEntrada} onChange={(e) => onAtualizarCampo(item.id, 'nfEntrada', e.target.value)} placeholder="NF" />
+                    <input className="input-editavel-tabela texto-preto" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} value={item.nfEntrada || ''} onChange={(e) => onAtualizarCampo(item.id, 'nfEntrada', e.target.value)} placeholder="NF" />
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
+                    <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor || ''} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                   </td>
 
-                  {/* ✨ CÉLULA WBS (MOSTRA "-" SE ESTIVER VAZIO E BLOQUEADO) */}
                   <td style={{ 
                     padding: '8px', 
                     backgroundColor: isWbsBloqueada ? '#f1f5f9' : 'transparent',
@@ -239,23 +236,38 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.nomeProjeto || ''} onChange={(e) => onAtualizarCampo(item.id, 'nomeProjeto', e.target.value)} placeholder="Nome Projeto" />
                   </td>
 
+                  {/* ✨ DATAS CORRIGIDAS: Se tiver um '-', transforma em vazio para o calendário nativo funcionar */}
                   <td style={{ padding: '8px' }}>
-                    <input type="date" className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} value={item.emissaoNF} onChange={(e) => onAtualizarCampo(item.id, 'emissaoNF', e.target.value)} onClick={(e) => e.target.showPicker && e.target.showPicker()} />
+                    <input 
+                      type="date" 
+                      className="input-editavel-tabela texto-cinza" 
+                      style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
+                      value={item.emissaoNF === '-' ? '' : (item.emissaoNF || '')} 
+                      onChange={(e) => onAtualizarCampo(item.id, 'emissaoNF', e.target.value)} 
+                      onClick={(e) => e.target.showPicker && e.target.showPicker()} 
+                    />
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <input type="date" className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} value={item.recebNF} onChange={(e) => onAtualizarCampo(item.id, 'recebNF', e.target.value)} onClick={(e) => e.target.showPicker && e.target.showPicker()} />
+                    <input 
+                      type="date" 
+                      className="input-editavel-tabela texto-cinza" 
+                      style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
+                      value={item.recebNF === '-' ? '' : (item.recebNF || '')} 
+                      onChange={(e) => onAtualizarCampo(item.id, 'recebNF', e.target.value)} 
+                      onClick={(e) => e.target.showPicker && e.target.showPicker()} 
+                    />
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.docCompras} onChange={(e) => onAtualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.docCompras || ''} onChange={(e) => onAtualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
                   </td>
 
                   <td style={{ padding: '8px' }}>
                     <input 
                       className="input-editavel-tabela texto-preto" 
                       style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} 
-                      value={item.poNetPrice} 
+                      value={item.poNetPrice || ''} 
                       onChange={(e) => {
                         const valorFormatado = formatarDinheiroTempoReal(e.target.value);
                         onAtualizarCampo(item.id, 'poNetPrice', valorFormatado);
@@ -265,15 +277,15 @@ export default function TabelaInsercaoItens({
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.centro} onChange={(e) => onAtualizarCampo(item.id, 'centro', e.target.value)} placeholder="Filial" />
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.centro || ''} onChange={(e) => onAtualizarCampo(item.id, 'centro', e.target.value)} placeholder="Filial" />
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.deposito} onChange={(e) => onAtualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.deposito || ''} onChange={(e) => onAtualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
                   </td>
 
                   <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela link-azul-fake" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#2563eb', fontFamily: 'monospace' }} value={item.alocacao} onChange={(e) => onAtualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
+                    <input className="input-editavel-tabela link-azul-fake" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#2563eb', fontFamily: 'monospace' }} value={item.alocacao || ''} onChange={(e) => onAtualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
                   </td>
                 </tr>
               ))}
