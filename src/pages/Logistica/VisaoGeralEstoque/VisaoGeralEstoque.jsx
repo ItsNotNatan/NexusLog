@@ -64,6 +64,7 @@ export default function VisaoGeralEstoque({ perfil }) {
     
     buscarEstoque();
 
+    // ✨ SOCKET.IO: Atualiza o saldo instantaneamente se alguém der entrada/saída
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
@@ -231,7 +232,7 @@ export default function VisaoGeralEstoque({ perfil }) {
   }, 0);
 
   // ==========================================
-  // EXPORTAR EXCEL NA NOVA ORDEM
+  // EXPORTAR EXCEL NA NOVA ORDEM E SEM DATA DE NECESSIDADE
   // ==========================================
   const handleExportarExcel = async () => {
     showLoading("A Gerar Excel", "Por favor, aguarde enquanto compilamos os dados do estoque...");
@@ -240,7 +241,7 @@ export default function VisaoGeralEstoque({ perfil }) {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Visão Geral do Estoque');
 
-      // ✨ EXCEL: MAPEAMENTO CIRÚRGICO (SEM DATA DE NECESSIDADE)
+      // ✨ EXCEL: MAPEAMENTO CIRÚRGICO SEM DATA NECESSIDADE
       worksheet.columns = [
         { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
         { header: 'REFERÊNCIA', key: 'ref', width: 20 },
@@ -342,7 +343,6 @@ export default function VisaoGeralEstoque({ perfil }) {
             <span>Disponíveis</span>
             <strong className="kpi-green">{kpiDisponiveis}</strong>
           </div>
-          {/* ✨ CARTÃO ZERADOS REMOVIDO! */}
           <div className="kpi-mini-card">
             <span>Reservados</span>
             <strong className="kpi-orange">{kpiReservados}</strong>

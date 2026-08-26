@@ -12,6 +12,7 @@ import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; 
 import { AuthContext } from '../../../contexts/AuthContext';
+import { useAlert } from '../../../contexts/AlertContext'; // ✨ ADICIONADO AQUI
 import { supabase } from '../../../supabaseClient';
 import { apiFetch } from '../../../services/api';
 
@@ -19,11 +20,13 @@ const LIMITE_LOGISTICA = 60;
 
 export default function EntradaEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
+  const { showAlert } = useAlert(); // ✨ IMPORTAMOS A FUNÇÃO DE ALERTA BONITA
   
   const [formDados, setFormDados] = useState({
     nome: '', wbs: '', observacoes: ''
   });
 
+  // ✨ ESTRUTURA ATUALIZADA (Sem Data Necessidade e com Nome do Projeto)
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`, 
     desenhoSAP: '', 
@@ -35,6 +38,7 @@ export default function EntradaEstoque() {
     unidadeMedida: 'Unid', 
     vendorDescription: '', 
     wbsElement: '', 
+    nomeProjeto: '', 
     emissaoNF: '', 
     recebNF: '', 
     docCompras: '', 
@@ -47,25 +51,23 @@ export default function EntradaEstoque() {
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
   
-  // ✨ ESTADO: Guarda as NFs de Crossdockings que estão "Pendentes"
+  // ESTADO: Guarda as NFs de Crossdockings que estão "Pendentes"
   const [nfsCrossdocking, setNfsCrossdocking] = useState([]);
   const processador = useProcessadorExcel();
 
-  // ✨ EFEITO: Busca TUDO e faz o filtro cirúrgico no Frontend
+  // EFEITO: Busca TUDO e faz o filtro cirúrgico no Frontend
   useEffect(() => {
     const buscarCrossdockingsPendentes = async () => {
       try {
         const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
         
-        // Buscamos as solicitações apenas pela filial para evitar conflitos na API
         const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
         
         if (resultado.sucesso && Array.isArray(resultado.dados)) {
-          // Filtramos manualmente pelo Tipo e Status para ter certeza absoluta que funciona
           const nfsAguardadas = resultado.dados
             .filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente')
             .map(sol => sol.nfCrossdocking)
-            .filter(nf => nf !== null && nf !== undefined && nf !== ''); // Ignora as vazias
+            .filter(nf => nf !== null && nf !== undefined && nf !== ''); 
             
           setNfsCrossdocking(nfsAguardadas);
         }
@@ -82,24 +84,27 @@ export default function EntradaEstoque() {
   const handleImportarExcel = async (arquivo) => {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
     if (itensProcessados && Array.isArray(itensProcessados)) {
+      
+      // ✨ MAPEAMENTO CIRÚRGICO ATUALIZADO PARA O BACK-OFFICE TAMBÉM
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: item['Desenho SAP'] || item.desenhoSAP || '',
-        numPecaFabricante: item['Nº peça fabricante'] || item.numPecaFabricante || '',
-        fornecedor: item['FORNECEDOR'] || item['Fornecedor'] || item.fornecedor || '',
+        desenhoSAP: item['NUM SAP | DESENHO'] || item['Desenho SAP'] || item.desenhoSAP || '',
         referencia: item['REFERÊNCIA'] || item['Referência'] || item.referencia || '',
-        qtdFornecida: item['Qtd.fornecida'] || item.qtdFornecida || 1,
-        nfEntrada: item['NF DE ENTRADA'] || '',
-        unidadeMedida: item['Unidade de medida'] || item.unidadeMedida || 'Unid',
-        vendorDescription: item['Vendor Description'] || item.vendorDescription || '',
-        wbsElement: item['WBS Element'] || item.wbs || '',
+        vendorDescription: item['DESCRIÇÃO'] || item['Vendor Description'] || item.vendorDescription || '',
+        numPecaFabricante: item['FABRICANTE'] || item['Nº peça fabricante'] || item.numPecaFabricante || '',
+        qtdFornecida: item['QTDE ENTRADA'] || item['Qtd.fornecida'] || item.qtdFornecida || 1,
+        unidadeMedida: item['UNID. MEDIDA'] || item['Unidade de medida'] || item.unidadeMedida || 'Unid',
+        nfEntrada: item['NUM DA NOTA FISCAL'] || item['NF DE ENTRADA'] || item.nfEntrada || '',
+        fornecedor: item['FORNECEDOR / REGISTRO'] || item['FORNECEDOR'] || item.fornecedor || '',
+        wbsElement: item['CENTRO DE CUSTO - WBS'] || item['WBS Element'] || item.wbs || '',
+        nomeProjeto: item['NOME CENTRO DE CUSTO / PROJETO'] || item.nomeProjeto || '',
         emissaoNF: item['EMISSÃO NF'] || item.emissaoNF || '',
         recebNF: item['RECEB. NF'] || item.recebNF || '',
-        docCompras: item['Documento de compras'] || item.docCompras || '',
-        poNetPrice: item['PO Net Price'] || item.poNetPrice || '',
-        centro: item['Centro'] || item.centro || '',
-        deposito: item['Depósito'] || item.deposito || '',
-        alocacao: item['Alocação'] || item.alocacao || ''
+        docCompras: item['Nº PEDIDO DE COMPRA / CPV'] || item['Documento de compras'] || item.docCompras || '',
+        poNetPrice: item['VLR. UNITÁRIO NOTA FISCAL'] || item['PO Net Price'] || item.poNetPrice || '',
+        centro: item['FILIAL'] || item['Centro'] || item.centro || '',
+        deposito: item['DEPÓSITO'] || item['Depósito'] || item.deposito || '',
+        alocacao: item['ALOCAÇÃO'] || item['Alocação'] || item.alocacao || ''
       }));
 
       setItens(prev => {
@@ -107,7 +112,7 @@ export default function EntradaEstoque() {
         const novaLista = [...listaLimpa, ...novosItensFormatados];
 
         if (novaLista.length > LIMITE_LOGISTICA) {
-          alert(`AVISO: A planilha contém mais itens do que o limite permitido de ${LIMITE_LOGISTICA}. Apenas as primeiras ${LIMITE_LOGISTICA} linhas foram importadas.`);
+          showAlert("Limite de Linhas Excedido", `A planilha contém mais itens do que o limite permitido de ${LIMITE_LOGISTICA}. Apenas as primeiras ${LIMITE_LOGISTICA} linhas foram importadas.`, "warning");
           return novaLista.slice(0, LIMITE_LOGISTICA);
         }
 
@@ -120,11 +125,29 @@ export default function EntradaEstoque() {
     if (itens.length < LIMITE_LOGISTICA) {
       setItens([...itens, gerarLinhaVazia()]);
     } else {
-      alert(`Limite máximo de ${LIMITE_LOGISTICA} itens atingido.`);
+      showAlert("Limite Atingido", `O limite máximo é de ${LIMITE_LOGISTICA} itens.`, "warning");
     }
   };
 
-  const atualizarCampo = (id, campo, novoValor) => setItens(itens.map(item => item.id === id ? { ...item, [campo]: novoValor } : item));
+  // ✨ ATUALIZAÇÃO SEGURA: Transforma sempre em inteiro e ignora lixo no array do React
+  const atualizarCampo = (id, campo, novoValor) => {
+    setItens(itens.map(item => {
+      if (item.id === id) {
+        let valorValidado = novoValor;
+        if (campo === 'qtdFornecida') {
+          if (novoValor === '') {
+            valorValidado = ''; 
+          } else {
+            valorValidado = parseInt(novoValor, 10);
+            if (isNaN(valorValidado) || valorValidado < 1) valorValidado = 1;
+          }
+        }
+        return { ...item, [campo]: valorValidado };
+      }
+      return item;
+    }));
+  };
+
   const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
   const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
   
@@ -134,22 +157,22 @@ export default function EntradaEstoque() {
 
   const handleEnviar = async () => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
-      alert("⚠️ AÇÃO BLOQUEADA: Por favor, selecione uma filial específica no topo da página antes de registar a entrada.");
+      showAlert("Ação Bloqueada", "Por favor, selecione uma filial específica no topo da página antes de registar a entrada.", "warning");
       return;
     }
 
     if (!formDados.nome || !formDados.wbs) {
-      alert("Preencha o Nome e o WBS do operador.");
+      showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS do operador.", "warning");
       return;
     }
     
     if (itens.length === 0) {
-      alert("Adicione pelo menos um item à tabela para registar a entrada.");
+      showAlert("Lista Vazia", "Adicione pelo menos um item à tabela para registar a entrada.", "warning");
       return;
     }
 
-    if (itens.some(i => !i.numPecaFabricante || !i.qtdFornecida)) {
-      alert("Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas.");
+    if (itens.some(i => !i.numPecaFabricante || !i.qtdFornecida || i.qtdFornecida === '')) {
+      showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
       return;
     }
 
@@ -162,7 +185,7 @@ export default function EntradaEstoque() {
           const { error: erroUpload } = await supabase.storage.from('documentos').upload(caminhoNoStorage, arquivo);
 
           if (erroUpload) {
-            alert(`Falha ao anexar o ficheiro: ${arquivo.name}.`);
+            showAlert("Erro de Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}.`, "error");
             return; 
           }
           const { data: linkPublico } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
@@ -172,14 +195,32 @@ export default function EntradaEstoque() {
         }
       }
 
+      // ✨ PAYLOAD MAPEADO COM AS NOVAS COLUNAS PARA O BACKEND
       const payload = {
-        solicitante: { ...formDados, tipo: 'Entrada', filial_id: estoqueAtual },
+        solicitante: { 
+          ...formDados, 
+          tipo: 'Entrada', 
+          filial_id: estoqueAtual 
+        },
         itens: itens.map(item => ({
-          ...item,
-          nfEntrada: item.nfEntrada ? item.nfEntrada.trim() : '', 
-          qtd: item.qtdFornecida,
-          desenhoSAP: item.desenhoSAP || '-', 
-          materialDescription: item.vendorDescription || 'Sem descrição'
+          desenho_sap: item.desenhoSAP || '-',
+          part_number: item.numPecaFabricante || '-',
+          fornecedor: item.fornecedor || null,
+          referencia: item.referencia || null,
+          qtd: parseInt(item.qtdFornecida, 10) || 1,
+          unidade_medida: item.unidadeMedida || 'Unid',
+          nf_entrada: item.nfEntrada || null,
+          descricao: item.vendorDescription || 'Sem descrição',
+          materialDescription: item.vendorDescription || 'Sem descrição',
+          wbs_element: item.wbsElement || '-',
+          nome_projeto: item.nomeProjeto || null,
+          emissao_nf: item.emissaoNF || null,
+          receb_nf: item.recebNF || null,
+          documento_compras: item.docCompras || null,
+          valor_unitario: item.poNetPrice || null,
+          centro: item.centro || null,
+          deposito: item.deposito || null,
+          alocacao: item.alocacao || null
         })),
         anexos: anexosProcessados 
       };
@@ -189,20 +230,20 @@ export default function EntradaEstoque() {
         body: JSON.stringify(payload)
       });
 
-      if (dados.sucesso || dados.ps_id) {
-        alert(`Sucesso! Solicitação de Entrada gerada no sistema. ID: ${dados.ps_id || dados.ps}`);
+      if (dados.sucesso || dados.ps_id || dados.ps) {
+        showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps_id || dados.ps}`, "success");
         setFormDados({ nome: '', wbs: '', observacoes: '' });
         setItens([]);
         setAnexos([]);
       } else {
-        alert(`Erro do servidor: ${dados.erro}`);
+        showAlert("Erro no Servidor", dados.erro, "error");
       }
     } catch (error) {
-      alert(`Falha ao conectar com o servidor. Motivo: ${error.message}`);
+      showAlert("Erro de Conexão", `Falha ao conectar com o servidor. Motivo: ${error.message}`, "error");
     }
   };
 
-  // ✨ LÓGICA DO INDICADOR: Verifica cada batida de tecla!
+  // LÓGICA DO INDICADOR: Verifica cada batida de tecla!
   const nfsNormalizadas = nfsCrossdocking.map(nf => String(nf).trim().toUpperCase());
   const nfsNaTabela = itens
     .map(i => String(i.nfEntrada || '').trim().toUpperCase())
@@ -266,10 +307,9 @@ export default function EntradaEstoque() {
         </div>
       )}
 
-      {/* COMPONENTE DA TABELA */}
+      {/* COMPONENTE DA TABELA (Sem DataNecessidade) */}
       <TabelaInsercaoItens 
         itens={itens}
-        mostrarDataNecessidade={true}
         limiteLinhas={LIMITE_LOGISTICA} 
         onAtualizarCampo={atualizarCampo}
         onRemoverItem={removerItem}
