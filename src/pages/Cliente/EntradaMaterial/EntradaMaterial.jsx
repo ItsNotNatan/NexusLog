@@ -1,7 +1,3 @@
-// =================================================================
-// ARQUIVO: src/pages/Cliente/EntradaMaterial/EntradaMaterial.jsx
-// DESCRIÇÃO: Ecrã para solicitar Entrada de Material no Estoque
-// =================================================================
 import React, { useState, useContext } from 'react';
 import { User, Send, Paperclip, X, MapPin } from 'lucide-react'; 
 
@@ -30,7 +26,6 @@ export default function EntradaMaterial() {
   
   const processador = useProcessadorExcel();
 
-  // ✨ ESTRUTURA ATUALIZADA: Sem data de necessidade
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`, 
     desenhoSAP: '', 
@@ -41,7 +36,7 @@ export default function EntradaMaterial() {
     nfEntrada: '', 
     unidadeMedida: 'Unid', 
     vendorDescription: '',
-    wbsElement: formDados.wbs || '', // Nasce logo com o WBS que estiver em cima
+    wbsElement: formDados.wbs || '', 
     nomeProjeto: '', 
     emissaoNF: '', 
     recebNF: '', 
@@ -52,14 +47,12 @@ export default function EntradaMaterial() {
     alocacao: ''
   });
 
-  // ✨ ESPELHAMENTO WBS 1: Quando o cliente altera o WBS principal, atualiza a tabela inteira!
   const handleWbsGlobalChange = (e) => {
     const novoWbs = formatarWBS(e.target.value);
     setFormDados({ ...formDados, wbs: novoWbs });
     setItens(prevItens => prevItens.map(it => ({ ...it, wbsElement: novoWbs })));
   };
 
-  // ✨ FUNÇÃO "À PROVA DE BALAS": Encontra a coluna independentemente de espaços ou acentos!
   const obterValor = (itemExcel, palavrasChave) => {
     const chavesReais = Object.keys(itemExcel);
     for (const palavra of palavrasChave) {
@@ -85,7 +78,7 @@ export default function EntradaMaterial() {
         unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid',
         nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']),
         fornecedor: obterValor(item, ['FORNECEDOR']),
-        wbsElement: obterValor(item, ['CENTRO DE CUSTO - WBS', 'WBS']),
+        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO - WBS', 'WBS'])).trim(),
         nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
         emissaoNF: obterValor(item, ['EMISSÃO NF', 'EMISSAO']),
         recebNF: obterValor(item, ['RECEB. NF', 'RECEBIMENTO']),
@@ -96,7 +89,24 @@ export default function EntradaMaterial() {
         alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
       }));
 
-      // ✨ ESPELHAMENTO WBS 2: Se a planilha trouxer WBS, sobrepõe o Formulário e todos os Itens
+      // ✨ VERIFICAÇÃO DE DIVERGÊNCIA: Pega em todos os WBS preenchidos na planilha e unifica
+      const wbsPreenchidos = novosItensFormatados
+        .map(i => i.wbsElement.toUpperCase()) // Padroniza para comparar
+        .filter(w => w !== '');
+      
+      const wbsUnicosDaPlanilha = [...new Set(wbsPreenchidos)];
+
+      // ❌ Se houver mais do que 1 WBS diferente dentro do Excel, bloqueia a importação!
+      if (wbsUnicosDaPlanilha.length > 1) {
+        showAlert(
+          "Planilha Bloqueada", 
+          `A sua planilha contém múltiplos WBS diferentes (${wbsUnicosDaPlanilha.join(', ')}). A entrada de material deve ser feita para um único projeto por vez. Por favor, corrija a planilha e tente novamente.`, 
+          "error"
+        );
+        return; // Interrompe o processo e não carrega nada na tela!
+      }
+
+      // Se passou da trava, ou a planilha tem apenas 1 WBS, ou nenhum (neste caso usa o do form).
       const wbsDaPlanilha = novosItensFormatados.find(i => i.wbsElement !== '')?.wbsElement || '';
       
       if (wbsDaPlanilha) {
@@ -110,7 +120,6 @@ export default function EntradaMaterial() {
       setItens(prev => {
         const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
         
-        // Garante que os antigos também recebem a atualização da planilha
         const listaAntigaAtualizada = listaLimpa.map(i => ({ ...i, wbsElement: wbsDaPlanilha ? formatarWBS(wbsDaPlanilha) : formDados.wbs }));
         
         const novaLista = [...listaAntigaAtualizada, ...novosItensFormatados];
@@ -125,7 +134,6 @@ export default function EntradaMaterial() {
 
   const adicionarLinhaEmBranco = () => {
     if (itens.length < LIMITE_CLIENTE) {
-      // ✨ ESPELHAMENTO WBS 3: Nova linha já nasce com a WBS Global preenchida
       const novaLinha = gerarLinhaVazia();
       novaLinha.wbsElement = formDados.wbs;
       setItens([...itens, novaLinha]);
@@ -209,7 +217,7 @@ export default function EntradaMaterial() {
           nf_entrada: item.nfEntrada || null,
           descricao: item.vendorDescription || 'Sem descrição',
           materialDescription: item.vendorDescription || 'Sem descrição', 
-          wbs_element: formDados.wbs || '-', // ✨ FORÇA SEMPRE O WBS PRINCIPAL DO FORMULÁRIO (IGNORANDO POSSÍVEIS FALHAS NO EXCEL)
+          wbs_element: formDados.wbs || '-',
           nome_projeto: item.nomeProjeto || null,
           emissao_nf: item.emissaoNF || null,
           receb_nf: item.recebNF || null,
@@ -260,7 +268,7 @@ export default function EntradaMaterial() {
               className="input-campo foco-verde" 
               placeholder="Ex: ABCDE-12345" 
               value={formDados.wbs} 
-              onChange={handleWbsGlobalChange} // ✨ CHAMA A FUNÇÃO DE ESPELHAMENTO
+              onChange={handleWbsGlobalChange}
             />
           </div>
           <div className="input-grupo">
@@ -300,7 +308,7 @@ export default function EntradaMaterial() {
       <TabelaInsercaoItens
         itens={itens} 
         limiteLinhas={LIMITE_CLIENTE} 
-        wbsGlobal={formDados.wbs} // ✨ AQUI PASSAMOS A PROP PARA O COMPONENTE BLOQUEAR A COLUNA WBS
+        wbsGlobal={formDados.wbs}
         onAtualizarCampo={atualizarCampo} 
         onRemoverItem={removerItem}
         onAdicionarLinha={adicionarLinhaEmBranco} 

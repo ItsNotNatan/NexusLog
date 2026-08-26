@@ -14,8 +14,8 @@ import { formatarDinheiroTempoReal } from '../../utils/formatadores';
 export default function TabelaInsercaoItens({
   itens,
   limiteLinhas = 20, 
-  wbsGlobal, // ✨ Recebe o WBS global do formulário
-  bloquearWBS = false, // Prop extra para a Logística
+  wbsGlobal, 
+  bloquearWBS = false, 
   onAtualizarCampo,
   onRemoverItem,
   onAdicionarLinha,
@@ -41,7 +41,6 @@ export default function TabelaInsercaoItens({
   const limiteAtingido = itens.length >= limiteLinhas;
   const larguraMinimaTabela = '2750px';
 
-  // ✨ LÓGICA DE BLOQUEIO: Se o wbsGlobal foi enviado pela página, bloqueia a coluna!
   const isWbsBloqueada = wbsGlobal !== undefined || bloquearWBS;
 
   return (
@@ -121,7 +120,7 @@ export default function TabelaInsercaoItens({
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
                 
-                {/* ✨ CABEÇALHO WBS BLOQUEADO E CINZENTO */}
+                {/* CABEÇALHO WBS BLOQUEADO E CINZENTO */}
                 <th style={{ 
                   padding: '12px', 
                   backgroundColor: isWbsBloqueada ? '#f1f5f9' : '#fafafa', 
@@ -214,7 +213,7 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                   </td>
 
-                  {/* ✨ CÉLULA WBS BLOQUEADA, DESATIVADA E CINZENTA */}
+                  {/* ✨ CÉLULA WBS (MOSTRA "-" SE ESTIVER VAZIO E BLOQUEADO) */}
                   <td style={{ 
                     padding: '8px', 
                     backgroundColor: isWbsBloqueada ? '#f1f5f9' : 'transparent',
@@ -229,10 +228,10 @@ export default function TabelaInsercaoItens({
                         fontWeight: isWbsBloqueada ? '500' : 'normal',
                         cursor: isWbsBloqueada ? 'not-allowed' : 'text'
                       }} 
-                      disabled={isWbsBloqueada} // Bloqueia cliques e digitação nativamente
-                      value={isWbsBloqueada ? wbsGlobal : (item.wbsElement || '')} 
+                      disabled={isWbsBloqueada}
+                      value={isWbsBloqueada ? (wbsGlobal || '-') : (item.wbsElement || '')} 
                       onChange={(e) => !isWbsBloqueada && onAtualizarCampo(item.id, 'wbsElement', e.target.value)} 
-                      placeholder={isWbsBloqueada ? "WBS Bloqueado" : "WBS"} 
+                      placeholder="-" 
                     />
                   </td>
 
