@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/components/TabelaInsercaoItens/TabelaInsercaoItens.jsx
-// DESCRIÇÃO: Tabela componentizada para entrada de itens
+// DESCRIÇÃO: Tabela componentizada para entrada de itens (Com WBS visualmente bloqueada)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
@@ -14,7 +14,8 @@ import { formatarDinheiroTempoReal } from '../../utils/formatadores';
 export default function TabelaInsercaoItens({
   itens,
   limiteLinhas = 20, 
-  bloquearWBS = false, // ✨ NOVA PROP: Define se a coluna WBS pode ser editada ou não
+  wbsGlobal, // ✨ Recebe o WBS global do formulário
+  bloquearWBS = false, // Prop extra para a Logística
   onAtualizarCampo,
   onRemoverItem,
   onAdicionarLinha,
@@ -37,9 +38,11 @@ export default function TabelaInsercaoItens({
   const itensDaPagina = itens.slice(indexPrimeiroItem, indexUltimoItem);
 
   const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
-
   const limiteAtingido = itens.length >= limiteLinhas;
   const larguraMinimaTabela = '2750px';
+
+  // ✨ LÓGICA DE BLOQUEIO: Se o wbsGlobal foi enviado pela página, bloqueia a coluna!
+  const isWbsBloqueada = wbsGlobal !== undefined || bloquearWBS;
 
   return (
     <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
@@ -117,7 +120,19 @@ export default function TabelaInsercaoItens({
                 <th style={{ width: '140px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>UNID. MEDIDA</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>CENTRO DE CUSTO - WBS</th>
+                
+                {/* ✨ CABEÇALHO WBS BLOQUEADO E CINZENTO */}
+                <th style={{ 
+                  padding: '12px', 
+                  backgroundColor: isWbsBloqueada ? '#f1f5f9' : '#fafafa', 
+                  borderBottom: '1px solid #e2e8f0',
+                  borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
+                  borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
+                  color: isWbsBloqueada ? '#64748b' : 'inherit'
+                }}>
+                  CENTRO DE CUSTO - WBS
+                </th>
+                
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NOME CENTRO DE CUSTO / PROJETO</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>EMISSÃO NF</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>RECEB. NF</th>
@@ -199,20 +214,25 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
                   </td>
 
-                  {/* ✨ COLUNA WBS COM BLOQUEIO CONDICIONAL */}
-                  <td style={{ padding: '8px' }}>
+                  {/* ✨ CÉLULA WBS BLOQUEADA, DESATIVADA E CINZENTA */}
+                  <td style={{ 
+                    padding: '8px', 
+                    backgroundColor: isWbsBloqueada ? '#f1f5f9' : 'transparent',
+                    borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
+                    borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none'
+                  }}>
                     <input 
-                      className="input-editavel-tabela link-azul-fake" 
                       style={{ 
                         width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', 
-                        color: '#2563eb', fontFamily: 'monospace',
-                        cursor: bloquearWBS ? 'not-allowed' : 'text', 
-                        opacity: bloquearWBS ? 0.6 : 1
+                        color: isWbsBloqueada ? '#94a3b8' : '#2563eb', 
+                        fontFamily: 'monospace',
+                        fontWeight: isWbsBloqueada ? '500' : 'normal',
+                        cursor: isWbsBloqueada ? 'not-allowed' : 'text'
                       }} 
-                      value={item.wbsElement || ''} 
-                      readOnly={bloquearWBS}
-                      onChange={(e) => !bloquearWBS && onAtualizarCampo(item.id, 'wbsElement', e.target.value)} 
-                      placeholder="WBS" 
+                      disabled={isWbsBloqueada} // Bloqueia cliques e digitação nativamente
+                      value={isWbsBloqueada ? wbsGlobal : (item.wbsElement || '')} 
+                      onChange={(e) => !isWbsBloqueada && onAtualizarCampo(item.id, 'wbsElement', e.target.value)} 
+                      placeholder={isWbsBloqueada ? "WBS Bloqueado" : "WBS"} 
                     />
                   </td>
 
