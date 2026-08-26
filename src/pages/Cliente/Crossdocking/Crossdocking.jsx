@@ -20,17 +20,34 @@ export default function Crossdocking() {
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
   
-  const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: '' }]);
+  const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); // ✨ Começa em 1
   const [anexos, setAnexos] = useState([]);
 
-  const adicionarItemParcial = () => setItensParciais([...itensParciais, { id: Date.now(), desenhoSAP: '', quantidade: '' }]);
+  const adicionarItemParcial = () => setItensParciais([...itensParciais, { id: Date.now(), desenhoSAP: '', quantidade: 1 }]);
   
   const removerItemParcial = (id) => {
     if (itensParciais.length > 1) setItensParciais(itensParciais.filter(item => item.id !== id));
     else showAlert("Atenção", "Para Saída Parcial, deve manter pelo menos 1 item na lista.", "warning");
   };
   
-  const atualizarItemParcial = (id, campo, valor) => setItensParciais(itensParciais.map(item => item.id === id ? { ...item, [campo]: valor } : item));
+  const atualizarItemParcial = (id, campo, valor) => {
+    setItensParciais(itensParciais.map(item => {
+      if (item.id === id) {
+        let valorValidado = valor;
+        // ✨ LÓGICA DE INTEIROS
+        if (campo === 'quantidade') {
+          if (valor === '') {
+            valorValidado = ''; 
+          } else {
+            valorValidado = parseInt(valor, 10);
+            if (isNaN(valorValidado) || valorValidado < 1) valorValidado = 1;
+          }
+        }
+        return { ...item, [campo]: valorValidado };
+      }
+      return item;
+    }));
+  };
 
   const handleEnviar = async () => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
@@ -47,9 +64,9 @@ export default function Crossdocking() {
       return;
     }
     if (tipoSaida === 'parcial') {
-      const temItemIncompleto = itensParciais.some(i => !i.desenhoSAP || !i.quantidade);
+      const temItemIncompleto = itensParciais.some(i => !i.desenhoSAP || !i.quantidade || i.quantidade === '');
       if (temItemIncompleto) {
-        showAlert("Itens Incompletos", "Preencha o Desenho SAP e a Quantidade em todas as linhas da Saída Parcial.", "warning");
+        showAlert("Itens Incompletos", "Preencha o Desenho SAP e a Quantidade (mínimo 1) em todas as linhas da Saída Parcial.", "warning");
         return;
       }
     }
@@ -70,9 +87,10 @@ export default function Crossdocking() {
       anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
     }
 
+    // ✨ ParseInt para garantir que nunca vai um número quebrado ou string
     const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
       desenho_sap_manual: i.desenhoSAP,
-      quantidade_solicitada: parseFloat(i.quantidade),
+      quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
       unidade_medida_manual: 'Unid'
     }));
 
@@ -92,7 +110,7 @@ export default function Crossdocking() {
         showAlert("Sucesso!", `Solicitação de Crossdocking enviada com sucesso. ID: ${dados.ps}`, "success");
         setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
         setTipoSaida(null); 
-        setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: '' }]); 
+        setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
         setAnexos([]); 
       } else {
         showAlert("Erro do Servidor", dados.erro, "error");
@@ -206,7 +224,37 @@ export default function Crossdocking() {
                       <tr key={item.id}>
                         <td style={{ color: '#64748b', fontSize: '0.875rem', fontWeight: '500', padding: '8px' }}>{index + 1}</td>
                         <td><input type="text" className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff', fontFamily: 'monospace', fontWeight: '600' }} placeholder="Ex: 12345-A" value={item.desenhoSAP} onChange={(e) => atualizarItemParcial(item.id, 'desenhoSAP', e.target.value)} /></td>
-                        <td><input type="number" className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff', color: '#2563eb', fontWeight: 'bold' }} min="1" placeholder="0" value={item.quantidade} onChange={(e) => atualizarItemParcial(item.id, 'quantidade', e.target.value)} /></td>
+                        
+                        {/* ✨ INPUT DE QUANTIDADE BLOQUEADO PARA INTEIROS */}
+                        <td>
+                          <input 
+                            type="number" 
+                            className="input-campo foco-ciano" 
+                            style={{ backgroundColor: '#ffffff', color: '#2563eb', fontWeight: 'bold' }} 
+                            min="1"
+                            step="1"
+                            placeholder="1" 
+                            value={item.quantidade} 
+                            onKeyDown={(e) => {
+                              // Bloqueia ponto, vírgula, sinal de menos, 'e' e 'E'
+                              if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') {
+                                e.preventDefault();
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // Se o utilizador apagar o número e sair do campo, volta a 1 automaticamente
+                              if (!e.target.value || parseInt(e.target.value, 10) < 1) {
+                                atualizarItemParcial(item.id, 'quantidade', 1);
+                              }
+                            }}
+                            onChange={(e) => {
+                              let val = e.target.value;
+                              if (val === '0') val = '1'; // Não permite que o utilizador comece a digitar 0
+                              atualizarItemParcial(item.id, 'quantidade', val);
+                            }} 
+                          />
+                        </td>
+
                         <td style={{ textAlign: 'center' }}>
                           <button onClick={() => removerItemParcial(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={16} /></button>
                         </td>

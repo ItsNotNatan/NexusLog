@@ -176,8 +176,24 @@ export default function VisaoGeralEstoque({ perfil }) {
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={() => saveEditing(item.id, field, val)}
           onKeyDown={(e) => handleKeyDown(e, item.id, field, val)}
+          onClick={(e) => {
+            // ✨ FORÇA A ABERTURA DO CALENDÁRIO QUANDO CLICADO
+            if (type === 'date' && e.target.showPicker) {
+              e.target.showPicker();
+            }
+          }}
           placeholder={placeholder}
-          style={{ width: '100%', padding: '6px 8px', boxSizing: 'border-box', border: '2px solid #3b82f6', borderRadius: '6px', outline: 'none', fontSize: '0.80rem', fontFamily: 'inherit' }}
+          style={{ 
+            width: '100%', 
+            padding: '6px 8px', 
+            boxSizing: 'border-box', 
+            border: '2px solid #3b82f6', 
+            borderRadius: '6px', 
+            outline: 'none', 
+            fontSize: '0.80rem', 
+            fontFamily: 'inherit',
+            cursor: type === 'date' ? 'pointer' : 'text'
+          }}
         />
       );
     }
@@ -186,10 +202,17 @@ export default function VisaoGeralEstoque({ perfil }) {
       <div
         onClick={(e) => { e.stopPropagation(); startEditing(item.id, field, val, type); }}
         style={{ 
-          cursor: 'text', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc',
-          borderRadius: '6px', padding: '4px 8px', display: 'inline-block', 
-          width: '100%', minHeight: '26px', boxSizing: 'border-box',
-          transition: 'all 0.2s ease', ...style 
+          cursor: type === 'date' ? 'pointer' : 'text', 
+          border: '1px solid #e2e8f0', 
+          backgroundColor: '#f8fafc',
+          borderRadius: '6px', 
+          padding: '4px 8px', 
+          display: 'inline-block', 
+          width: '100%', 
+          minHeight: '26px', 
+          boxSizing: 'border-box',
+          transition: 'all 0.2s ease', 
+          ...style 
         }}
         onMouseOver={(e) => {
           e.currentTarget.style.borderColor = '#93c5fd';

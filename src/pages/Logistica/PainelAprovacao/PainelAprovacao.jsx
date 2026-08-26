@@ -59,7 +59,6 @@ export default function PainelAprovacao() {
   const [solicitacaoSendoEditada, setSolicitacaoSendoEditada] = useState(null);
   const [itensEdicao, setItensEdicao] = useState([]);
 
-  // ✨ NOVO ESTADO: Controla o Modal de Recusa
   const [modalRecusa, setModalRecusa] = useState({ aberto: false, idOriginal: null, motivo: '' });
 
   const [paginaGeral, setPaginaGeral] = useState(1);
@@ -130,10 +129,8 @@ export default function PainelAprovacao() {
       }
     };
 
-    // 1. Carrega os dados normalmente ao abrir a página
     buscarDados();
 
-    // ✨ 2. MAGIA DO TEMPO REAL
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
 
@@ -141,19 +138,32 @@ export default function PainelAprovacao() {
       transports: ['websocket', 'polling']
     });
 
-    socket.on('connect', () => {
-      console.log('🟢 Painel de Aprovação conectado ao Tempo Real!');
-    });
-
     socket.on('solicitacoes_atualizadas', () => {
-      console.log('⚡ Novo pedido chegou! A atualizar a tela silenciosamente...');
-      buscarDados(true); // O true faz com que atualize sem piscar o "Loader" no ecrã
+      buscarDados(true); 
     });
 
     return () => {
-      socket.disconnect(); // Desliga o radar ao sair da página
+      socket.disconnect(); 
     };
   }, [estoqueAtual]);
+
+  // ✨ FUNÇÃO INTELIGENTE: Puxa o dado onde quer que ele esteja (Front, DB Solicitacoes ou DB Estoque)
+  const obterValorSeguro = (item, chaveFront, chaveBack, chaveEstoque) => {
+    // 1. Tenta pegar do que o utilizador acabou de editar
+    if (item[chaveFront] !== undefined && item[chaveFront] !== '') return item[chaveFront];
+    
+    // 2. Tenta pegar do que veio da tabela de solicitações
+    if (item[chaveBack] !== undefined && item[chaveBack] !== null && item[chaveBack] !== '') return item[chaveBack];
+    
+    // 3. Se for Retirada/Transferência, vai buscar as colunas em falta ao Estoque físico[cite: 1]
+    if (item.estoque_id && estoque.length > 0) {
+      const itemFisico = estoque.find(e => e.id === item.estoque_id);
+      if (itemFisico && itemFisico[chaveEstoque] !== undefined && itemFisico[chaveEstoque] !== null && itemFisico[chaveEstoque] !== '') {
+        return itemFisico[chaveEstoque];
+      }
+    }
+    return '';
+  };
 
   const dadosFiltrados = dadosTabela.filter((linha) => {
     if (!termoPesquisa) return true;
@@ -197,7 +207,6 @@ export default function PainelAprovacao() {
       return;
     }
 
-    // ✨ ESTRUTURA VAZIA ATUALIZADA
     setItensEdicao([...itensEdicao, {
       id_temporario: `novo-${Date.now()}`,
       desenhoSAP: '',
@@ -225,7 +234,6 @@ export default function PainelAprovacao() {
       showAlert("Ação Bloqueada", "A solicitação deve conter pelo menos 1 item.", "warning");
       return;
     }
-
     setItensEdicao(itensEdicao.filter((_, index) => index !== indexParaRemover));
   };
 
@@ -233,7 +241,6 @@ export default function PainelAprovacao() {
     const novosItens = [...itensEdicao];
     let valorValidado = valor;
     
-    // Tratamento de bloqueio na quantidade para evitar valores inválidos na edição direta
     if (campo === 'qtdFornecida') {
       if (valor === '') {
         valorValidado = ''; 
@@ -250,32 +257,30 @@ export default function PainelAprovacao() {
   const salvarEdicaoItens = async () => {
     if (!solicitacaoSendoEditada) return;
     
-    // Trava de segurança extra
     if (itensEdicao.some(i => !i.qtdFornecida && !i.quantidade_solicitada)) {
       showAlert("Atenção", "Preencha a quantidade em todos os itens antes de salvar.", "warning");
       return;
     }
 
-    // ✨ MAPEAMENTO CIRÚRGICO ATUALIZADO PARA ENVIAR AO BACKEND
     const itensParaEnviar = itensEdicao.map(i => ({
       ...i,
-      desenho_sap_manual: i.desenhoSAP || i.desenho_sap_manual || i.desenho_sap || '-',
-      part_number_manual: i.numPecaFabricante || i.part_number_manual || i.part_number || '-',
-      descricao_manual: i.vendorDescription || i.descricao_manual || i.descricao || 'Sem descrição',
+      desenho_sap_manual: obterValorSeguro(i, 'desenhoSAP', 'desenho_sap_manual', 'desenho_sap') || '-',
+      part_number_manual: obterValorSeguro(i, 'numPecaFabricante', 'part_number_manual', 'part_number') || '-',
+      descricao_manual: obterValorSeguro(i, 'vendorDescription', 'descricao_manual', 'descricao') || 'Sem descrição',
       quantidade_solicitada: parseInt(i.qtdFornecida || i.quantidade_solicitada, 10) || 1,
-      unidade_medida_manual: i.unidadeMedida || i.unidade_medida_manual || 'Unid',
-      fornecedor: i.fornecedor || null,
-      referencia: i.referencia || null,
-      nf_entrada: i.nfEntrada || i.nf_entrada || null,
-      wbs_element: i.wbsElement || i.wbs_element || i.wbs || null,
-      nome_projeto: i.nomeProjeto || i.nome_projeto || null,
-      emissao_nf: i.emissaoNF || i.emissao_nf || null,
-      receb_nf: i.recebNF || i.receb_nf || null,
-      documento_compras: i.docCompras || i.documento_compras || null,
-      valor_unitario_manual: i.poNetPrice || i.valor_unitario_manual || null,
-      centro: i.centro || null,
-      deposito: i.deposito || null,
-      alocacao: i.alocacao || null
+      unidade_medida_manual: obterValorSeguro(i, 'unidadeMedida', 'unidade_medida_manual', 'unidade_medida') || 'Unid',
+      fornecedor: obterValorSeguro(i, 'fornecedor', 'fornecedor', 'fornecedor') || null,
+      referencia: obterValorSeguro(i, 'referencia', 'referencia', 'referencia') || null,
+      nf_entrada: obterValorSeguro(i, 'nfEntrada', 'nf_entrada', 'nf_entrada') || null,
+      wbs_element: obterValorSeguro(i, 'wbsElement', 'wbs_element', 'wbs') || null,
+      nome_projeto: obterValorSeguro(i, 'nomeProjeto', 'nome_projeto', 'nome_projeto') || null,
+      emissao_nf: obterValorSeguro(i, 'emissaoNF', 'emissao_nf', 'emissao_nf') || null,
+      receb_nf: obterValorSeguro(i, 'recebNF', 'receb_nf', 'receb_nf') || null,
+      documento_compras: obterValorSeguro(i, 'docCompras', 'documento_compras', 'documento_compras') || null,
+      valor_unitario_manual: obterValorSeguro(i, 'poNetPrice', 'valor_unitario_manual', 'valor_unitario') || null,
+      centro: obterValorSeguro(i, 'centro', 'centro', 'centro') || null,
+      deposito: obterValorSeguro(i, 'deposito', 'deposito', 'deposito') || null,
+      alocacao: obterValorSeguro(i, 'alocacao', 'alocacao', 'alocacao') || null
     }));
 
     try {
@@ -287,26 +292,22 @@ export default function PainelAprovacao() {
       if (resposta.sucesso) {
         setDadosTabela(prev => prev.map(item => {
           if (item.idOriginal === solicitacaoSendoEditada.idOriginal) {
-            return { ...item, itens: itensParaEnviar }; // Atualiza com a versão limpa
+            return { ...item, itens: itensParaEnviar }; 
           }
           return item;
         }));
-
         setLinhaExpandida(null);
         showAlert("Sucesso!", "Os itens da solicitação foram salvos com sucesso.", "success");
       } else {
         showAlert("Erro", resposta.erro || "O servidor recusou a atualização dos itens.", "error");
       }
     } catch (error) {
-      console.error('Erro de rede ao tentar atualizar os itens:', error.message);
       showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
     }
   };
 
-  // ✨ LÓGICA DE APROVAÇÃO
   const handleAprovar = async (e, idOriginal) => {
     e.stopPropagation();
-
     const confirmado = await showConfirm(
       "Aprovar Solicitação",
       "Tem certeza que deseja aprovar esta solicitação?",
@@ -323,7 +324,6 @@ export default function PainelAprovacao() {
 
         if (resposta.sucesso) {
           const solAprovada = dadosTabela.find(s => s.idOriginal === idOriginal);
-          
           setDadosTabela(prev => prev.filter(item => item.idOriginal !== idOriginal));
           setLinhaExpandida(null);
 
@@ -332,25 +332,21 @@ export default function PainelAprovacao() {
             setTimeout(() => window.location.reload(), 1500); 
             return;
           }
-
           showAlert("Solicitação Aprovada", "A solicitação foi aprovada e enviada para separação com sucesso!", "success");
         } else {
           showAlert("Erro no Servidor", resposta.erro || "Não foi possível aprovar a solicitação.", "error");
         }
       } catch (error) {
-        console.error("Erro na aprovação:", error.message);
         showAlert("Erro de Conexão", "Falha de comunicação com o servidor.", "error");
       }
     }
   };
 
-  // ✨ NOVA LÓGICA DE RECUSA (ABRE O MODAL)
   const abrirModalRecusa = (e, idOriginal) => {
     e.stopPropagation();
     setModalRecusa({ aberto: true, idOriginal, motivo: '' });
   };
 
-  // ✨ CONFIRMAÇÃO DO MODAL DE RECUSA
   const confirmarRecusa = async () => {
     if (!modalRecusa.motivo.trim()) {
       showAlert("Atenção", "Por favor, informe um motivo para recusar esta solicitação.", "warning");
@@ -366,13 +362,12 @@ export default function PainelAprovacao() {
       if (resposta.sucesso) {
         setDadosTabela(prev => prev.filter(item => item.idOriginal !== modalRecusa.idOriginal));
         setLinhaExpandida(null);
-        setModalRecusa({ aberto: false, idOriginal: null, motivo: '' }); // Fecha o modal
+        setModalRecusa({ aberto: false, idOriginal: null, motivo: '' }); 
         showAlert("Solicitação Recusada", "A solicitação foi recusada e o solicitante será notificado.", "info");
       } else {
         showAlert("Erro no Servidor", resposta.erro || "Não foi possível recusar a solicitação.", "error");
       }
     } catch (error) {
-      console.error("Erro na recusa:", error.message);
       showAlert("Erro de Conexão", "Falha de comunicação com o servidor.", "error");
     }
   };
@@ -384,15 +379,9 @@ export default function PainelAprovacao() {
     const limiteMinimo = itensEdicao.length <= 1;
 
     const estiloInput = { 
-      width: '100%', 
-      padding: '6px', 
-      border: editavel ? '1px solid #cbd5e1' : 'none', 
-      borderRadius: '4px', 
-      fontSize: '0.85rem',
-      backgroundColor: editavel ? '#ffffff' : 'transparent',
-      color: '#334155',
-      appearance: editavel ? 'auto' : 'none',
-      fontFamily: 'inherit'
+      width: '100%', padding: '6px', border: editavel ? '1px solid #cbd5e1' : 'none', 
+      borderRadius: '4px', fontSize: '0.85rem', backgroundColor: editavel ? '#ffffff' : 'transparent',
+      color: '#334155', appearance: editavel ? 'auto' : 'none', fontFamily: 'inherit'
     };
 
     return (
@@ -401,7 +390,7 @@ export default function PainelAprovacao() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <h4 style={{ margin: 0, color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <FileText size={18} color="#0284c7" /> 
-              {editavel ? 'Itens da Entrada (Modo de Edição)' : 'Itens da Solicitação (Visualização)'}
+              {editavel ? 'Itens da Entrada (Modo de Edição)' : `Itens da Solicitação (${solicitacaoSendoEditada?.tipo})`}
             </h4>
             
             {editavel && (
@@ -418,11 +407,9 @@ export default function PainelAprovacao() {
               title={limiteAtingido ? "Limite de 20 itens atingido" : "Adicionar Nova Linha"}
               style={{ 
                 display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', 
-                background: '#fff', 
-                color: limiteAtingido ? '#94a3b8' : '#334155', 
+                background: '#fff', color: limiteAtingido ? '#94a3b8' : '#334155', 
                 border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', 
-                cursor: limiteAtingido ? 'not-allowed' : 'pointer',
-                opacity: limiteAtingido ? 0.6 : 1
+                cursor: limiteAtingido ? 'not-allowed' : 'pointer', opacity: limiteAtingido ? 0.6 : 1
               }}
             >
               <Plus size={14} /> Adicionar Nova Linha
@@ -433,14 +420,13 @@ export default function PainelAprovacao() {
         <div style={{ overflowX: 'auto', marginBottom: '20px', paddingBottom: '10px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2400px' }}>
             <thead>
-              {/* ✨ CABEÇALHOS ATUALIZADOS PARA A NOVA ORDEM/NOMES */}
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 {editavel && <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', textAlign: 'center', width: '60px' }}>AÇÕES</th>}
                 <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>NUM SAP | DESENHO</th>
                 <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>REFERÊNCIA</th>
                 <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', minWidth: '200px' }}>DESCRIÇÃO</th>
                 <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>FABRICANTE</th>
-                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '120px', textAlign: 'center' }}>QTDE ENTRADA</th>
+                <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '120px', textAlign: 'center' }}>QTDE</th>
                 <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569', width: '140px' }}>UNID. MEDIDA</th>
                 <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>NUM DA NOTA FISCAL</th>
                 <th style={{ padding: '8px', fontSize: '0.75rem', color: '#475569' }}>FORNECEDOR / REGISTRO</th>
@@ -465,49 +451,34 @@ export default function PainelAprovacao() {
                         onClick={() => removerLinhaItem(index)} 
                         disabled={limiteMinimo}
                         title={limiteMinimo ? "A solicitação precisa de pelo menos 1 item." : "Remover linha"}
-                        style={{ 
-                          background: 'none', border: 'none', padding: '4px', 
-                          color: limiteMinimo ? '#cbd5e1' : '#ef4444', 
-                          cursor: limiteMinimo ? 'not-allowed' : 'pointer' 
-                        }} 
+                        style={{ background: 'none', border: 'none', padding: '4px', color: limiteMinimo ? '#cbd5e1' : '#ef4444', cursor: limiteMinimo ? 'not-allowed' : 'pointer' }} 
                       >
                         <Trash2 size={16} />
                       </button>
                     </td>
                   )}
                   
-                  {/* ✨ MAPEMENTO CORRETO DOS INPUTS NA NOVA ORDEM */}
+                  {/* ✨ AGORA USANDO obterValorSeguro PARA NUNCA DEIXAR BURACOS */}
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.desenhoSAP || item.desenho_sap_manual || item.desenho_sap || ''} onChange={(e) => atualizarCampoItem(index, 'desenhoSAP', e.target.value)} style={estiloInput} placeholder="Desenho SAP" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'desenhoSAP', 'desenho_sap_manual', 'desenho_sap')} onChange={(e) => atualizarCampoItem(index, 'desenhoSAP', e.target.value)} style={estiloInput} placeholder="SAP / Desenho" />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.referencia || ''} onChange={(e) => atualizarCampoItem(index, 'referencia', e.target.value)} style={estiloInput} placeholder="Referência" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'referencia', 'referencia', 'referencia')} onChange={(e) => atualizarCampoItem(index, 'referencia', e.target.value)} style={estiloInput} placeholder="Referência" />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.vendorDescription || item.descricao_manual || item.descricao || ''} onChange={(e) => atualizarCampoItem(index, 'vendorDescription', e.target.value)} style={estiloInput} placeholder="Descrição" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'vendorDescription', 'descricao_manual', 'descricao')} onChange={(e) => atualizarCampoItem(index, 'vendorDescription', e.target.value)} style={estiloInput} placeholder="Descrição" />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.numPecaFabricante || item.part_number_manual || item.part_number || ''} onChange={(e) => atualizarCampoItem(index, 'numPecaFabricante', e.target.value)} style={estiloInput} placeholder="PN" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'numPecaFabricante', 'part_number_manual', 'part_number')} onChange={(e) => atualizarCampoItem(index, 'numPecaFabricante', e.target.value)} style={estiloInput} placeholder="PN" />
                   </td>
 
-                  {/* ✨ CAMPO DE QUANTIDADE COM SETINHAS E BLOQUEIO DE LETRAS */}
                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                     {editavel ? (
                       <input 
-                        type="number" 
-                        min="1"
-                        step="1"
-                        value={item.qtdFornecida || item.quantidade_solicitada || item.quantidade || 1} 
-                        onKeyDown={(e) => {
-                          if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') {
-                            e.preventDefault();
-                          }
-                        }}
-                        onBlur={(e) => {
-                          if (!e.target.value || parseInt(e.target.value, 10) < 1) {
-                            atualizarCampoItem(index, 'qtdFornecida', 1);
-                          }
-                        }}
+                        type="number" min="1" step="1"
+                        value={item.qtdFornecida || item.quantidade_solicitada || 1} 
+                        onKeyDown={(e) => { if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                        onBlur={(e) => { if (!e.target.value || parseInt(e.target.value, 10) < 1) atualizarCampoItem(index, 'qtdFornecida', 1); }}
                         onChange={(e) => {
                           let val = e.target.value;
                           if (val === '0') val = '1';
@@ -517,13 +488,13 @@ export default function PainelAprovacao() {
                       />
                     ) : (
                       <span style={{ display: 'inline-block', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 12px', borderRadius: '6px', fontWeight: '700' }}>
-                        {item.qtdFornecida || item.quantidade_solicitada || item.quantidade || 1}
+                        {item.qtdFornecida || item.quantidade_solicitada || 1}
                       </span>
                     )}
                   </td>
 
                   <td style={{ padding: '6px 8px' }}>
-                    <select disabled={!editavel} value={item.unidadeMedida || item.unidade_medida_manual || 'Unid'} onChange={(e) => atualizarCampoItem(index, 'unidadeMedida', e.target.value)} style={estiloInput}>
+                    <select disabled={!editavel} value={obterValorSeguro(item, 'unidadeMedida', 'unidade_medida_manual', 'unidade_medida') || 'Unid'} onChange={(e) => atualizarCampoItem(index, 'unidadeMedida', e.target.value)} style={estiloInput}>
                       <option value="Unid">Unid</option>
                       <option value="Kg">Kg</option>
                       <option value="Metro">Metro</option>
@@ -533,33 +504,32 @@ export default function PainelAprovacao() {
                     </select>
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.nfEntrada || item.nf_entrada || ''} onChange={(e) => atualizarCampoItem(index, 'nfEntrada', e.target.value)} style={estiloInput} placeholder="NF Entrada" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'nfEntrada', 'nf_entrada', 'nf_entrada')} onChange={(e) => atualizarCampoItem(index, 'nfEntrada', e.target.value)} style={estiloInput} placeholder="NF Entrada" />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.fornecedor || ''} onChange={(e) => atualizarCampoItem(index, 'fornecedor', e.target.value)} style={estiloInput} placeholder="Fornecedor" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'fornecedor', 'fornecedor', 'fornecedor')} onChange={(e) => atualizarCampoItem(index, 'fornecedor', e.target.value)} style={estiloInput} placeholder="Fornecedor" />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.wbsElement || item.wbs_element || item.wbs || ''} onChange={(e) => atualizarCampoItem(index, 'wbsElement', e.target.value)} style={{...estiloInput, color: '#2563eb', fontFamily: 'monospace'}} placeholder="WBS" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'wbsElement', 'wbs_element', 'wbs')} onChange={(e) => atualizarCampoItem(index, 'wbsElement', e.target.value)} style={{...estiloInput, color: '#2563eb', fontFamily: 'monospace'}} placeholder="WBS" />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.nomeProjeto || item.nome_projeto || ''} onChange={(e) => atualizarCampoItem(index, 'nomeProjeto', e.target.value)} style={estiloInput} placeholder="Nome Projeto" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'nomeProjeto', 'nome_projeto', 'nome_projeto')} onChange={(e) => atualizarCampoItem(index, 'nomeProjeto', e.target.value)} style={estiloInput} placeholder="Nome Projeto" />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="date" readOnly={!editavel} value={item.emissaoNF || item.emissao_nf || ''} onChange={(e) => atualizarCampoItem(index, 'emissaoNF', e.target.value)} style={estiloInput} />
+                    <input type="date" readOnly={!editavel} value={obterValorSeguro(item, 'emissaoNF', 'emissao_nf', 'emissao_nf')} onChange={(e) => atualizarCampoItem(index, 'emissaoNF', e.target.value)} style={estiloInput} />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="date" readOnly={!editavel} value={item.recebNF || item.receb_nf || ''} onChange={(e) => atualizarCampoItem(index, 'recebNF', e.target.value)} style={estiloInput} />
+                    <input type="date" readOnly={!editavel} value={obterValorSeguro(item, 'recebNF', 'receb_nf', 'receb_nf')} onChange={(e) => atualizarCampoItem(index, 'recebNF', e.target.value)} style={estiloInput} />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.docCompras || item.documento_compras || ''} onChange={(e) => atualizarCampoItem(index, 'docCompras', e.target.value)} style={estiloInput} placeholder="Doc Compras" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'docCompras', 'documento_compras', 'documento_compras')} onChange={(e) => atualizarCampoItem(index, 'docCompras', e.target.value)} style={estiloInput} placeholder="Doc Compras" />
                   </td>
                   
-                  {/* ✨ FORMATAÇÃO EM TEMPO REAL NO MODO EDIÇÃO */}
                   <td style={{ padding: '6px 8px' }}>
                     <input 
                       type="text" 
                       readOnly={!editavel} 
-                      value={item.poNetPrice || item.valor_unitario_manual || ''} 
+                      value={obterValorSeguro(item, 'poNetPrice', 'valor_unitario_manual', 'valor_unitario')} 
                       onChange={(e) => {
                         const valorLimpo = formatarDinheiroTempoReal(e.target.value);
                         atualizarCampoItem(index, 'poNetPrice', valorLimpo);
@@ -570,13 +540,13 @@ export default function PainelAprovacao() {
                   </td>
 
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.centro || ''} onChange={(e) => atualizarCampoItem(index, 'centro', e.target.value)} style={estiloInput} placeholder="Centro" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'centro', 'centro', 'centro')} onChange={(e) => atualizarCampoItem(index, 'centro', e.target.value)} style={estiloInput} placeholder="Centro" />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.deposito || ''} onChange={(e) => atualizarCampoItem(index, 'deposito', e.target.value)} style={estiloInput} placeholder="Depósito" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'deposito', 'deposito', 'deposito')} onChange={(e) => atualizarCampoItem(index, 'deposito', e.target.value)} style={estiloInput} placeholder="Depósito" />
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <input type="text" readOnly={!editavel} value={item.alocacao || ''} onChange={(e) => atualizarCampoItem(index, 'alocacao', e.target.value)} style={{...estiloInput, color: '#3b82f6', fontFamily: 'monospace'}} placeholder="Alocação" />
+                    <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'alocacao', 'alocacao', 'alocacao')} onChange={(e) => atualizarCampoItem(index, 'alocacao', e.target.value)} style={{...estiloInput, color: '#3b82f6', fontFamily: 'monospace'}} placeholder="Alocação" />
                   </td>
                 </tr>
               ))}
