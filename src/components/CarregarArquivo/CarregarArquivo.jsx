@@ -6,8 +6,8 @@ export default function CarregarArquivo({
   onFileSelect, 
   accept = "*", 
   label = "Clique ou arraste um arquivo", 
-  variante = "area", // Pode ser "area" ou "botao"
-  icone // Ícone customizado opcional
+  variante = "area", 
+  icone 
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
@@ -27,24 +27,23 @@ export default function CarregarArquivo({
     e.preventDefault();
     setIsDragging(false);
     
-    // Pega o ficheiro que foi arrastado
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onFileSelect(e.dataTransfer.files[0]); 
-      e.dataTransfer.clearData(); // Limpa a memória do navegador
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      onFileSelect(file); 
     }
   };
 
   // --- EVENTOS DE CLIQUE E SELEÇÃO ---
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      onFileSelect(e.target.files[0]); 
+    const file = e.target.files?.[0];
+    if (file) {
+      onFileSelect(file); 
     }
     // Reseta o input para permitir selecionar o mesmo ficheiro duas vezes seguidas
     e.target.value = ''; 
   };
 
   const handleClick = () => {
-    // A interrogação garante que não dá erro se o ref estiver vazio
     fileInputRef.current?.click();
   };
 
