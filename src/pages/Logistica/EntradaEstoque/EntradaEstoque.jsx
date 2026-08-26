@@ -12,7 +12,7 @@ import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; 
 import { AuthContext } from '../../../contexts/AuthContext';
-import { useAlert } from '../../../contexts/AlertContext'; // ✨ ADICIONADO AQUI
+import { useAlert } from '../../../contexts/AlertContext';
 import { supabase } from '../../../supabaseClient';
 import { apiFetch } from '../../../services/api';
 
@@ -20,13 +20,13 @@ const LIMITE_LOGISTICA = 60;
 
 export default function EntradaEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
-  const { showAlert } = useAlert(); // ✨ IMPORTAMOS A FUNÇÃO DE ALERTA BONITA
+  const { showAlert } = useAlert();
   
+  // ✨ ESTADO ATUALIZADO: Sem o WBS global
   const [formDados, setFormDados] = useState({
-    nome: '', wbs: '', observacoes: ''
+    nome: '', observacoes: ''
   });
 
-  // ✨ ESTRUTURA ATUALIZADA (Sem Data Necessidade e com Nome do Projeto)
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`, 
     desenhoSAP: '', 
@@ -37,7 +37,7 @@ export default function EntradaEstoque() {
     nfEntrada: '', 
     unidadeMedida: 'Unid', 
     vendorDescription: '', 
-    wbsElement: '', 
+    wbsElement: '', // Fica vazio para ser preenchido na tabela
     nomeProjeto: '', 
     emissaoNF: '', 
     recebNF: '', 
@@ -85,7 +85,6 @@ export default function EntradaEstoque() {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
     if (itensProcessados && Array.isArray(itensProcessados)) {
       
-      // ✨ MAPEAMENTO CIRÚRGICO ATUALIZADO PARA O BACK-OFFICE TAMBÉM
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
         desenhoSAP: item['NUM SAP | DESENHO'] || item['Desenho SAP'] || item.desenhoSAP || '',
@@ -129,7 +128,6 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ ATUALIZAÇÃO SEGURA: Transforma sempre em inteiro e ignora lixo no array do React
   const atualizarCampo = (id, campo, novoValor) => {
     setItens(itens.map(item => {
       if (item.id === id) {
@@ -161,8 +159,9 @@ export default function EntradaEstoque() {
       return;
     }
 
-    if (!formDados.nome || !formDados.wbs) {
-      showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS do operador.", "warning");
+    // ✨ VALIDAÇÃO ATUALIZADA: Exige apenas o nome agora
+    if (!formDados.nome) {
+      showAlert("Campos Obrigatórios", "Preencha o Nome do operador.", "warning");
       return;
     }
     
@@ -195,7 +194,6 @@ export default function EntradaEstoque() {
         }
       }
 
-      // ✨ PAYLOAD MAPEADO COM AS NOVAS COLUNAS PARA O BACKEND
       const payload = {
         solicitante: { 
           ...formDados, 
@@ -232,7 +230,7 @@ export default function EntradaEstoque() {
 
       if (dados.sucesso || dados.ps_id || dados.ps) {
         showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps_id || dados.ps}`, "success");
-        setFormDados({ nome: '', wbs: '', observacoes: '' });
+        setFormDados({ nome: '', observacoes: '' }); // Limpa sem o WBS
         setItens([]);
         setAnexos([]);
       } else {
@@ -243,13 +241,11 @@ export default function EntradaEstoque() {
     }
   };
 
-  // LÓGICA DO INDICADOR: Verifica cada batida de tecla!
   const nfsNormalizadas = nfsCrossdocking.map(nf => String(nf).trim().toUpperCase());
   const nfsNaTabela = itens
     .map(i => String(i.nfEntrada || '').trim().toUpperCase())
     .filter(nf => nf !== '' && nfsNormalizadas.includes(nf));
     
-  // Tira duplicatas para exibir no alerta
   const nfsUnicasEncontradas = [...new Set(nfsNaTabela)];
   const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
 
@@ -269,23 +265,21 @@ export default function EntradaEstoque() {
             <h2 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, color: '#0f172a' }}>Operador Responsável</h2>
           </div>
         </div>
-        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        
+        {/* ✨ GRID ATUALIZADO: Sem o campo WBS */}
+        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
           <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
             <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>NOME *</label>
             <input type="text" className="input-campo" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none' }} />
           </div>
+          
           <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>WBS *</label>
-            <input type="text" className="input-campo" placeholder="Ex: WBS-PRJ-2024-001" value={formDados.wbs} onChange={(e) => setFormDados({...formDados, wbs: e.target.value})} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none' }} />
-          </div>
-          <div className="input-grupo" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column' }}>
             <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>OBSERVAÇÕES</label>
             <textarea className="input-campo" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})} style={{ minHeight: '42px', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none', resize: 'vertical' }}></textarea>
           </div>
         </div>
       </div>
 
-      {/* ✨ BANNER ANIMADO DE AVISO DE CROSSDOCKING */}
       {temCrossdockingAguardando && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '16px',
@@ -307,7 +301,6 @@ export default function EntradaEstoque() {
         </div>
       )}
 
-      {/* COMPONENTE DA TABELA (Sem DataNecessidade) */}
       <TabelaInsercaoItens 
         itens={itens}
         limiteLinhas={LIMITE_LOGISTICA} 
