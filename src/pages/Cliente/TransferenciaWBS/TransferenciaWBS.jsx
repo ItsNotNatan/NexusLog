@@ -27,6 +27,7 @@ export default function TransferenciaWBS() {
   const [estoqueReal, setEstoqueReal] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
+  // Buscar dados e ligar o radar em tempo real
   useEffect(() => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       setEstoqueReal([]); setCarregandoEstoque(false); return;
@@ -39,6 +40,7 @@ export default function TransferenciaWBS() {
           const itensComSaldo = resultado.dados.filter(item => item.quantidade_disponivel > 0);
           setEstoqueReal(itensComSaldo);
 
+          // SINCRONIZA O CARRINHO EM TEMPO REAL
           setItensSelecionados(prevSelecionados => 
             prevSelecionados.map(selecionado => {
               const itemFresco = itensComSaldo.find(i => i.id === selecionado.id);
@@ -67,6 +69,7 @@ export default function TransferenciaWBS() {
     
     carregarEstoque();
 
+    // CONFIGURAÇÃO DO SOCKET.IO
     const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
@@ -78,7 +81,6 @@ export default function TransferenciaWBS() {
   }, [estoqueAtual]); 
 
   const adicionarItem = (itemOriginal) => {
-    // ✨ LIMITE REDUZIDO PARA 20!
     if (itensSelecionados.length >= 20) { showAlert("Limite Atingido", "Limite máximo de 20 itens.", "warning"); return; }
     
     const saldoLivre = itemOriginal.quantidade_disponivel - (itemOriginal.quantidade_reservada || 0);
@@ -186,7 +188,7 @@ export default function TransferenciaWBS() {
           carregando={carregandoEstoque} 
           itensSelecionados={itensSelecionados} 
           bloquearTransferidos={true} 
-          limiteMaximo={20} // ✨ INJETADO O NOVO LIMITE NO SELETOR!
+          limiteMaximo={20}
           onAdicionarItem={adicionarItem} 
           onRemoverItem={removerItem}
           onAtualizarQuantidade={atualizarQuantidade}

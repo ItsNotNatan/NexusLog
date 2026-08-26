@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/components/TabelaInsercaoItens/TabelaInsercaoItens.jsx
-// DESCRIÇÃO: Tabela componentizada para entrada de itens (Limpa e sem Data de Necessidade)
+// DESCRIÇÃO: Tabela componentizada para entrada de itens (Limpa e Segura)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
@@ -38,8 +38,6 @@ export default function TabelaInsercaoItens({
   const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
 
   const limiteAtingido = itens.length >= limiteLinhas;
-  
-  // Largura reajustada após remoção da coluna
   const larguraMinimaTabela = '2750px';
 
   return (
@@ -121,7 +119,6 @@ export default function TabelaInsercaoItens({
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>CENTRO DE CUSTO - WBS</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NOME CENTRO DE CUSTO / PROJETO</th>
-                {/* ✨ Coluna de Data de Necessidade foi apagada daqui */}
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>EMISSÃO NF</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>RECEB. NF</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>Nº PEDIDO DE COMPRA / CPV</th>
@@ -156,8 +153,38 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela badge-partnumber" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', fontWeight: '600' }} value={item.numPecaFabricante} onChange={(e) => onAtualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
                   </td>
 
-                  <td className="qtd-solicitada-destaque" style={{ padding: '8px', textAlign: 'center' }}>
-                    <input type="number" className="input-inline-tabela" style={{ width: '60px', padding: '4px 8px', border: '1px solid transparent', borderRadius: '4px', color: '#2563eb', fontWeight: '700', textAlign: 'center', backgroundColor: '#eff6ff', outline: 'none' }} value={item.qtdFornecida} onChange={(e) => onAtualizarCampo(item.id, 'qtdFornecida', e.target.value)} placeholder="0" min="1" />
+                  {/* ✨ CAMPO DE QUANTIDADE REFORMULADO: SETINHAS VISÍVEIS E BLOQUEIOS RÍGIDOS */}
+                  <td style={{ padding: '8px', textAlign: 'center' }}>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      step="1"
+                      style={{ 
+                        width: '75px', padding: '6px 8px', border: '1px solid #bfdbfe', 
+                        borderRadius: '6px', color: '#2563eb', fontWeight: '700', 
+                        textAlign: 'center', backgroundColor: '#eff6ff', outline: 'none',
+                        cursor: 'text'
+                      }} 
+                      value={item.qtdFornecida} 
+                      onKeyDown={(e) => {
+                        // Bloqueia ponto, vírgula, sinal de menos, 'e' e 'E'
+                        if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') {
+                          e.preventDefault();
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Se o utilizador apagar o número e sair do campo, volta a 1 automaticamente
+                        if (!e.target.value || parseInt(e.target.value, 10) < 1) {
+                          onAtualizarCampo(item.id, 'qtdFornecida', 1);
+                        }
+                      }}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        if (val === '0') val = '1'; // Não permite que o utilizador comece a digitar 0
+                        onAtualizarCampo(item.id, 'qtdFornecida', val);
+                      }} 
+                      placeholder="1" 
+                    />
                   </td>
 
                   <td style={{ padding: '8px' }}>
@@ -187,7 +214,6 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.nomeProjeto || ''} onChange={(e) => onAtualizarCampo(item.id, 'nomeProjeto', e.target.value)} placeholder="Nome Projeto" />
                   </td>
 
-                  {/* ✨ Datas de NF corrigidas: Agora permitem qualquer data no passado sem restrições! */}
                   <td style={{ padding: '8px' }}>
                     <input type="date" className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} value={item.emissaoNF} onChange={(e) => onAtualizarCampo(item.id, 'emissaoNF', e.target.value)} onClick={(e) => e.target.showPicker && e.target.showPicker()} />
                   </td>
@@ -229,7 +255,6 @@ export default function TabelaInsercaoItens({
               
               {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
                 <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
-                  {/* ✨ colSpan ajustado para 18 colunas totais */}
                   <td colSpan={18} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
                 </tr>
               ))}
