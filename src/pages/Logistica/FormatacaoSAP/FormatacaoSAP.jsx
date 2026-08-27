@@ -23,8 +23,19 @@ export default function FormatacaoSAP() {
   const [categoriaGeral, setCategoriaGeral] = useState('');
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
 
-  // Opções de Categoria para o SAP
-  const opcoesCategoria = ['Preencher .', 'Consumo', 'Imobilizado', 'Transferência', 'Venda'];
+  // ✨ Opções de Categoria para o SAP (Atualizado com ZBN3, ZNB4, ZBRI, ZBE3, ZBE4)
+  const opcoesCategoria = [
+    'Preencher .', 
+    'Consumo', 
+    'Imobilizado', 
+    'Transferência', 
+    'Venda',
+    'ZBN3',
+    'ZNB4',
+    'ZBRI',
+    'ZBE3',
+    'ZBE4'
+  ];
 
   // ---------------------------------------------------------------------------
   // 1. BUSCA DE DADOS NA API
