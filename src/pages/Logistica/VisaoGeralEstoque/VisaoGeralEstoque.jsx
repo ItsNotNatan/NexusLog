@@ -244,15 +244,21 @@ export default function VisaoGeralEstoque({ perfil }) {
     (item.nome_projeto && item.nome_projeto.toLowerCase().includes(termoPesquisa.toLowerCase()))
   );
 
-  const kpiTotalItens = estoqueFiltrado.length;
-  const kpiDisponiveis = estoqueFiltrado.filter(i => Number(i.quantidade_disponivel) > 0).length;
-  const kpiReservados = estoqueFiltrado.filter(i => i.alocacao && i.alocacao !== '-' && i.alocacao.toUpperCase() !== 'PENDENTE').length;
+  // ✨ ATUALIZAÇÃO DOS CÁLCULOS: Agora somam as quantidades em vez de contar as linhas!
+  const kpiTotalItens = estoqueFiltrado.reduce((acc, item) => acc + (Number(item.quantidade_disponivel) || 0), 0);
+  const kpiReservados = estoqueFiltrado.reduce((acc, item) => acc + (Number(item.quantidade_reservada) || 0), 0);
+  
+  // Disponíveis reais = Total de peças menos as que estão reservadas
+  const kpiDisponiveis = Math.max(0, kpiTotalItens - kpiReservados);
   
   const kpiValorTotal = estoqueFiltrado.reduce((acc, item) => {
     const qtd = Number(item.quantidade_disponivel) || 0;
     const valor = Number(item.valor_unitario) || 0;
     return acc + (qtd * valor);
   }, 0);
+
+  // Formatação bonita para os KPIs de quantidade (ex: 1.500)
+  const formatarQtd = (num) => new Intl.NumberFormat('pt-BR').format(num);
 
   // ==========================================
   // EXPORTAR EXCEL NA NOVA ORDEM E SEM DATA DE NECESSIDADE
@@ -264,7 +270,6 @@ export default function VisaoGeralEstoque({ perfil }) {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Visão Geral do Estoque');
 
-      // ✨ EXCEL: MAPEAMENTO CIRÚRGICO SEM DATA NECESSIDADE
       worksheet.columns = [
         { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
         { header: 'REFERÊNCIA', key: 'ref', width: 20 },
@@ -359,16 +364,16 @@ export default function VisaoGeralEstoque({ perfil }) {
         
         <div className="vg-dash-direita">
           <div className="kpi-mini-card">
-            <span>Total de Itens</span>
-            <strong className="kpi-black">{kpiTotalItens}</strong>
+            <span>Volume Total (Qtd)</span>
+            <strong className="kpi-black">{formatarQtd(kpiTotalItens)}</strong>
           </div>
           <div className="kpi-mini-card">
-            <span>Disponíveis</span>
-            <strong className="kpi-green">{kpiDisponiveis}</strong>
+            <span>Saldo Disponível</span>
+            <strong className="kpi-green">{formatarQtd(kpiDisponiveis)}</strong>
           </div>
           <div className="kpi-mini-card">
-            <span>Reservados</span>
-            <strong className="kpi-orange">{kpiReservados}</strong>
+            <span>Total Reservado</span>
+            <strong className="kpi-orange">{formatarQtd(kpiReservados)}</strong>
           </div>
         </div>
       </div>
@@ -390,7 +395,6 @@ export default function VisaoGeralEstoque({ perfil }) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2400px' }}>
             <thead>
-              {/* ✨ NOVA ORDEM DE CABEÇALHOS (SEM DATA DE NECESSIDADE) */}
               <tr style={{ backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', width: '40px', textAlign: 'center' }}></th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
@@ -430,7 +434,6 @@ export default function VisaoGeralEstoque({ perfil }) {
                       <History size={16} color="#94a3b8" />
                     </td>
 
-                    {/* ✨ COLUNAS REORGANIZADAS PARA A NOVA ORDEM */}
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
                       <CelulaEditavel item={item} field="desenho_sap" style={{ fontFamily: 'monospace', color: '#2563eb', fontWeight: '600' }} />
                     </td>
