@@ -1,7 +1,7 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
 // DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP
-//            (Atualizado: Nomenclatura unificada para PL - Packing List)
+//            (Exclusivo para PL - Packing Lists Concluídas)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
@@ -18,8 +18,6 @@ export default function FormatacaoSAP() {
   // ---------------------------------------------------------------------------
   // ESTADOS DA INTERFACE
   // ---------------------------------------------------------------------------
-  // ✨ Aba inicial definida como 'PL' em vez de 'BS'
-  const [abaAtiva, setAbaAtiva] = useState('PL'); 
   const [busca, setBusca] = useState('');
   const [selecionados, setSelecionados] = useState([]); // IDs das solicitações selecionadas
   const [categoriaGeral, setCategoriaGeral] = useState('');
@@ -65,18 +63,13 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais({});
   };
 
-  // Filtra as solicitações para a lista da esquerda
+  // Filtra as solicitações para a lista da esquerda (Apenas PLs válidas)
   const listaFiltrada = solicitacoes.filter(sol => {
-    const termo = busca.toLowerCase();
     const isPL = sol.pl && sol.pl !== '-'; // Verifica se tem Packing List gerada
-    
-    // Filtra pela Aba (PL ou PS)
-    if (abaAtiva === 'PL' && !isPL) return false;
-    if (abaAtiva === 'PS' && isPL) return false;
+    if (!isPL) return false;
 
-    // Filtra pela barra de Pesquisa
-    const identificador = abaAtiva === 'PL' ? sol.pl : sol.ps;
-    return identificador?.toLowerCase().includes(termo) || 
+    const termo = busca.toLowerCase();
+    return sol.pl.toLowerCase().includes(termo) || 
            sol.solicitante?.toLowerCase().includes(termo) ||
            sol.wbs?.toLowerCase().includes(termo);
   });
@@ -85,12 +78,9 @@ export default function FormatacaoSAP() {
   const itensConsolidados = solicitacoes
     .filter(sol => selecionados.includes(sol.id))
     .flatMap(sol => {
-      // Define a origem como a PL (se existir) ou a PS
-      const identificador = sol.pl && sol.pl !== '-' ? sol.pl : sol.ps;
-      
       return (sol.itens || []).map(item => ({
         idLinha: `${sol.id}-${item.id}`,
-        origem: identificador,
+        origem: sol.pl, // Usa sempre a PL
         desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
         quantidade: item.quantidade_solicitada || item.qtd || 1,
         valorUnitario: item.valor_unitario_manual || 0,
@@ -155,27 +145,12 @@ export default function FormatacaoSAP() {
         
         {/* ================= COLUNA ESQUERDA: LISTA E PESQUISA ================= */}
         <div className="form-sap-coluna-esq">
-          <div className="sap-abas">
-            <button 
-              className={`sap-btn-aba ${abaAtiva === 'PL' ? 'ativo' : ''}`}
-              onClick={() => setAbaAtiva('PL')}
-            >
-              Packing Lists (PL)
-            </button>
-            <button 
-              className={`sap-btn-aba ${abaAtiva === 'PS' ? 'ativo' : ''}`}
-              onClick={() => setAbaAtiva('PS')}
-            >
-              Solicitações (PS)
-            </button>
-          </div>
-
           <div className="sap-pesquisa-caixa">
             <div className="sap-input-wrapper">
               <Search size={16} className="sap-icone-pesquisa" />
               <input 
                 type="text" 
-                placeholder="Buscar por nº PL, WBS..." 
+                placeholder="Buscar por nº PL, WBS ou Solicitante..." 
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
               />
@@ -193,15 +168,13 @@ export default function FormatacaoSAP() {
 
           <div className="sap-lista-scroll">
             {carregando ? (
-              <div className="sap-estado-vazio">A carregar documentos...</div>
+              <div className="sap-estado-vazio">A carregar Packing Lists...</div>
             ) : listaFiltrada.length === 0 ? (
-              <div className="sap-estado-vazio">Nenhum documento encontrado.</div>
+              <div className="sap-estado-vazio">Nenhuma PL concluída encontrada.</div>
             ) : (
               listaFiltrada.map(sol => {
                 const isSelected = selecionados.includes(sol.id);
-                // Utiliza a PL diretamente, sem substituir texto
-                const identificador = abaAtiva === 'PL' ? sol.pl : sol.ps;
-                const dataFormatada = sol.criacaoPl !== '—' ? sol.criacaoPl.split(' ')[0] : 'N/D';
+                const dataFormatada = sol.criacaoPl && sol.criacaoPl !== '—' ? sol.criacaoPl.split(' ')[0] : 'N/D';
                 const qtdItens = sol.itens ? sol.itens.length : 0;
 
                 return (
@@ -214,7 +187,7 @@ export default function FormatacaoSAP() {
                       {isSelected ? <CheckCircle2 size={20} color="#2563eb" className="check-preenchido" /> : <Circle size={20} color="#cbd5e1" />}
                     </div>
                     <div className="sap-item-detalhes">
-                      <div className="sap-item-titulo">{identificador}</div>
+                      <div className="sap-item-titulo">{sol.pl}</div>
                       <div className="sap-item-subtitulo">
                         {sol.solicitante.toUpperCase()} · {qtdItens} itens · {dataFormatada}
                       </div>
@@ -250,7 +223,7 @@ export default function FormatacaoSAP() {
                 <div className="sap-tags-selecionadas">
                   {solicitacoes.filter(s => selecionados.includes(s.id)).slice(0, 3).map(s => (
                     <span key={s.id} className="sap-tag">
-                      {abaAtiva === 'PL' ? s.pl : s.ps} 
+                      {s.pl} 
                       <X size={12} onClick={() => toggleSelecao(s.id)} />
                     </span>
                   ))}
