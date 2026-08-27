@@ -9,14 +9,11 @@ import {
   AlertCircle, Plus, Trash2, Save, XCircle
 } from 'lucide-react';
 
-// ✨ IMPORTAÇÃO DO SOCKET.IO
+// ✨ IMPORTAÇÃO DO SOCKET.IO E FORMATADORES
 import { io } from 'socket.io-client';
-
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
-
-// ✨ IMPORTAÇÃO DO FORMATADOR CENTRALIZADO
 import { formatarDinheiroTempoReal } from '../../../utils/formatadores';
 
 const obterNomeFilial = (codigo) => {
@@ -147,22 +144,31 @@ export default function PainelAprovacao() {
     };
   }, [estoqueAtual]);
 
-  // ✨ FUNÇÃO INTELIGENTE: Puxa o dado onde quer que ele esteja (Front, DB Solicitacoes ou DB Estoque)
+  // ✨ FUNÇÃO INTELIGENTE (À PROVA DE BALAS): Agora ignora completamente nulos, undefined e vazios!
   const obterValorSeguro = (item, chaveFront, chaveBack, chaveEstoque) => {
-    // 1. Tenta pegar do que o utilizador acabou de editar
-    if (item[chaveFront] !== undefined && item[chaveFront] !== '') return item[chaveFront];
     
-    // 2. Tenta pegar do que veio da tabela de solicitações
-    if (item[chaveBack] !== undefined && item[chaveBack] !== null && item[chaveBack] !== '') return item[chaveBack];
+    const validarValor = (valor) => {
+      if (valor === undefined || valor === null) return false;
+      const str = String(valor).trim();
+      if (str === '' || str === '-' || str === 'null') return false;
+      return true;
+    };
+
+    // 1. Tenta pegar do que o utilizador acabou de editar no Front
+    if (validarValor(item[chaveFront])) return item[chaveFront];
     
-    // 3. Se for Retirada/Transferência, vai buscar as colunas em falta ao Estoque físico[cite: 1]
+    // 2. Tenta pegar do que veio da tabela de solicitações (Back)
+    if (validarValor(item[chaveBack])) return item[chaveBack];
+    
+    // 3. Se for Retirada/Transferência, cruza as colunas em falta com o Estoque físico real!
     if (item.estoque_id && estoque.length > 0) {
       const itemFisico = estoque.find(e => e.id === item.estoque_id);
-      if (itemFisico && itemFisico[chaveEstoque] !== undefined && itemFisico[chaveEstoque] !== null && itemFisico[chaveEstoque] !== '') {
+      if (itemFisico && validarValor(itemFisico[chaveEstoque])) {
         return itemFisico[chaveEstoque];
       }
     }
-    return '';
+    
+    return ''; // Se não achar de todo, devolve vazio limpo para a tabela
   };
 
   const dadosFiltrados = dadosTabela.filter((linha) => {
@@ -458,7 +464,6 @@ export default function PainelAprovacao() {
                     </td>
                   )}
                   
-                  {/* ✨ AGORA USANDO obterValorSeguro PARA NUNCA DEIXAR BURACOS */}
                   <td style={{ padding: '6px 8px' }}>
                     <input type="text" readOnly={!editavel} value={obterValorSeguro(item, 'desenhoSAP', 'desenho_sap_manual', 'desenho_sap')} onChange={(e) => atualizarCampoItem(index, 'desenhoSAP', e.target.value)} style={estiloInput} placeholder="SAP / Desenho" />
                   </td>

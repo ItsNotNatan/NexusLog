@@ -68,6 +68,14 @@ const converterParaInputDateTime = (dataString) => {
   return '';
 };
 
+// ✨ FUNÇÃO AUXILIAR INTELIGENTE: Puxa o valor da solicitação ou cruza com o estoque
+const obterValorSeguro = (valItem, valEstoque) => {
+  const validar = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== 'null';
+  if (validar(valItem)) return valItem;
+  if (validar(valEstoque)) return valEstoque;
+  return '';
+};
+
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
@@ -142,6 +150,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
           );
 
+          const estoqueReferencia = resultadoEst.sucesso ? resultadoEst.dados : [];
+
           const dadosFormatados = resultadoSol.dados.map((item) => {
             let prefixo = "PS";
             const idNumerico = item.id.replace(/\D/g, "");
@@ -190,6 +200,30 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
+            // ✨ AQUI: ENRIQUECIMENTO DOS ITENS! 
+            // Cruza a informação da solicitação com a prateleira física do estoque para preencher os buracos nas Retiradas
+            const itensEnriquecidos = (item.itens || []).map(it => {
+              const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
+                ? estoqueReferencia.find(e => e.id === it.estoque_id)
+                : null;
+                
+              return {
+                ...it,
+                referencia: obterValorSeguro(it.referencia, itemFisico?.referencia),
+                fornecedor: obterValorSeguro(it.fornecedor, itemFisico?.fornecedor),
+                nf_entrada: obterValorSeguro(it.nf_entrada, itemFisico?.nf_entrada),
+                wbs_element: obterValorSeguro(it.wbs_element, itemFisico?.wbs),
+                nome_projeto: obterValorSeguro(it.nome_projeto, itemFisico?.nome_projeto),
+                emissao_nf: obterValorSeguro(it.emissao_nf, itemFisico?.emissao_nf),
+                receb_nf: obterValorSeguro(it.receb_nf, itemFisico?.receb_nf),
+                documento_compras: obterValorSeguro(it.documento_compras, itemFisico?.documento_compras),
+                valor_unitario_manual: obterValorSeguro(it.valor_unitario_manual, itemFisico?.valor_unitario),
+                centro: obterValorSeguro(it.centro, itemFisico?.centro),
+                deposito: obterValorSeguro(it.deposito, itemFisico?.deposito),
+                alocacao: obterValorSeguro(it.alocacao, itemFisico?.alocacao)
+              };
+            });
+
             return {
               ...item,
               idOriginal: item.id,
@@ -202,7 +236,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataSolicitacao: item.dataSolicitacao || "-",
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
-              nfCrossdocking: item.nfCrossdocking || null
+              nfCrossdocking: item.nfCrossdocking || null,
+              itens: itensEnriquecidos // ✨ Substitui pela versão completa
             };
           });
 
@@ -483,8 +518,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   }
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
                   
-                  // ✨ AQUI ESTÁ A LÓGICA DO MODO VERMELHO CORRIGIDA! 
-                  // Agora engloba tanto o STATUS "Cancelado" quanto o TIPO "Cancelado" (o pedido de cancelamento de PL)
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado' || linha.tipo === 'Cancelado';
                   
                   const corTextoForte = isRecusadoOuCancelado ? "#991b1b" : "#1e293b";
