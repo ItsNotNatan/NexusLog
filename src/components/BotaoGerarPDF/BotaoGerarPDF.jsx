@@ -49,22 +49,45 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const dataEntrega = formatarDataSimples(linha.data_entrega || linha.dataEntrega);
 
       // ==========================================
-      // CONSTRUÇÃO DA TABELA DE ITENS (Igual à imagem)
+      // CONSTRUÇÃO DA TABELA DE ITENS (Com as 5 novas colunas)
       // ==========================================
-      const colWidths = ['4%', '12%', '14%', '5%', '6%', '23%', '10%', '6%', '7%', '7%', '6%'];
+      // Reduzimos a percentagem de algumas colunas para fazer caber as novas 5
+      const colWidths = [
+        '3%',  // ITEM
+        '8%',  // DESENHO
+        '5%',  // REFERÊNCIA (NOVO)
+        '10%', // PART NUMBER
+        '15%', // DESCRIÇÃO
+        '4%',  // QTD
+        '4%',  // UNID
+        '7%',  // FORNECEDOR
+        '7%',  // NF ENTRADA
+        '5%',  // ALOCAÇÃO
+        '6%',  // VLOR UNIT
+        '5%',  // WBS
+        '5%',  // PROJETO (NOVO)
+        '5%',  // EMISSÃO NF (NOVO)
+        '5%',  // RECEB. NF (NOVO)
+        '6%'   // PEDIDO DE COMPRA / CPV (NOVO)
+      ];
       
       const headerRow = [
-        { text: 'ITEM', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
-        { text: 'DESENHO', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
-        { text: 'PART NUMBER', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
-        { text: 'QTD', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
-        { text: 'UNID', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
-        { text: 'DESCRIÇÃO', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
-        { text: 'FORNECEDOR', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
-        { text: 'NF ENTRADA', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
-        { text: 'ALOCAÇÃO', bold: true, fontSize: 6, fillColor: '#e2e8f0', margin: [0, 2] },
-        { text: 'VLOR UNIT', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
-        { text: 'WBS', bold: true, fontSize: 6, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] }
+        { text: 'ITEM', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'DESENHO', bold: true, fontSize: 5, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'REFERÊNCIA', bold: true, fontSize: 5, fillColor: '#e2e8f0', margin: [0, 2] }, // ✨ NOVO
+        { text: 'PART NUMBER', bold: true, fontSize: 5, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'DESCRIÇÃO', bold: true, fontSize: 5, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'QTD', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'UNID', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'FORNECEDOR', bold: true, fontSize: 5, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'NF ENTRADA', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'ALOCAÇÃO', bold: true, fontSize: 5, fillColor: '#e2e8f0', margin: [0, 2] },
+        { text: 'VLOR UNIT', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'WBS', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] },
+        { text: 'PROJETO', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] }, // ✨ NOVO
+        { text: 'EMISSÃO NF', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] }, // ✨ NOVO
+        { text: 'RECEB. NF', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] }, // ✨ NOVO
+        { text: 'PED. COMPRA / CPV', bold: true, fontSize: 5, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 2] } // ✨ NOVO
       ];
 
       let bodyRows = [headerRow];
@@ -72,29 +95,36 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       if (linha.itens && linha.itens.length > 0) {
         linha.itens.forEach((it, index) => {
           bodyRows.push([
-            { text: (index + 1).toString(), fontSize: 6, alignment: 'center', margin: [0, 3] },
-            { text: it.desenho_sap_manual || '-', fontSize: 6, margin: [0, 3] },
-            { text: it.part_number_manual || '-', fontSize: 6, bold: true, margin: [0, 3] },
-            { text: it.quantidade_solicitada || '-', fontSize: 6, alignment: 'center', margin: [0, 3] },
-            { text: it.unidade_medida_manual || 'Un', fontSize: 6, alignment: 'center', margin: [0, 3] },
-            { text: it.descricao_manual || '-', fontSize: 6, margin: [0, 3] },
-            { text: it.fornecedor || '-', fontSize: 6, margin: [0, 3] },
-            { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 6, alignment: 'center', margin: [0, 3] },
-            { text: it.alocacao || '-', fontSize: 6, margin: [0, 3] },
-            { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', fontSize: 6, alignment: 'center', margin: [0, 3] },
-            { text: it.wbs_element || '-', fontSize: 6, color: '#2563eb', alignment: 'center', margin: [0, 3], bold: true }
+            { text: (index + 1).toString(), fontSize: 5, alignment: 'center', margin: [0, 3] },
+            { text: it.desenho_sap_manual || '-', fontSize: 5, margin: [0, 3] },
+            { text: it.referencia || '-', fontSize: 5, margin: [0, 3] }, // ✨ NOVO
+            { text: it.part_number_manual || '-', fontSize: 5, bold: true, margin: [0, 3] },
+            { text: it.descricao_manual || '-', fontSize: 5, margin: [0, 3] },
+            { text: it.quantidade_solicitada || '-', fontSize: 5, alignment: 'center', margin: [0, 3] },
+            { text: it.unidade_medida_manual || 'Un', fontSize: 5, alignment: 'center', margin: [0, 3] },
+            { text: it.fornecedor || '-', fontSize: 5, margin: [0, 3] },
+            { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 5, alignment: 'center', margin: [0, 3] },
+            { text: it.alocacao || '-', fontSize: 5, margin: [0, 3] },
+            { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', fontSize: 5, alignment: 'center', margin: [0, 3] },
+            { text: it.wbs_element || '-', fontSize: 5, color: '#2563eb', alignment: 'center', margin: [0, 3], bold: true },
+            { text: it.nome_projeto || '-', fontSize: 5, alignment: 'center', margin: [0, 3] }, // ✨ NOVO
+            { text: formatarDataSimples(it.emissao_nf) || '-', fontSize: 5, alignment: 'center', margin: [0, 3] }, // ✨ NOVO
+            { text: formatarDataSimples(it.receb_nf) || '-', fontSize: 5, alignment: 'center', margin: [0, 3] }, // ✨ NOVO
+            { text: it.documento_compras || '-', fontSize: 5, alignment: 'center', margin: [0, 3] } // ✨ NOVO
           ]);
         });
       }
 
-      // Preencher linhas vazias para criar a grelha estilo formulário físico
+      // Preencher linhas vazias para criar a grelha estilo formulário físico (Atualizado para 16 colunas)
       const minRows = 20;
       for (let i = bodyRows.length; i <= minRows; i++) {
         bodyRows.push([
-          { text: '', fontSize: 6, margin: [0, 5] }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
-          { text: '', fontSize: 6 }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
-          { text: '', fontSize: 6 }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
-          { text: '', fontSize: 6 }, { text: '', fontSize: 6 }
+          { text: '', fontSize: 5, margin: [0, 5] }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
+          { text: '', fontSize: 5 }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
+          { text: '', fontSize: 5 }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
+          { text: '', fontSize: 5 }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
+          { text: '', fontSize: 5 }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
+          { text: '', fontSize: 5 }
         ]);
       }
 
@@ -104,7 +134,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const docDefinition = {
         pageSize: 'A4',
         pageOrientation: 'landscape',
-        pageMargins: [15, 15, 15, 15], 
+        pageMargins: [10, 15, 10, 15], // Margens laterais reduzidas para dar mais espaço à tabela
         content: [
           
           // --- BLOCO 1: CABEÇALHO (Grid Igual à Imagem) ---
