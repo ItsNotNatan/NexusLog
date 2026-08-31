@@ -13,7 +13,7 @@ import {
 import { io } from 'socket.io-client';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
-import { apiFetch, urlDoServidor } from '../../../services/api';
+import { apiFetch } from '../../../services/api';
 import { formatarDinheiroTempoReal } from '../../../utils/formatadores';
 
 const obterNomeFilial = (codigo) => {
@@ -128,7 +128,8 @@ export default function PainelAprovacao() {
 
     buscarDados();
 
-    const SOCKET_URL = urlDoServidor();
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
 
     const socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling']
@@ -659,19 +660,19 @@ export default function PainelAprovacao() {
                               <Eye size={16} /> {isExpandida ? "Fechar Itens" : "Ver Itens"}
                             </button>
 
+                            {/* ✨ BOTÃO RECUSAR SEMPRE VISÍVEL! */}
+                            <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => abrirModalRecusa(e, linha.idOriginal)}>
+                              <X size={16} /> Recusar
+                            </button>
+
                             {isCrossdocking && !nfNoEstoque ? (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#fef3c7', color: '#d97706', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '500', marginLeft: '12px' }}>
                                 <AlertCircle size={16} /> Aguardando NF {linha.nfCrossdocking}
                               </div>
                             ) : (
-                              <>
-                                <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => abrirModalRecusa(e, linha.idOriginal)}>
-                                  <X size={16} /> Recusar
-                                </button>
-                                <button className="btn-acao-lista btn-aprovar-solid azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
-                                  <Check size={16} /> Aprovar
-                                </button>
-                              </>
+                              <button className="btn-acao-lista btn-aprovar-solid azul" onClick={(e) => handleAprovar(e, linha.idOriginal)}>
+                                <Check size={16} /> Aprovar
+                              </button>
                             )}
                           </div>
                         </div>
@@ -747,7 +748,7 @@ export default function PainelAprovacao() {
 
                           <div className="item-acoes-grupo">
                             <button className="btn-acao-lista btn-ver-itens" onClick={() => toggleLinha(idUnico, linha)}>
-                              <Eye size={16} /> {isExpandida ? "Fechar Itens" : "Ver / Editar Itens"}
+                              <Eye size={16} /> {isExpandida ? "Fechar / Editar Itens" : "Ver / Editar Itens"}
                             </button>
 
                             <button className="btn-acao-lista btn-recusar-outline" onClick={(e) => abrirModalRecusa(e, linha.idOriginal)}>
