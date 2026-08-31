@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Search, Loader2, PackageOpen, X, History, Download, DollarSign } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
-import { apiFetch } from '../../../services/api';
+import { apiFetch, urlDoServidor } from '../../../services/api';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -65,8 +65,7 @@ export default function VisaoGeralEstoque({ perfil }) {
     buscarEstoque();
 
     // ✨ SOCKET.IO: Atualiza o saldo instantaneamente se alguém der entrada/saída
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+    const SOCKET_URL = urlDoServidor();
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
     socket.on('estoque_atualizado', () => {

@@ -11,9 +11,8 @@ import { useAlert } from '../../../contexts/AlertContext';
 import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import BotaoGerarPDF from "../../../components/BotaoGerarPDF/BotaoGerarPDF";
-import ScrollDuplo from "../../../components/ScrollDuplo/ScrollDuplo"; 
-import { supabase } from "../../../supabaseClient";
-import { apiFetch } from '../../../services/api';
+import ScrollDuplo from "../../../components/ScrollDuplo/ScrollDuplo";
+import { apiFetch, urlDoServidor, enviarArquivos } from '../../../services/api';
 import { io } from 'socket.io-client';
 
 const renderBadgeStatus = (status) => {
@@ -260,8 +259,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (token) {
       buscarDados();
 
-      const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
+      const SOCKET_URL = urlDoServidor();
       const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
       
       socket.on('solicitacoes_atualizadas', () => {
@@ -415,21 +413,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     try {
       setCarregando(true);
-      const anexosProcessados = [];
-      for (const arquivo of anexosNovos) {
-        const extensao = arquivo.name.split(".").pop();
-        const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
-        const caminhoNoStorage = `uploads/${nomeUnico}`;
-
-        const { error: erroUpload } = await supabase.storage.from("documentos").upload(caminhoNoStorage, arquivo);
-
-        if (erroUpload) {
-          showAlert("Erro no Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
-          setCarregando(false);
-          return;
-        }
-        const { data: linkPublico } = supabase.storage.from("documentos").getPublicUrl(caminhoNoStorage);
-        anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
+      let anexosProcessados = [];
+      try {
+        anexosProcessados = await enviarArquivos(anexosNovos);
+      } catch (erroUpload) {
+        showAlert("Erro no Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+        setCarregando(false);
+        return;
       }
 
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/anexos`, { method: "POST", body: JSON.stringify({ anexos: anexosProcessados }) });

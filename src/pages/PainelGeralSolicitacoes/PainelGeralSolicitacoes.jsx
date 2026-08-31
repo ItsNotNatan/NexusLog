@@ -15,6 +15,7 @@ import {
 
 // ✨ 1. IMPORTAÇÃO DA LOGO DA COMAU
 import logoComau from '../../assets/logo-comau.png';
+import { urlDaApi } from '../../services/api';
 
 const filtrosArray = ['Todos', 'Material', 'Transferencia WBS', 'Nota Fiscal', 'Entrada', 'Crossdocking', 'Reintegracao'];
 
@@ -69,11 +70,11 @@ export default function PainelGeralSolicitacoes() {
         setCarregando(true);
 
         const tipoFiltro = filtroAtivo === 'Transfer. WBS' ? 'Transferencia WBS' : filtroAtivo;
-        const urlSolicitacoes = `http://localhost:3001/api/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoFiltro !== 'Todos' ? tipoFiltro : ''}`;
+        const urlSolicitacoes = `${urlDaApi()}/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoFiltro !== 'Todos' ? tipoFiltro : ''}`;
 
         const [resSolicitacoes, resEstoque] = await Promise.all([
           fetch(urlSolicitacoes),
-          fetch('http://localhost:3001/api/estoque/listar')
+          fetch(`${urlDaApi()}/estoque/listar`)
         ]);
 
         const resultadoSol = await resSolicitacoes.json();
@@ -126,7 +127,7 @@ export default function PainelGeralSolicitacoes() {
     }
 
     try {
-      const resposta = await fetch(`http://localhost:3001/api/solicitacoes/${idSolicitacao}/status`, {
+      const resposta = await fetch(`${urlDaApi()}/solicitacoes/${idSolicitacao}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })

@@ -2,9 +2,8 @@ import React, { useState, useContext } from 'react';
 import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText, MapPin } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
-import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext';
-import { apiFetch } from '../../../services/api';
+import { apiFetch, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
 // ✨ IMPORTAÇÃO DO FORMATADOR CENTRALIZADO
@@ -71,20 +70,12 @@ export default function Crossdocking() {
       }
     }
 
-    const anexosProcessados = [];
-    for (const arquivo of anexos) {
-      const extensao = arquivo.name.split('.').pop();
-      const nomeUnico = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
-      const caminhoNoStorage = `uploads/${nomeUnico}`;
-
-      const { error: erroUpload } = await supabase.storage.from('documentos').upload(caminhoNoStorage, arquivo);
-
-      if (erroUpload) {
-        showAlert("Erro no Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}`, "error");
-        return; 
-      }
-      const { data: linkPublico } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
-      anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
+    let anexosProcessados = [];
+    try {
+      anexosProcessados = await enviarArquivos(anexos);
+    } catch (erroUpload) {
+      showAlert("Erro no Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+      return;
     }
 
     // ✨ ParseInt para garantir que nunca vai um número quebrado ou string

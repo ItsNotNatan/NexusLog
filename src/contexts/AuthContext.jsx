@@ -4,7 +4,7 @@
 // =================================================================
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiFetch } from '../services/api';
+import { apiFetch, urlDoServidor } from '../services/api';
 import { io } from 'socket.io-client'; // ✨ IMPORTAÇÃO DO SOCKET NO CONTEXTO GLOBAL
 
 export const AuthContext = createContext({});
@@ -60,8 +60,7 @@ export const AuthProvider = ({ children }) => {
 
   // ✨ 2. RADAR GLOBAL: Ouve as filiais em tempo real de qualquer ecrã!
   useEffect(() => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+    const SOCKET_URL = urlDoServidor();
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
     socket.on('filiais_atualizadas', () => {

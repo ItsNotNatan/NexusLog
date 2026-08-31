@@ -1,0 +1,23 @@
+# Dependencias
+node_modules/
+
+# Build do front (o auto-deploy compila na maquina servidora)
+dist/
+
+# Segredos e banco (nunca vao para o GitHub)
+.env
+Servidor/.env
+
+# PocketBase: o executavel e' baixado, e o banco fica FORA do repo
+Servidor/pocketbase/pocketbase.exe
+Servidor/pocketbase/pb_data/
+Servidor/pocketbase/LICENSE.md
+Servidor/pocketbase/CHANGELOG.md
+
+# Sistema operativo
+Thumbs.db
+.DS_Store
+
+# Editores
+.vscode/
+.idea/

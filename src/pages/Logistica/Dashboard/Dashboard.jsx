@@ -11,7 +11,7 @@ import {
   FileText, Download, Loader2 
 } from 'lucide-react';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
-import { apiFetch } from '../../../services/api';
+import { apiFetch, urlDoServidor } from '../../../services/api';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { io } from 'socket.io-client'; // ✨ IMPORTAÇÃO DO SOCKET NO TOPO
 
@@ -128,8 +128,7 @@ export default function Dashboard() {
     buscarDados();
 
     // ✨ SOCKET.IO: Atualiza gráficos e tabela em tempo real (Silenciosamente)
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+    const SOCKET_URL = urlDoServidor();
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
     socket.on('solicitacoes_atualizadas', () => {

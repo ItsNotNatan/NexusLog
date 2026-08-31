@@ -1,70 +1,146 @@
 // =================================================================
 // FICHEIRO: src/services/api.js
-// DESCRIÇÃO: Serviço de comunicação com o Backend no Render
+// DESCRICAO: Comunicacao com o Backend (NexusLog self-hosted)
+//
+// O sistema roda numa maquina da empresa, e nao mais no Render. O endereco
+// do servidor NAO fica fixo no codigo: ele e' deduzido do endereco em que a
+// pagina foi aberta. Assim, se o IP da maquina mudar, nada precisa ser
+// recompilado - basta abrir o site pelo IP novo.
 // =================================================================
 
-// Lê a URL do Render configurada no painel ou usa o localhost como fallback local
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Porta da API no servidor (o front e' servido na 8083, a API na 3002).
+const PORTA_API = 3002;
 
 /**
- * Função principal para fazer pedidos ao servidor (Backend).
- * Inclui tratamento de erros para quando o Render está "adormecido".
+ * Endereco do servidor, SEM o /api no fim.
+ * Serve para o WebSocket (Socket.io) e para montar links de anexos.
  */
-export async function apiFetch(endpoint, options = {}) {
-  // 1. Recupera o token de segurança guardado no navegador do utilizador
+export function urlDoServidor() {
+  // Se alguem definir VITE_API_URL no build, ela manda.
+  const configurada = import.meta.env.VITE_API_URL;
+  if (configurada) return configurada.replace(/\/api\/?$/, '');
+
+  if (typeof window === 'undefined') return `http://localhost:${PORTA_API}`;
+
+  const { hostname, protocol } = window.location;
+  const ehLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+
+  // Em producao: mesmo IP/host da pagina, na porta da API.
+  return ehLocal ? `http://localhost:${PORTA_API}` : `${protocol}//${hostname}:${PORTA_API}`;
+}
+
+/** Endereco base das rotas da API (com o /api no fim). */
+export function urlDaApi() {
+  return `${urlDoServidor()}/api`;
+}
+
+/**
+ * Monta o endereco completo de um anexo.
+ * As URLs sao guardadas no banco em formato relativo ("/api/arquivos/..."),
+ * justamente para continuarem validas se o IP do servidor mudar.
+ */
+export function resolverUrlArquivo(url) {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url; // anexo antigo, com endereco completo
+  return `${urlDoServidor()}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+/**
+ * Envia arquivos para o servidor e devolve a lista pronta para gravar
+ * como anexo: [{ nome_arquivo, url_arquivo }].
+ * Substitui o upload que era feito direto no Supabase Storage.
+ */
+export async function enviarArquivos(arquivos) {
+  const lista = Array.from(arquivos || []);
+  if (lista.length === 0) return [];
+
+  const formulario = new FormData();
+  for (const arquivo of lista) formulario.append('arquivos', arquivo);
+
   const token = localStorage.getItem('@NexusLog:token');
 
-  // 2. Monta os cabeçalhos (Headers) necessários para a comunicação em JSON
+  const resposta = await fetch(`${urlDaApi()}/arquivos/upload`, {
+    method: 'POST',
+    // Sem Content-Type: o navegador precisa definir o boundary do multipart.
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formulario,
+  });
+
+  const textoBruto = await resposta.text();
+  let dados = {};
+  if (textoBruto) {
+    try {
+      dados = JSON.parse(textoBruto);
+    } catch {
+      throw new Error('O servidor nao respondeu como esperado ao guardar o anexo.');
+    }
+  }
+
+  if (!resposta.ok || !dados.sucesso) {
+    throw new Error(dados.erro || 'Falha ao guardar o anexo no servidor.');
+  }
+
+  return dados.dados || [];
+}
+
+/**
+ * Funcao principal para fazer pedidos ao servidor (Backend).
+ */
+export async function apiFetch(endpoint, options = {}) {
+  // 1. Recupera o token de seguranca guardado no navegador do utilizador
+  const token = localStorage.getItem('@NexusLog:token');
+
+  // 2. Monta os cabecalhos (Headers) necessarios para a comunicacao em JSON
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
-  // 3. Garante que o caminho da rota (endpoint) tem sempre uma barra '/' no início
+  // 3. Garante que o caminho da rota (endpoint) tem sempre uma barra '/' no inicio
   const rotaFormatada = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const urlCompleta = `${BASE_URL}${rotaFormatada}`;
+  const urlCompleta = `${urlDaApi()}${rotaFormatada}`;
 
   try {
     // 4. Executa o pedido ao servidor
-    const resposta = await fetch(urlCompleta, {
-      ...options,
-      headers,
-    });
+    const resposta = await fetch(urlCompleta, { ...options, headers });
 
-    // 5. O NOSSO ESCUDO DE PROTEÇÃO! Lemos primeiro como Texto Bruto (Raw Text)
-    // Assim evitamos o erro "Unexpected end of JSON input" se o Render enviar HTML
+    // 5. Lemos primeiro como texto bruto: assim um erro em HTML nao vira
+    // "Unexpected end of JSON input" e a mensagem real aparece no console.
     const textoBruto = await resposta.text();
-    
+
     let dados = {};
 
-    // 6. Se o servidor enviou algum texto, tentamos transformá-lo em JSON
+    // 6. Se o servidor enviou algum texto, tentamos transforma-lo em JSON
     if (textoBruto) {
       try {
         dados = JSON.parse(textoBruto);
-      } catch (erroJson) {
-        // Se a conversão falhar, é porque o servidor enviou HTML de erro ou está a ligar
-        console.error("❌ O Servidor não devolveu JSON. Devolveu isto:", textoBruto);
-        throw new Error(`O servidor está a iniciar ou sobrecarregado (Status ${resposta.status}). O Render demora cerca de 50s a acordar. Aguarda um momento e tenta de novo!`);
+      } catch {
+        console.error('❌ O Servidor nao devolveu JSON. Devolveu isto:', textoBruto);
+        throw new Error(
+          `O servidor devolveu uma resposta inesperada (Status ${resposta.status}). ` +
+          'Verifique se o NexusLog esta a correr na maquina servidora.'
+        );
       }
     }
 
-    // 7. Avalia se o Backend devolveu uma resposta de sucesso (códigos 200 a 299)
+    // 7. Avalia se o Backend devolveu uma resposta de sucesso (200 a 299)
     if (!resposta.ok) {
       throw new Error(dados.erro || dados.mensagem || `Erro reportado pelo servidor (Status ${resposta.status})`);
     }
 
-    // 8. Se tudo correu bem, devolvemos os dados em JSON para a página usar
+    // 8. Se tudo correu bem, devolvemos os dados em JSON para a pagina usar
     return dados;
-    
   } catch (error) {
-    // 9. Se a rede falhar completamente (ex: sem internet ou servidor totalmente offline)
+    // 9. Se a rede falhar completamente (servidor desligado, fora da rede...)
     if (error.name === 'TypeError' && error.message.toLowerCase().includes('fetch')) {
       console.error(`❌ [ERRO DE REDE] Falha ao ligar a: ${urlCompleta}`);
-      throw new Error(`A comunicação com o servidor falhou. Se o site acabou de ser aberto, o servidor no Render está a ligar. Aguarda 1 minuto e tenta novamente.`);
+      throw new Error(
+        'Nao foi possivel falar com o servidor do NexusLog. ' +
+        'Confirme que a maquina servidora esta ligada e que voce esta na rede da empresa.'
+      );
     }
 
-    // Lança qualquer erro formatado (seja o nosso aviso amigável ou um erro real)
     throw error;
   }
 }

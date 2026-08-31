@@ -15,6 +15,7 @@ import { io } from 'socket.io-client'; // ✨ TEMPO REAL
 import CadastroFiliais from './Abas/CadastroFiliais';
 import GestaoPerfis from './Abas/GestaoPerfis';
 import TargetEficiencia from './Abas/TargetEficiencia';
+import { urlDoServidor } from '../../../services/api';
 
 export default function Configuracoes() {
   const [abaAtiva, setAbaAtiva] = useState('filiais'); 
@@ -27,8 +28,7 @@ export default function Configuracoes() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+    const SOCKET_URL = urlDoServidor();
 
     const socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling']

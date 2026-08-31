@@ -1,0 +1,21 @@
+{
+  "name": "nexuslog-servidor",
+  "version": "1.0.0",
+  "description": "Servidor de producao do NexusLog (Express + PocketBase self-hosted)",
+  "private": true,
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.0.2",
+    "pocketbase": "^0.22.1",
+    "socket.io": "^4.8.1"
+  }
+}

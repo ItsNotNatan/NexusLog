@@ -8,9 +8,8 @@ import { Send, MapPin } from 'lucide-react';
 
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import SeletorEstoqueLateral from '../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral';
-import { supabase } from '../../../supabaseClient';
 import { AuthContext } from '../../../contexts/AuthContext';
-import { apiFetch } from '../../../services/api';
+import { apiFetch, urlDoServidor, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext'; 
 import { io } from 'socket.io-client';
 
@@ -70,8 +69,7 @@ export default function TransferenciaWBS() {
     carregarEstoque();
 
     // CONFIGURAÇÃO DO SOCKET.IO
-    const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
+    const SOCKET_URL = urlDoServidor();
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
     socket.on('estoque_atualizado', () => { carregarEstoque(); });
@@ -114,15 +112,13 @@ export default function TransferenciaWBS() {
     if (!formDados.nome || !formDados.wbsDestino) { showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS de Destino.", "warning"); return; }
     if (itensSelecionados.length === 0) { showAlert("Carrinho Vazio", "Selecione pelo menos um item para transferir.", "warning"); return; }
 
-    const anexosProcessados = [];
+    let anexosProcessados = [];
     if (anexos.length > 0) {
-      for (const arquivo of anexos) {
-        const extensao = arquivo.name.split('.').pop();
-        const caminhoNoStorage = `uploads/${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
-        const { error: erroUpload } = await supabase.storage.from('documentos').upload(caminhoNoStorage, arquivo);
-        if (erroUpload) { showAlert("Falha no Anexo", `Erro: ${arquivo.name}`, "error"); return; }
-        const { data: linkPublico } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
-        anexosProcessados.push({ nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl });
+      try {
+        anexosProcessados = await enviarArquivos(anexos);
+      } catch (erroUpload) {
+        showAlert("Falha no Anexo", erroUpload.message || "Erro ao anexar os ficheiros.", "error");
+        return;
       }
     }
 

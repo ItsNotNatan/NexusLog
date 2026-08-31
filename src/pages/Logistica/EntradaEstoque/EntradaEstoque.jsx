@@ -13,8 +13,7 @@ import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal
 import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; 
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
-import { supabase } from '../../../supabaseClient';
-import { apiFetch } from '../../../services/api';
+import { apiFetch, enviarArquivos } from '../../../services/api';
 
 const LIMITE_LOGISTICA = 60;
 
@@ -178,20 +177,15 @@ export default function EntradaEstoque() {
     try {
       const anexosProcessados = [];
       if (anexos.length > 0) {
-        for (const arquivo of anexos) {
-          const extensao = arquivo.name.split('.').pop();
-          const caminhoNoStorage = `uploads/${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
-          const { error: erroUpload } = await supabase.storage.from('documentos').upload(caminhoNoStorage, arquivo);
-
-          if (erroUpload) {
-            showAlert("Erro de Anexo", `Falha ao anexar o ficheiro: ${arquivo.name}.`, "error");
-            return; 
-          }
-          const { data: linkPublico } = supabase.storage.from('documentos').getPublicUrl(caminhoNoStorage);
-          anexosProcessados.push({
-            nome_arquivo: arquivo.name, url_arquivo: linkPublico.publicUrl, origem: 'logistica'
-          });
+        let enviados;
+        try {
+          enviados = await enviarArquivos(anexos);
+        } catch (erroUpload) {
+          showAlert("Erro de Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+          return;
         }
+
+        anexosProcessados.push(...enviados.map((anexo) => ({ ...anexo, origem: 'logistica' })));
       }
 
       const payload = {

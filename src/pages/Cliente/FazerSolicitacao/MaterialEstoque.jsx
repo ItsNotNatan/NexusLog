@@ -10,8 +10,7 @@ import { AlertContext } from '../../../contexts/AlertContext';
 
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral";
-import { supabase } from "../../../supabaseClient";
-import { apiFetch } from '../../../services/api';
+import { apiFetch, urlDoServidor, enviarArquivos } from '../../../services/api';
 import { io } from 'socket.io-client'; 
 
 import { formatarWBS } from '../../../utils/formatadores';
@@ -98,8 +97,7 @@ export default function MaterialEstoque() {
     
     buscarEstoqueReal();
 
-    const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const SOCKET_URL = BACKEND_URL.replace(/\/api\/?$/, ''); 
+    const SOCKET_URL = urlDoServidor();
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
     socket.on('estoque_atualizado', () => { buscarEstoqueReal(); });
@@ -157,22 +155,21 @@ export default function MaterialEstoque() {
     
     try {
       if (anexos.length > 0) {
-        for (let i = 0; i < anexos.length; i++) {
-          const arquivo = anexos[i];
-          const extensao = arquivo.name.split(".").pop();
-          const caminhoNoStorage = `uploads/${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`;
-          const { error: erroUpload } = await supabase.storage.from("documentos").upload(caminhoNoStorage, arquivo);
-          
-          if (erroUpload) { showAlert("Erro Anexo", `Falha: ${arquivo.name}`, "error"); return; }
-          const { data: linkPublico } = supabase.storage.from("documentos").getPublicUrl(caminhoNoStorage);
-          
-          let nomeFicheiro = arquivo.name;
-          if (temWbsDivergente && i === 0) {
-            nomeFicheiro = `[AUTORIZAÇÃO WBS] ${arquivo.name}`;
-          }
-
-          anexosProcessados.push({ nome_arquivo: nomeFicheiro, url_arquivo: linkPublico.publicUrl });
+        let enviados;
+        try {
+          enviados = await enviarArquivos(anexos);
+        } catch (erroUpload) {
+          showAlert("Erro Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+          return;
         }
+
+        enviados.forEach((anexo, i) => {
+          // O primeiro anexo é a autorização quando a WBS diverge.
+          const nomeFicheiro =
+            temWbsDivergente && i === 0 ? `[AUTORIZAÇÃO WBS] ${anexo.nome_arquivo}` : anexo.nome_arquivo;
+
+          anexosProcessados.push({ nome_arquivo: nomeFicheiro, url_arquivo: anexo.url_arquivo });
+        });
       }
 
       let observacoesFinais = formDados.observacoes;

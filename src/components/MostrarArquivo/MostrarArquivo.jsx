@@ -3,6 +3,7 @@ import {
   FileText, FileImage, FileSpreadsheet, File, Download, Paperclip, Trash2 // 👈 Adiciona Trash2 aqui
 } from 'lucide-react';
 import './MostrarArquivo.css';
+import { resolverUrlArquivo } from '../../services/api';
 
 // --- FUNÇÃO AUXILIAR: Retorna o ícone e a cor com base na extensão ou mime-type ---
 const obterEstiloArquivo = (nomeArquivo) => {
@@ -49,7 +50,9 @@ export default function MostrarArquivo({ arquivos = [], tituloCustomizado, exibi
       <div className="mostrar-arquivo-lista">
         {arquivos.map((arq, index) => {
           const nomeFinal = arq.nome_arquivo || arq.name || `Arquivo_${index + 1}`;
-          const urlFinal = arq.url_arquivo || arq.url || arq;
+          // O banco guarda o caminho relativo ("/api/arquivos/..."); aqui ele
+          // vira o endereco completo do servidor onde a pagina esta aberta.
+          const urlFinal = resolverUrlArquivo(arq.url_arquivo || arq.url || arq);
           const { icone, classeCor } = obterEstiloArquivo(nomeFinal);
 
           // 👇 Identifica quem mandou o arquivo (padrão é cliente se vier nulo)

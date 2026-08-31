@@ -13,7 +13,7 @@ import {
 import { io } from 'socket.io-client';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
-import { apiFetch } from '../../../services/api';
+import { apiFetch, urlDoServidor } from '../../../services/api';
 import { formatarDinheiroTempoReal } from '../../../utils/formatadores';
 
 const obterNomeFilial = (codigo) => {
@@ -128,8 +128,7 @@ export default function PainelAprovacao() {
 
     buscarDados();
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+    const SOCKET_URL = urlDoServidor();
 
     const socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling']
