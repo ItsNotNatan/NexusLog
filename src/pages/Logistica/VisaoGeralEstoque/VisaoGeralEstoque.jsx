@@ -52,7 +52,8 @@ export default function VisaoGeralEstoque({ perfil }) {
     const buscarEstoque = async () => {
       try {
         setCarregando(true);
-        const urlEstoque = estoqueAtual === 'TODOS' ? '/estoque/listar' : `/estoque/listar?filial_id=${estoqueAtual}`;
+        // ✨ CORREÇÃO: O backend espera "?filial=" e não "?filial_id="
+        const urlEstoque = estoqueAtual === 'TODOS' ? '/estoque/listar' : `/estoque/listar?filial=${estoqueAtual}`;
         const resposta = await apiFetch(urlEstoque);
         if (resposta.sucesso) setEstoque(resposta.dados || []);
       } catch (error) {
@@ -233,15 +234,28 @@ export default function VisaoGeralEstoque({ perfil }) {
   // ==========================================
   // FILTRAGEM E CÁLCULO DE KPIS
   // ==========================================
-  const estoqueFiltrado = estoque.filter(item =>
-    (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.part_number && item.part_number.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.descricao && item.descricao.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.wbs && item.wbs.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.fornecedor && item.fornecedor.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.nome_projeto && item.nome_projeto.toLowerCase().includes(termoPesquisa.toLowerCase()))
-  );
+  const estoqueFiltrado = estoque.filter(item => {
+    // ✨ FILTRO DE SEGURANÇA NO FRONTEND: Garante que só vemos os itens da filial
+    if (estoqueAtual && estoqueAtual !== 'TODOS') {
+      const filialDoItem = item.filial_id || item.filial;
+      if (filialDoItem !== estoqueAtual) {
+        return false;
+      }
+    }
+
+    if (!termoPesquisa) return true;
+    
+    const termo = termoPesquisa.toLowerCase();
+    return (
+      (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
+      (item.part_number && item.part_number.toLowerCase().includes(termo)) ||
+      (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
+      (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
+      (item.fornecedor && item.fornecedor.toLowerCase().includes(termo)) ||
+      (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termo)) ||
+      (item.nome_projeto && item.nome_projeto.toLowerCase().includes(termo))
+    );
+  });
 
   // ✨ ATUALIZAÇÃO DOS CÁLCULOS: Agora somam as quantidades em vez de contar as linhas!
   const kpiTotalItens = estoqueFiltrado.reduce((acc, item) => acc + (Number(item.quantidade_disponivel) || 0), 0);
