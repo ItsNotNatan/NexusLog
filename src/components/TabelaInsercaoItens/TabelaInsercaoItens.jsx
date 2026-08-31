@@ -111,10 +111,14 @@ export default function TabelaInsercaoItens({
               <tr>
                 <th style={{ width: '60px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
+                
+                {/* ✨ NOVA ORDEM DAS COLUNAS AQUI */}
                 <th style={{ minWidth: '200px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESCRIÇÃO</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
                 <th style={{ width: '120px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>QTDE ENTRADA</th>
+                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
+                {/* FIM DA NOVA ORDEM */}
+
                 <th style={{ width: '140px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>UNID. MEDIDA</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
@@ -153,10 +157,7 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.desenhoSAP || ''} onChange={(e) => onAtualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP / Desenho" />
                   </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.referencia || ''} onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Referência" />
-                  </td>
-
+                  {/* ✨ NOVA ORDEM DAS CÉLULAS AQUI */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.vendorDescription || ''} onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição" />
                   </td>
@@ -191,6 +192,11 @@ export default function TabelaInsercaoItens({
                       placeholder="1" 
                     />
                   </td>
+
+                  <td style={{ padding: '8px' }}>
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.referencia || ''} onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Referência" />
+                  </td>
+                  {/* FIM DA NOVA ORDEM */}
 
                   <td style={{ padding: '8px' }}>
                     <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida || 'Unid'} onChange={(e) => onAtualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
@@ -236,7 +242,6 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.nomeProjeto || ''} onChange={(e) => onAtualizarCampo(item.id, 'nomeProjeto', e.target.value)} placeholder="Nome Projeto" />
                   </td>
 
-                  {/* ✨ DATAS CORRIGIDAS: Se tiver um '-', transforma em vazio para o calendário nativo funcionar */}
                   <td style={{ padding: '8px' }}>
                     <input 
                       type="date" 
