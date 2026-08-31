@@ -10,13 +10,13 @@ export default function ExemploExcel() {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Modelo SAP');
 
-      // ✨ COLUNAS DEFINIDAS COM CHAVES CLARAS PARA EVITAR BUGS
+      // ✨ COLUNAS DEFINIDAS COM A NOVA ORDEM SOLICITADA
       worksheet.columns = [
         { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
-        { header: 'REFERÊNCIA', key: 'ref', width: 20 },
         { header: 'DESCRIÇÃO', key: 'desc', width: 40 },
         { header: 'FABRICANTE', key: 'pn', width: 25 },
         { header: 'QTDE ENTRADA', key: 'qtd', width: 15 },
+        { header: 'REFERÊNCIA', key: 'ref', width: 20 },
         { header: 'UNID. MEDIDA', key: 'unid', width: 15 },
         { header: 'NUM DA NOTA FISCAL', key: 'nf', width: 20 },
         { header: 'FORNECEDOR / REGISTRO', key: 'fornecedor', width: 25 },
@@ -45,10 +45,10 @@ export default function ExemploExcel() {
 
       worksheet.addRow({
         sap: 'DS-778899',
-        ref: 'REF-9988', 
         desc: 'Parafuso Sextavado Exemplo',
         pn: 'PN-12345',
         qtd: 10,
+        ref: 'REF-9988', 
         unid: 'Unid',
         nf: 'NF-001',
         fornecedor: 'Fornecedor A',
