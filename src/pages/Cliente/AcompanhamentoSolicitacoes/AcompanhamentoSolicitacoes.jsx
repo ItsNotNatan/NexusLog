@@ -275,22 +275,30 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  const kpiTotal = dadosTabela.length;
-  const kpiPendentes = dadosTabela.filter((item) => item.status === "Pendente").length;
-  const kpiAndamento = dadosTabela.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
-  const kpiConcluidos = dadosTabela.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length;
-  const kpiRecusados = dadosTabela.filter((item) => item.status === "Recusado").length;
-  const kpiCancelados = dadosTabela.filter((item) => item.status === "Cancelado" || item.statusExibicao === "Cancelado").length;
-
+  // ✨ FILTRO DUPLO SEGURO: Filtra pela Filial Atual + Status + Termo
   const dadosFiltrados = dadosTabela.filter((item) => {
-    if (filtroStatus === 'Todos') return true;
-    if (filtroStatus === 'Pendente') return item.status === 'Pendente';
-    if (filtroStatus === 'Em Andamento') return item.status === 'Em Separação' || item.status === 'Em Andamento';
-    if (filtroStatus === 'Concluído') return item.status === 'Concluído' || item.statusExibicao === 'Reintegrado';
-    if (filtroStatus === 'Recusado') return item.status === 'Recusado';
-    if (filtroStatus === 'Cancelado') return item.status === 'Cancelado' || item.statusExibicao === 'Cancelado';
+    // Bloqueia qualquer filial que não seja a selecionada (se não for TODOS)
+    if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) {
+      return false;
+    }
+
+    if (filtroStatus !== 'Todos') {
+      if (filtroStatus === 'Pendente' && item.status !== 'Pendente') return false;
+      if (filtroStatus === 'Em Andamento' && (item.status !== 'Em Separação' && item.status !== 'Em Andamento')) return false;
+      if (filtroStatus === 'Concluído' && (item.status !== 'Concluído' && item.statusExibicao !== 'Reintegrado')) return false;
+      if (filtroStatus === 'Recusado' && item.status !== 'Recusado') return false;
+      if (filtroStatus === 'Cancelado' && (item.status !== 'Cancelado' && item.statusExibicao !== 'Cancelado')) return false;
+    }
+
     return true;
   });
+
+  const kpiTotal = dadosFiltrados.length;
+  const kpiPendentes = dadosFiltrados.filter((item) => item.status === "Pendente").length;
+  const kpiAndamento = dadosFiltrados.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
+  const kpiConcluidos = dadosFiltrados.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length;
+  const kpiRecusados = dadosFiltrados.filter((item) => item.status === "Recusado").length;
+  const kpiCancelados = dadosFiltrados.filter((item) => item.status === "Cancelado" || item.statusExibicao === "Cancelado").length;
 
   const totalRegistrosFiltrados = dadosFiltrados.length;
   const totalPaginas = Math.max(1, Math.ceil(totalRegistrosFiltrados / itensPorPagina));
