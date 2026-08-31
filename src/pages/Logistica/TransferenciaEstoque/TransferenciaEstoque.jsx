@@ -3,7 +3,7 @@
 // DESCRIÇÃO: Consolida transferências e exporta no formato exato para a Entrada de Estoque
 // =================================================================
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { Lock, FileText, Search, CheckSquare, Square, Box, Download, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Lock, FileText, Search, CheckSquare, Square, Box, Download, ArrowRight, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
@@ -36,6 +36,10 @@ export default function TransferenciaEstoque() {
   const [carregando, setCarregando] = useState(true);
   const [termoBusca, setTermoBusca] = useState('');
   const [selecionadosIds, setSelecionadosIds] = useState(new Set());
+
+  // ✨ ESTADOS DA PAGINAÇÃO
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 20;
 
   // ---------------------------------------------------------------------------
   // 1. BUSCA DE DADOS & TEMPO REAL
@@ -83,7 +87,7 @@ export default function TransferenciaEstoque() {
   }, [estoqueAtual, carregandoInicial, showAlert]);
 
   // ---------------------------------------------------------------------------
-  // 2. FILTRAGEM E BUSCA LOCAL
+  // 2. FILTRAGEM E PAGINAÇÃO LOCAL
   // ---------------------------------------------------------------------------
   const transferenciasFiltradas = useMemo(() => {
     if (!termoBusca) return solicitacoes;
@@ -99,6 +103,21 @@ export default function TransferenciaEstoque() {
       );
     });
   }, [solicitacoes, termoBusca]);
+
+  // Reinicia a página para 1 sempre que o utilizador pesquisa algo
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [termoBusca]);
+
+  // Lógica matemática da paginação
+  const totalPaginas = Math.max(1, Math.ceil(transferenciasFiltradas.length / itensPorPagina));
+  
+  useEffect(() => {
+    if (paginaAtual > totalPaginas) setPaginaAtual(totalPaginas);
+  }, [transferenciasFiltradas.length, totalPaginas, paginaAtual]);
+
+  const indexInicio = (paginaAtual - 1) * itensPorPagina;
+  const transferenciasPaginadas = transferenciasFiltradas.slice(indexInicio, indexInicio + itensPorPagina);
 
   // ---------------------------------------------------------------------------
   // 3. SELEÇÃO DE ITENS (CAIXAS DE SELEÇÃO)
@@ -122,7 +141,7 @@ export default function TransferenciaEstoque() {
     // Só seleciona as que já foram aprovadas pela logística
     const idsAprovados = transferenciasFiltradas
       .filter(t => t.status === 'Concluído' || t.status === 'Em Separação')
-      .map(t => t.idOriginal || t.id); // ✨ Garante que pega a ID correta!
+      .map(t => t.idOriginal || t.id); 
     
     setSelecionadosIds(new Set(idsAprovados));
   };
@@ -275,7 +294,7 @@ export default function TransferenciaEstoque() {
       <div className="transf-grid-colunas">
         
         {/* COLUNA ESQUERDA: LISTA DE TRANSFERÊNCIAS */}
-        <div className="transf-cartao">
+        <div className="transf-cartao" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="transf-cartao-header">
             <h3 className="transf-cartao-titulo">Transferências Registadas</h3>
             <span className="badge-contagem-simples">{transferenciasFiltradas.length} registro(s)</span>
@@ -306,7 +325,7 @@ export default function TransferenciaEstoque() {
             </div>
           </div>
 
-          <div className="transf-lista-scroll">
+          <div className="transf-lista-scroll" style={{ flex: 1 }}>
             {carregando ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '40px', color: '#94a3b8' }}>
                 <Loader2 size={24} className="animate-spin" />
@@ -316,13 +335,12 @@ export default function TransferenciaEstoque() {
                 Nenhuma transferência encontrada para esta filial.
               </div>
             ) : (
-              transferenciasFiltradas.map(sol => {
+              transferenciasPaginadas.map(sol => {
                 const idReal = sol.idOriginal || sol.id;
                 const isAprovada = sol.status === 'Concluído' || sol.status === 'Em Separação';
                 const isSelected = isAprovada && selecionadosIds.has(idReal);
                 
                 const filialOrigem = sol.filial || 'N/D';
-                const wbsOrig = sol.wbs && sol.wbs.includes('➔') ? sol.wbs.split('➔')[0]?.trim() : '';
                 const destinoVisivel = sol.wbs && sol.wbs.includes('➔') ? sol.wbs.split('➔')[1]?.trim() : sol.wbs;
 
                 return (
@@ -369,6 +387,31 @@ export default function TransferenciaEstoque() {
               })
             )}
           </div>
+
+          {/* ✨ CONTROLOS DE PAGINAÇÃO */}
+          {totalPaginas > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
+              <div style={{ fontSize: '0.80rem', color: '#64748b' }}>
+                Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button 
+                  onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
+                  disabled={paginaAtual === 1}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', backgroundColor: paginaAtual === 1 ? '#f8fafc' : '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.80rem', fontWeight: '500', color: paginaAtual === 1 ? '#94a3b8' : '#334155', cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+                >
+                  <ChevronLeft size={14} /> Anterior
+                </button>
+                <button 
+                  onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
+                  disabled={paginaAtual === totalPaginas}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', backgroundColor: paginaAtual === totalPaginas ? '#f8fafc' : '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.80rem', fontWeight: '500', color: paginaAtual === totalPaginas ? '#94a3b8' : '#334155', cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+                >
+                  Próxima <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* COLUNA DIREITA: ITENS CONSOLIDADOS */}
