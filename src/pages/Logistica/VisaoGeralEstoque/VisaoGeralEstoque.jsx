@@ -397,6 +397,10 @@ export default function VisaoGeralEstoque({ perfil }) {
             <thead>
               <tr style={{ backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', width: '40px', textAlign: 'center' }}></th>
+                
+                {/* ✨ NOVA COLUNA DE INDICAÇÃO DE ESTOQUE/FILIAL (APENAS LEITURA) */}
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', width: '80px' }}>ESTOQUE</th>
+
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', minWidth: '200px' }}>DESCRIÇÃO</th>
@@ -418,9 +422,9 @@ export default function VisaoGeralEstoque({ perfil }) {
             </thead>
             <tbody>
               {carregando ? (
-                <tr><td colSpan="18" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><Loader2 className="animate-spin" size={28} style={{ margin: '0 auto' }} /></td></tr>
+                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><Loader2 className="animate-spin" size={28} style={{ margin: '0 auto' }} /></td></tr>
               ) : estoqueFiltrado.length === 0 ? (
-                <tr><td colSpan="18" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
+                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
               ) : (
                 estoqueFiltrado.map(item => (
                   <tr
@@ -432,6 +436,13 @@ export default function VisaoGeralEstoque({ perfil }) {
                   >
                     <td style={{ padding: '12px 16px', textAlign: 'center' }} title="Duplo clique na linha para ver demandas">
                       <History size={16} color="#94a3b8" />
+                    </td>
+
+                    {/* ✨ COLUNA NÃO EDITÁVEL DE INDICAÇÃO DE ESTOQUE */}
+                    <td style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>
+                      <span style={{ backgroundColor: '#e2e8f0', padding: '4px 8px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                        {item.filial_id || item.filial || '-'}
+                      </span>
                     </td>
 
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>

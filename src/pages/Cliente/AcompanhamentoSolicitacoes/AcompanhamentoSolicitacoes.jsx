@@ -131,9 +131,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
+        // ✨ ADICIONADO "?rastreabilidade=true" PARA LER ITENS ZERADOS E RECUPERAR A REFERÊNCIA
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
-          apiFetch("/estoque/listar")
+          apiFetch("/estoque/listar?rastreabilidade=true")
         ]);
 
         if (resultadoEst.sucesso) {
@@ -201,7 +202,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             }
 
             // ✨ AQUI: ENRIQUECIMENTO DOS ITENS! 
-            // Cruza a informação da solicitação com a prateleira física do estoque para preencher os buracos nas Retiradas
+            // Cruza todos os campos da solicitação com a prateleira física (mesmo as zeradas)
             const itensEnriquecidos = (item.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
@@ -209,6 +210,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 
               return {
                 ...it,
+                desenho_sap_manual: obterValorSeguro(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
+                part_number_manual: obterValorSeguro(it.part_number_manual || it.part_number, itemFisico?.part_number),
+                descricao_manual: obterValorSeguro(it.descricao_manual || it.descricao, itemFisico?.descricao),
                 referencia: obterValorSeguro(it.referencia, itemFisico?.referencia),
                 fornecedor: obterValorSeguro(it.fornecedor, itemFisico?.fornecedor),
                 nf_entrada: obterValorSeguro(it.nf_entrada, itemFisico?.nf_entrada),
@@ -220,7 +224,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 valor_unitario_manual: obterValorSeguro(it.valor_unitario_manual, itemFisico?.valor_unitario),
                 centro: obterValorSeguro(it.centro, itemFisico?.centro),
                 deposito: obterValorSeguro(it.deposito, itemFisico?.deposito),
-                alocacao: obterValorSeguro(it.alocacao, itemFisico?.alocacao)
+                alocacao: obterValorSeguro(it.alocacao, itemFisico?.alocacao),
+                unidade_medida_manual: obterValorSeguro(it.unidade_medida_manual, itemFisico?.unidade_medida) || 'Unid'
               };
             });
 
@@ -237,7 +242,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
               nfCrossdocking: item.nfCrossdocking || null,
-              itens: itensEnriquecidos // ✨ Substitui pela versão completa
+              itens: itensEnriquecidos // ✨ Substitui pela versão completa com as Referências resgatadas
             };
           });
 
