@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, PackageOpen, X, History, Download, DollarSign } from 'lucide-react';
+import { Search, Loader2, PackageOpen, X, History, Download, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
-import { apiFetch, urlDoServidor } from '../../../services/api';
+import { apiFetch } from '../../../services/api';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -16,6 +16,10 @@ export default function VisaoGeralEstoque({ perfil }) {
   const [estoque, setEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
+
+  // ✨ ESTADOS DA PAGINAÇÃO
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 20;
 
   // ✨ VERIFICAÇÃO DE PERMISSÃO DE EDIÇÃO
   const podeEditar = usuario?.cargo === 'ADM' || usuario?.cargo === 'LIDER';
@@ -52,7 +56,6 @@ export default function VisaoGeralEstoque({ perfil }) {
     const buscarEstoque = async () => {
       try {
         setCarregando(true);
-        // ✨ CORREÇÃO: O backend espera "?filial=" e não "?filial_id="
         const urlEstoque = estoqueAtual === 'TODOS' ? '/estoque/listar' : `/estoque/listar?filial=${estoqueAtual}`;
         const resposta = await apiFetch(urlEstoque);
         if (resposta.sucesso) setEstoque(resposta.dados || []);
@@ -66,7 +69,8 @@ export default function VisaoGeralEstoque({ perfil }) {
     buscarEstoque();
 
     // ✨ SOCKET.IO: Atualiza o saldo instantaneamente se alguém der entrada/saída
-    const SOCKET_URL = urlDoServidor();
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
     socket.on('estoque_atualizado', () => {
@@ -177,7 +181,6 @@ export default function VisaoGeralEstoque({ perfil }) {
           onBlur={() => saveEditing(item.id, field, val)}
           onKeyDown={(e) => handleKeyDown(e, item.id, field, val)}
           onClick={(e) => {
-            // ✨ FORÇA A ABERTURA DO CALENDÁRIO QUANDO CLICADO
             if (type === 'date' && e.target.showPicker) {
               e.target.showPicker();
             }
@@ -235,7 +238,7 @@ export default function VisaoGeralEstoque({ perfil }) {
   // FILTRAGEM E CÁLCULO DE KPIS
   // ==========================================
   const estoqueFiltrado = estoque.filter(item => {
-    // ✨ FILTRO DE SEGURANÇA NO FRONTEND: Garante que só vemos os itens da filial
+    // FILTRO DE SEGURANÇA NO FRONTEND: Garante que só vemos os itens da filial
     if (estoqueAtual && estoqueAtual !== 'TODOS') {
       const filialDoItem = item.filial_id || item.filial;
       if (filialDoItem !== estoqueAtual) {
@@ -257,11 +260,9 @@ export default function VisaoGeralEstoque({ perfil }) {
     );
   });
 
-  // ✨ ATUALIZAÇÃO DOS CÁLCULOS: Agora somam as quantidades em vez de contar as linhas!
   const kpiTotalItens = estoqueFiltrado.reduce((acc, item) => acc + (Number(item.quantidade_disponivel) || 0), 0);
   const kpiReservados = estoqueFiltrado.reduce((acc, item) => acc + (Number(item.quantidade_reservada) || 0), 0);
   
-  // Disponíveis reais = Total de peças menos as que estão reservadas
   const kpiDisponiveis = Math.max(0, kpiTotalItens - kpiReservados);
   
   const kpiValorTotal = estoqueFiltrado.reduce((acc, item) => {
@@ -270,11 +271,22 @@ export default function VisaoGeralEstoque({ perfil }) {
     return acc + (qtd * valor);
   }, 0);
 
-  // Formatação bonita para os KPIs de quantidade (ex: 1.500)
   const formatarQtd = (num) => new Intl.NumberFormat('pt-BR').format(num);
 
   // ==========================================
-  // EXPORTAR EXCEL NA NOVA ORDEM E SEM DATA DE NECESSIDADE
+  // LÓGICA DA PAGINAÇÃO
+  // ==========================================
+  useEffect(() => {
+    setPaginaAtual(1); // Volta à primeira página ao fazer uma pesquisa ou mudar de filial
+  }, [termoPesquisa, estoqueAtual]);
+
+  const totalPaginas = Math.max(1, Math.ceil(estoqueFiltrado.length / itensPorPagina));
+  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
+  const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, estoqueFiltrado.length);
+  const estoquePaginado = estoqueFiltrado.slice(indexPrimeiroItem, paginaAtual * itensPorPagina);
+
+  // ==========================================
+  // EXPORTAR EXCEL
   // ==========================================
   const handleExportarExcel = async () => {
     showLoading("A Gerar Excel", "Por favor, aguarde enquanto compilamos os dados do estoque...");
@@ -410,10 +422,7 @@ export default function VisaoGeralEstoque({ perfil }) {
             <thead>
               <tr style={{ backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', width: '40px', textAlign: 'center' }}></th>
-                
-                {/* ✨ NOVA COLUNA DE INDICAÇÃO DE ESTOQUE/FILIAL (APENAS LEITURA) */}
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', width: '80px' }}>ESTOQUE</th>
-
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', minWidth: '200px' }}>DESCRIÇÃO</th>
@@ -439,7 +448,7 @@ export default function VisaoGeralEstoque({ perfil }) {
               ) : estoqueFiltrado.length === 0 ? (
                 <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
               ) : (
-                estoqueFiltrado.map(item => (
+                estoquePaginado.map(item => (
                   <tr
                     key={item.id}
                     onDoubleClick={() => handleDuploCliqueItem(item)}
@@ -451,7 +460,6 @@ export default function VisaoGeralEstoque({ perfil }) {
                       <History size={16} color="#94a3b8" />
                     </td>
 
-                    {/* ✨ COLUNA NÃO EDITÁVEL DE INDICAÇÃO DE ESTOQUE */}
                     <td style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>
                       <span style={{ backgroundColor: '#e2e8f0', padding: '4px 8px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                         {item.filial_id || item.filial || '-'}
@@ -528,6 +536,34 @@ export default function VisaoGeralEstoque({ perfil }) {
             </tbody>
           </table>
         </div>
+
+        {/* ✨ CONTROLOS DE PAGINAÇÃO AQUI */}
+        {totalPaginas > 1 && (
+          <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
+            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {estoqueFiltrado.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{indexUltimoItem}</strong> de <strong>{estoqueFiltrado.length}</strong> itens
+            </div>
+            <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button 
+                className="btn-paginacao" 
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} 
+                disabled={paginaAtual === 1 || carregando} 
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}
+              >
+                <ChevronLeft size={16} /> Anterior
+              </button>
+              
+              <button 
+                className="btn-paginacao" 
+                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} 
+                disabled={paginaAtual === totalPaginas || carregando || estoqueFiltrado.length === 0} 
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || estoqueFiltrado.length === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || estoqueFiltrado.length === 0) ? 0.6 : 1 }}
+              >
+                Próxima <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* MODAL DE HISTÓRICO DE DEMANDAS */}
