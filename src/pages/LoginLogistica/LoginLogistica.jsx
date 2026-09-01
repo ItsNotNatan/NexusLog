@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './LoginLogistica.css';
 import { Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
@@ -18,10 +18,19 @@ export default function LoginLogistica() {
   const [erro, setErro] = useState('');
 
   const navigate = useNavigate();
-  const { login } = useAuth();
+  
+  // ✨ PUXAMOS O "USUARIO" PARA SABER SE JÁ ESTÁ LOGADO
+  const { login, usuario } = useAuth();
   
   // ✨ INICIALIZAÇÃO DO HOOK DE ALERTAS
   const { showAlert } = useAlert();
+
+  // ✨ EFEITO DE AUTO-LOGIN: Se já tem sessão, atira logo para o Painel
+  useEffect(() => {
+    if (usuario) {
+      navigate('/logistica/painel');
+    }
+  }, [usuario, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
