@@ -4,8 +4,13 @@ import './CentralOperacoes.css';
 import { Box, LayoutGrid } from 'lucide-react';
 import logoComau from '../../assets/logo-comau.png';
 
+// ✨ IMPORTAÇÃO DO CONTEXTO DE AUTENTICAÇÃO
+import { useAuth } from '../../contexts/AuthContext';
+
 export default function CentralDeOperacoes() {
   const navigate = useNavigate();
+  // ✨ PUXA O ESTADO DO USUÁRIO PARA SABER SE JÁ ESTÁ LOGADO
+  const { usuario } = useAuth();
 
   return (
     <div className="home-hub-container fade-in">
@@ -29,7 +34,6 @@ export default function CentralDeOperacoes() {
           <img src={logoComau} alt="Logo Comau" className="home-hub-logo" />
           
           <h1 className="home-greeting">
-            {/* ✨ NOME ATUALIZADO AQUI */}
             Bem-vindo ao STOCK<span className="logo-accent">Log</span>
           </h1>
           <p className="home-instructions">
@@ -61,7 +65,8 @@ export default function CentralDeOperacoes() {
 
           <div 
             className="hub-card hub-card--indigo"
-            onClick={() => navigate('/login')}
+            // ✨ LÓGICA INTELIGENTE: Se tem utilizador logado, vai direto para o Painel, senão vai para Login
+            onClick={() => navigate(usuario ? '/logistica/painel' : '/login')}
             role="button"
             tabIndex={0}
           >
