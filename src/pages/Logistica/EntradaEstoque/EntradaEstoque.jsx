@@ -21,7 +21,6 @@ export default function EntradaEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useAlert();
   
-  // ✨ ESTADO ATUALIZADO: Sem o WBS global
   const [formDados, setFormDados] = useState({
     nome: '', observacoes: ''
   });
@@ -36,7 +35,7 @@ export default function EntradaEstoque() {
     nfEntrada: '', 
     unidadeMedida: 'Unid', 
     vendorDescription: '', 
-    wbsElement: '', // Fica vazio para ser preenchido na tabela
+    wbsElement: '', 
     nomeProjeto: '', 
     emissaoNF: '', 
     recebNF: '', 
@@ -50,16 +49,13 @@ export default function EntradaEstoque() {
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
   
-  // ESTADO: Guarda as NFs de Crossdockings que estão "Pendentes"
   const [nfsCrossdocking, setNfsCrossdocking] = useState([]);
   const processador = useProcessadorExcel();
 
-  // EFEITO: Busca TUDO e faz o filtro cirúrgico no Frontend
   useEffect(() => {
     const buscarCrossdockingsPendentes = async () => {
       try {
         const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
-        
         const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
         
         if (resultado.sucesso && Array.isArray(resultado.dados)) {
@@ -80,29 +76,43 @@ export default function EntradaEstoque() {
     }
   }, [estoqueAtual]);
 
+  // ✨ A SOLUÇÃO: Função de leitura inteligente de colunas do Excel
+  const obterValor = (itemExcel, palavrasChave) => {
+    const chavesReais = Object.keys(itemExcel);
+    for (const palavra of palavrasChave) {
+      const chaveEncontrada = chavesReais.find(k => k.trim().toUpperCase().includes(palavra));
+      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined) {
+        const valor = itemExcel[chaveEncontrada];
+        return valor === '-' ? '' : valor;
+      }
+    }
+    return '';
+  };
+
   const handleImportarExcel = async (arquivo) => {
     const itensProcessados = await processador.iniciarProcessamento(arquivo);
     if (itensProcessados && Array.isArray(itensProcessados)) {
       
+      // ✨ AGORA USANDO obterValor PARA LER COM PRECISÃO CADA CAMPO, INCLUINDO A DESCRIÇÃO
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: item['NUM SAP | DESENHO'] || item['Desenho SAP'] || item.desenhoSAP || '',
-        referencia: item['REFERÊNCIA'] || item['Referência'] || item.referencia || '',
-        vendorDescription: item['DESCRIÇÃO'] || item['Vendor Description'] || item.vendorDescription || '',
-        numPecaFabricante: item['FABRICANTE'] || item['Nº peça fabricante'] || item.numPecaFabricante || '',
-        qtdFornecida: item['QTDE ENTRADA'] || item['Qtd.fornecida'] || item.qtdFornecida || 1,
-        unidadeMedida: item['UNID. MEDIDA'] || item['Unidade de medida'] || item.unidadeMedida || 'Unid',
-        nfEntrada: item['NUM DA NOTA FISCAL'] || item['NF DE ENTRADA'] || item.nfEntrada || '',
-        fornecedor: item['FORNECEDOR / REGISTRO'] || item['FORNECEDOR'] || item.fornecedor || '',
-        wbsElement: item['CENTRO DE CUSTO - WBS'] || item['WBS Element'] || item.wbs || '',
-        nomeProjeto: item['NOME CENTRO DE CUSTO / PROJETO'] || item.nomeProjeto || '',
-        emissaoNF: item['EMISSÃO NF'] || item.emissaoNF || '',
-        recebNF: item['RECEB. NF'] || item.recebNF || '',
-        docCompras: item['Nº PEDIDO DE COMPRA / CPV'] || item['Documento de compras'] || item.docCompras || '',
-        poNetPrice: item['VLR. UNITÁRIO NOTA FISCAL'] || item['PO Net Price'] || item.poNetPrice || '',
-        centro: item['FILIAL'] || item['Centro'] || item.centro || '',
-        deposito: item['DEPÓSITO'] || item['Depósito'] || item.deposito || '',
-        alocacao: item['ALOCAÇÃO'] || item['Alocação'] || item.alocacao || ''
+        desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO SAP', 'SAP']),
+        referencia: obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
+        vendorDescription: obterValor(item, ['DESCRIÇÃO', 'DESCRICAO', 'VENDOR']),
+        numPecaFabricante: obterValor(item, ['FABRICANTE', 'Nº PEÇA', 'PART NUMBER', 'PN']),
+        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
+        unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid',
+        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']),
+        fornecedor: obterValor(item, ['FORNECEDOR', 'REGISTRO']),
+        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO - WBS', 'WBS'])).trim(),
+        nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
+        emissaoNF: obterValor(item, ['EMISSÃO NF', 'EMISSAO']),
+        recebNF: obterValor(item, ['RECEB. NF', 'RECEBIMENTO']),
+        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'COMPRAS']),
+        poNetPrice: obterValor(item, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']),
+        centro: obterValor(item, ['FILIAL', 'CENTRO']),
+        deposito: obterValor(item, ['DEPÓSITO', 'DEPOSITO']),
+        alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
       }));
 
       setItens(prev => {
@@ -158,7 +168,6 @@ export default function EntradaEstoque() {
       return;
     }
 
-    // ✨ VALIDAÇÃO ATUALIZADA: Exige apenas o nome agora
     if (!formDados.nome) {
       showAlert("Campos Obrigatórios", "Preencha o Nome do operador.", "warning");
       return;
@@ -224,7 +233,7 @@ export default function EntradaEstoque() {
 
       if (dados.sucesso || dados.ps_id || dados.ps) {
         showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps_id || dados.ps}`, "success");
-        setFormDados({ nome: '', observacoes: '' }); // Limpa sem o WBS
+        setFormDados({ nome: '', observacoes: '' });
         setItens([]);
         setAnexos([]);
       } else {
@@ -260,7 +269,6 @@ export default function EntradaEstoque() {
           </div>
         </div>
         
-        {/* ✨ GRID ATUALIZADO: Sem o campo WBS */}
         <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
           <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
             <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>NOME *</label>
