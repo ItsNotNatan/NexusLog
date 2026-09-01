@@ -42,26 +42,7 @@ export default function ExemploExcel() {
         };
       });
       linhaCabecalho.height = 25;
-
-      worksheet.addRow({
-        sap: 'DS-778899',
-        desc: 'Parafuso Sextavado Exemplo',
-        pn: 'PN-12345',
-        qtd: 10,
-        ref: 'REF-9988', 
-        unid: 'Unid',
-        nf: 'NF-001',
-        fornecedor: 'Fornecedor A',
-        wbs: 'WBS-EX-001',
-        projeto: 'Projeto Stellantis',
-        emi: '01/01/2026',
-        rec: '05/01/2026',
-        doc: 'DOC-999',
-        val: 'R$ 100,00',
-        filial: 'BR01',
-        dep: '0010',
-        aloc: 'A-01'
-      });
+);
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
