@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import './EntradaEstoque.css';
 import { User, Send, Paperclip, X, Truck } from 'lucide-react';
+import ExcelJS from 'exceljs';
 
 import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
 import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
@@ -19,7 +20,7 @@ const LIMITE_LOGISTICA = 60;
 
 export default function EntradaEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
-  const { showAlert } = useAlert();
+  const { showAlert, showLoading, closeAlert } = useAlert();
   
   const [formDados, setFormDados] = useState({
     nome: '', observacoes: ''
@@ -76,56 +77,152 @@ export default function EntradaEstoque() {
     }
   }, [estoqueAtual]);
 
-  // ✨ A SOLUÇÃO: Função de leitura inteligente de colunas do Excel
-  const obterValor = (itemExcel, palavrasChave) => {
-    const chavesReais = Object.keys(itemExcel);
-    for (const palavra of palavrasChave) {
-      const chaveEncontrada = chavesReais.find(k => k.trim().toUpperCase().includes(palavra));
-      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined) {
-        const valor = itemExcel[chaveEncontrada];
-        return valor === '-' ? '' : valor;
-      }
-    }
-    return '';
-  };
-
+  // ✨ NOVA LÓGICA DE IMPORTAÇÃO: VALIDAÇÃO MAIS RÍGIDA CONTRA LINHAS FANTASMAS
   const handleImportarExcel = async (arquivo) => {
-    const itensProcessados = await processador.iniciarProcessamento(arquivo);
-    if (itensProcessados && Array.isArray(itensProcessados)) {
+    try {
+      showLoading("Processando Excel", "A procurar a aba e as colunas corretas. Por favor, aguarde...");
       
-      // ✨ AGORA USANDO obterValor PARA LER COM PRECISÃO CADA CAMPO, INCLUINDO A DESCRIÇÃO
-      const novosItensFormatados = itensProcessados.map((item, index) => ({
-        id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO SAP', 'SAP']),
-        referencia: obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
-        vendorDescription: obterValor(item, ['DESCRIÇÃO', 'DESCRICAO', 'VENDOR']),
-        numPecaFabricante: obterValor(item, ['FABRICANTE', 'Nº PEÇA', 'PART NUMBER', 'PN']),
-        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
-        unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid',
-        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']),
-        fornecedor: obterValor(item, ['FORNECEDOR', 'REGISTRO']),
-        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO - WBS', 'WBS'])).trim(),
-        nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
-        emissaoNF: obterValor(item, ['EMISSÃO NF', 'EMISSAO']),
-        recebNF: obterValor(item, ['RECEB. NF', 'RECEBIMENTO']),
-        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'COMPRAS']),
-        poNetPrice: obterValor(item, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']),
-        centro: obterValor(item, ['FILIAL', 'CENTRO']),
-        deposito: obterValor(item, ['DEPÓSITO', 'DEPOSITO']),
-        alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
-      }));
+      const workbook = new ExcelJS.Workbook();
+      const buffer = await arquivo.arrayBuffer();
+      await workbook.xlsx.load(buffer);
+      
+      const novosItensFormatados = [];
+      let headerRowIndex = -1;
+      let mapColunas = {};
+      let worksheetParaLer = null;
+
+      workbook.worksheets.forEach(worksheet => {
+        if (worksheetParaLer) return; 
+
+        worksheet.eachRow((row, rowNumber) => {
+          if (worksheetParaLer) return; 
+          if (rowNumber > 30) return; 
+
+          const tempMap = {};
+          
+          row.eachCell((cell, colNumber) => {
+            let val = cell.value;
+            if (val && typeof val === 'object' && val.richText) {
+              val = val.richText.map(rt => rt.text).join('');
+            }
+            const valStr = String(val || '').trim().toUpperCase();
+            if (valStr) tempMap[valStr] = colNumber;
+          });
+
+          const temCabecalho = Object.keys(tempMap).some(k => 
+            k.includes('DESCRIÇÃO') || k.includes('DESCRICAO') || 
+            k.includes('CÓDIGO') || k.includes('CODIGO') || 
+            k.includes('SAP') || k.includes('PART NUMBER') || 
+            k.includes('FABRICANTE') || k.includes('QTDE ENTRADA')
+          );
+
+          if (temCabecalho) {
+            headerRowIndex = rowNumber; 
+            mapColunas = tempMap;       
+            worksheetParaLer = worksheet;
+          }
+        });
+      });
+
+      if (!worksheetParaLer) {
+        closeAlert();
+        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados em nenhuma das abas da planilha. Verifique o ficheiro.", "error");
+        return;
+      }
+
+      worksheetParaLer.eachRow((row, rowNumber) => {
+        if (rowNumber <= headerRowIndex) return; 
+
+        const getVal = (colIndex) => {
+          if (!colIndex) return '';
+          const cell = row.getCell(colIndex);
+          const val = cell.value;
+          if (val === null || val === undefined) return '';
+          if (typeof val === 'object') {
+            if (val.result !== undefined && val.result !== null) return String(val.result).trim();
+            if (val.richText) return val.richText.map(rt => rt.text).join('').trim();
+            if (val instanceof Date) return val.toISOString().split('T')[0];
+          }
+          return String(val).trim();
+        };
+
+        const puxarDado = (palavrasChave) => {
+          const chavesReais = Object.keys(mapColunas);
+          for (const palavra of palavrasChave) {
+            const chaveEncontrada = chavesReais.find(k => k.includes(palavra));
+            if (chaveEncontrada) {
+              const numColuna = mapColunas[chaveEncontrada];
+              const valor = getVal(numColuna);
+              return valor === '-' ? '' : valor;
+            }
+          }
+          return '';
+        };
+
+        const sap = puxarDado(['NUM SAP', 'DESENHO', 'SAP', 'CÓDIGO', 'CODIGO']);
+        const desc = puxarDado(['DESCRIÇÃO', 'DESCRICAO', 'VENDOR']);
+        const numPeca = puxarDado(['FABRICANTE', 'PEÇA', 'PART NUMBER', 'PN', 'REF. FABRICANTE']);
+        const qtd = parseInt(puxarDado(['QTDE ENTRADA', 'QTD', 'QUANTIDADE'])) || 1;
+        const ref = puxarDado(['REFERÊNCIA', 'REFERENCIA']);
+        const unid = puxarDado(['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid';
+        const nf = puxarDado(['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NFE ENTRADA', 'NOTA FISCAL']);
+        const fornec = puxarDado(['FORNECEDOR', 'REGISTRO']);
+        const wbs = puxarDado(['CENTRO DE CUSTO - WBS', 'WBS']);
+        const projeto = puxarDado(['NOME CENTRO DE CUSTO', 'PROJETO']);
+        const emissao = puxarDado(['EMISSÃO NF', 'EMISSAO', 'DATA EMISSÃO']);
+        const receb = puxarDado(['RECEB. NF', 'RECEBIMENTO']);
+        const docCompras = puxarDado(['PEDIDO DE COMPRA', 'CPV', 'COMPRAS']);
+        const preco = puxarDado(['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']);
+        const filialPlanilha = puxarDado(['FILIAL', 'CENTRO']);
+        const deposito = puxarDado(['DEPÓSITO', 'DEPOSITO', 'LOCAL ESTOQUE']);
+        const alocacao = puxarDado(['ALOCAÇÃO', 'ALOCACAO']);
+
+        // ✨ BLOQUEIO REFORÇADO DE "LINHAS FANTASMAS"
+        // Agora exige que pelo menos o PN OU (SAP E Descrição) existam. 
+        // Formatações vazias ou células com um único caractere são ignoradas.
+        const linhaValida = (numPeca.length > 2) || (sap.length > 2 && desc.length > 3);
+
+        if (linhaValida) {
+          novosItensFormatados.push({
+            id: `excel-${Date.now()}-${rowNumber}`,
+            desenhoSAP: sap,                       
+            vendorDescription: desc,               
+            numPecaFabricante: numPeca,            
+            qtdFornecida: qtd,                
+            referencia: ref, 
+            unidadeMedida: unid,                 
+            nfEntrada: nf,                         
+            fornecedor: fornec,                    
+            wbsElement: wbs,                       
+            nomeProjeto: projeto,                  
+            emissaoNF: emissao,                    
+            recebNF: receb,                        
+            docCompras: docCompras,                
+            poNetPrice: preco,                     
+            centro: filialPlanilha,                
+            deposito: deposito,                    
+            alocacao: alocacao                     
+          });
+        }
+      });
+
+      closeAlert();
 
       setItens(prev => {
-        const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
+        const listaLimpa = prev.filter(i => i.numPecaFabricante !== '' || i.desenhoSAP !== '');
         const novaLista = [...listaLimpa, ...novosItensFormatados];
 
         if (novaLista.length > LIMITE_LOGISTICA) {
-          showAlert("Limite de Linhas Excedido", `A planilha contém mais itens do que o limite permitido de ${LIMITE_LOGISTICA}. Apenas as primeiras ${LIMITE_LOGISTICA} linhas foram importadas.`, "warning");
+          showAlert("Limite de Linhas Excedido", `A planilha contém mais itens do que o limite permitido. Foram importados os primeiros ${LIMITE_LOGISTICA} itens (de um total detetado de ${novaLista.length}).`, "warning");
           return novaLista.slice(0, LIMITE_LOGISTICA);
         }
 
         return novaLista;
       });
+
+    } catch (error) {
+      console.error(error);
+      showAlert("Erro de Leitura", "Falha ao ler o ficheiro Excel. Verifique se o documento está corrompido.", "error");
     }
   };
 
@@ -184,6 +281,7 @@ export default function EntradaEstoque() {
     }
 
     try {
+      showLoading("Registar Entrada", "A gravar dados no sistema...");
       const anexosProcessados = [];
       if (anexos.length > 0) {
         let enviados;
@@ -232,14 +330,17 @@ export default function EntradaEstoque() {
       });
 
       if (dados.sucesso || dados.ps_id || dados.ps) {
+        closeAlert();
         showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps_id || dados.ps}`, "success");
-        setFormDados({ nome: '', observacoes: '' });
+        setFormDados({ nome: '', observacoes: '' }); 
         setItens([]);
         setAnexos([]);
       } else {
+        closeAlert();
         showAlert("Erro no Servidor", dados.erro, "error");
       }
     } catch (error) {
+      closeAlert();
       showAlert("Erro de Conexão", `Falha ao conectar com o servidor. Motivo: ${error.message}`, "error");
     }
   };
