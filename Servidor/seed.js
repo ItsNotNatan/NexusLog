@@ -1,13 +1,6 @@
 // =================================================================
 // ARQUIVO: seed.js
 // DESCRICAO: Popula o banco com os dados iniciais do NexusLog.
-//
-// Os dados sao os mesmos do BancoDeDados.txt (o DDL do Postgres) que esta
-// na raiz do repositorio: o target de eficiencia, as tres filiais e os
-// utilizadores de teste.
-//
-// E IDEMPOTENTE: roda a cada arranque e so cria o que ainda nao existe.
-// Nada e' sobrescrito - se o Natan trocar a senha do adm, ela fica.
 // =================================================================
 require('dotenv').config();
 const db = require('./src/db');
@@ -18,17 +11,18 @@ const FILIAIS = [
   { codigo: 'BR06', nome: 'BR06 — Betim', cidade: 'Betim, MG' },
 ];
 
+// O PB requer senhas de no mínimo 8 caracteres para coleções de autenticação
 const USUARIOS = [
   {
-    email: 'adm@comau.com', senha: '123', nome_completo: 'Douglas Felipe (ADM)',
+    email: 'adm@comau.com', senha: 'Password123', nome_completo: 'Douglas Felipe (ADM)',
     cargo: 'ADM', filial_padrao_id: 'BR04', filiais_acesso: ['BR02', 'BR04', 'BR06'],
   },
   {
-    email: 'lider@comau.com', senha: '123', nome_completo: 'Jeferson Garandy (Líder)',
+    email: 'lider@comau.com', senha: 'Password123', nome_completo: 'Jeferson Garandy (Líder)',
     cargo: 'LIDER', filial_padrao_id: 'BR06', filiais_acesso: ['BR06', 'BR02'],
   },
   {
-    email: 'operador@comau.com', senha: '123', nome_completo: 'Marcio (Operador)',
+    email: 'operador@comau.com', senha: 'Password123', nome_completo: 'Marcio (Operador)',
     cargo: 'OPERADOR', filial_padrao_id: 'BR02', filiais_acesso: ['BR02'],
   },
 ];
@@ -36,7 +30,6 @@ const USUARIOS = [
 async function semear() {
   let criados = 0;
 
-  // ---- Configuracao: target de eficiencia (padrao 3 dias) ----
   const target = await db.um('configuracoes', db.f('chave = {:c}', { c: 'target_eficiencia' }));
   if (!target) {
     await db.criar('configuracoes', { chave: 'target_eficiencia', valor: '3' });
@@ -44,7 +37,6 @@ async function semear() {
     criados++;
   }
 
-  // ---- Filiais ----
   for (const filial of FILIAIS) {
     const existe = await db.um('filiais', db.f('codigo = {:c}', { c: filial.codigo }));
     if (!existe) {
@@ -54,11 +46,19 @@ async function semear() {
     }
   }
 
-  // ---- Utilizadores de teste ----
   for (const usuario of USUARIOS) {
     const existe = await db.um('usuarios', db.f('email = {:e}', { e: usuario.email }));
     if (!existe) {
-      await db.criar('usuarios', usuario);
+      await db.criar('usuarios', {
+        email: usuario.email,
+        emailVisibility: true,
+        password: usuario.senha,        // O PB exige o campo password
+        passwordConfirm: usuario.senha, // O PB exige a confirmação
+        nome_completo: usuario.nome_completo,
+        cargo: usuario.cargo,
+        filial_padrao_id: usuario.filial_padrao_id,
+        filiais_acesso: usuario.filiais_acesso
+      });
       console.log(`  + utilizador ${usuario.email} (${usuario.cargo})`);
       criados++;
     }
@@ -75,6 +75,5 @@ semear()
   })
   .catch((erro) => {
     console.error('❌ Falha no seed:', erro.message);
-    // Nao derruba o deploy: o sistema sobe e o erro fica visivel no log.
     process.exit(0);
   });
