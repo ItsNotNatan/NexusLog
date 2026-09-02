@@ -5,9 +5,6 @@ import { Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import { useAuth } from '../../contexts/AuthContext';
 
-// ✨ IMPORTAÇÃO DO CONTEXTO DE ALERTAS
-import { useAlert } from '../../contexts/AlertContext';
-
 import { apiFetch } from '../../services/api';
 import logoComau from '../../assets/logo-comau.png';
 
@@ -18,14 +15,9 @@ export default function LoginLogistica() {
   const [erro, setErro] = useState('');
 
   const navigate = useNavigate();
-  
-  // ✨ PUXAMOS O "USUARIO" PARA SABER SE JÁ ESTÁ LOGADO
   const { login, usuario } = useAuth();
-  
-  // ✨ INICIALIZAÇÃO DO HOOK DE ALERTAS
-  const { showAlert } = useAlert();
 
-  // ✨ EFEITO DE AUTO-LOGIN: Se já tem sessão, atira logo para o Painel
+  // Efeito de Auto-Login: Se já tem sessão, atira logo para o Painel
   useEffect(() => {
     if (usuario) {
       navigate('/logistica/painel');
@@ -61,21 +53,12 @@ export default function LoginLogistica() {
     }
   };
 
-  const handleVoltar = () => {
-    navigate('/');
-  };
-
-  // ✨ FUNÇÃO PARA A RECUPERAÇÃO DE SENHA (AGORA REDIRECIONA PARA A PÁGINA)
-  const handleRecuperarSenha = () => {
-    navigate('/esqueci-senha');
-  };
-
   return (
     <div className="login-page-wrapper">
       <div className="login-card">
 
         <button
-          onClick={handleVoltar}
+          onClick={() => navigate('/')}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -124,34 +107,33 @@ export default function LoginLogistica() {
               <Lock className="input-login-icone" size={18} />
               <input type="password" className="input-login-campo" placeholder="••••••••" required value={senha} onChange={(e) => setSenha(e.target.value)} />
             </div>
-            
-            {/* ✨ NOVO LINK DE RECUPERAÇÃO DE SENHA */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-              <button
-                type="button"
-                onClick={handleRecuperarSenha}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#2563eb',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  padding: 0,
-                  transition: 'color 0.2s ease'
-                }}
-                onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
-                onMouseOut={(e) => e.target.style.textDecoration = 'none'}
-              >
-                Esqueceu a senha?
-              </button>
-            </div>
           </div>
 
-          <div style={{ marginTop: '8px' }}>
+          <div style={{ marginTop: '16px' }}>
             <BotaoAcaoGlobal texto="Acessar Logística" icone={<ArrowRight size={18} />} cor="azul" onClick={handleLogin} carregando={carregando} />
           </div>
         </form>
+
+        {/* ✨ BOTÃO MOVIDO PARA FORA DO FORMULÁRIO PARA NÃO INTERFERIR NO LOGIN */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+          <button
+            onClick={() => navigate('/esqueci-senha')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#2563eb',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              transition: 'color 0.2s ease'
+            }}
+            onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
+            onMouseOut={(e) => e.target.style.textDecoration = 'none'}
+          >
+            Esqueceu a sua senha?
+          </button>
+        </div>
 
       </div>
     </div>
