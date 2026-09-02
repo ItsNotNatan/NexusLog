@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { KeyRound, Lock, Loader2, CheckCircle2 } from 'lucide-react';
-import { supabase } from '../../supabaseClient';
+import { apiFetch } from '../../services/api';
 import '../LoginLogistica/LoginLogistica.css';
 
 export default function RedefinirSenha() {
@@ -11,19 +11,27 @@ export default function RedefinirSenha() {
   const [carregando, setCarregando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
   const [erroMensagem, setErroMensagem] = useState('');
+  const [tokenRecuperacao, setTokenRecuperacao] = useState(null);
 
-  // Verifica se a página foi acedida pelo link do e-mail
+  // Apanha o token do URL que virá no link do e-mail (ex: /redefinir-senha?token=abc)
   useEffect(() => {
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        // Tudo ok, o utilizador clicou no link válido!
-      }
-    });
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      setTokenRecuperacao(token);
+    } else {
+      setErroMensagem("Link inválido ou expirado. Solicite uma nova recuperação.");
+    }
   }, []);
 
   const handleRedefinir = async (e) => {
     e.preventDefault();
     setErroMensagem('');
+
+    if (!tokenRecuperacao) {
+      setErroMensagem("Token de segurança ausente. Use o link do e-mail.");
+      return;
+    }
 
     if (senha.length < 6) {
       setErroMensagem("A nova senha deve ter pelo menos 6 caracteres.");
@@ -38,10 +46,13 @@ export default function RedefinirSenha() {
     setCarregando(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({ password: senha });
+      const data = await apiFetch('/auth/redefinir-senha', {
+        method: 'POST',
+        body: JSON.stringify({ token: tokenRecuperacao, novaSenha: senha })
+      });
 
-      if (error) {
-        setErroMensagem(error.message || "Ocorreu um erro ao atualizar a senha.");
+      if (!data.sucesso) {
+        setErroMensagem(data.erro || "Ocorreu um erro ao atualizar a senha.");
       } else {
         setSucesso(true);
       }
@@ -60,7 +71,7 @@ export default function RedefinirSenha() {
             <KeyRound size={28} />
           </div>
           <h2>Criar Nova Senha</h2>
-          <p>A sua identidade foi confirmada. Introduza a sua nova senha de acesso.</p>
+          <p>Insira a sua nova senha de acesso.</p>
         </div>
 
         {sucesso ? (
@@ -87,7 +98,7 @@ export default function RedefinirSenha() {
                   placeholder="No mínimo 6 caracteres"
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
-                  disabled={carregando}
+                  disabled={carregando || !tokenRecuperacao}
                 />
               </div>
             </div>
@@ -101,12 +112,12 @@ export default function RedefinirSenha() {
                   placeholder="Repita a nova senha"
                   value={confirmarSenha}
                   onChange={(e) => setConfirmarSenha(e.target.value)}
-                  disabled={carregando}
+                  disabled={carregando || !tokenRecuperacao}
                 />
               </div>
             </div>
 
-            <button type="submit" className="login-btn-submit" disabled={carregando}>
+            <button type="submit" className="login-btn-submit" disabled={carregando || !tokenRecuperacao}>
               {carregando ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Nova Senha'}
             </button>
           </form>
