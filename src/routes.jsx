@@ -20,7 +20,9 @@ import Configuracoes from './pages/Logistica/Configuracoes/Configuracoes';
 import RotaColeta from './pages/Logistica/RotaColeta/RotaColeta';
 import VisaoGeralEstoque from './pages/Logistica/VisaoGeralEstoque/VisaoGeralEstoque';
 // ✨ NOVO: Importação da página de Transferência de Estoque
-import TransferenciaEstoque from './pages/Logistica/TransferenciaEstoque/TransferenciaEstoque'; 
+import TransferenciaEstoque from './pages/Logistica/TransferenciaEstoque/TransferenciaEstoque';
+import EsqueciSenha from './pages/RecuperarSenha/EsqueciSenha';
+import RedefinirSenha from './pages/RecuperarSenha/RedefinirSenha';
 
 // --- PÁGINAS DO CLIENTE ---
 import FazerSolicitacao from './pages/Cliente/FazerSolicitacao/FazerSolicitacao';
@@ -29,6 +31,8 @@ import AcompanhamentoSolicitacoes from './pages/Cliente/AcompanhamentoSolicitaco
 export const router = createBrowserRouter([
   { path: "/", element: <CentralDeOperacoes /> },
   { path: "/login", element: <LoginLogistica /> },
+  { path: "/esqueci-senha", element: <EsqueciSenha /> },
+  { path: "/redefinir-senha", element: <RedefinirSenha /> },
 
   // ==========================================
   // 🟢 ÁREA DO CLIENTE (AGORA PÚBLICA / LIVRE DE LOGIN)
