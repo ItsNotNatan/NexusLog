@@ -1,11 +1,10 @@
 // =================================================================
 // ARQUIVO: src/services/usuariosService.js
-// DESCRICAO: Utilizadores no PocketBase
-//
-// A colecao "usuarios" e' do tipo "base" (nao "auth"): o login continua
-// sendo feito pelo Express com JWT, exatamente como era no Supabase.
+// DESCRICAO: Utilizadores no PocketBase (Coleção AUTH)
 // =================================================================
 const db = require('../db');
+const { PB_URL } = require('../config/pocketbase');
+const PocketBase = require('pocketbase/cjs');
 
 // Registro do PocketBase -> formato que o front sempre conheceu.
 const paraFront = (r) => ({
@@ -15,7 +14,8 @@ const paraFront = (r) => ({
   cargo: db.txt(r.cargo),
   filial_padrao_id: db.txt(r.filial_padrao_id),
   filiais_acesso: Array.isArray(r.filiais_acesso) ? r.filiais_acesso : [],
-  senha: r.senha,
+  // Como as senhas agora estão criptografadas, devolvemos vazio para não quebrar o frontend
+  senha: '',
   created_at: db.dt(r.created_at),
 });
 
@@ -27,18 +27,21 @@ const listarUsuarios = async () => {
 const criarUsuario = async (dadosUsuario) => {
   const email = String(dadosUsuario.email || '').trim();
 
-  // O indice unico ja barraria; aqui o erro sai com a mensagem certa.
+  // Mantemos a validação para o frontend receber a mensagem clara
   const jaExiste = await db.um('usuarios', db.f('email = {:email}', { email }));
   if (jaExiste) {
-    const erro = new Error('Este e-mail ja esta registado.');
-    erro.code = '23505'; // mesmo codigo do Postgres que o controller ja trata
+    const erro = new Error('Este e-mail já está registado.');
+    erro.code = '23505'; 
     throw erro;
   }
 
+  // ✨ MUDANÇA: Coleções Auth exigem password e passwordConfirm
   await db.criar('usuarios', {
     nome_completo: dadosUsuario.nome,
     email,
-    senha: dadosUsuario.senha,
+    emailVisibility: true,
+    password: dadosUsuario.senha,        // Mapeado
+    passwordConfirm: dadosUsuario.senha, // Mapeado
     cargo: dadosUsuario.cargo,
     filial_padrao_id: dadosUsuario.filial_padrao_id || dadosUsuario.filial || '',
     filiais_acesso: dadosUsuario.filiais_acesso || [],
@@ -56,7 +59,13 @@ const atualizarUsuario = async (id, dadosAtualizados) => {
   if (dadosAtualizados.filial_padrao_id || dadosAtualizados.filial) {
     dadosMapeados.filial_padrao_id = dadosAtualizados.filial_padrao_id || dadosAtualizados.filial;
   }
-  if (dadosAtualizados.senha) dadosMapeados.senha = dadosAtualizados.senha;
+  
+  // ✨ MUDANÇA: Se enviou senha nova, atualizamos os campos nativos
+  if (dadosAtualizados.senha) {
+    dadosMapeados.password = dadosAtualizados.senha;
+    dadosMapeados.passwordConfirm = dadosAtualizados.senha;
+  }
+  
   if (dadosAtualizados.filiais_acesso) dadosMapeados.filiais_acesso = dadosAtualizados.filiais_acesso;
 
   if (Object.keys(dadosMapeados).length === 0) return true;
@@ -69,18 +78,19 @@ const atualizarUsuario = async (id, dadosAtualizados) => {
  * Apaga um utilizador depois de confirmar a senha de quem pediu a exclusao.
  */
 const deletarUsuarioComConfirmacao = async (idAlvo, idAdmin, senhaFornecida) => {
-  // 1. Buscar a senha real do administrador
   const admin = await db.porId('usuarios', idAdmin);
-  if (!admin) throw new Error('Nao foi possivel verificar a identidade do administrador.');
+  if (!admin) throw new Error('Não foi possível verificar a identidade do administrador.');
 
-  // 2. Conferir a senha
-  if (admin.senha !== senhaFornecida) {
-    throw new Error('A senha de confirmacao esta incorreta. Exclusao cancelada.');
+  // ✨ MUDANÇA: Como não temos a senha em texto, validamos fazendo um "login fantasma" no PocketBase
+  try {
+    const pbTest = new PocketBase(PB_URL);
+    await pbTest.collection('usuarios').authWithPassword(admin.email, senhaFornecida);
+  } catch (err) {
+    throw new Error('A senha de confirmação está incorreta. Exclusão cancelada.');
   }
 
-  // 3. Apagar o utilizador alvo
   const alvo = await db.porId('usuarios', idAlvo);
-  if (!alvo) throw new Error('Utilizador nao encontrado.');
+  if (!alvo) throw new Error('Utilizador não encontrado.');
 
   await db.remover('usuarios', idAlvo);
   return true;
