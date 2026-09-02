@@ -8,12 +8,18 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const db = require('../db');
 
-// Configuração do transportador de e-mail (Gmail)
+// Configuração do transportador de e-mail (Preparado para Office 365 / Corporativo)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.EMAIL_HOST || 'smtp.office365.com',
+  port: parseInt(process.env.EMAIL_PORT) || 587,
+  secure: false, // false para a porta 587 (usa STARTTLS)
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    ciphers: 'SSLv3',
+    rejectUnauthorized: false // Evita bloqueios com certificados internos de rede
   }
 });
 
@@ -72,16 +78,12 @@ router.post('/recuperar-senha', async (req, res) => {
   }
 
   try {
-    // Verifica se o usuário existe
     const usuario = await db.um('usuarios', db.f('email = {:email}', { email: String(email).trim() }));
     
-    // Por segurança (evitar rastreio de e-mails válidos), devolvemos sucesso mesmo se não existir, 
-    // mas só enviamos e-mail se existir.
     if (!usuario) {
       return res.status(200).json({ sucesso: true, mensagem: 'Se o e-mail existir, as instruções foram enviadas.' });
     }
 
-    // Gera um token temporário válido por 1 hora, guardando apenas o ID do usuário
     const resetToken = jwt.sign(
       { id: usuario.id, tipo: 'reset' },
       process.env.JWT_SECRET,
@@ -114,7 +116,7 @@ router.post('/recuperar-senha', async (req, res) => {
 
   } catch (error) {
     console.error('Erro na recuperação de senha:', error);
-    res.status(500).json({ sucesso: false, erro: 'Falha ao processar o pedido de recuperação.' });
+    res.status(500).json({ sucesso: false, erro: 'Falha ao enviar o e-mail de recuperação. Verifique as credenciais no .env.' });
   }
 });
 
@@ -130,7 +132,6 @@ router.post('/redefinir-senha', async (req, res) => {
   }
 
   try {
-    // Descodifica e verifica se o token ainda é válido
     const descodificado = jwt.verify(token, process.env.JWT_SECRET);
     
     if (descodificado.tipo !== 'reset' || !descodificado.id) {
@@ -143,7 +144,6 @@ router.post('/redefinir-senha', async (req, res) => {
       return res.status(404).json({ sucesso: false, erro: 'Utilizador não encontrado.' });
     }
 
-    // Atualiza a senha no PocketBase (texto puro, conforme a sua arquitetura atual)
     await db.atualizar('usuarios', usuario.id, { senha: novaSenha });
 
     res.status(200).json({ sucesso: true, mensagem: 'Senha alterada com sucesso.' });
