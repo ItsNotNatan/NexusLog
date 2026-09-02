@@ -65,13 +65,9 @@ export default function LoginLogistica() {
     navigate('/');
   };
 
-  // ✨ FUNÇÃO PARA A RECUPERAÇÃO DE SENHA
+  // ✨ FUNÇÃO PARA A RECUPERAÇÃO DE SENHA (AGORA REDIRECIONA PARA A PÁGINA)
   const handleRecuperarSenha = () => {
-    showAlert(
-      "Recuperação de Senha", 
-      "Para redefinir a sua senha de acesso, por favor contacte o Administrador do sistema ou o Líder da sua equipa.", 
-      "info"
-    );
+    navigate('/esqueci-senha');
   };
 
   return (
