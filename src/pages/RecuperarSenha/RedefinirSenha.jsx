@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Lock, ArrowLeft } from 'lucide-react';
+import BotaoAcaoGlobal from '../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import { useAlert } from '../../contexts/AlertContext';
 import { apiFetch } from '../../services/api';
-import { Lock, Loader2 } from 'lucide-react';
+
+// ✨ O Segredo: Importamos o CSS do Login para ficar 100% igual!
+import '../LoginLogistica/LoginLogistica.css';
+import logoComau from '../../assets/logo-comau.png';
 
 export default function RedefinirSenha() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token'); // Captura o token da URL
+  const token = searchParams.get('token');
   
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
@@ -18,19 +23,11 @@ export default function RedefinirSenha() {
   const handleRedefinir = async (e) => {
     e.preventDefault();
 
-    if (!token) {
-      return showAlert("Link Inválido", "O link de recuperação está ausente ou quebrado. Peça um novo e-mail.", "error");
-    }
+    if (!token) return showAlert("Link Inválido", "O link de recuperação está ausente ou quebrado.", "error");
+    if (novaSenha.length < 8) return showAlert("Senha Fraca", "A senha deve ter no mínimo 8 caracteres.", "warning");
+    if (novaSenha !== confirmarSenha) return showAlert("Atenção", "As senhas não coincidem.", "warning");
 
-    if (novaSenha.length < 8) {
-      return showAlert("Senha Fraca", "A senha deve ter no mínimo 8 caracteres.", "warning");
-    }
-
-    if (novaSenha !== confirmarSenha) {
-      return showAlert("Atenção", "As senhas não coincidem.", "warning");
-    }
-
-    showLoading("A Atualizar...", "A gravar a sua nova senha na base de dados.");
+    showLoading("A Atualizar...", "A gravar a sua nova senha...");
     setCarregando(true);
 
     try {
@@ -40,12 +37,11 @@ export default function RedefinirSenha() {
       });
 
       closeAlert();
-
       if (resposta.sucesso) {
-        showAlert("Senha Atualizada!", "A sua senha foi alterada com sucesso. Já pode iniciar sessão.", "success");
+        showAlert("Senha Atualizada!", "A sua senha foi alterada com sucesso.", "success");
         navigate('/login');
       } else {
-        showAlert("Link Expirado", resposta.erro || "O link expirou ou é inválido. Por favor, peça uma nova recuperação.", "error");
+        showAlert("Link Expirado", resposta.erro || "O link expirou ou é inválido.", "error");
       }
     } catch (error) {
       closeAlert();
@@ -57,61 +53,91 @@ export default function RedefinirSenha() {
 
   if (!token) {
     return (
-      <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px' }}>
-        <div>
-          <h2 style={{ color: '#ef4444' }}>Link Inválido</h2>
-          <p style={{ color: '#475569', marginTop: '10px' }}>Este link não possui a chave de segurança necessária.</p>
-          <button onClick={() => navigate('/esqueci-senha')} style={{ marginTop: '20px', padding: '10px 20px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Pedir Novo Link</button>
+      <div className="login-page-wrapper">
+        <div className="login-card" style={{ textAlign: 'center' }}>
+          <div className="login-logo-seccao">
+            <img src={logoComau} alt="Logo COMAU" className="login-logo-img" />
+            <h2 style={{ color: '#ef4444' }}>Link Inválido</h2>
+            <p style={{ marginTop: '8px' }}>Este link não possui a chave de segurança necessária.</p>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+            <BotaoAcaoGlobal texto="Pedir Novo Link" cor="azul" onClick={() => navigate('/esqueci-senha')} />
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: '420px', backgroundColor: '#fff', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1e293b', marginBottom: '8px', textAlign: 'center' }}>Nova Senha</h2>
-        <p style={{ color: '#64748b', fontSize: '0.9rem', textAlign: 'center', marginBottom: '32px' }}>
-          Crie uma nova senha segura para a sua conta.
-        </p>
+    <div className="login-page-wrapper">
+      <div className="login-card">
 
-        <form onSubmit={handleRedefinir} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Nova Senha</label>
-            <div style={{ position: 'relative' }}>
-              <Lock size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+        <button
+          onClick={() => navigate('/login')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px', background: 'none',
+            border: 'none', color: '#64748b', cursor: 'pointer', marginBottom: '24px',
+            fontSize: '0.875rem', fontWeight: '600', padding: 0, transition: 'color 0.2s'
+          }}
+          onMouseOver={(e) => e.target.style.color = '#334155'}
+          onMouseOut={(e) => e.target.style.color = '#64748b'}
+        >
+          <ArrowLeft size={18} />
+          Voltar ao Login
+        </button>
+
+        <div className="login-logo-seccao">
+          <img src={logoComau} alt="Logo COMAU" className="login-logo-img" />
+          <h2>Nova Senha</h2>
+          <p style={{ marginTop: '8px' }}>Crie uma nova senha segura para a sua conta.</p>
+        </div>
+
+        <form className="login-form" onSubmit={handleRedefinir}>
+          <div className="input-grupo">
+            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px', display: 'block' }}>
+              NOVA SENHA
+            </label>
+            <div className="input-login-wrapper">
+              <Lock className="input-login-icone" size={18} />
               <input 
                 type="password" 
-                value={novaSenha}
-                onChange={(e) => setNovaSenha(e.target.value)}
-                placeholder="Mínimo 8 caracteres"
-                style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box' }}
+                className="input-login-campo" 
+                placeholder="Mínimo 8 caracteres" 
+                required 
+                value={novaSenha} 
+                onChange={(e) => setNovaSenha(e.target.value)} 
               />
             </div>
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Confirmar Nova Senha</label>
-            <div style={{ position: 'relative' }}>
-              <Lock size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+          <div className="input-grupo" style={{ marginTop: '16px' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px', display: 'block' }}>
+              CONFIRMAR NOVA SENHA
+            </label>
+            <div className="input-login-wrapper">
+              <Lock className="input-login-icone" size={18} />
               <input 
                 type="password" 
-                value={confirmarSenha}
-                onChange={(e) => setConfirmarSenha(e.target.value)}
-                placeholder="Repita a senha"
-                style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box' }}
+                className="input-login-campo" 
+                placeholder="Repita a senha" 
+                required 
+                value={confirmarSenha} 
+                onChange={(e) => setConfirmarSenha(e.target.value)} 
               />
             </div>
           </div>
 
-          <button 
-            type="submit" 
-            disabled={carregando}
-            style={{ width: '100%', padding: '12px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '1rem', cursor: carregando ? 'not-allowed' : 'pointer', display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '10px' }}
-          >
-            {carregando ? <Loader2 size={20} className="spin-icon" /> : "Gravar Nova Senha"}
-          </button>
+          <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+            <BotaoAcaoGlobal 
+              texto="Gravar Nova Senha" 
+              icone={<Lock size={18} />} 
+              cor="verde" 
+              onClick={handleRedefinir} 
+              carregando={carregando} 
+            />
+          </div>
         </form>
+        
       </div>
     </div>
   );
