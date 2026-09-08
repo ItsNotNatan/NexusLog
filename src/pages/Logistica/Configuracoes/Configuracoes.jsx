@@ -5,26 +5,24 @@
 
 import React, { useState, useEffect, useContext } from 'react';
 import './Configuracoes.css';
-import { Target, Users, Building } from 'lucide-react';
+import { Target, Users, Building, Database } from 'lucide-react'; // ✨ Novo ícone adicionado
 
 import { useAlert } from '../../../contexts/AlertContext';
-import { AuthContext } from '../../../contexts/AuthContext'; // ✨ Para atualizar o Header
-import { io } from 'socket.io-client'; // ✨ TEMPO REAL
+import { AuthContext } from '../../../contexts/AuthContext';
+import { io } from 'socket.io-client';
 
 // Importação das Abas Separadas
 import CadastroFiliais from './Abas/CadastroFiliais';
 import GestaoPerfis from './Abas/GestaoPerfis';
 import TargetEficiencia from './Abas/TargetEficiencia';
+import ImportarEstoqueBase from './Abas/ImportarEstoqueBase'; // ✨ Nova aba que vamos criar
 import { urlDoServidor } from '../../../services/api';
 
 export default function Configuracoes() {
   const [abaAtiva, setAbaAtiva] = useState('filiais'); 
   const { showAlert } = useAlert();
   
-  // ✨ Trazemos a função que atualiza as filiais globais no Header
   const { atualizarFiliaisGlobais } = useContext(AuthContext);
-
-  // ✨ GATILHO DE ATUALIZAÇÃO: Quando este número mudar, as abas recarregam os dados
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -38,22 +36,24 @@ export default function Configuracoes() {
       console.log('🟢 Configurações conectadas ao Tempo Real!');
     });
 
-    // Se alguém editar as filiais
     socket.on('filiais_atualizadas', () => {
       console.log('⚡ Filiais atualizadas! A atualizar o sistema...');
-      setRefreshKey(prev => prev + 1); // Força a aba a recarregar
-      atualizarFiliaisGlobais();       // Atualiza a lista do cabeçalho (Header) na hora!
+      setRefreshKey(prev => prev + 1); 
+      atualizarFiliaisGlobais();       
     });
 
-    // Se alguém editar os utilizadores
     socket.on('usuarios_atualizados', () => {
       console.log('⚡ Utilizadores atualizados! A atualizar a tela...');
       setRefreshKey(prev => prev + 1);
     });
 
-    // Se alguém mudar o target
     socket.on('configuracoes_atualizadas', () => {
       console.log('⚡ Target de eficiência atualizado!');
+      setRefreshKey(prev => prev + 1);
+    });
+
+    // Se houver importação massiva, também avisa
+    socket.on('estoque_atualizado', () => {
       setRefreshKey(prev => prev + 1);
     });
 
@@ -61,6 +61,13 @@ export default function Configuracoes() {
       socket.disconnect();
     };
   }, [atualizarFiliaisGlobais]);
+
+  const estiloBotao = (aba) => ({
+    background: 'none', border: 'none', padding: '8px 16px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap',
+    color: abaAtiva === aba ? '#0056b3' : '#6b7280',
+    borderBottom: abaAtiva === aba ? '3px solid #0056b3' : '3px solid transparent',
+    transition: 'all 0.2s'
+  });
 
   return (
     <div className="config-wrapper">
@@ -70,50 +77,32 @@ export default function Configuracoes() {
       </header>
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '2px solid #e5e7eb', paddingBottom: '8px', overflowX: 'auto' }}>
-        <button 
-          onClick={() => setAbaAtiva('filiais')}
-          style={{
-            background: 'none', border: 'none', padding: '8px 16px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap',
-            color: abaAtiva === 'filiais' ? '#0056b3' : '#6b7280',
-            borderBottom: abaAtiva === 'filiais' ? '3px solid #0056b3' : '3px solid transparent',
-            transition: 'all 0.2s'
-          }}
-        >
+        <button onClick={() => setAbaAtiva('filiais')} style={estiloBotao('filiais')}>
           <Building size={18} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
           Cadastro de Filiais
         </button>
 
-        <button 
-          onClick={() => setAbaAtiva('perfis')}
-          style={{
-            background: 'none', border: 'none', padding: '8px 16px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap',
-            color: abaAtiva === 'perfis' ? '#0056b3' : '#6b7280',
-            borderBottom: abaAtiva === 'perfis' ? '3px solid #0056b3' : '3px solid transparent',
-            transition: 'all 0.2s'
-          }}
-        >
+        <button onClick={() => setAbaAtiva('perfis')} style={estiloBotao('perfis')}>
           <Users size={18} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
           Gestão de Perfis
         </button>
 
-        <button 
-          onClick={() => setAbaAtiva('target')}
-          style={{
-            background: 'none', border: 'none', padding: '8px 16px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap',
-            color: abaAtiva === 'target' ? '#0056b3' : '#6b7280',
-            borderBottom: abaAtiva === 'target' ? '3px solid #0056b3' : '3px solid transparent',
-            transition: 'all 0.2s'
-          }}
-        >
+        <button onClick={() => setAbaAtiva('target')} style={estiloBotao('target')}>
           <Target size={18} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
           Target de Eficiência
         </button>
+
+        {/* ✨ NOVA ABA ADICIONADA */}
+        <button onClick={() => setAbaAtiva('importar')} style={estiloBotao('importar')}>
+          <Database size={18} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
+          Importar Base Inicial
+        </button>
       </div>
 
-      {/* Passamos o gatilho para as abas saberem quando atualizar */}
       {abaAtiva === 'filiais' && <CadastroFiliais refreshKey={refreshKey} />}
       {abaAtiva === 'perfis' && <GestaoPerfis refreshKey={refreshKey} />}
       {abaAtiva === 'target' && <TargetEficiencia refreshKey={refreshKey} />}
+      {abaAtiva === 'importar' && <ImportarEstoqueBase refreshKey={refreshKey} />}
     </div>
   );
 }
