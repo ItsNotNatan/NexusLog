@@ -36,6 +36,26 @@ export default function ImportarEstoqueBase() {
   } = useProcessadorExcel();
 
   /**
+   * FUNÇÃO DE FORMATAÇÃO DE DATA
+   * Garante que se o Excel enviar um objeto de data nativo (em vez de texto),
+   * nós convertemos de volta para uma string legível (DD/MM/AAAA).
+   */
+  const formatarDataExcel = (valorData) => {
+    if (!valorData) return '';
+    
+    // Se a biblioteca converteu para um objeto Date real do JavaScript
+    if (valorData instanceof Date) {
+      const dia = String(valorData.getDate()).padStart(2, '0');
+      const mes = String(valorData.getMonth() + 1).padStart(2, '0');
+      const ano = valorData.getFullYear();
+      return `${dia}/${mes}/${ano}`;
+    }
+    
+    // Se já for um texto (string) ou número, apenas converte para string de forma segura
+    return String(valorData).trim();
+  };
+
+  /**
    * FUNÇÃO DE TRADUÇÃO TURBO
    * Remove acentos, caracteres especiais e espaços extra das chaves (cabeçalhos) 
    * do Excel, tornando a procura à prova de falhas de digitação.
@@ -86,8 +106,6 @@ export default function ImportarEstoqueBase() {
       const novosItensFormatados = itensPlanilha.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`, // Cria um ID único para a interface
         desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO']),
-        
-        // Mapeamento da Descrição corrigido anteriormente
         vendorDescription: obterValor(item, ['DESCRICAO', 'DESC', 'DENOMINACAO', 'TEXTO BREVE', 'MATERIAL DESCRIPTION']),
         numPecaFabricante: obterValor(item, ['FABRICANTE', 'PART NUMBER', 'PN']),
         qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
@@ -98,9 +116,9 @@ export default function ImportarEstoqueBase() {
         wbsElement: String(obterValor(item, ['CENTRO DE CUSTO WBS', 'WBS', 'CENTRO DE CUSTO'])).trim(),
         nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
         
-        // 👇 AQUI ESTÁ A NOVA CORREÇÃO: Dicionário expandido para as datas
-        emissaoNF: obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO', 'DATA DE EMISSAO', 'EMI']),
-        recebNF: obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO', 'RECEB', 'DATA DE RECEBIMENTO', 'REC']),
+        // Passamos o valor bruto pelo nosso conversor de datas para garantir que fica legível
+        emissaoNF: formatarDataExcel(obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO'])),
+        recebNF: formatarDataExcel(obterValor(item, ['RECEB NF', 'RECEBIMENTO NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO'])),
         
         docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'PO']),
         poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR']),
