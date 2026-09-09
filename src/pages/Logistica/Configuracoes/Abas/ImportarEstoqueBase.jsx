@@ -32,7 +32,7 @@ export default function ImportarEstoqueBase() {
 
   /**
    * 1. FUNÇÃO DE TRADUÇÃO TURBO
-   * Encontra a coluna certa ignorando acentos, traços e espaços.
+   * Encontra a coluna certa ignorando acentos, traços, espaços e símbolos ordinais.
    */
   const obterValor = (itemExcel, palavrasChave) => {
     const chavesReais = Object.keys(itemExcel);
@@ -41,9 +41,10 @@ export default function ImportarEstoqueBase() {
       if (!texto) return '';
       return String(texto)
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[-|/.]/g, " ")
-        .replace(/\s+/g, " ")
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/[ºª°]/g, "") // 👇 CORREÇÃO: Remove indicadores ordinais (Nº passa a N)
+        .replace(/[-|/.]/g, " ") // Troca traços, barras verticais e pontos por espaço
+        .replace(/\s+/g, " ") // Remove espaços múltiplos
         .trim()
         .toUpperCase();
     };
@@ -70,49 +71,38 @@ export default function ImportarEstoqueBase() {
   const formatarDataExcel = (valor) => {
     if (!valor || valor === '-' || String(valor).trim() === '') return '';
 
-    // Caso 1: A biblioteca já converteu para um objeto Date nativo
     if (valor instanceof Date) {
       if (isNaN(valor.getTime())) return '';
       return valor.toISOString().split('T')[0];
     }
 
-    // Remove horas se vierem junto (ex: "21/10/2013 14:30")
     let stringValor = String(valor).trim().split(' ')[0];
 
-    // Caso 2: Número Serial do Excel (ex: 45674)
     if (/^\d{4,5}$/.test(stringValor)) {
       const numeroDias = parseInt(stringValor, 10);
-      // O Excel começa a contar a partir de 30/12/1899
       const dataBaseExcel = new Date(Date.UTC(1899, 11, 30));
       const dataConvertida = new Date(dataBaseExcel.getTime() + numeroDias * 86400000);
-      return dataConvertida.toISOString().split('T')[0]; // Retorna AAAA-MM-DD
+      return dataConvertida.toISOString().split('T')[0]; 
     }
 
-    // Caso 3: Datas em String com pontos (04.02.2025) convertidas para barras
     stringValor = stringValor.replace(/\./g, '/');
 
-    // Tentar quebrar a data pelas barras ou hifens
     const partes = stringValor.split(/[\/\-]/);
     if (partes.length === 3) {
       let dia, mes, ano;
 
-      // Se começar pelo ano (ex: 2025-02-04)
       if (partes[0].length === 4) {
         ano = partes[0];
         mes = partes[1].padStart(2, '0');
         dia = partes[2].padStart(2, '0');
       } else {
-        // Assume o último como ano
         ano = partes[2];
-        if (ano.length === 2) ano = '20' + ano; // Converte "23" para "2023"
+        if (ano.length === 2) ano = '20' + ano; 
 
-        // Verifica se é Padrão Americano (Mês/Dia) vs Brasileiro (Dia/Mês)
         if (parseInt(partes[1], 10) > 12) {
-          // Se a peça do meio for > 12, garantidamente é Mês/Dia/Ano (ex: 9/25/2021)
           mes = partes[0].padStart(2, '0');
           dia = partes[1].padStart(2, '0');
         } else {
-          // Assume Padrão normal Dia/Mês/Ano
           dia = partes[0].padStart(2, '0');
           mes = partes[1].padStart(2, '0');
         }
@@ -125,7 +115,7 @@ export default function ImportarEstoqueBase() {
       }
     }
 
-    return ''; // Falha silenciosa: retorna vazio para o campo
+    return ''; 
   };
 
   /**
@@ -148,13 +138,13 @@ export default function ImportarEstoqueBase() {
         fornecedor: obterValor(item, ['FORNECEDOR', 'REGISTRO']),
         wbsElement: String(obterValor(item, ['CENTRO DE CUSTO WBS', 'WBS', 'CENTRO DE CUSTO'])).trim(),
         nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
-        
-        // 👇 SOLUÇÃO: As datas passam pelo extrator E logo a seguir pelo nosso formatador universal
         emissaoNF: formatarDataExcel(obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO', 'DATA DE EMISSAO', 'EMI'])),
         recebNF: formatarDataExcel(obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO', 'RECEB', 'DATA DE RECEBIMENTO', 'REC'])),
         
-        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'PO']),
-        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR']),
+        // 👇 CORREÇÃO: Dicionários super blindados para evitar a troca de colunas
+        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'PEDIDO', 'NUM PEDIDO', 'DOC COMPRA', 'CPV', 'PO']),
+        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR UNITARIO', 'UNITARIO', 'VLR', 'VALOR', 'PRECO']),
+        
         centro: obterValor(item, ['FILIAL', 'CENTRO']) || 'BR04',
         deposito: obterValor(item, ['DEPOSITO']) || '20',
         alocacao: obterValor(item, ['ALOCACAO'])
