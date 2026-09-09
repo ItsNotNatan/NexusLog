@@ -31,9 +31,9 @@ export default function ImportarEstoqueBase() {
   } = useProcessadorExcel();
 
   /**
-   * 1. FUNÇÃO DE TRADUÇÃO INTELIGENTE (ATUALIZADA)
-   * Substitui símbolos por espaços para manter as palavras separadas e legíveis.
-   * Evita a aglutinação de palavras que estava a quebrar a extração.
+   * 1. FUNÇÃO DE TRADUÇÃO ULTRA-TURBO
+   * Apaga todos os espaços e símbolos para criar blocos de texto únicos.
+   * Exemplo: "Nº PEDIDO DE COMPRA / CPV" vira "NPEDIDODECOMPRACPV".
    */
   const obterValor = (itemExcel, palavrasChave) => {
     const chavesReais = Object.keys(itemExcel);
@@ -44,18 +44,19 @@ export default function ImportarEstoqueBase() {
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "") // Remove acentos
         .toUpperCase()
-        .replace(/[^A-Z0-9]/g, " ") // Substitui TUDO o que não for letra ou número por ESPAÇO
-        .replace(/\s+/g, " ") // Limpa os espaços duplos criados no passo anterior
-        .trim();
+        .replace(/[^A-Z0-9]/g, ""); // APAGA TUDO o que não for letra ou número (junta tudo num bloco só)
     };
 
     for (const palavra of palavrasChave) {
       const palavraLimpa = limparTexto(palavra);
       
-      const chaveEncontrada = chavesReais.find(k => {
-        const kLimpo = limparTexto(k);
-        return kLimpo === palavraLimpa || kLimpo.includes(palavraLimpa);
-      });
+      // 1ª Tentativa: Correspondência EXATA (Impede completamente o roubo de colunas)
+      let chaveEncontrada = chavesReais.find(k => limparTexto(k) === palavraLimpa);
+
+      // 2ª Tentativa: Se não achar igual, tenta ver se está contido (apenas se a palavra for muito longa)
+      if (!chaveEncontrada && palavraLimpa.length > 5) {
+        chaveEncontrada = chavesReais.find(k => limparTexto(k).includes(palavraLimpa));
+      }
 
       if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null && String(itemExcel[chaveEncontrada]).trim() !== '') {
         return itemExcel[chaveEncontrada];
@@ -66,7 +67,7 @@ export default function ImportarEstoqueBase() {
 
   /**
    * 2. FORMATADOR UNIVERSAL DE DATAS
-   * Converte números de série, formatos americanos ou dados com pontos para ISO (AAAA-MM-DD).
+   * Resolve a anomalia das datas do Excel (números de série, pontos, barras).
    */
   const formatarDataExcel = (valor) => {
     if (!valor || valor === '-' || String(valor).trim() === '') return '';
@@ -129,28 +130,31 @@ export default function ImportarEstoqueBase() {
     
     if (itensPlanilha && itensPlanilha.length > 0) {
       
+      // 👇 MAPEMENTO COM OS NOMES EXATOS QUE ME FORNECESTE
       const novosItensFormatados = itensPlanilha.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO']),
-        vendorDescription: obterValor(item, ['DESCRICAO', 'DESC', 'DENOMINACAO', 'TEXTO BREVE', 'MATERIAL DESCRIPTION']),
-        numPecaFabricante: obterValor(item, ['FABRICANTE', 'PART NUMBER', 'PN']),
-        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
-        referencia: obterValor(item, ['REFERENCIA', 'REF']),
-        unidadeMedida: obterValor(item, ['UNID MEDIDA', 'UNIDADE', 'UM']) || 'Unid',
-        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NF', 'NOTA FISCAL']),
-        fornecedor: obterValor(item, ['FORNECEDOR', 'REGISTRO']),
-        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO WBS', 'WBS', 'CENTRO DE CUSTO'])).trim(),
-        nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
-        emissaoNF: formatarDataExcel(obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO', 'DATA DE EMISSAO', 'EMI'])),
-        recebNF: formatarDataExcel(obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO', 'RECEB', 'DATA DE RECEBIMENTO', 'REC'])),
+        desenhoSAP: obterValor(item, ['NUM SAP | DESENHO', 'NUM SAP', 'DESENHO SAP']),
+        vendorDescription: obterValor(item, ['DESCRIÇÃO', 'DESCRICAO', 'MATERIAL DESCRIPTION']),
+        numPecaFabricante: obterValor(item, ['FABRICANTE', 'PART NUMBER']),
+        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QUANTIDADE', 'QTD']),
+        referencia: obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
+        unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE MEDIDA', 'UNIDADE']),
+        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NUMERO DA NOTA FISCAL', 'NOTA FISCAL DE ENTRADA']),
+        fornecedor: obterValor(item, ['FORNECEDOR / REGISTRO', 'FORNECEDOR']),
+        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO - WBS', 'CENTRO DE CUSTO WBS', 'WBS'])).trim(),
+        nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO / PROJETO', 'NOME CENTRO DE CUSTO', 'PROJETO']),
         
-        // 👇 AQUI ESTÁ A CORREÇÃO: Nomes exatos adicionados na primeira posição do array
+        // As datas usam agora o formatador e os nomes exatos!
+        emissaoNF: formatarDataExcel(obterValor(item, ['EMISSÃO NF', 'EMISSAO NF'])),
+        recebNF: formatarDataExcel(obterValor(item, ['RECEB. NF', 'RECEB NF'])),
+        
+        // Os pedidos e valores não vão roubar dados uns aos outros
         docCompras: obterValor(item, ['Nº PEDIDO DE COMPRA / CPV', 'PEDIDO DE COMPRA', 'CPV']),
-        poNetPrice: obterValor(item, ['VLR. UNITÁRIO NOTA FISCAL', 'VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR UNITARIO']),
+        poNetPrice: obterValor(item, ['VLR. UNITÁRIO NOTA FISCAL', 'VALOR UNITARIO NOTA FISCAL', 'VLR UNITARIO']),
         
-        centro: obterValor(item, ['FILIAL', 'CENTRO']) || 'BR04',
-        deposito: obterValor(item, ['DEPOSITO']) || '20',
-        alocacao: obterValor(item, ['ALOCACAO'])
+        centro: obterValor(item, ['FILIAL']) || 'BR04',
+        deposito: obterValor(item, ['DEPÓSITO', 'DEPOSITO']) || '20',
+        alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
       }));
 
       const itensValidos = novosItensFormatados.filter(
@@ -162,7 +166,7 @@ export default function ImportarEstoqueBase() {
   };
 
   /**
-   * ATUALIZAÇÃO MANUAL
+   * ATUALIZAÇÃO MANUAL DA TABELA
    */
   const handleAtualizarCampo = (id, campo, valor) => {
     setItens(prev => prev.map(item => item.id === id ? { ...item, [campo]: valor } : item));
@@ -183,7 +187,7 @@ export default function ImportarEstoqueBase() {
   };
 
   /**
-   * GRAVAÇÃO FINAL
+   * GRAVAÇÃO FINAL NO BANCO DE DADOS
    */
   const handleGravarNoBanco = async () => {
     if (itens.length === 0) return showAlert("Aviso", "A tabela está vazia.", "warning");
