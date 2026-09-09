@@ -5,6 +5,9 @@ import { Database, AlertCircle, FileSpreadsheet, Save } from 'lucide-react';
 import { useAlert } from '../../../../contexts/AlertContext';
 import { useAuth } from '../../../../contexts/AuthContext';
 
+// Formatadores auxiliares
+import { formatarDinheiro } from '../../../../utils/formatadores';
+
 // Hook personalizado para processar o Excel
 import { useProcessadorExcel } from '../../../../hooks/useProcessadorExcel';
 
@@ -36,6 +39,7 @@ export default function ImportarEstoqueBase() {
    * Exemplo: "Nº PEDIDO DE COMPRA / CPV" vira "NPEDIDODECOMPRACPV".
    */
   const obterValor = (itemExcel, palavrasChave) => {
+    if (!itemExcel || typeof itemExcel !== 'object') return '';
     const chavesReais = Object.keys(itemExcel);
     
     const limparTexto = (texto) => {
@@ -49,16 +53,20 @@ export default function ImportarEstoqueBase() {
 
     for (const palavra of palavrasChave) {
       const palavraLimpa = limparTexto(palavra);
+      if (!palavraLimpa) continue;
       
-      // 1ª Tentativa: Correspondência EXATA (Impede completamente o roubo de colunas)
+      // 1ª Tentativa: Correspondência EXATA
       let chaveEncontrada = chavesReais.find(k => limparTexto(k) === palavraLimpa);
 
-      // 2ª Tentativa: Se não achar igual, tenta ver se está contido (apenas se a palavra for muito longa)
-      if (!chaveEncontrada && palavraLimpa.length > 5) {
-        chaveEncontrada = chavesReais.find(k => limparTexto(k).includes(palavraLimpa));
+      // 2ª Tentativa: Se não achar igual, tenta ver se está contido
+      if (!chaveEncontrada && palavraLimpa.length > 4) {
+        chaveEncontrada = chavesReais.find(k => {
+          const kLimpa = limparTexto(k);
+          return kLimpa.includes(palavraLimpa) || palavraLimpa.includes(kLimpa);
+        });
       }
 
-      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null && String(itemExcel[chaveEncontrada]).trim() !== '') {
+      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null && String(itemExcel[chaveEncontrada]).trim() !== '' && String(itemExcel[chaveEncontrada]).trim() !== '-') {
         return itemExcel[chaveEncontrada];
       }
     }
@@ -122,6 +130,18 @@ export default function ImportarEstoqueBase() {
     return '';
   };
 
+  const normalizarUnidade = (u) => {
+    if (!u) return 'Unid';
+    const limpo = String(u).trim().toUpperCase();
+    if (limpo.startsWith('UN') || limpo === 'PC' || limpo === 'PECA' || limpo === 'PÇ' || limpo === 'N/A' || limpo === 'ND') return 'Unid';
+    if (limpo.startsWith('M') || limpo.includes('METRO')) return 'Metro';
+    if (limpo.startsWith('KG') || limpo.includes('QUILO')) return 'Kg';
+    if (limpo.startsWith('CX') || limpo.includes('CAIXA')) return 'Caixa';
+    if (limpo.startsWith('L') || limpo.includes('LITRO')) return 'Litro';
+    if (limpo === 'NR') return 'NR';
+    return 'Unid';
+  };
+
   /**
    * 3. FUNÇÃO PRINCIPAL DE IMPORTAÇÃO
    */
@@ -130,32 +150,51 @@ export default function ImportarEstoqueBase() {
     
     if (itensPlanilha && itensPlanilha.length > 0) {
       
-      // 👇 MAPEMENTO COM OS NOMES EXATOS QUE ME FORNECESTE
-      const novosItensFormatados = itensPlanilha.map((item, index) => ({
-        id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: obterValor(item, ['NUM SAP | DESENHO', 'NUM SAP', 'DESENHO SAP']),
-        vendorDescription: obterValor(item, ['DESCRIÇÃO', 'DESCRICAO', 'MATERIAL DESCRIPTION']),
-        numPecaFabricante: obterValor(item, ['FABRICANTE', 'PART NUMBER']),
-        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QUANTIDADE', 'QTD']),
-        referencia: obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
-        unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE MEDIDA', 'UNIDADE']),
-        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NUMERO DA NOTA FISCAL', 'NOTA FISCAL DE ENTRADA']),
-        fornecedor: obterValor(item, ['FORNECEDOR / REGISTRO', 'FORNECEDOR']),
-        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO - WBS', 'CENTRO DE CUSTO WBS', 'WBS'])).trim(),
-        nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO / PROJETO', 'NOME CENTRO DE CUSTO', 'PROJETO']),
-        
-        // As datas usam agora o formatador e os nomes exatos!
-        emissaoNF: formatarDataExcel(obterValor(item, ['EMISSÃO NF', 'EMISSAO NF'])),
-        recebNF: formatarDataExcel(obterValor(item, ['RECEB. NF', 'RECEB NF'])),
-        
-        // Os pedidos e valores não vão roubar dados uns aos outros
-        docCompras: obterValor(item, ['Nº PEDIDO DE COMPRA / CPV', 'PEDIDO DE COMPRA', 'CPV']),
-        poNetPrice: obterValor(item, ['VLR. UNITÁRIO NOTA FISCAL', 'VALOR UNITARIO NOTA FISCAL', 'VLR UNITARIO']),
-        
-        centro: obterValor(item, ['FILIAL']) || 'BR04',
-        deposito: obterValor(item, ['DEPÓSITO', 'DEPOSITO']) || '20',
-        alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
-      }));
+      // 👇 MAPEAMENTO ROBUSTO COM PRIORIZAÇÃO DOS DADOS PROCESSADOS E FALLBACKS
+      const novosItensFormatados = itensPlanilha.map((item, index) => {
+        // Pedido de Compra / CPV
+        let pedidoVal = item.docCompras;
+        if (!pedidoVal || pedidoVal === '-') {
+          pedidoVal = obterValor(item, ['DOC COMPRAS', 'DOCCOMPRAS', 'Nº PEDIDO DE COMPRA / CPV', 'PEDIDO DE COMPRA', 'CPV', 'COMPRAS']);
+        }
+        if (pedidoVal === '-') pedidoVal = '';
+
+        // Valor Unitário Nota Fiscal
+        let precoVal = item.poNetPrice;
+        if (!precoVal || precoVal === '-') {
+          precoVal = obterValor(item, ['PO NET PRICE', 'PONETPRICE', 'VLR. UNITÁRIO NOTA FISCAL', 'VALOR UNITARIO NOTA FISCAL', 'VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'VLR UNITARIO']);
+        }
+        if (precoVal === '-') precoVal = '';
+        if (precoVal !== '') {
+          precoVal = formatarDinheiro(precoVal);
+        }
+
+        return {
+          id: `excel-${Date.now()}-${index}`,
+          desenhoSAP: item.desenhoSAP || obterValor(item, ['NUM SAP | DESENHO', 'NUM SAP', 'DESENHO SAP']),
+          vendorDescription: item.vendorDescription || item.materialDescription || obterValor(item, ['DESCRIÇÃO', 'DESCRICAO', 'MATERIAL DESCRIPTION']),
+          numPecaFabricante: item.numPecaFabricante || obterValor(item, ['FABRICANTE', 'PART NUMBER']),
+          qtdFornecida: item.qtdFornecida || obterValor(item, ['QTDE ENTRADA', 'QUANTIDADE', 'QTD']) || 1,
+          referencia: item.referencia || obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
+          unidadeMedida: normalizarUnidade(item.unidadeMedida || obterValor(item, ['UNID. MEDIDA', 'UNIDADE MEDIDA', 'UNIDADE'])),
+          nfEntrada: item.nfEntrada || obterValor(item, ['NUM DA NOTA FISCAL', 'NUMERO DA NOTA FISCAL', 'NOTA FISCAL DE ENTRADA']),
+          fornecedor: item.fornecedor || obterValor(item, ['FORNECEDOR / REGISTRO', 'FORNECEDOR']),
+          wbsElement: String(item.wbs || obterValor(item, ['CENTRO DE CUSTO - WBS', 'CENTRO DE CUSTO WBS', 'WBS']) || '').trim(),
+          nomeProjeto: item.nomeProjeto || obterValor(item, ['NOME CENTRO DE CUSTO / PROJETO', 'NOME CENTRO DE CUSTO', 'PROJETO']),
+          
+          // As datas usam agora o formatador e os nomes exatos!
+          emissaoNF: formatarDataExcel(item.emissaoNF || obterValor(item, ['EMISSÃO NF', 'EMISSAO NF'])),
+          recebNF: formatarDataExcel(item.recebNF || obterValor(item, ['RECEB. NF', 'RECEB NF'])),
+          
+          // Os pedidos e valores não vão roubar dados uns aos outros
+          docCompras: pedidoVal ? String(pedidoVal).trim() : '',
+          poNetPrice: precoVal || '',
+          
+          centro: item.centro || obterValor(item, ['FILIAL']) || 'BR04',
+          deposito: item.deposito || obterValor(item, ['DEPÓSITO', 'DEPOSITO']) || '20',
+          alocacao: item.alocacao || obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
+        };
+      });
 
       const itensValidos = novosItensFormatados.filter(
         item => item.vendorDescription !== '' || item.numPecaFabricante !== '' || item.desenhoSAP !== ''
