@@ -86,7 +86,8 @@ export default function ImportarEstoqueBase() {
       const novosItensFormatados = itensPlanilha.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`, // Cria um ID único para a interface
         desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO']),
-        // O dicionário expandido resolve o problema da coluna "Descrição"
+        
+        // Mapeamento da Descrição corrigido anteriormente
         vendorDescription: obterValor(item, ['DESCRICAO', 'DESC', 'DENOMINACAO', 'TEXTO BREVE', 'MATERIAL DESCRIPTION']),
         numPecaFabricante: obterValor(item, ['FABRICANTE', 'PART NUMBER', 'PN']),
         qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
@@ -96,8 +97,11 @@ export default function ImportarEstoqueBase() {
         fornecedor: obterValor(item, ['FORNECEDOR', 'REGISTRO']),
         wbsElement: String(obterValor(item, ['CENTRO DE CUSTO WBS', 'WBS', 'CENTRO DE CUSTO'])).trim(),
         nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
-        emissaoNF: obterValor(item, ['EMISSAO NF', 'DATA EMISSAO']),
-        recebNF: obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO']),
+        
+        // 👇 AQUI ESTÁ A NOVA CORREÇÃO: Dicionário expandido para as datas
+        emissaoNF: obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO', 'DATA DE EMISSAO', 'EMI']),
+        recebNF: obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO', 'RECEB', 'DATA DE RECEBIMENTO', 'REC']),
+        
         docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'PO']),
         poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR']),
         centro: obterValor(item, ['FILIAL', 'CENTRO']) || 'BR04',
