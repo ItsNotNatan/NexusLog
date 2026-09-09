@@ -10,7 +10,7 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { AlertContext } from '../../../contexts/AlertContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 
-import { formatarWBS } from '../../../utils/formatadores';
+import { formatarWBS, formatarDinheiro } from '../../../utils/formatadores';
 
 const LIMITE_CLIENTE = 20;
 
@@ -68,23 +68,27 @@ export default function EntradaMaterial() {
       
       const novosItensFormatados = itensProcessados.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO SAP', 'SAP']),
-        referencia: obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
-        vendorDescription: obterValor(item, ['DESCRIÇÃO', 'DESCRICAO']),
-        numPecaFabricante: obterValor(item, ['FABRICANTE', 'Nº PEÇA', 'PART NUMBER', 'PN']),
-        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
-        unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid',
-        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']),
-        fornecedor: obterValor(item, ['FORNECEDOR']),
-        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO - WBS', 'WBS'])).trim(),
-        nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
-        emissaoNF: obterValor(item, ['EMISSÃO NF', 'EMISSAO']),
-        recebNF: obterValor(item, ['RECEB. NF', 'RECEBIMENTO']),
-        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'COMPRAS']),
-        poNetPrice: obterValor(item, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']),
-        centro: obterValor(item, ['FILIAL', 'CENTRO']),
-        deposito: obterValor(item, ['DEPÓSITO', 'DEPOSITO']),
-        alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
+        desenhoSAP: item.desenhoSAP || obterValor(item, ['NUM SAP', 'DESENHO SAP', 'SAP']),
+        referencia: item.referencia || obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
+        vendorDescription: item.vendorDescription || item.materialDescription || obterValor(item, ['DESCRIÇÃO', 'DESCRICAO']),
+        numPecaFabricante: item.numPecaFabricante || obterValor(item, ['FABRICANTE', 'Nº PEÇA', 'PART NUMBER', 'PN']),
+        qtdFornecida: item.qtdFornecida || obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
+        unidadeMedida: item.unidadeMedida || obterValor(item, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid',
+        nfEntrada: item.nfEntrada || obterValor(item, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']),
+        fornecedor: item.fornecedor || obterValor(item, ['FORNECEDOR']),
+        wbsElement: String(item.wbs || obterValor(item, ['CENTRO DE CUSTO - WBS', 'WBS'])).trim(),
+        nomeProjeto: item.nomeProjeto || obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
+        emissaoNF: item.emissaoNF || obterValor(item, ['EMISSÃO NF', 'EMISSAO']),
+        recebNF: item.recebNF || obterValor(item, ['RECEB. NF', 'RECEBIMENTO']),
+        docCompras: item.docCompras || obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'COMPRAS', 'DOCUMENTO']),
+        poNetPrice: (item.poNetPrice && item.poNetPrice !== '-') 
+          ? formatarDinheiro(item.poNetPrice) 
+          : (obterValor(item, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']) 
+              ? formatarDinheiro(obterValor(item, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE'])) 
+              : ''),
+        centro: item.centro || obterValor(item, ['FILIAL', 'CENTRO']),
+        deposito: item.deposito || obterValor(item, ['DEPÓSITO', 'DEPOSITO']),
+        alocacao: item.alocacao || obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
       }));
 
       // ✨ VERIFICAÇÃO DE DIVERGÊNCIA: Pega em todos os WBS preenchidos na planilha e unifica
