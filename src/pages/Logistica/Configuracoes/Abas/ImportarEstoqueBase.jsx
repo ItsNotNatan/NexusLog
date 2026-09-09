@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
 import { Database, AlertCircle, FileSpreadsheet, Save } from 'lucide-react';
+
+// Importação dos contextos globais para alertas e utilizador
 import { useAlert } from '../../../../contexts/AlertContext';
 import { useAuth } from '../../../../contexts/AuthContext';
+
+// Hook personalizado para processar o Excel
 import { useProcessadorExcel } from '../../../../hooks/useProcessadorExcel';
+
+// Serviço de comunicação com o backend
 import { apiFetch } from '../../../../services/api';
 
+// Componentes visuais
 import ModalProcessamento from '../../../../components/ModalProcessamento/ModalProcessamento';
 import CarregarArquivo from '../../../../components/CarregarArquivo/CarregarArquivo';
 import ExemploExcel from '../../../../components/ExemploExcel/ExemploExcel';
@@ -12,21 +19,31 @@ import TabelaInsercaoItens from '../../../../components/TabelaInsercaoItens/Tabe
 import BotaoAcaoGlobal from '../../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 export default function ImportarEstoqueBase() {
+  // Extração das funções de alerta do contexto
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
+  // Obtenção dos dados do utilizador logado
   const { usuario } = useAuth();
   
+  // Estado para armazenar as linhas que aparecem na tabela antes de guardar
   const [itens, setItens] = useState([]);
+  // Estado para controlar se o botão de guardar está a carregar
   const [salvando, setSalvando] = useState(false);
 
+  // Hook do processador de Excel que gere o progresso e o estado da leitura
   const {
     estaProcessando, concluido, estadoProgresso, resultado, erroFatal,
     iniciarProcessamento, resetarProcessador
   } = useProcessadorExcel();
 
-  // ✨ FUNÇÃO DE TRADUÇÃO TURBO: Ignora acentos, traços, barras e espaços extras
+  /**
+   * FUNÇÃO DE TRADUÇÃO TURBO
+   * Remove acentos, caracteres especiais e espaços extra das chaves (cabeçalhos) 
+   * do Excel, tornando a procura à prova de falhas de digitação.
+   */
   const obterValor = (itemExcel, palavrasChave) => {
     const chavesReais = Object.keys(itemExcel);
     
+    // Função auxiliar para normalizar o texto
     const limparTexto = (texto) => {
       if (!texto) return '';
       return String(texto)
@@ -38,14 +55,17 @@ export default function ImportarEstoqueBase() {
         .toUpperCase();
     };
 
+    // Percorre o dicionário de palavras que queremos procurar
     for (const palavra of palavrasChave) {
       const palavraLimpa = limparTexto(palavra);
       
+      // Procura nas chaves do Excel alguma que contenha a palavra limpa
       const chaveEncontrada = chavesReais.find(k => {
         const kLimpo = limparTexto(k);
         return kLimpo.includes(palavraLimpa);
       });
 
+      // Se encontrou e tem valor válido, devolve esse valor
       if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null) {
         return itemExcel[chaveEncontrada];
       }
@@ -53,50 +73,61 @@ export default function ImportarEstoqueBase() {
     return '';
   };
 
+  /**
+   * FUNÇÃO PRINCIPAL DE IMPORTAÇÃO
+   * Recebe o ficheiro, manda processar e mapeia os dados para a tabela.
+   */
   const handleImportar = async (arquivo) => {
     const itensPlanilha = await iniciarProcessamento(arquivo);
     
     if (itensPlanilha && itensPlanilha.length > 0) {
       
-      // ✨ Mapeando exatamente com os nomes que você forneceu
+      // Mapeamento robusto com várias palavras-chave como margem de segurança
       const novosItensFormatados = itensPlanilha.map((item, index) => ({
-        id: `excel-${Date.now()}-${index}`,
+        id: `excel-${Date.now()}-${index}`, // Cria um ID único para a interface
         desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO']),
-        vendorDescription: obterValor(item, ['DESCRICAO']),
-        numPecaFabricante: obterValor(item, ['FABRICANTE']),
-        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD']) || 1,
-        referencia: obterValor(item, ['REFERENCIA']),
-        unidadeMedida: obterValor(item, ['UNID MEDIDA']) || 'Unid',
-        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL']),
+        // O dicionário expandido resolve o problema da coluna "Descrição"
+        vendorDescription: obterValor(item, ['DESCRICAO', 'DESC', 'DENOMINACAO', 'TEXTO BREVE', 'MATERIAL DESCRIPTION']),
+        numPecaFabricante: obterValor(item, ['FABRICANTE', 'PART NUMBER', 'PN']),
+        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
+        referencia: obterValor(item, ['REFERENCIA', 'REF']),
+        unidadeMedida: obterValor(item, ['UNID MEDIDA', 'UNIDADE', 'UM']) || 'Unid',
+        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NF', 'NOTA FISCAL']),
         fornecedor: obterValor(item, ['FORNECEDOR', 'REGISTRO']),
-        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO WBS', 'WBS'])).trim(),
+        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO WBS', 'WBS', 'CENTRO DE CUSTO'])).trim(),
         nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
-        emissaoNF: obterValor(item, ['EMISSAO NF']),
-        recebNF: obterValor(item, ['RECEB NF']),
-        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV']),
-        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO']),
-        centro: obterValor(item, ['FILIAL']) || 'BR04',
+        emissaoNF: obterValor(item, ['EMISSAO NF', 'DATA EMISSAO']),
+        recebNF: obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO']),
+        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'PO']),
+        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR']),
+        centro: obterValor(item, ['FILIAL', 'CENTRO']) || 'BR04',
         deposito: obterValor(item, ['DEPOSITO']) || '20',
         alocacao: obterValor(item, ['ALOCACAO'])
       }));
 
-      // Filtra linhas que estejam completamente vazias (caso o Excel puxe lixo nas últimas linhas)
+      // Filtra as linhas vazias (evita criar linhas mortas se o Excel tiver lixo no final)
       const itensValidos = novosItensFormatados.filter(
         item => item.vendorDescription !== '' || item.numPecaFabricante !== '' || item.desenhoSAP !== ''
       );
 
-      setItens(itensValidos);
+      setItens(itensValidos); // Coloca os itens validados no estado para desenhar a tabela
     }
   };
 
+  /**
+   * ATUALIZAÇÃO MANUAL
+   * Permite editar uma célula específica na tabela antes de gravar no sistema.
+   */
   const handleAtualizarCampo = (id, campo, valor) => {
     setItens(prev => prev.map(item => item.id === id ? { ...item, [campo]: valor } : item));
   };
 
+  // Remove uma linha específica da tabela
   const handleRemoverItem = (id) => {
     setItens(prev => prev.filter(item => item.id !== id));
   };
 
+  // Adiciona uma linha totalmente em branco à tabela
   const handleAdicionarLinha = () => {
     const novaLinha = {
       id: Date.now().toString(), desenhoSAP: '', vendorDescription: '', numPecaFabricante: '',
@@ -107,9 +138,14 @@ export default function ImportarEstoqueBase() {
     setItens([novaLinha, ...itens]);
   };
 
+  /**
+   * GRAVAÇÃO FINAL
+   * Pega nos itens da tabela, formata-os para a Base de Dados e envia via API.
+   */
   const handleGravarNoBanco = async () => {
     if (itens.length === 0) return showAlert("Aviso", "A tabela está vazia.", "warning");
 
+    // Confirmação dupla de segurança
     const confirm = await showConfirm(
       "Salvar no Banco?", 
       `Deseja registrar definitivamente estes ${itens.length} itens no estoque oficial?`, 
@@ -121,6 +157,7 @@ export default function ImportarEstoqueBase() {
     setSalvando(true);
 
     try {
+      // Mapeamento dos campos do frontend (tabela) para as colunas reais da Base de Dados
       const itensFormatadosParaBanco = itens.map(item => ({
         desenho_sap: item.desenhoSAP || '-',
         part_number: item.numPecaFabricante || '-',
@@ -142,6 +179,7 @@ export default function ImportarEstoqueBase() {
         alocacao: item.alocacao || null
       }));
 
+      // Objeto com a estrutura que o Backend espera receber
       const dadosEnvio = {
         solicitante: {
           nome: usuario?.nome_completo || 'Sistema de Importação',
@@ -154,19 +192,22 @@ export default function ImportarEstoqueBase() {
         anexos: []
       };
 
+      // Envia os dados para a rota de entrada do backend
       const res = await apiFetch('/solicitacoes/entrada', {
         method: 'POST',
         body: JSON.stringify(dadosEnvio)
       });
 
-      closeAlert();
+      closeAlert(); // Fecha o modal de carregamento
 
+      // Tratamento de falhas do servidor
       if (!res.sucesso && !res.ps && !res.ps_id) {
         throw new Error(res.erro || "Falha ao gravar no banco.");
       }
 
+      // Conclusão com sucesso
       showAlert("Sucesso!", "A carga base foi importada e salva no estoque com sucesso!", "success");
-      setItens([]); 
+      setItens([]); // Limpa a tabela
       resetarProcessador();
 
     } catch (e) {
@@ -180,12 +221,14 @@ export default function ImportarEstoqueBase() {
   return (
     <div className="aba-conteudo" style={{ animation: 'fadeIn 0.3s ease-out' }}>
       
+      {/* Modal que surge durante a leitura da planilha */}
       <ModalProcessamento 
         estaProcessando={estaProcessando} concluido={concluido}
         estadoProgresso={estadoProgresso} resultado={resultado}
         erroFatal={erroFatal} onClose={resetarProcessador}
       />
 
+      {/* TELA INICIAL: Mostra a área de upload se não houver itens nem leitura ativa */}
       {itens.length === 0 && !estaProcessando && !concluido && (
         <div style={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <h2 style={{ fontSize: '1.25rem', color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -207,6 +250,7 @@ export default function ImportarEstoqueBase() {
             </div>
           </div>
 
+          {/* Dicas e Download do Modelo de Planilha */}
           <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '16px', borderRadius: '8px', borderLeft: '4px solid #f59e0b', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
             <AlertCircle size={20} color="#d97706" style={{ marginTop: '2px', flexShrink: 0 }} />
             <div>
@@ -224,6 +268,7 @@ export default function ImportarEstoqueBase() {
         </div>
       )}
 
+      {/* TELA DA TABELA: Mostra a tabela de edição assim que o ficheiro for lido com sucesso */}
       {itens.length > 0 && !estaProcessando && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
