@@ -32,7 +32,7 @@ export default function ImportarEstoqueBase() {
 
   /**
    * 1. FUNÇÃO DE TRADUÇÃO TURBO
-   * Encontra a coluna certa ignorando acentos, traços, espaços e símbolos ordinais.
+   * Encontra a coluna certa ignorando acentos, traços e espaços.
    */
   const obterValor = (itemExcel, palavrasChave) => {
     const chavesReais = Object.keys(itemExcel);
@@ -41,10 +41,9 @@ export default function ImportarEstoqueBase() {
       if (!texto) return '';
       return String(texto)
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
-        .replace(/[ºª°]/g, "") // 👇 CORREÇÃO: Remove indicadores ordinais (Nº passa a N)
-        .replace(/[-|/.]/g, " ") // Troca traços, barras verticais e pontos por espaço
-        .replace(/\s+/g, " ") // Remove espaços múltiplos
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[-|/.]/g, " ")
+        .replace(/\s+/g, " ")
         .trim()
         .toUpperCase();
     };
@@ -82,7 +81,7 @@ export default function ImportarEstoqueBase() {
       const numeroDias = parseInt(stringValor, 10);
       const dataBaseExcel = new Date(Date.UTC(1899, 11, 30));
       const dataConvertida = new Date(dataBaseExcel.getTime() + numeroDias * 86400000);
-      return dataConvertida.toISOString().split('T')[0]; 
+      return dataConvertida.toISOString().split('T')[0];
     }
 
     stringValor = stringValor.replace(/\./g, '/');
@@ -115,7 +114,7 @@ export default function ImportarEstoqueBase() {
       }
     }
 
-    return ''; 
+    return '';
   };
 
   /**
@@ -141,9 +140,9 @@ export default function ImportarEstoqueBase() {
         emissaoNF: formatarDataExcel(obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO', 'DATA DE EMISSAO', 'EMI'])),
         recebNF: formatarDataExcel(obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO', 'RECEB', 'DATA DE RECEBIMENTO', 'REC'])),
         
-        // 👇 CORREÇÃO: Dicionários super blindados para evitar a troca de colunas
-        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'PEDIDO', 'NUM PEDIDO', 'DOC COMPRA', 'CPV', 'PO']),
-        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR UNITARIO', 'UNITARIO', 'VLR', 'VALOR', 'PRECO']),
+        // 👇 AQUI ESTÁ A CORREÇÃO: Dicionários super restritos para evitar roubo de colunas
+        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'DOC COMPRA', 'NUMERO DO PEDIDO']),
+        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR UNITARIO', 'UNITARIO NOTA FISCAL', 'PRECO', 'VALOR', 'VLR']),
         
         centro: obterValor(item, ['FILIAL', 'CENTRO']) || 'BR04',
         deposito: obterValor(item, ['DEPOSITO']) || '20',
@@ -159,7 +158,7 @@ export default function ImportarEstoqueBase() {
   };
 
   /**
-   * ATUALIZAÇÃO MANUAL (Manuseio da Tabela no Frontend)
+   * ATUALIZAÇÃO MANUAL
    */
   const handleAtualizarCampo = (id, campo, valor) => {
     setItens(prev => prev.map(item => item.id === id ? { ...item, [campo]: valor } : item));
@@ -180,7 +179,7 @@ export default function ImportarEstoqueBase() {
   };
 
   /**
-   * GRAVAÇÃO FINAL (Envia os dados validados para o Node.js)
+   * GRAVAÇÃO FINAL
    */
   const handleGravarNoBanco = async () => {
     if (itens.length === 0) return showAlert("Aviso", "A tabela está vazia.", "warning");
