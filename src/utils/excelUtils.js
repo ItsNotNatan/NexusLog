@@ -51,11 +51,24 @@ export const processarExcelComProgresso = (file, onProgress) => {
         let linhaAtual = 0;
         const tamanhoLote = 500;
 
+        const normalizar = (txt) => {
+          if (!txt) return '';
+          return String(txt)
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toUpperCase()
+            .trim();
+        };
+
         // ✨ FUNÇÃO MÁGICA: Procura o valor por várias palavras chave nos cabeçalhos lidos
         const obterValor = (linhaObj, palavrasChave) => {
           const chavesAtuais = Object.keys(linhaObj);
           for (const palavra of palavrasChave) {
-            const chaveCerta = chavesAtuais.find(k => k.toUpperCase().trim().includes(palavra.toUpperCase()));
+            const palavraNorm = normalizar(palavra);
+            const chaveCerta = chavesAtuais.find(k => {
+              const kNorm = normalizar(k);
+              return kNorm === palavraNorm || kNorm.includes(palavraNorm) || palavraNorm.includes(kNorm);
+            });
             if (chaveCerta && linhaObj[chaveCerta] !== undefined && linhaObj[chaveCerta] !== "") {
               return linhaObj[chaveCerta];
             }
@@ -86,20 +99,20 @@ export const processarExcelComProgresso = (file, onProgress) => {
                 id: `excel-${Date.now()}-${i}`,
                 desenhoSAP: desenho !== '-' ? desenho : '',
                 materialDescription: desc !== '-' ? desc : '',
-                vendorDescription: obterValor(linha, ['VENDOR DESCRIPTION']) !== '-' ? obterValor(linha, ['VENDOR DESCRIPTION']) : '',
+                vendorDescription: obterValor(linha, ['VENDOR DESCRIPTION', 'DESCRIÇÃO', 'DESCRICAO']) !== '-' ? obterValor(linha, ['VENDOR DESCRIPTION', 'DESCRIÇÃO', 'DESCRICAO']) : (desc !== '-' ? desc : ''),
                 numPecaFabricante: partNumber !== '-' ? partNumber : '',
-                fornecedor: obterValor(linha, ['FORNECEDOR']) !== '-' ? obterValor(linha, ['FORNECEDOR']) : '',
+                fornecedor: obterValor(linha, ['FORNECEDOR', 'REGISTRO']) !== '-' ? obterValor(linha, ['FORNECEDOR', 'REGISTRO']) : '',
                 qtdSelecionada: qtd,
                 qtdFornecida: qtd, // Duplo mapeamento para cobrir Cliente e Logística
                 referencia: obterValor(linha, ['REFERÊNCIA', 'REFERENCIA']) !== '-' ? obterValor(linha, ['REFERÊNCIA', 'REFERENCIA']) : '',
                 unidadeMedida: obterValor(linha, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) !== '-' ? obterValor(linha, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) : 'Unid',
-                wbs: obterValor(linha, ['CENTRO DE CUSTO - WBS', 'WBS ELEMENT', 'WBS']) !== '-' ? obterValor(linha, ['CENTRO DE CUSTO - WBS', 'WBS ELEMENT', 'WBS']) : '',
-                nomeProjeto: obterValor(linha, ['NOME CENTRO DE CUSTO', 'PROJETO']) !== '-' ? obterValor(linha, ['NOME CENTRO DE CUSTO', 'PROJETO']) : '',
-                nfEntrada: obterValor(linha, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']) !== '-' ? obterValor(linha, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']) : '',
-                emissaoNF: obterValor(linha, ['EMISSÃO NF', 'EMISSAO']) !== '-' ? obterValor(linha, ['EMISSÃO NF', 'EMISSAO']) : '',
-                recebNF: obterValor(linha, ['RECEB. NF', 'RECEBIMENTO']) !== '-' ? obterValor(linha, ['RECEB. NF', 'RECEBIMENTO']) : '',
-                docCompras: obterValor(linha, ['PEDIDO DE COMPRA', 'CPV', 'COMPRAS', 'DOCUMENTO']) !== '-' ? obterValor(linha, ['PEDIDO DE COMPRA', 'CPV', 'COMPRAS', 'DOCUMENTO']) : '',
-                poNetPrice: obterValor(linha, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']) !== '-' ? obterValor(linha, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']) : '',
+                wbs: obterValor(linha, ['CENTRO DE CUSTO - WBS', 'CENTRO DE CUSTO WBS', 'WBS ELEMENT', 'WBS']) !== '-' ? obterValor(linha, ['CENTRO DE CUSTO - WBS', 'CENTRO DE CUSTO WBS', 'WBS ELEMENT', 'WBS']) : '',
+                nomeProjeto: obterValor(linha, ['NOME CENTRO DE CUSTO / PROJETO', 'NOME CENTRO DE CUSTO', 'PROJETO']) !== '-' ? obterValor(linha, ['NOME CENTRO DE CUSTO / PROJETO', 'NOME CENTRO DE CUSTO', 'PROJETO']) : '',
+                nfEntrada: obterValor(linha, ['NUM DA NOTA FISCAL', 'NUMERO DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']) !== '-' ? obterValor(linha, ['NUM DA NOTA FISCAL', 'NUMERO DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']) : '',
+                emissaoNF: obterValor(linha, ['EMISSÃO NF', 'EMISSAO NF', 'EMISSAO']) !== '-' ? obterValor(linha, ['EMISSÃO NF', 'EMISSAO NF', 'EMISSAO']) : '',
+                recebNF: obterValor(linha, ['RECEB. NF', 'RECEB NF', 'RECEBIMENTO']) !== '-' ? obterValor(linha, ['RECEB. NF', 'RECEB NF', 'RECEBIMENTO']) : '',
+                docCompras: obterValor(linha, ['Nº PEDIDO DE COMPRA / CPV', 'PEDIDO DE COMPRA', 'CPV', 'COMPRAS', 'DOCUMENTO']) !== '-' ? String(obterValor(linha, ['Nº PEDIDO DE COMPRA / CPV', 'PEDIDO DE COMPRA', 'CPV', 'COMPRAS', 'DOCUMENTO'])).trim() : '',
+                poNetPrice: obterValor(linha, ['VLR. UNITÁRIO NOTA FISCAL', 'VALOR UNITARIO NOTA FISCAL', 'VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'VLR UNITARIO', 'PO NET PRICE', 'PREÇO', 'PRECO']) !== '-' ? obterValor(linha, ['VLR. UNITÁRIO NOTA FISCAL', 'VALOR UNITARIO NOTA FISCAL', 'VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'VLR UNITARIO', 'PO NET PRICE', 'PREÇO', 'PRECO']) : '',
                 centro: obterValor(linha, ['FILIAL', 'CENTRO']) !== '-' ? obterValor(linha, ['FILIAL', 'CENTRO']) : '',
                 deposito: obterValor(linha, ['DEPÓSITO', 'DEPOSITO']) !== '-' ? obterValor(linha, ['DEPÓSITO', 'DEPOSITO']) : '',
                 alocacao: obterValor(linha, ['ALOCAÇÃO', 'ALOCACAO']) !== '-' ? obterValor(linha, ['ALOCAÇÃO', 'ALOCACAO']) : ''
