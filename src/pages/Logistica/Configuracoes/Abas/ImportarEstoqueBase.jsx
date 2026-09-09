@@ -23,12 +23,30 @@ export default function ImportarEstoqueBase() {
     iniciarProcessamento, resetarProcessador
   } = useProcessadorExcel();
 
-  // ✨ FUNÇÃO DE TRADUÇÃO (Copiada do EntradaMaterial para funcionar igual)
+  // ✨ FUNÇÃO DE TRADUÇÃO TURBO: Ignora acentos, traços, barras e espaços extras
   const obterValor = (itemExcel, palavrasChave) => {
     const chavesReais = Object.keys(itemExcel);
+    
+    const limparTexto = (texto) => {
+      if (!texto) return '';
+      return String(texto)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos (ç -> c, ã -> a)
+        .replace(/[-|/.]/g, " ") // Troca traços, barras verticais e pontos por espaço
+        .replace(/\s+/g, " ") // Remove espaços múltiplos
+        .trim()
+        .toUpperCase();
+    };
+
     for (const palavra of palavrasChave) {
-      const chaveEncontrada = chavesReais.find(k => k.trim().toUpperCase().includes(palavra));
-      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined) {
+      const palavraLimpa = limparTexto(palavra);
+      
+      const chaveEncontrada = chavesReais.find(k => {
+        const kLimpo = limparTexto(k);
+        return kLimpo.includes(palavraLimpa);
+      });
+
+      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null) {
         return itemExcel[chaveEncontrada];
       }
     }
@@ -39,29 +57,35 @@ export default function ImportarEstoqueBase() {
     const itensPlanilha = await iniciarProcessamento(arquivo);
     
     if (itensPlanilha && itensPlanilha.length > 0) {
-      // ✨ AGORA SIM! Formatando os dados para a tabela entender (igual no EntradaMaterial)
+      
+      // ✨ Mapeando exatamente com os nomes que você forneceu
       const novosItensFormatados = itensPlanilha.map((item, index) => ({
         id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO SAP', 'SAP']),
-        referencia: obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
-        vendorDescription: obterValor(item, ['DESCRIÇÃO', 'DESCRICAO']),
-        numPecaFabricante: obterValor(item, ['FABRICANTE', 'Nº PEÇA', 'PART NUMBER', 'PN']),
-        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
-        unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid',
-        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']),
-        fornecedor: obterValor(item, ['FORNECEDOR']),
-        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO - WBS', 'WBS'])).trim(),
+        desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO']),
+        vendorDescription: obterValor(item, ['DESCRICAO']),
+        numPecaFabricante: obterValor(item, ['FABRICANTE']),
+        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD']) || 1,
+        referencia: obterValor(item, ['REFERENCIA']),
+        unidadeMedida: obterValor(item, ['UNID MEDIDA']) || 'Unid',
+        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL']),
+        fornecedor: obterValor(item, ['FORNECEDOR', 'REGISTRO']),
+        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO WBS', 'WBS'])).trim(),
         nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
-        emissaoNF: obterValor(item, ['EMISSÃO NF', 'EMISSAO']),
-        recebNF: obterValor(item, ['RECEB. NF', 'RECEBIMENTO']),
-        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'COMPRAS']),
-        poNetPrice: obterValor(item, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']),
-        centro: obterValor(item, ['FILIAL', 'CENTRO']) || 'BR04',
-        deposito: obterValor(item, ['DEPÓSITO', 'DEPOSITO']) || '20',
-        alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
+        emissaoNF: obterValor(item, ['EMISSAO NF']),
+        recebNF: obterValor(item, ['RECEB NF']),
+        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV']),
+        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO']),
+        centro: obterValor(item, ['FILIAL']) || 'BR04',
+        deposito: obterValor(item, ['DEPOSITO']) || '20',
+        alocacao: obterValor(item, ['ALOCACAO'])
       }));
 
-      setItens(novosItensFormatados);
+      // Filtra linhas que estejam completamente vazias (caso o Excel puxe lixo nas últimas linhas)
+      const itensValidos = novosItensFormatados.filter(
+        item => item.vendorDescription !== '' || item.numPecaFabricante !== '' || item.desenhoSAP !== ''
+      );
+
+      setItens(itensValidos);
     }
   };
 
@@ -97,7 +121,6 @@ export default function ImportarEstoqueBase() {
     setSalvando(true);
 
     try {
-      // ✨ Mapeamento para o backend igual ao que você fez no EntradaMaterial
       const itensFormatadosParaBanco = itens.map(item => ({
         desenho_sap: item.desenhoSAP || '-',
         part_number: item.numPecaFabricante || '-',
@@ -121,11 +144,11 @@ export default function ImportarEstoqueBase() {
 
       const dadosEnvio = {
         solicitante: {
-          nome: usuario.nome_completo || 'Sistema de Importação',
-          filial_id: usuario.filial_padrao_id || 'BR04',
+          nome: usuario?.nome_completo || 'Sistema de Importação',
+          filial_id: usuario?.filial_padrao_id || 'BR04',
           wbs: '-',
           observacoes: 'Carga Base Inicial (Importação Excel)',
-          tipo: 'Entrada' // Adicionado para garantir o padrão
+          tipo: 'Entrada'
         },
         itens: itensFormatadosParaBanco,
         anexos: []
@@ -138,7 +161,6 @@ export default function ImportarEstoqueBase() {
 
       closeAlert();
 
-      // Ajuste na verificação de sucesso para seguir o padrão da sua API
       if (!res.sucesso && !res.ps && !res.ps_id) {
         throw new Error(res.erro || "Falha ao gravar no banco.");
       }
@@ -190,7 +212,7 @@ export default function ImportarEstoqueBase() {
             <div>
               <h4 style={{ margin: '0 0 8px 0', color: '#b45309', fontSize: '0.95rem' }}>Importante antes de importar:</h4>
               <ul style={{ margin: 0, paddingLeft: '20px', color: '#92400e', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <li>A planilha deve seguir rigorosamente a ordem das colunas do sistema.</li>
+                <li>A planilha deve seguir rigorosamente os cabeçalhos.</li>
                 <li>Saldos vazios serão considerados como "0" (Zero).</li>
                 <li>A importação é processada em blocos para não sobrecarregar o seu navegador.</li>
               </ul>
