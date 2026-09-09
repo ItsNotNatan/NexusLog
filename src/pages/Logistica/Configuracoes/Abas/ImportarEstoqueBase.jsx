@@ -31,8 +31,9 @@ export default function ImportarEstoqueBase() {
   } = useProcessadorExcel();
 
   /**
-   * 1. FUNÇÃO DE TRADUÇÃO TURBO
-   * Encontra a coluna certa ignorando acentos, traços e espaços.
+   * 1. FUNÇÃO DE TRADUÇÃO ULTRA-TURBO
+   * Apaga espaços, traços, barras, pontuações e acentos. 
+   * Deixa APENAS letras e números para uma correspondência à prova de falhas.
    */
   const obterValor = (itemExcel, palavrasChave) => {
     const chavesReais = Object.keys(itemExcel);
@@ -41,10 +42,8 @@ export default function ImportarEstoqueBase() {
       if (!texto) return '';
       return String(texto)
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[-|/.]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/[^A-Z0-9]/gi, "") // Remove TUDO o que não for letra ou número
         .toUpperCase();
     };
 
@@ -56,7 +55,7 @@ export default function ImportarEstoqueBase() {
         return kLimpo.includes(palavraLimpa);
       });
 
-      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null) {
+      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null && String(itemExcel[chaveEncontrada]).trim() !== '') {
         return itemExcel[chaveEncontrada];
       }
     }
@@ -65,7 +64,7 @@ export default function ImportarEstoqueBase() {
 
   /**
    * 2. FORMATADOR UNIVERSAL DE DATAS
-   * Resolve a anomalia das datas do Excel (números de série, pontos, barras).
+   * Converte números de série, formatos americanos ou dados com pontos para ISO (AAAA-MM-DD).
    */
   const formatarDataExcel = (valor) => {
     if (!valor || valor === '-' || String(valor).trim() === '') return '';
@@ -77,6 +76,7 @@ export default function ImportarEstoqueBase() {
 
     let stringValor = String(valor).trim().split(' ')[0];
 
+    // Trata Números de Série do Excel (Ex: 45674)
     if (/^\d{4,5}$/.test(stringValor)) {
       const numeroDias = parseInt(stringValor, 10);
       const dataBaseExcel = new Date(Date.UTC(1899, 11, 30));
@@ -84,6 +84,7 @@ export default function ImportarEstoqueBase() {
       return dataConvertida.toISOString().split('T')[0];
     }
 
+    // Uniformiza pontos para barras (Ex: 04.02.2025 -> 04/02/2025)
     stringValor = stringValor.replace(/\./g, '/');
 
     const partes = stringValor.split(/[\/\-]/);
@@ -98,6 +99,7 @@ export default function ImportarEstoqueBase() {
         ano = partes[2];
         if (ano.length === 2) ano = '20' + ano; 
 
+        // Diferencia Formato Americano (M/D/A) do Brasileiro (D/M/A)
         if (parseInt(partes[1], 10) > 12) {
           mes = partes[0].padStart(2, '0');
           dia = partes[1].padStart(2, '0');
@@ -140,9 +142,9 @@ export default function ImportarEstoqueBase() {
         emissaoNF: formatarDataExcel(obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO', 'DATA DE EMISSAO', 'EMI'])),
         recebNF: formatarDataExcel(obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO', 'RECEB', 'DATA DE RECEBIMENTO', 'REC'])),
         
-        // 👇 AQUI ESTÁ A CORREÇÃO: Dicionários super restritos para evitar roubo de colunas
-        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'DOC COMPRA', 'NUMERO DO PEDIDO']),
-        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR UNITARIO', 'UNITARIO NOTA FISCAL', 'PRECO', 'VALOR', 'VLR']),
+        // 👇 SOLUÇÃO: Dicionários completamente isolados e restritos
+        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV']),
+        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR UNITARIO']),
         
         centro: obterValor(item, ['FILIAL', 'CENTRO']) || 'BR04',
         deposito: obterValor(item, ['DEPOSITO']) || '20',
