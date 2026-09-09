@@ -15,7 +15,6 @@ export default function ImportarEstoqueBase() {
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
   const { usuario } = useAuth();
   
-  // ✨ ESTADO NOVO: Guarda os itens lidos e mostra-os na tabela antes de gravar
   const [itens, setItens] = useState([]);
   const [salvando, setSalvando] = useState(false);
 
@@ -24,17 +23,48 @@ export default function ImportarEstoqueBase() {
     iniciarProcessamento, resetarProcessador
   } = useProcessadorExcel();
 
+  // ✨ FUNÇÃO DE TRADUÇÃO (Copiada do EntradaMaterial para funcionar igual)
+  const obterValor = (itemExcel, palavrasChave) => {
+    const chavesReais = Object.keys(itemExcel);
+    for (const palavra of palavrasChave) {
+      const chaveEncontrada = chavesReais.find(k => k.trim().toUpperCase().includes(palavra));
+      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined) {
+        return itemExcel[chaveEncontrada];
+      }
+    }
+    return '';
+  };
+
   const handleImportar = async (arquivo) => {
-    // 1. O Excel é processado e, em vez de enviar direto, fica no "Modo de Rascunho" na Tabela
     const itensPlanilha = await iniciarProcessamento(arquivo);
+    
     if (itensPlanilha && itensPlanilha.length > 0) {
-      setItens(itensPlanilha);
+      // ✨ AGORA SIM! Formatando os dados para a tabela entender (igual no EntradaMaterial)
+      const novosItensFormatados = itensPlanilha.map((item, index) => ({
+        id: `excel-${Date.now()}-${index}`,
+        desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO SAP', 'SAP']),
+        referencia: obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
+        vendorDescription: obterValor(item, ['DESCRIÇÃO', 'DESCRICAO']),
+        numPecaFabricante: obterValor(item, ['FABRICANTE', 'Nº PEÇA', 'PART NUMBER', 'PN']),
+        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
+        unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid',
+        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']),
+        fornecedor: obterValor(item, ['FORNECEDOR']),
+        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO - WBS', 'WBS'])).trim(),
+        nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
+        emissaoNF: obterValor(item, ['EMISSÃO NF', 'EMISSAO']),
+        recebNF: obterValor(item, ['RECEB. NF', 'RECEBIMENTO']),
+        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'COMPRAS']),
+        poNetPrice: obterValor(item, ['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']),
+        centro: obterValor(item, ['FILIAL', 'CENTRO']) || 'BR04',
+        deposito: obterValor(item, ['DEPÓSITO', 'DEPOSITO']) || '20',
+        alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
+      }));
+
+      setItens(novosItensFormatados);
     }
   };
 
-  // ==========================================
-  // FUNÇÕES PARA A TABELA DE INSERÇÃO FUNCIONAR
-  // ==========================================
   const handleAtualizarCampo = (id, campo, valor) => {
     setItens(prev => prev.map(item => item.id === id ? { ...item, [campo]: valor } : item));
   };
@@ -53,9 +83,6 @@ export default function ImportarEstoqueBase() {
     setItens([novaLinha, ...itens]);
   };
 
-  // ==========================================
-  // GRAVAR NA BASE DE DADOS (Só acionado quando clica no botão final)
-  // ==========================================
   const handleGravarNoBanco = async () => {
     if (itens.length === 0) return showAlert("Aviso", "A tabela está vazia.", "warning");
 
@@ -70,14 +97,37 @@ export default function ImportarEstoqueBase() {
     setSalvando(true);
 
     try {
+      // ✨ Mapeamento para o backend igual ao que você fez no EntradaMaterial
+      const itensFormatadosParaBanco = itens.map(item => ({
+        desenho_sap: item.desenhoSAP || '-',
+        part_number: item.numPecaFabricante || '-',
+        fornecedor: item.fornecedor || null,
+        referencia: item.referencia || null,
+        qtd: parseInt(item.qtdFornecida, 10) || 1,
+        unidade_medida: item.unidadeMedida || 'Unid',
+        nf_entrada: item.nfEntrada || null,
+        descricao: item.vendorDescription || 'Sem descrição',
+        materialDescription: item.vendorDescription || 'Sem descrição', 
+        wbs_element: item.wbsElement || '-',
+        nome_projeto: item.nomeProjeto || null,
+        emissao_nf: item.emissaoNF || null,
+        receb_nf: item.recebNF || null,
+        documento_compras: item.docCompras || null,
+        valor_unitario: item.poNetPrice || null,
+        centro: item.centro || 'BR04',
+        deposito: item.deposito || '20',
+        alocacao: item.alocacao || null
+      }));
+
       const dadosEnvio = {
         solicitante: {
           nome: usuario.nome_completo || 'Sistema de Importação',
           filial_id: usuario.filial_padrao_id || 'BR04',
           wbs: '-',
-          observacoes: 'Carga Base Inicial (Importação Excel)'
+          observacoes: 'Carga Base Inicial (Importação Excel)',
+          tipo: 'Entrada' // Adicionado para garantir o padrão
         },
-        itens: itens,
+        itens: itensFormatadosParaBanco,
         anexos: []
       };
 
@@ -88,12 +138,13 @@ export default function ImportarEstoqueBase() {
 
       closeAlert();
 
-      if (!res.sucesso) {
+      // Ajuste na verificação de sucesso para seguir o padrão da sua API
+      if (!res.sucesso && !res.ps && !res.ps_id) {
         throw new Error(res.erro || "Falha ao gravar no banco.");
       }
 
       showAlert("Sucesso!", "A carga base foi importada e salva no estoque com sucesso!", "success");
-      setItens([]); // Limpa a tabela após o sucesso
+      setItens([]); 
       resetarProcessador();
 
     } catch (e) {
@@ -107,14 +158,12 @@ export default function ImportarEstoqueBase() {
   return (
     <div className="aba-conteudo" style={{ animation: 'fadeIn 0.3s ease-out' }}>
       
-      {/* MODAL DE PROGRESSO DE LEITURA DO EXCEL */}
       <ModalProcessamento 
         estaProcessando={estaProcessando} concluido={concluido}
         estadoProgresso={estadoProgresso} resultado={resultado}
         erroFatal={erroFatal} onClose={resetarProcessador}
       />
 
-      {/* TELA 1: ÁREA DE UPLOAD (Vazia) */}
       {itens.length === 0 && !estaProcessando && !concluido && (
         <div style={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <h2 style={{ fontSize: '1.25rem', color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -153,13 +202,12 @@ export default function ImportarEstoqueBase() {
         </div>
       )}
 
-      {/* TELA 2: TABELA DE INSERÇÃO (Revisão) */}
       {itens.length > 0 && !estaProcessando && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           <TabelaInsercaoItens 
             itens={itens}
-            limiteLinhas={5000} /* Limite alto para suportar cargas massivas */
+            limiteLinhas={5000} 
             onAtualizarCampo={handleAtualizarCampo}
             onRemoverItem={handleRemoverItem}
             onAdicionarLinha={handleAdicionarLinha}
