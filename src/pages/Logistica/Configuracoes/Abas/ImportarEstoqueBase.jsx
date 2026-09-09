@@ -19,73 +19,43 @@ import TabelaInsercaoItens from '../../../../components/TabelaInsercaoItens/Tabe
 import BotaoAcaoGlobal from '../../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 
 export default function ImportarEstoqueBase() {
-  // Extração das funções de alerta do contexto
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
-  // Obtenção dos dados do utilizador logado
   const { usuario } = useAuth();
   
-  // Estado para armazenar as linhas que aparecem na tabela antes de guardar
   const [itens, setItens] = useState([]);
-  // Estado para controlar se o botão de guardar está a carregar
   const [salvando, setSalvando] = useState(false);
 
-  // Hook do processador de Excel que gere o progresso e o estado da leitura
   const {
     estaProcessando, concluido, estadoProgresso, resultado, erroFatal,
     iniciarProcessamento, resetarProcessador
   } = useProcessadorExcel();
 
   /**
-   * FUNÇÃO DE FORMATAÇÃO DE DATA
-   * Garante que se o Excel enviar um objeto de data nativo (em vez de texto),
-   * nós convertemos de volta para uma string legível (DD/MM/AAAA).
-   */
-  const formatarDataExcel = (valorData) => {
-    if (!valorData) return '';
-    
-    // Se a biblioteca converteu para um objeto Date real do JavaScript
-    if (valorData instanceof Date) {
-      const dia = String(valorData.getDate()).padStart(2, '0');
-      const mes = String(valorData.getMonth() + 1).padStart(2, '0');
-      const ano = valorData.getFullYear();
-      return `${dia}/${mes}/${ano}`;
-    }
-    
-    // Se já for um texto (string) ou número, apenas converte para string de forma segura
-    return String(valorData).trim();
-  };
-
-  /**
-   * FUNÇÃO DE TRADUÇÃO TURBO
-   * Remove acentos, caracteres especiais e espaços extra das chaves (cabeçalhos) 
-   * do Excel, tornando a procura à prova de falhas de digitação.
+   * 1. FUNÇÃO DE TRADUÇÃO TURBO
+   * Encontra a coluna certa ignorando acentos, traços e espaços.
    */
   const obterValor = (itemExcel, palavrasChave) => {
     const chavesReais = Object.keys(itemExcel);
     
-    // Função auxiliar para normalizar o texto
     const limparTexto = (texto) => {
       if (!texto) return '';
       return String(texto)
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Remove acentos (ç -> c, ã -> a)
-        .replace(/[-|/.]/g, " ") // Troca traços, barras verticais e pontos por espaço
-        .replace(/\s+/g, " ") // Remove espaços múltiplos
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[-|/.]/g, " ")
+        .replace(/\s+/g, " ")
         .trim()
         .toUpperCase();
     };
 
-    // Percorre o dicionário de palavras que queremos procurar
     for (const palavra of palavrasChave) {
       const palavraLimpa = limparTexto(palavra);
       
-      // Procura nas chaves do Excel alguma que contenha a palavra limpa
       const chaveEncontrada = chavesReais.find(k => {
         const kLimpo = limparTexto(k);
         return kLimpo.includes(palavraLimpa);
       });
 
-      // Se encontrou e tem valor válido, devolve esse valor
       if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null) {
         return itemExcel[chaveEncontrada];
       }
@@ -94,17 +64,80 @@ export default function ImportarEstoqueBase() {
   };
 
   /**
-   * FUNÇÃO PRINCIPAL DE IMPORTAÇÃO
-   * Recebe o ficheiro, manda processar e mapeia os dados para a tabela.
+   * 2. FORMATADOR UNIVERSAL DE DATAS
+   * Resolve a anomalia das datas do Excel (números de série, pontos, barras).
+   */
+  const formatarDataExcel = (valor) => {
+    if (!valor || valor === '-' || String(valor).trim() === '') return '';
+
+    // Caso 1: A biblioteca já converteu para um objeto Date nativo
+    if (valor instanceof Date) {
+      if (isNaN(valor.getTime())) return '';
+      return valor.toISOString().split('T')[0];
+    }
+
+    // Remove horas se vierem junto (ex: "21/10/2013 14:30")
+    let stringValor = String(valor).trim().split(' ')[0];
+
+    // Caso 2: Número Serial do Excel (ex: 45674)
+    if (/^\d{4,5}$/.test(stringValor)) {
+      const numeroDias = parseInt(stringValor, 10);
+      // O Excel começa a contar a partir de 30/12/1899
+      const dataBaseExcel = new Date(Date.UTC(1899, 11, 30));
+      const dataConvertida = new Date(dataBaseExcel.getTime() + numeroDias * 86400000);
+      return dataConvertida.toISOString().split('T')[0]; // Retorna AAAA-MM-DD
+    }
+
+    // Caso 3: Datas em String com pontos (04.02.2025) convertidas para barras
+    stringValor = stringValor.replace(/\./g, '/');
+
+    // Tentar quebrar a data pelas barras ou hifens
+    const partes = stringValor.split(/[\/\-]/);
+    if (partes.length === 3) {
+      let dia, mes, ano;
+
+      // Se começar pelo ano (ex: 2025-02-04)
+      if (partes[0].length === 4) {
+        ano = partes[0];
+        mes = partes[1].padStart(2, '0');
+        dia = partes[2].padStart(2, '0');
+      } else {
+        // Assume o último como ano
+        ano = partes[2];
+        if (ano.length === 2) ano = '20' + ano; // Converte "23" para "2023"
+
+        // Verifica se é Padrão Americano (Mês/Dia) vs Brasileiro (Dia/Mês)
+        if (parseInt(partes[1], 10) > 12) {
+          // Se a peça do meio for > 12, garantidamente é Mês/Dia/Ano (ex: 9/25/2021)
+          mes = partes[0].padStart(2, '0');
+          dia = partes[1].padStart(2, '0');
+        } else {
+          // Assume Padrão normal Dia/Mês/Ano
+          dia = partes[0].padStart(2, '0');
+          mes = partes[1].padStart(2, '0');
+        }
+      }
+
+      const dataFormatada = `${ano}-${mes}-${dia}`;
+      const dataTeste = new Date(dataFormatada);
+      if (!isNaN(dataTeste.getTime())) {
+        return dataFormatada;
+      }
+    }
+
+    return ''; // Falha silenciosa: retorna vazio para o campo
+  };
+
+  /**
+   * 3. FUNÇÃO PRINCIPAL DE IMPORTAÇÃO
    */
   const handleImportar = async (arquivo) => {
     const itensPlanilha = await iniciarProcessamento(arquivo);
     
     if (itensPlanilha && itensPlanilha.length > 0) {
       
-      // Mapeamento robusto com várias palavras-chave como margem de segurança
       const novosItensFormatados = itensPlanilha.map((item, index) => ({
-        id: `excel-${Date.now()}-${index}`, // Cria um ID único para a interface
+        id: `excel-${Date.now()}-${index}`,
         desenhoSAP: obterValor(item, ['NUM SAP', 'DESENHO']),
         vendorDescription: obterValor(item, ['DESCRICAO', 'DESC', 'DENOMINACAO', 'TEXTO BREVE', 'MATERIAL DESCRIPTION']),
         numPecaFabricante: obterValor(item, ['FABRICANTE', 'PART NUMBER', 'PN']),
@@ -116,9 +149,9 @@ export default function ImportarEstoqueBase() {
         wbsElement: String(obterValor(item, ['CENTRO DE CUSTO WBS', 'WBS', 'CENTRO DE CUSTO'])).trim(),
         nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO', 'PROJETO']),
         
-        // Passamos o valor bruto pelo nosso conversor de datas para garantir que fica legível
-        emissaoNF: formatarDataExcel(obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO'])),
-        recebNF: formatarDataExcel(obterValor(item, ['RECEB NF', 'RECEBIMENTO NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO'])),
+        // 👇 SOLUÇÃO: As datas passam pelo extrator E logo a seguir pelo nosso formatador universal
+        emissaoNF: formatarDataExcel(obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO', 'DATA DE EMISSAO', 'EMI'])),
+        recebNF: formatarDataExcel(obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO', 'RECEB', 'DATA DE RECEBIMENTO', 'REC'])),
         
         docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV', 'PO']),
         poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR']),
@@ -127,29 +160,25 @@ export default function ImportarEstoqueBase() {
         alocacao: obterValor(item, ['ALOCACAO'])
       }));
 
-      // Filtra as linhas vazias (evita criar linhas mortas se o Excel tiver lixo no final)
       const itensValidos = novosItensFormatados.filter(
         item => item.vendorDescription !== '' || item.numPecaFabricante !== '' || item.desenhoSAP !== ''
       );
 
-      setItens(itensValidos); // Coloca os itens validados no estado para desenhar a tabela
+      setItens(itensValidos);
     }
   };
 
   /**
-   * ATUALIZAÇÃO MANUAL
-   * Permite editar uma célula específica na tabela antes de gravar no sistema.
+   * ATUALIZAÇÃO MANUAL (Manuseio da Tabela no Frontend)
    */
   const handleAtualizarCampo = (id, campo, valor) => {
     setItens(prev => prev.map(item => item.id === id ? { ...item, [campo]: valor } : item));
   };
 
-  // Remove uma linha específica da tabela
   const handleRemoverItem = (id) => {
     setItens(prev => prev.filter(item => item.id !== id));
   };
 
-  // Adiciona uma linha totalmente em branco à tabela
   const handleAdicionarLinha = () => {
     const novaLinha = {
       id: Date.now().toString(), desenhoSAP: '', vendorDescription: '', numPecaFabricante: '',
@@ -161,13 +190,11 @@ export default function ImportarEstoqueBase() {
   };
 
   /**
-   * GRAVAÇÃO FINAL
-   * Pega nos itens da tabela, formata-os para a Base de Dados e envia via API.
+   * GRAVAÇÃO FINAL (Envia os dados validados para o Node.js)
    */
   const handleGravarNoBanco = async () => {
     if (itens.length === 0) return showAlert("Aviso", "A tabela está vazia.", "warning");
 
-    // Confirmação dupla de segurança
     const confirm = await showConfirm(
       "Salvar no Banco?", 
       `Deseja registrar definitivamente estes ${itens.length} itens no estoque oficial?`, 
@@ -179,7 +206,6 @@ export default function ImportarEstoqueBase() {
     setSalvando(true);
 
     try {
-      // Mapeamento dos campos do frontend (tabela) para as colunas reais da Base de Dados
       const itensFormatadosParaBanco = itens.map(item => ({
         desenho_sap: item.desenhoSAP || '-',
         part_number: item.numPecaFabricante || '-',
@@ -201,7 +227,6 @@ export default function ImportarEstoqueBase() {
         alocacao: item.alocacao || null
       }));
 
-      // Objeto com a estrutura que o Backend espera receber
       const dadosEnvio = {
         solicitante: {
           nome: usuario?.nome_completo || 'Sistema de Importação',
@@ -214,22 +239,19 @@ export default function ImportarEstoqueBase() {
         anexos: []
       };
 
-      // Envia os dados para a rota de entrada do backend
       const res = await apiFetch('/solicitacoes/entrada', {
         method: 'POST',
         body: JSON.stringify(dadosEnvio)
       });
 
-      closeAlert(); // Fecha o modal de carregamento
+      closeAlert(); 
 
-      // Tratamento de falhas do servidor
       if (!res.sucesso && !res.ps && !res.ps_id) {
         throw new Error(res.erro || "Falha ao gravar no banco.");
       }
 
-      // Conclusão com sucesso
       showAlert("Sucesso!", "A carga base foi importada e salva no estoque com sucesso!", "success");
-      setItens([]); // Limpa a tabela
+      setItens([]); 
       resetarProcessador();
 
     } catch (e) {
@@ -243,14 +265,12 @@ export default function ImportarEstoqueBase() {
   return (
     <div className="aba-conteudo" style={{ animation: 'fadeIn 0.3s ease-out' }}>
       
-      {/* Modal que surge durante a leitura da planilha */}
       <ModalProcessamento 
         estaProcessando={estaProcessando} concluido={concluido}
         estadoProgresso={estadoProgresso} resultado={resultado}
         erroFatal={erroFatal} onClose={resetarProcessador}
       />
 
-      {/* TELA INICIAL: Mostra a área de upload se não houver itens nem leitura ativa */}
       {itens.length === 0 && !estaProcessando && !concluido && (
         <div style={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <h2 style={{ fontSize: '1.25rem', color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -272,7 +292,6 @@ export default function ImportarEstoqueBase() {
             </div>
           </div>
 
-          {/* Dicas e Download do Modelo de Planilha */}
           <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '16px', borderRadius: '8px', borderLeft: '4px solid #f59e0b', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
             <AlertCircle size={20} color="#d97706" style={{ marginTop: '2px', flexShrink: 0 }} />
             <div>
@@ -290,7 +309,6 @@ export default function ImportarEstoqueBase() {
         </div>
       )}
 
-      {/* TELA DA TABELA: Mostra a tabela de edição assim que o ficheiro for lido com sucesso */}
       {itens.length > 0 && !estaProcessando && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
