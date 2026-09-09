@@ -31,43 +31,9 @@ export default function ImportarEstoqueBase() {
   } = useProcessadorExcel();
 
   /**
-   * 1. FUNÇÃO DE TRADUÇÃO ULTRA-TURBO
-   * Apaga todos os espaços e símbolos para criar blocos de texto únicos.
-   * Exemplo: "Nº PEDIDO DE COMPRA / CPV" vira "NPEDIDODECOMPRACPV".
-   */
-  const obterValor = (itemExcel, palavrasChave) => {
-    const chavesReais = Object.keys(itemExcel);
-    
-    const limparTexto = (texto) => {
-      if (!texto) return '';
-      return String(texto)
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, ""); // APAGA TUDO o que não for letra ou número (junta tudo num bloco só)
-    };
-
-    for (const palavra of palavrasChave) {
-      const palavraLimpa = limparTexto(palavra);
-      
-      // 1ª Tentativa: Correspondência EXATA (Impede completamente o roubo de colunas)
-      let chaveEncontrada = chavesReais.find(k => limparTexto(k) === palavraLimpa);
-
-      // 2ª Tentativa: Se não achar igual, tenta ver se está contido (apenas se a palavra for muito longa)
-      if (!chaveEncontrada && palavraLimpa.length > 5) {
-        chaveEncontrada = chavesReais.find(k => limparTexto(k).includes(palavraLimpa));
-      }
-
-      if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null && String(itemExcel[chaveEncontrada]).trim() !== '') {
-        return itemExcel[chaveEncontrada];
-      }
-    }
-    return '';
-  };
-
-  /**
-   * 2. FORMATADOR UNIVERSAL DE DATAS
-   * Resolve a anomalia das datas do Excel (números de série, pontos, barras).
+   * FORMATADOR UNIVERSAL DE DATAS
+   * Mantemos esta função para garantir que os números de série e formatos 
+   * estranhos do Excel viram datas válidas (AAAA-MM-DD).
    */
   const formatarDataExcel = (valor) => {
     if (!valor || valor === '-' || String(valor).trim() === '') return '';
@@ -79,7 +45,6 @@ export default function ImportarEstoqueBase() {
 
     let stringValor = String(valor).trim().split(' ')[0];
 
-    // Trata Números de Série do Excel (Ex: 45674)
     if (/^\d{4,5}$/.test(stringValor)) {
       const numeroDias = parseInt(stringValor, 10);
       const dataBaseExcel = new Date(Date.UTC(1899, 11, 30));
@@ -87,7 +52,6 @@ export default function ImportarEstoqueBase() {
       return dataConvertida.toISOString().split('T')[0];
     }
 
-    // Uniformiza pontos para barras (Ex: 04.02.2025 -> 04/02/2025)
     stringValor = stringValor.replace(/\./g, '/');
 
     const partes = stringValor.split(/[\/\-]/);
@@ -102,7 +66,6 @@ export default function ImportarEstoqueBase() {
         ano = partes[2];
         if (ano.length === 2) ano = '20' + ano; 
 
-        // Diferencia Formato Americano (M/D/A) do Brasileiro (D/M/A)
         if (parseInt(partes[1], 10) > 12) {
           mes = partes[0].padStart(2, '0');
           dia = partes[1].padStart(2, '0');
@@ -123,40 +86,46 @@ export default function ImportarEstoqueBase() {
   };
 
   /**
-   * 3. FUNÇÃO PRINCIPAL DE IMPORTAÇÃO
+   * FUNÇÃO PRINCIPAL DE IMPORTAÇÃO (ABORDAGEM POR COLUNA / DA ESQUERDA PARA A DIREITA)
    */
   const handleImportar = async (arquivo) => {
     const itensPlanilha = await iniciarProcessamento(arquivo);
     
     if (itensPlanilha && itensPlanilha.length > 0) {
       
-      // 👇 MAPEMENTO COM OS NOMES EXATOS QUE ME FORNECESTE
-      const novosItensFormatados = itensPlanilha.map((item, index) => ({
-        id: `excel-${Date.now()}-${index}`,
-        desenhoSAP: obterValor(item, ['NUM SAP | DESENHO', 'NUM SAP', 'DESENHO SAP']),
-        vendorDescription: obterValor(item, ['DESCRIÇÃO', 'DESCRICAO', 'MATERIAL DESCRIPTION']),
-        numPecaFabricante: obterValor(item, ['FABRICANTE', 'PART NUMBER']),
-        qtdFornecida: obterValor(item, ['QTDE ENTRADA', 'QUANTIDADE', 'QTD']),
-        referencia: obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
-        unidadeMedida: obterValor(item, ['UNID. MEDIDA', 'UNIDADE MEDIDA', 'UNIDADE']),
-        nfEntrada: obterValor(item, ['NUM DA NOTA FISCAL', 'NUMERO DA NOTA FISCAL', 'NOTA FISCAL DE ENTRADA']),
-        fornecedor: obterValor(item, ['FORNECEDOR / REGISTRO', 'FORNECEDOR']),
-        wbsElement: String(obterValor(item, ['CENTRO DE CUSTO - WBS', 'CENTRO DE CUSTO WBS', 'WBS'])).trim(),
-        nomeProjeto: obterValor(item, ['NOME CENTRO DE CUSTO / PROJETO', 'NOME CENTRO DE CUSTO', 'PROJETO']),
-        
-        // As datas usam agora o formatador e os nomes exatos!
-        emissaoNF: formatarDataExcel(obterValor(item, ['EMISSÃO NF', 'EMISSAO NF'])),
-        recebNF: formatarDataExcel(obterValor(item, ['RECEB. NF', 'RECEB NF'])),
-        
-        // Os pedidos e valores não vão roubar dados uns aos outros
-        docCompras: obterValor(item, ['Nº PEDIDO DE COMPRA / CPV', 'PEDIDO DE COMPRA', 'CPV']),
-        poNetPrice: obterValor(item, ['VLR. UNITÁRIO NOTA FISCAL', 'VALOR UNITARIO NOTA FISCAL', 'VLR UNITARIO']),
-        
-        centro: obterValor(item, ['FILIAL']) || 'BR04',
-        deposito: obterValor(item, ['DEPÓSITO', 'DEPOSITO']) || '20',
-        alocacao: obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
-      }));
+      const novosItensFormatados = itensPlanilha.map((item, index) => {
+        // ✨ O SEGREDO DO TESTE ESTÁ AQUI ✨
+        // Object.values pega apenas nos valores e ignora os nomes dos cabeçalhos.
+        // Assim, lemos estritamente da esquerda para a direita!
+        const colunas = Object.values(item);
 
+        return {
+          id: `excel-${Date.now()}-${index}`,
+          // Mapeamento por posição (Index) baseado na ordem do teu modelo Excel
+          desenhoSAP: colunas[0] || '',                  // Coluna A
+          vendorDescription: colunas[1] || '',           // Coluna B
+          numPecaFabricante: colunas[2] || '',           // Coluna C
+          qtdFornecida: colunas[3] || 1,                 // Coluna D
+          referencia: colunas[4] || '',                  // Coluna E
+          unidadeMedida: colunas[5] || 'Unid',           // Coluna F
+          nfEntrada: colunas[6] || '',                   // Coluna G
+          fornecedor: colunas[7] || '',                  // Coluna H
+          wbsElement: String(colunas[8] || '').trim(),   // Coluna I
+          nomeProjeto: colunas[9] || '',                 // Coluna J
+          
+          // As datas continuam a passar pelo formatador, mas pegamos pela posição
+          emissaoNF: formatarDataExcel(colunas[10]),     // Coluna K
+          recebNF: formatarDataExcel(colunas[11]),       // Coluna L
+          
+          docCompras: colunas[12] || '',                 // Coluna M
+          poNetPrice: colunas[13] || '',                 // Coluna N
+          centro: colunas[14] || 'BR04',                 // Coluna O
+          deposito: colunas[15] || '20',                 // Coluna P
+          alocacao: colunas[16] || ''                    // Coluna Q
+        };
+      });
+
+      // Filtra linhas vazias garantindo que têm pelo menos um dado relevante
       const itensValidos = novosItensFormatados.filter(
         item => item.vendorDescription !== '' || item.numPecaFabricante !== '' || item.desenhoSAP !== ''
       );
@@ -166,7 +135,7 @@ export default function ImportarEstoqueBase() {
   };
 
   /**
-   * ATUALIZAÇÃO MANUAL DA TABELA
+   * ATUALIZAÇÃO MANUAL
    */
   const handleAtualizarCampo = (id, campo, valor) => {
     setItens(prev => prev.map(item => item.id === id ? { ...item, [campo]: valor } : item));
@@ -294,7 +263,7 @@ export default function ImportarEstoqueBase() {
             <div>
               <h4 style={{ margin: '0 0 8px 0', color: '#b45309', fontSize: '0.95rem' }}>Importante antes de importar:</h4>
               <ul style={{ margin: 0, paddingLeft: '20px', color: '#92400e', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <li>A planilha deve seguir rigorosamente os cabeçalhos.</li>
+                <li>Neste modo de teste, <strong>a ordem das colunas é vital</strong>!</li>
                 <li>Saldos vazios serão considerados como "0" (Zero).</li>
                 <li>A importação é processada em blocos para não sobrecarregar o seu navegador.</li>
               </ul>
