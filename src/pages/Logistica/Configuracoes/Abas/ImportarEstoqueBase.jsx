@@ -31,9 +31,9 @@ export default function ImportarEstoqueBase() {
   } = useProcessadorExcel();
 
   /**
-   * 1. FUNÇÃO DE TRADUÇÃO ULTRA-TURBO
-   * Apaga espaços, traços, barras, pontuações e acentos. 
-   * Deixa APENAS letras e números para uma correspondência à prova de falhas.
+   * 1. FUNÇÃO DE TRADUÇÃO INTELIGENTE (ATUALIZADA)
+   * Substitui símbolos por espaços para manter as palavras separadas e legíveis.
+   * Evita a aglutinação de palavras que estava a quebrar a extração.
    */
   const obterValor = (itemExcel, palavrasChave) => {
     const chavesReais = Object.keys(itemExcel);
@@ -43,8 +43,10 @@ export default function ImportarEstoqueBase() {
       return String(texto)
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "") // Remove acentos
-        .replace(/[^A-Z0-9]/gi, "") // Remove TUDO o que não for letra ou número
-        .toUpperCase();
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, " ") // Substitui TUDO o que não for letra ou número por ESPAÇO
+        .replace(/\s+/g, " ") // Limpa os espaços duplos criados no passo anterior
+        .trim();
     };
 
     for (const palavra of palavrasChave) {
@@ -52,7 +54,7 @@ export default function ImportarEstoqueBase() {
       
       const chaveEncontrada = chavesReais.find(k => {
         const kLimpo = limparTexto(k);
-        return kLimpo.includes(palavraLimpa);
+        return kLimpo === palavraLimpa || kLimpo.includes(palavraLimpa);
       });
 
       if (chaveEncontrada && itemExcel[chaveEncontrada] !== undefined && itemExcel[chaveEncontrada] !== null && String(itemExcel[chaveEncontrada]).trim() !== '') {
@@ -142,9 +144,9 @@ export default function ImportarEstoqueBase() {
         emissaoNF: formatarDataExcel(obterValor(item, ['EMISSAO NF', 'DATA EMISSAO', 'DT EMISSAO', 'EMISSAO', 'DATA DE EMISSAO', 'EMI'])),
         recebNF: formatarDataExcel(obterValor(item, ['RECEB NF', 'DATA RECEBIMENTO', 'DT RECEB', 'RECEBIMENTO', 'RECEB', 'DATA DE RECEBIMENTO', 'REC'])),
         
-        // 👇 SOLUÇÃO: Dicionários completamente isolados e restritos
-        docCompras: obterValor(item, ['PEDIDO DE COMPRA', 'CPV']),
-        poNetPrice: obterValor(item, ['VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR UNITARIO']),
+        // 👇 AQUI ESTÁ A CORREÇÃO: Nomes exatos adicionados na primeira posição do array
+        docCompras: obterValor(item, ['Nº PEDIDO DE COMPRA / CPV', 'PEDIDO DE COMPRA', 'CPV']),
+        poNetPrice: obterValor(item, ['VLR. UNITÁRIO NOTA FISCAL', 'VLR UNITARIO NOTA FISCAL', 'VLR UNITARIO', 'VALOR UNITARIO']),
         
         centro: obterValor(item, ['FILIAL', 'CENTRO']) || 'BR04',
         deposito: obterValor(item, ['DEPOSITO']) || '20',
