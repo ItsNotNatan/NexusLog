@@ -127,6 +127,31 @@ httpServer.listen(PORT_API, '0.0.0.0', () =>
 );
 
 // =================================================================
+// 💾 SISTEMA DE BACKUP AUTOMÁTICO EM EXCEL
+// =================================================================
+// 1. Importamos a função de gerar Excel que criaremos no ficheiro de serviço.
+const { gerarBackupExcel } = require('./src/services/backupExcelService');
+
+// 2. Definimos de quanto em quanto tempo a rotina deve repetir.
+// A matemática é simples: Horas * Minutos * Segundos * Milissegundos
+const HORAS_INTERVALO = 12;
+const TEMPO_EM_MILISSEGUNDOS = HORAS_INTERVALO * 60 * 60 * 1000;
+
+// 3. O 'setInterval' é uma função nativa do JavaScript que repete uma ação
+// infinitamente, respeitando a pausa definida.
+setInterval(() => {
+  gerarBackupExcel();
+}, TEMPO_EM_MILISSEGUNDOS);
+
+// 4. O 'setTimeout' executa a ação apenas UMA VEZ. Usamos isto para garantir 
+// que o sistema faz logo um backup ao ligar (depois de esperar 15 segundos 
+// para dar tempo da base de dados arrancar primeiro).
+setTimeout(() => {
+  gerarBackupExcel();
+}, 15000);
+
+
+// =================================================================
 // 🌐 FRONT (SPA React buildado pelo Vite)
 // =================================================================
 function servirSPA(nome, pastaDist, porta) {
