@@ -114,10 +114,12 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         });
       }
 
-      const minRows = 20;
+      // Ajustado de 20 para 15 linhas para garantir que o PDF não quebra a página
+      const minRows = 15;
       for (let i = bodyRows.length; i <= minRows; i++) {
         bodyRows.push([
-          { text: '', fontSize: 5, margin: [0, 5] }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
+          // Margem vertical reduzida para [0, 3] para poupar espaço vertical
+          { text: '', fontSize: 5, margin: [0, 3] }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
           { text: '', fontSize: 5 }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
           { text: '', fontSize: 5 }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
           { text: '', fontSize: 5 }, { text: '', fontSize: 5 }, { text: '', fontSize: 5 },
@@ -186,7 +188,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             margin: [0, 0, 0, 5]
           },
 
-          // --- BLOCO 2: APROVAÇÕES (COMPACTADO) ---
+          // --- BLOCO 2: APROVAÇÕES ---
           {
             table: {
               widths: ['33.3%', '33.3%', '33.4%'],
@@ -199,12 +201,9 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   {
                     stack: [
                       { text: 'Solicitado por:', fontSize: 7 },
-                      // Margem reduzida em redor do nome
                       { text: linha.solicitante || 'N/A', fontSize: 8, bold: true, alignment: 'center', fillColor: '#FFFF00', margin: [10, 2, 10, 2] },
-                      // Adicionada margem superior diretamente à linha para controlar o espaço
                       { text: '________________________________', alignment: 'center', fontSize: 7, margin: [0, 8, 0, 0] },
                       { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 7 },
-                      // Margem superior da matrícula reduzida
                       { text: 'Matrícula:', fontSize: 7, margin: [0, 2, 0, 0] }
                     ],
                     margin: [2, 2, 2, 2]
@@ -212,7 +211,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   {
                     stack: [
                       { text: 'Separado e Double Check por:', fontSize: 7 },
-                      // Quebras de linha removidas e substituídas por uma margem exata de 18px
                       { text: '________________________________', alignment: 'center', fontSize: 7, margin: [0, 18, 0, 0] },
                       { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 7 },
                       { text: 'Matrícula:', fontSize: 7, margin: [0, 2, 0, 0] }
@@ -222,7 +220,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   {
                     stack: [
                       { text: 'Recebido por:', fontSize: 7 },
-                      // Igual ao separador central
                       { text: '________________________________', alignment: 'center', fontSize: 7, margin: [0, 18, 0, 0] },
                       { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 7 },
                       { text: 'Matrícula:', fontSize: 7, margin: [0, 2, 0, 0] }
