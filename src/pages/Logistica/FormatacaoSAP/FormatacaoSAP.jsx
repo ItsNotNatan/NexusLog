@@ -1,7 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
 // DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP
-//            (Exclusivo para PL - Packing Lists Concluídas)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
@@ -15,15 +14,11 @@ export default function FormatacaoSAP() {
   const [carregando, setCarregando] = useState(true);
   const [solicitacoes, setSolicitacoes] = useState([]);
   
-  // ---------------------------------------------------------------------------
-  // ESTADOS DA INTERFACE
-  // ---------------------------------------------------------------------------
   const [busca, setBusca] = useState('');
-  const [selecionados, setSelecionados] = useState([]); // IDs das solicitações selecionadas
+  const [selecionados, setSelecionados] = useState([]); 
   const [categoriaGeral, setCategoriaGeral] = useState('');
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
 
-  // ✨ Opções de Categoria para o SAP (Atualizado com ZBN3, ZNB4, ZBRI, ZBE3, ZBE4)
   const opcoesCategoria = [
     'Preencher .', 
     'Consumo', 
@@ -37,18 +32,23 @@ export default function FormatacaoSAP() {
     'ZBE4'
   ];
 
-  // ---------------------------------------------------------------------------
-  // 1. BUSCA DE DADOS NA API
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     const buscarDados = async () => {
       try {
         setCarregando(true);
-        // Busca solicitações concluídas (onde foi gerada PL)
         const resultado = await apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=100');
         
         if (resultado.sucesso && resultado.dados) {
-          setSolicitacoes(resultado.dados);
+          // ✨ FILTRO ESTRITO: Apenas os 3 tipos E OBRIGATÓRIAMENTE COM PL GERADA
+          const transferencias = resultado.dados.filter(
+            s => (
+              s.tipo === 'Material' || 
+              s.tipo === 'Transferencia WBS' || 
+              s.tipo === 'Transfer. WBS' || 
+              s.tipo === 'Crossdocking'
+            ) && (s.pl && s.pl !== '-' && s.pl !== '—')
+          );
+          setSolicitacoes(transferencias);
         }
       } catch (error) {
         console.error('Erro ao buscar dados:', error.message);
@@ -59,9 +59,6 @@ export default function FormatacaoSAP() {
     buscarDados();
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // 2. LÓGICA DE SELEÇÃO E FILTRAGEM
-  // ---------------------------------------------------------------------------
   const toggleSelecao = (id) => {
     setSelecionados(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -74,24 +71,19 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais({});
   };
 
-  // Filtra as solicitações para a lista da esquerda (Apenas PLs válidas)
   const listaFiltrada = solicitacoes.filter(sol => {
-    const isPL = sol.pl && sol.pl !== '-'; // Verifica se tem Packing List gerada
-    if (!isPL) return false;
-
     const termo = busca.toLowerCase();
     return sol.pl.toLowerCase().includes(termo) || 
            sol.solicitante?.toLowerCase().includes(termo) ||
            sol.wbs?.toLowerCase().includes(termo);
   });
 
-  // Consolidar todos os itens das solicitações selecionadas na tabela da direita
   const itensConsolidados = solicitacoes
     .filter(sol => selecionados.includes(sol.id))
     .flatMap(sol => {
       return (sol.itens || []).map(item => ({
         idLinha: `${sol.id}-${item.id}`,
-        origem: sol.pl, // Usa sempre a PL
+        origem: sol.pl,
         desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
         quantidade: item.quantidade_solicitada || item.qtd || 1,
         valorUnitario: item.valor_unitario_manual || 0,
@@ -100,9 +92,6 @@ export default function FormatacaoSAP() {
       }));
     });
 
-  // ---------------------------------------------------------------------------
-  // 3. LÓGICA DE CÓPIA PARA A ÁREA DE TRANSFERÊNCIA (CLIPBOARD)
-  // ---------------------------------------------------------------------------
   const atualizarCategoriaGeral = (valor) => {
     setCategoriaGeral(valor);
     const novasCatIndividuais = {};
@@ -119,7 +108,6 @@ export default function FormatacaoSAP() {
   const gerarLinhaTsv = (item) => {
     const categoria = categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .';
     const valorFormatado = Number(item.valorUnitario).toFixed(2);
-    // Ordem exata: Desenho SAP \t Quantidade \t Valor Unitário \t WBS \t Filial de Destino \t Categoria
     return `${item.desenhoSAP}\t${item.quantidade}\t${valorFormatado}\t${item.wbs}\t${item.destino}\t${categoria}`;
   };
 
@@ -135,26 +123,21 @@ export default function FormatacaoSAP() {
     alert('Dados copiados para a área de transferência! Pronto para colar no SAP.');
   };
 
-  // ---------------------------------------------------------------------------
-  // 4. INTERFACE (RENDER)
-  // ---------------------------------------------------------------------------
   return (
     <div className="form-sap-wrapper">
       
-      {/* CABEÇALHO DA PÁGINA */}
       <div className="form-sap-cabecalho">
         <div className="form-sap-icone-titulo">
           <FileSpreadsheet size={28} />
         </div>
         <div>
           <h1>Formatação para SAP</h1>
-          <p>Selecione múltiplas PL para juntar (limite de 20 itens), preencha a Categoria e copie as linhas formatadas.</p>
+          <p>Selecione múltiplas PL concluídas para juntar, preencha a Categoria e copie as linhas formatadas.</p>
         </div>
       </div>
 
       <div className="form-sap-grid">
         
-        {/* ================= COLUNA ESQUERDA: LISTA E PESQUISA ================= */}
         <div className="form-sap-coluna-esq">
           <div className="sap-pesquisa-caixa">
             <div className="sap-input-wrapper">
@@ -213,9 +196,7 @@ export default function FormatacaoSAP() {
           </div>
         </div>
 
-        {/* ================= COLUNA DIREITA: PREVIEW E AÇÕES ================= */}
         <div className="form-sap-coluna-dir">
-          
           {selecionados.length === 0 ? (
             <div className="sap-preview-vazio">
               <FileSpreadsheet size={48} color="#cbd5e1" />
@@ -224,8 +205,6 @@ export default function FormatacaoSAP() {
             </div>
           ) : (
             <div className="sap-preview-conteudo">
-              
-              {/* Alerta Topo */}
               <div className="sap-alerta-selecao">
                 <div className="sap-alerta-texto">
                   <AlertTriangle size={16} /> 
@@ -242,7 +221,6 @@ export default function FormatacaoSAP() {
                 </div>
               </div>
 
-              {/* Barra de Ação Global (Categoria) */}
               <div className="sap-barra-acao">
                 <div className="sap-categoria-global">
                   <div className="sap-icone-camadas"><Layers size={20} /></div>
@@ -265,7 +243,6 @@ export default function FormatacaoSAP() {
                 </button>
               </div>
 
-              {/* Tabela de Itens */}
               <div className="sap-tabela-container">
                 <table className="sap-tabela-preview">
                   <thead>
@@ -312,7 +289,6 @@ export default function FormatacaoSAP() {
                 </table>
               </div>
 
-              {/* Nota de Rodapé */}
               <div className="sap-footer-nota">
                 <Lightbulb size={16} color="#eab308" />
                 <span>
