@@ -1,8 +1,5 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/RotaColeta/RotaColeta.jsx
-// DESCRIÇÃO: Página de geração de Rota de Coleta (Picking).
-// Gera o PDF silenciosamente em memória e abre-o no visualizador nativo.
-// (Exibe apenas Material, Transferência WBS e Crossdocking)
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './RotaColeta.css';
@@ -12,25 +9,19 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-// IMPORTAÇÃO DA BIBLIOTECA DE PDF
 import html2pdf from 'html2pdf.js';
-
 import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch } from '../../../services/api';
 
 export default function RotaColeta() {
   const { estoqueAtual } = useContext(AuthContext);
 
-  // ESTADOS DO COMPONENTE
   const [listaPl, setListaPl] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [pesquisa, setPesquisa] = useState('');
   const [selecionados, setSelecionados] = useState([]);
   const [rotaGerada, setRotaGerada] = useState(false);
 
-  // ==========================================
-  // 1. CARREGAMENTO DAS PLs ATIVAS DA API
-  // ==========================================
   useEffect(() => {
     const carregarPlsAtivos = async () => {
       try {
@@ -41,17 +32,16 @@ export default function RotaColeta() {
         const resultado = await apiFetch(`/solicitacoes/listar?status=Em%20Separa%C3%A7%C3%A3o&filial=${estoqueAtual || ''}&limit=100`);
 
         if (resultado.sucesso && resultado.dados) {
-          // ✨ FILTRO EXCLUSIVO: Apenas Material, Transferência WBS e Crossdocking
+          // ✨ FILTRO ESTRITO: Apenas os 3 tipos E OBRIGATÓRIAMENTE COM PL GERADA
           const dadosPermitidos = resultado.dados.filter(item => 
-            item.tipo === 'Material' || 
-            item.tipo === 'Transferencia WBS' || 
-            item.tipo === 'Transfer. WBS' || 
-            item.tipo === 'Crossdocking'
+            (item.tipo === 'Material' || 
+             item.tipo === 'Transferencia WBS' || 
+             item.tipo === 'Transfer. WBS' || 
+             item.tipo === 'Crossdocking') && 
+            (item.pl && item.pl !== '-' && item.pl !== '—')
           );
 
-          const apenasPLsReais = dadosPermitidos.filter(item => item.pl && item.pl !== '-' && item.pl !== '—');
-
-          const plsFormatados = apenasPLsReais.map(item => ({
+          const plsFormatados = dadosPermitidos.map(item => ({
             id: item.pl.replace(/\D/g, ''), 
             idOriginal: item.id,
             plCompleto: item.pl, 
@@ -65,7 +55,7 @@ export default function RotaColeta() {
           setListaPl(plsFormatados);
         }
       } catch (error) {
-        console.error("Erro ao carregar PLs para rota de coleta:", error.message);
+        console.error("Erro ao carregar PLs:", error.message);
       } finally {
         setCarregando(false);
       }
@@ -74,9 +64,6 @@ export default function RotaColeta() {
     carregarPlsAtivos();
   }, [estoqueAtual]);
 
-  // ==========================================
-  // 2. LÓGICA DE PESQUISA E SELEÇÃO
-  // ==========================================
   const listaFiltrada = listaPl.filter(pl => 
     pl.plCompleto.toLowerCase().includes(pesquisa.toLowerCase()) || 
     pl.solicitante.toLowerCase().includes(pesquisa.toLowerCase()) ||
@@ -104,9 +91,6 @@ export default function RotaColeta() {
   const isTodosSelecionados = selecionados.length === listaFiltrada.length && listaFiltrada.length > 0;
   const existemSelecionados = selecionados.length > 0;
 
-  // ==========================================
-  // 3. LÓGICA DE AGRUPAMENTO (PARADAS E NFs)
-  // ==========================================
   const plsSelecionadosObjetos = listaPl.filter(pl => selecionados.includes(pl.id));
   
   let todosItens = [];
@@ -142,9 +126,6 @@ export default function RotaColeta() {
     hour: '2-digit', minute: '2-digit' 
   });
 
-  // ==========================================
-  // 4. GERAR PDF EM MEMÓRIA E ABRIR NO NAVEGADOR
-  // ==========================================
   const gerarPdfNativo = () => {
     const novaAba = window.open('', '_blank');
     novaAba.document.write(`
@@ -284,20 +265,18 @@ export default function RotaColeta() {
 
   return (
     <div className="rota-coleta-wrapper">
-      
       <header className="rota-cabecalho">
         <Waypoints className="icone-titulo" size={36} strokeWidth={2.5} />
         <div>
           <h1>Rota de Coleta (Picking)</h1>
-          <p>Selecione múltiplas PLs (apenas de Saída de Material ou WBS) para consolidar e gerar a rota.</p>
+          <p>Selecione múltiplas PLs (apenas de Material, WBS ou Crossdocking) para consolidar e gerar a rota.</p>
         </div>
       </header>
 
       <div className="rota-grid">
-        {/* COLUNA ESQUERDA: LISTA DE PLs */}
         <div className="painel-selecao">
           <div className="banner-info-azul">
-            <Box size={16} /> Exibindo apenas PLs pendentes de Material e WBS
+            <Box size={16} /> Exibindo apenas PLs pendentes de Material, WBS e Crossdocking
           </div>
 
           <div className="pesquisa-pl-wrapper">
@@ -361,7 +340,6 @@ export default function RotaColeta() {
           </div>
         </div>
 
-        {/* COLUNA DIREITA: PREVIEW E ROTA GERADA */}
         {!rotaGerada ? (
           <div className="painel-preview">
             <Waypoints size={64} className="icone-preview-rota" strokeWidth={1.5} />
@@ -445,7 +423,6 @@ export default function RotaColeta() {
           </div>
         )}
       </div>
-
     </div>
   );
 }
