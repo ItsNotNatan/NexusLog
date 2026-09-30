@@ -1,8 +1,8 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/RotaColeta/RotaColeta.jsx
 // DESCRIÇÃO: Página de geração de Rota de Coleta (Picking).
-// Gera o PDF silenciosamente em memória e abre-o no visualizador
-// nativo do navegador.
+// Gera o PDF silenciosamente em memória e abre-o no visualizador nativo.
+// (Exibe apenas Material, Transferência WBS e Crossdocking)
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './RotaColeta.css';
@@ -12,7 +12,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-// ✨ IMPORTAÇÃO DA BIBLIOTECA DE PDF
+// IMPORTAÇÃO DA BIBLIOTECA DE PDF
 import html2pdf from 'html2pdf.js';
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -41,7 +41,15 @@ export default function RotaColeta() {
         const resultado = await apiFetch(`/solicitacoes/listar?status=Em%20Separa%C3%A7%C3%A3o&filial=${estoqueAtual || ''}&limit=100`);
 
         if (resultado.sucesso && resultado.dados) {
-          const apenasPLsReais = resultado.dados.filter(item => item.pl && item.pl !== '-' && item.pl !== '—');
+          // ✨ FILTRO EXCLUSIVO: Apenas Material, Transferência WBS e Crossdocking
+          const dadosPermitidos = resultado.dados.filter(item => 
+            item.tipo === 'Material' || 
+            item.tipo === 'Transferencia WBS' || 
+            item.tipo === 'Transfer. WBS' || 
+            item.tipo === 'Crossdocking'
+          );
+
+          const apenasPLsReais = dadosPermitidos.filter(item => item.pl && item.pl !== '-' && item.pl !== '—');
 
           const plsFormatados = apenasPLsReais.map(item => ({
             id: item.pl.replace(/\D/g, ''), 
@@ -135,10 +143,9 @@ export default function RotaColeta() {
   });
 
   // ==========================================
-  // 4. ✨ GERAR PDF EM MEMÓRIA E ABRIR NO NAVEGADOR
+  // 4. GERAR PDF EM MEMÓRIA E ABRIR NO NAVEGADOR
   // ==========================================
   const gerarPdfNativo = () => {
-    // 1. Abre a aba imediatamente para evitar bloqueio de Pop-ups
     const novaAba = window.open('', '_blank');
     novaAba.document.write(`
       <html>
@@ -149,7 +156,6 @@ export default function RotaColeta() {
       </html>
     `);
 
-    // 2. Cria o elemento HTML invisível em memória para desenhar o boletim
     const containerParaPdf = document.createElement('div');
     containerParaPdf.style.width = '1000px'; 
     containerParaPdf.style.padding = '20px';
@@ -167,7 +173,6 @@ export default function RotaColeta() {
       </div>
     `;
 
-    // Loop nas Paradas
     paradasOrdenadas.forEach((localizacao, pIdx) => {
       const itensDaParada = paradasMap[localizacao];
       const totalDaParada = somarQtd(itensDaParada);
@@ -260,7 +265,6 @@ export default function RotaColeta() {
 
     containerParaPdf.innerHTML = htmlString;
 
-    // 3. Configurações para a biblioteca gerar o PDF a partir do HTML em memória
     const opcoesPDF = {
       margin:       10, 
       filename:     `Boletim_Coleta_${Date.now()}.pdf`,
@@ -269,9 +273,7 @@ export default function RotaColeta() {
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
-    // 4. Executa a geração do PDF e substitui a aba pelo Blob do ficheiro
     html2pdf().set(opcoesPDF).from(containerParaPdf).output('bloburl').then((pdfBlobUrl) => {
-      // Magia: A aba "Aguarde" transforma-se instantaneamente no leitor nativo de PDF do Chrome!
       novaAba.location.replace(pdfBlobUrl); 
     }).catch(err => {
       console.error("Erro ao gerar PDF:", err);
@@ -287,7 +289,7 @@ export default function RotaColeta() {
         <Waypoints className="icone-titulo" size={36} strokeWidth={2.5} />
         <div>
           <h1>Rota de Coleta (Picking)</h1>
-          <p>Selecione múltiplas PLs para consolidar os materiais e gerar uma rota de separação ordenada pela posição no estoque.</p>
+          <p>Selecione múltiplas PLs (apenas de Saída de Material ou WBS) para consolidar e gerar a rota.</p>
         </div>
       </header>
 
@@ -295,7 +297,7 @@ export default function RotaColeta() {
         {/* COLUNA ESQUERDA: LISTA DE PLs */}
         <div className="painel-selecao">
           <div className="banner-info-azul">
-            <Box size={16} /> Exibindo apenas PLs ativos (Em Separação)
+            <Box size={16} /> Exibindo apenas PLs pendentes de Material e WBS
           </div>
 
           <div className="pesquisa-pl-wrapper">
@@ -380,7 +382,6 @@ export default function RotaColeta() {
                 <h2>Rota Otimizada de Separação</h2>
                 <p>Ordenada por posição no estoque &middot; PL #{selecionados.join(', PL #')}</p>
               </div>
-              {/* ✨ AÇÃO: Dispara a nova função de PDF puro */}
               <button className="btn-imprimir" onClick={gerarPdfNativo}>
                 <Printer size={16} /> Imprimir / PDF
               </button>
