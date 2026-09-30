@@ -47,7 +47,6 @@ export default function TransferenciaEstoque() {
         const resultado = await apiFetch(`/solicitacoes/listar?limit=1000&filial=${filialFiltro}&t=${Date.now()}`);
 
         if (resultado.sucesso) {
-          // ✨ FILTRO ESTRITO: Apenas os 3 tipos E OBRIGATÓRIAMENTE COM PL GERADA
           const transferencias = resultado.dados.filter(
             s => (
               s.tipo === 'Material' || 
@@ -151,22 +150,38 @@ export default function TransferenciaEstoque() {
     return itens;
   }, [solicitacoes, selecionadosIds]);
 
+  // =======================================================================
+  // ✨ EXPORTAÇÃO EXCEL: FORMATO EXATO PARA A TABELA DE INSERÇÃO/IMPORTAÇÃO
+  // =======================================================================
   const exportarExcel = async () => {
     if (itensConsolidados.length === 0) return;
 
     try {
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Itens Transferidos');
+      const worksheet = workbook.addWorksheet('Exportação de Estoque');
 
-      const colunas = [
-        'Desenho SAP', 'Nº peça fabricante', 'FORNECEDOR', 'REFERÊNCIA',
-        'Qtd.fornecida', 'NF DE ENTRADA', 'Unidade de medida', 'Vendor Description',
-        'WBS Element', 'EMISSÃO NF', 'RECEB. NF', 'Documento de compras',
-        'PO Net Price', 'Centro', 'Depósito', 'Alocação'
+      // Colunas EXATAMENTE IGUAIS ao ExemploExcel para permitir importação na aba "Configurações > Importar"
+      worksheet.columns = [
+        { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
+        { header: 'DESCRIÇÃO', key: 'desc', width: 40 },
+        { header: 'FABRICANTE', key: 'pn', width: 25 },
+        { header: 'QTDE ENTRADA', key: 'qtd', width: 15 },
+        { header: 'REFERÊNCIA', key: 'ref', width: 20 },
+        { header: 'UNID. MEDIDA', key: 'unid', width: 15 },
+        { header: 'NUM DA NOTA FISCAL', key: 'nf', width: 20 },
+        { header: 'FORNECEDOR / REGISTRO', key: 'fornecedor', width: 25 },
+        { header: 'CENTRO DE CUSTO - WBS', key: 'wbs', width: 25 },
+        { header: 'NOME CENTRO DE CUSTO / PROJETO', key: 'projeto', width: 35 },
+        { header: 'EMISSÃO NF', key: 'emi', width: 15 },
+        { header: 'RECEB. NF', key: 'rec', width: 15 },
+        { header: 'Nº PEDIDO DE COMPRA / CPV', key: 'doc', width: 25 },
+        { header: 'VLR. UNITÁRIO NOTA FISCAL', key: 'val', width: 25 },
+        { header: 'FILIAL', key: 'filial', width: 15 },
+        { header: 'DEPÓSITO', key: 'dep', width: 15 },
+        { header: 'ALOCAÇÃO', key: 'aloc', width: 20 }
       ];
 
-      worksheet.columns = colunas.map(col => ({ header: col, key: col, width: 20 }));
-
+      // Formatação visual do Cabeçalho
       const linhaCabecalho = worksheet.getRow(1);
       linhaCabecalho.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
@@ -176,32 +191,38 @@ export default function TransferenciaEstoque() {
       });
       linhaCabecalho.height = 25;
 
+      // Inserção das linhas mapeadas da consolidação
       itensConsolidados.forEach(item => {
+        // A WBS leva o destino se for transferência, senão a WBS do item original.
+        const wbsFinal = item.wbs_destino && item.wbs_destino !== '-' ? item.wbs_destino : (item.wbs_element || '-');
+
         worksheet.addRow({
-          'Desenho SAP': item.desenho_sap_manual || item.desenho_sap || '-',
-          'Nº peça fabricante': item.part_number_manual || item.part_number || '-',
-          'FORNECEDOR': item.fornecedor || '',
-          'REFERÊNCIA': item.referencia || '',
-          'Qtd.fornecida': item.quantidade_solicitada || 1,
-          'NF DE ENTRADA': item.nf_entrada || '',
-          'Unidade de medida': item.unidade_medida_manual || 'Unid',
-          'Vendor Description': item.descricao_manual || item.descricao || '-',
-          'WBS Element': item.wbs_destino || item.wbs_element || '-',
-          'EMISSÃO NF': item.emissao_nf || '',
-          'RECEB. NF': item.receb_nf || '',
-          'Documento de compras': item.documento_compras || '',
-          'PO Net Price': item.valor_unitario_manual ? `R$ ${item.valor_unitario_manual}` : '',
-          'Centro': item.centro || '',
-          'Depósito': item.deposito || '',
-          'Alocação': `[TR] De: ${item.wbs_origem} (${item.solicitacao_ps})`
+          sap: item.desenho_sap_manual || item.desenho_sap || '-',
+          desc: item.descricao_manual || item.descricao || '-',
+          pn: item.part_number_manual || item.part_number || '-',
+          qtd: item.quantidade_solicitada || 1,
+          ref: item.referencia || '-',
+          unid: item.unidade_medida_manual || 'Unid',
+          nf: item.nf_entrada || '-',
+          fornecedor: item.fornecedor || '-',
+          wbs: wbsFinal,
+          projeto: item.nome_projeto || '-',
+          emi: item.emissao_nf || '-',
+          rec: item.receb_nf || '-',
+          doc: item.documento_compras || '-',
+          val: item.valor_unitario_manual || 0,
+          filial: item.centro || '-', // Na listagem usa-se centro ou filial
+          dep: item.deposito || '20', // Depósito padrão
+          // Tag visual na alocação a indicar de onde veio a transferência
+          aloc: `[TR] De: ${item.wbs_origem} (${item.solicitacao_ps})`
         });
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      saveAs(blob, `Transferencias_Expedidas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      saveAs(blob, `Transferencias_Exportadas_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
-      showAlert("Sucesso!", "O ficheiro Excel foi gerado. Use-o na página de 'Entrada de Estoque' da filial de destino.", "success");
+      showAlert("Sucesso!", "O ficheiro Excel foi gerado. Use-o na página de 'Importar Base' ou 'Entrada de Estoque' da filial de destino.", "success");
       limparSelecao();
       
     } catch (error) {
@@ -216,7 +237,7 @@ export default function TransferenciaEstoque() {
       <header className="transf-estoque-cabecalho">
         <div>
           <h1>Transferência de Estoque</h1>
-          <p>Selecione múltiplas transferências ou saídas (PS/BS) e exporte todos os itens em um único Excel</p>
+          <p>Selecione múltiplas transferências (PS/PL) e exporte no formato compatível para a Importação de Estoque.</p>
         </div>
         <div className="badge-exclusivo">
           <Lock size={14} /> Exclusivo Logística
@@ -230,8 +251,8 @@ export default function TransferenciaEstoque() {
           <ol>
             <li>Selecione as operações na lista à esquerda.</li>
             <li>Os itens selecionados são consolidados no painel à direita.</li>
-            <li>Ao Exportar, o sistema gera o Excel no formato exato da página de <strong>Entrada de Estoque</strong>.</li>
-            <li>Na filial de destino, basta fazer upload do Excel que a WBS e os rastreios são herdados automaticamente.</li>
+            <li>Ao Exportar, o sistema gera o Excel no formato exato da página de <strong>Entrada de Estoque e Importação Inicial</strong>.</li>
+            <li>Na filial de destino, basta fazer upload do Excel para inserir os materiais no banco de dados.</li>
           </ol>
         </div>
       </div>
