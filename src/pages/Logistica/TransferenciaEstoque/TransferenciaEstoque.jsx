@@ -2,7 +2,7 @@
 // ARQUIVO: src/pages/Logistica/TransferenciaEstoque/TransferenciaEstoque.jsx
 // =================================================================
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { Lock, FileText, Search, CheckSquare, Square, Box, Download, ArrowRight, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Lock, FileText, Search, CheckSquare, Square, Box, Download, ArrowRight, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { io } from 'socket.io-client';
@@ -29,6 +29,7 @@ export default function TransferenciaEstoque() {
   const { showAlert } = useAlert();
 
   const [solicitacoes, setSolicitacoes] = useState([]);
+  const [estoqueGlobal, setEstoqueGlobal] = useState([]); // ✨ NOVO: Guarda o estoque para enriquecer dados
   const [carregando, setCarregando] = useState(true);
   const [termoBusca, setTermoBusca] = useState('');
   const [selecionadosIds, setSelecionadosIds] = useState(new Set());
@@ -44,10 +45,18 @@ export default function TransferenciaEstoque() {
         if (!silencioso) setCarregando(true);
         const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
         
-        const resultado = await apiFetch(`/solicitacoes/listar?limit=1000&filial=${filialFiltro}&t=${Date.now()}`);
+        // ✨ NOVO: Traz o estoque físico em simultâneo para cruzamento de dados!
+        const [resultadoSol, resultadoEst] = await Promise.all([
+          apiFetch(`/solicitacoes/listar?limit=1000&filial=${filialFiltro}&t=${Date.now()}`),
+          apiFetch('/estoque/listar?rastreabilidade=true')
+        ]);
 
-        if (resultado.sucesso) {
-          const transferencias = resultado.dados.filter(
+        if (resultadoEst.sucesso) {
+          setEstoqueGlobal(resultadoEst.dados);
+        }
+
+        if (resultadoSol.sucesso) {
+          const transferencias = resultadoSol.dados.filter(
             s => (
               s.tipo === 'Material' || 
               s.tipo === 'Transferencia WBS' || 
@@ -59,7 +68,7 @@ export default function TransferenciaEstoque() {
           );
           setSolicitacoes(transferencias);
         } else {
-          showAlert("Erro", resultado.erro || "Falha ao carregar transferências.", "error");
+          showAlert("Erro", resultadoSol.erro || "Falha ao carregar transferências.", "error");
         }
       } catch (error) {
         if (!silencioso) showAlert("Erro de Conexão", "Não foi possível ligar ao servidor.", "error");
@@ -127,6 +136,9 @@ export default function TransferenciaEstoque() {
     setSelecionadosIds(new Set());
   };
 
+  // ---------------------------------------------------------------------------
+  // 4. CONSOLIDAÇÃO DOS ITENS SELECIONADOS (COM ENRIQUECIMENTO DE DADOS)
+  // ---------------------------------------------------------------------------
   const itensConsolidados = useMemo(() => {
     const itens = [];
     solicitacoes.forEach(sol => {
@@ -136,37 +148,65 @@ export default function TransferenciaEstoque() {
           const origemWBS = sol.wbs && sol.wbs.includes('➔') ? sol.wbs.split('➔')[0]?.trim() : '-';
           const destinoWBS = sol.wbs && sol.wbs.includes('➔') ? sol.wbs.split('➔')[1]?.trim() : sol.wbs;
           
+          // ✨ MÁGICA: Cruza com o item físico original para resgatar Referência, Fornecedor, etc.
+          const itemFisico = (item.estoque_id && estoqueGlobal.length > 0)
+            ? estoqueGlobal.find(e => e.id === item.estoque_id)
+            : null;
+            
+          const valorSeguro = (v1, v2) => {
+             const isValid = v => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== 'null';
+             if (isValid(v1)) return v1;
+             if (isValid(v2)) return v2;
+             return '';
+          };
+
           itens.push({
             ...item,
             solicitacao_ps: sol.ps,
             solicitacao_bs: sol.pl,
             wbs_origem: origemWBS,
             wbs_destino: destinoWBS,
-            filial_origem: sol.filial
+            filial_origem: sol.filial,
+            
+            // Dados Resgatados
+            desenho_sap_manual: valorSeguro(item.desenho_sap_manual || item.desenho_sap, itemFisico?.desenho_sap),
+            part_number_manual: valorSeguro(item.part_number_manual || item.part_number, itemFisico?.part_number),
+            descricao_manual: valorSeguro(item.descricao_manual || item.descricao, itemFisico?.descricao),
+            referencia: valorSeguro(item.referencia, itemFisico?.referencia),
+            fornecedor: valorSeguro(item.fornecedor, itemFisico?.fornecedor),
+            nf_entrada: valorSeguro(item.nf_entrada, itemFisico?.nf_entrada),
+            nome_projeto: valorSeguro(item.nome_projeto, itemFisico?.nome_projeto),
+            emissao_nf: valorSeguro(item.emissao_nf, itemFisico?.emissao_nf),
+            receb_nf: valorSeguro(item.receb_nf, itemFisico?.receb_nf),
+            documento_compras: valorSeguro(item.documento_compras, itemFisico?.documento_compras),
+            valor_unitario_manual: valorSeguro(item.valor_unitario_manual, itemFisico?.valor_unitario),
+            centro: valorSeguro(item.centro, itemFisico?.centro),
+            deposito: valorSeguro(item.deposito, itemFisico?.deposito),
+            unidade_medida_manual: valorSeguro(item.unidade_medida_manual, itemFisico?.unidade_medida) || 'Unid'
           });
         });
       }
     });
     return itens;
-  }, [solicitacoes, selecionadosIds]);
+  }, [solicitacoes, selecionadosIds, estoqueGlobal]);
 
-  // =======================================================================
-  // ✨ EXPORTAÇÃO EXCEL: FORMATO EXATO PARA A TABELA DE INSERÇÃO/IMPORTAÇÃO
-  // =======================================================================
+  // ---------------------------------------------------------------------------
+  // 5. EXPORTAR PARA EXCEL (Ordem Exata que Você Pediu)
+  // ---------------------------------------------------------------------------
   const exportarExcel = async () => {
     if (itensConsolidados.length === 0) return;
 
     try {
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Exportação de Estoque');
+      const worksheet = workbook.addWorksheet('Itens Transferidos');
 
-      // Colunas EXATAMENTE IGUAIS ao ExemploExcel para permitir importação na aba "Configurações > Importar"
+      // ✨ COLUNAS COM A ORDEM RIGOROSA DA SUA BASE DE DADOS
       worksheet.columns = [
         { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
+        { header: 'REFERÊNCIA', key: 'ref', width: 20 },
         { header: 'DESCRIÇÃO', key: 'desc', width: 40 },
         { header: 'FABRICANTE', key: 'pn', width: 25 },
         { header: 'QTDE ENTRADA', key: 'qtd', width: 15 },
-        { header: 'REFERÊNCIA', key: 'ref', width: 20 },
         { header: 'UNID. MEDIDA', key: 'unid', width: 15 },
         { header: 'NUM DA NOTA FISCAL', key: 'nf', width: 20 },
         { header: 'FORNECEDOR / REGISTRO', key: 'fornecedor', width: 25 },
@@ -181,7 +221,6 @@ export default function TransferenciaEstoque() {
         { header: 'ALOCAÇÃO', key: 'aloc', width: 20 }
       ];
 
-      // Formatação visual do Cabeçalho
       const linhaCabecalho = worksheet.getRow(1);
       linhaCabecalho.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
@@ -191,17 +230,15 @@ export default function TransferenciaEstoque() {
       });
       linhaCabecalho.height = 25;
 
-      // Inserção das linhas mapeadas da consolidação
       itensConsolidados.forEach(item => {
-        // A WBS leva o destino se for transferência, senão a WBS do item original.
         const wbsFinal = item.wbs_destino && item.wbs_destino !== '-' ? item.wbs_destino : (item.wbs_element || '-');
 
         worksheet.addRow({
-          sap: item.desenho_sap_manual || item.desenho_sap || '-',
-          desc: item.descricao_manual || item.descricao || '-',
-          pn: item.part_number_manual || item.part_number || '-',
-          qtd: item.quantidade_solicitada || 1,
+          sap: item.desenho_sap_manual || '-',
           ref: item.referencia || '-',
+          desc: item.descricao_manual || '-',
+          pn: item.part_number_manual || '-',
+          qtd: item.quantidade_solicitada || 1,
           unid: item.unidade_medida_manual || 'Unid',
           nf: item.nf_entrada || '-',
           fornecedor: item.fornecedor || '-',
@@ -211,9 +248,8 @@ export default function TransferenciaEstoque() {
           rec: item.receb_nf || '-',
           doc: item.documento_compras || '-',
           val: item.valor_unitario_manual || 0,
-          filial: item.centro || '-', // Na listagem usa-se centro ou filial
-          dep: item.deposito || '20', // Depósito padrão
-          // Tag visual na alocação a indicar de onde veio a transferência
+          filial: item.centro || '-',
+          dep: item.deposito || '20',
           aloc: `[TR] De: ${item.wbs_origem} (${item.solicitacao_ps})`
         });
       });
@@ -222,7 +258,7 @@ export default function TransferenciaEstoque() {
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, `Transferencias_Exportadas_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
-      showAlert("Sucesso!", "O ficheiro Excel foi gerado. Use-o na página de 'Importar Base' ou 'Entrada de Estoque' da filial de destino.", "success");
+      showAlert("Sucesso!", "Ficheiro Excel gerado com todos os dados resgatados. Pode importá-lo diretamente.", "success");
       limparSelecao();
       
     } catch (error) {
@@ -237,7 +273,7 @@ export default function TransferenciaEstoque() {
       <header className="transf-estoque-cabecalho">
         <div>
           <h1>Transferência de Estoque</h1>
-          <p>Selecione múltiplas transferências (PS/PL) e exporte no formato compatível para a Importação de Estoque.</p>
+          <p>Selecione múltiplas transferências ou saídas aprovadas (com PL) e exporte todos os itens e referências em um único Excel</p>
         </div>
         <div className="badge-exclusivo">
           <Lock size={14} /> Exclusivo Logística
@@ -250,9 +286,9 @@ export default function TransferenciaEstoque() {
           <h3>Como funciona a exportação?</h3>
           <ol>
             <li>Selecione as operações na lista à esquerda.</li>
-            <li>Os itens selecionados são consolidados no painel à direita.</li>
-            <li>Ao Exportar, o sistema gera o Excel no formato exato da página de <strong>Entrada de Estoque e Importação Inicial</strong>.</li>
-            <li>Na filial de destino, basta fazer upload do Excel para inserir os materiais no banco de dados.</li>
+            <li>O sistema cruza as informações e resgata todos os detalhes invisíveis (Preços, Fornecedores, etc.).</li>
+            <li>Ao Exportar, é gerado o Excel no formato exato da página de <strong>Entrada de Estoque</strong>.</li>
+            <li>Na filial de destino, basta importar o Excel e o histórico completo é herdado automaticamente.</li>
           </ol>
         </div>
       </div>
@@ -398,7 +434,7 @@ export default function TransferenciaEstoque() {
                     <th>Part Number</th>
                     <th>Descrição</th>
                     <th style={{ textAlign: 'center' }}>Qtd</th>
-                    <th>WBS Destino</th>
+                    <th>Referência</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -412,7 +448,7 @@ export default function TransferenciaEstoque() {
                         {item.quantidade_solicitada} <span style={{fontSize: '0.7rem', color: '#64748b'}}>{item.unidade_medida_manual || 'Unid'}</span>
                       </td>
                       <td style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        {item.wbs_destino || '-'}
+                        {item.referencia || '-'}
                       </td>
                     </tr>
                   ))}
