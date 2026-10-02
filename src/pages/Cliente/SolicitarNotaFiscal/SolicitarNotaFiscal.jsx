@@ -1,12 +1,9 @@
 import React, { useState, useContext } from 'react';
 import { User, FileText, Paperclip, Send, MapPin } from 'lucide-react'; 
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-
-// ✨ IMPORTAÇÃO CENTRALIZADA (formatarDinheiro removido)
 import { formatarWBS } from '../../../utils/formatadores';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { apiFetch, enviarArquivos } from '../../../services/api';
-
 import { useAlert } from '../../../contexts/AlertContext';
 import { AuthContext } from '../../../contexts/AuthContext';
 
@@ -14,8 +11,8 @@ export default function SolicitarNotaFiscal() {
   const { showAlert } = useAlert();
   const { estoqueAtual } = useContext(AuthContext); 
 
-  // Removido o campo valorEstimado do estado inicial
-  const [formDados, setFormDados] = useState({ nome: '', wbs: '', descricao: '', observacoes: '' });
+  // ✨ CAMPO DESTINO ADICIONADO AO ESTADO INICIAL
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', descricao: '', observacoes: '' });
   const [anexos, setAnexos] = useState([]);
 
   const handleEnviar = async () => {
@@ -23,7 +20,9 @@ export default function SolicitarNotaFiscal() {
       showAlert("Atenção", "Por favor, selecione uma filial no topo da página antes de prosseguir.", "warning");
       return;
     }
-    if (!formDados.nome || !formDados.wbs || !formDados.descricao) {
+    
+    // ✨ VALIDAÇÃO ATUALIZADA PARA OBRIGAR O DESTINO
+    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.descricao) {
       showAlert("Campos Obrigatórios", "Por favor, preencha os campos obrigatórios (*).", "warning");
       return;
     }
@@ -40,9 +39,13 @@ export default function SolicitarNotaFiscal() {
 
     const payload = {
       solicitante: {
-        nome: formDados.nome, wbs: formDados.wbs,
-        descricao: formDados.descricao, observacoes: formDados.observacoes,
-        tipo: 'Nota Fiscal', filial_origem: estoqueAtual 
+        nome: formDados.nome, 
+        wbs: formDados.wbs, 
+        destino: formDados.destino, // ✨ ENVIADO PARA O SERVIDOR
+        descricao: formDados.descricao, 
+        observacoes: formDados.observacoes,
+        tipo: 'Nota Fiscal', 
+        filial_origem: estoqueAtual 
       },
       anexos: anexosProcessados 
     };
@@ -52,7 +55,7 @@ export default function SolicitarNotaFiscal() {
 
       if (dados.sucesso || dados.ps_id) {
         showAlert("Sucesso!", `Solicitação de NF enviada. ID: ${dados.ps_id || dados.ps}`, "success");
-        setFormDados({ nome: '', wbs: '', descricao: '', observacoes: '' });
+        setFormDados({ nome: '', wbs: '', destino: '', descricao: '', observacoes: '' });
         setAnexos([]);
       } else {
         showAlert("Erro do Servidor", dados.erro, "error");
@@ -77,6 +80,7 @@ export default function SolicitarNotaFiscal() {
               <label>NOME *</label>
               <input type="text" className="input-campo foco-roxo" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} />
             </div>
+            
             <div className="input-grupo">
               <label>WBS / CENTRO DE CUSTO *</label>
               <input 
@@ -87,7 +91,19 @@ export default function SolicitarNotaFiscal() {
                 onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} 
               />
             </div>
-            {/* ✨ Campo "Valor Estimado" removido daqui */}
+
+            {/* ✨ NOVO INPUT DE DESTINO NA NOTA FISCAL */}
+            <div className="input-grupo">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> DESTINO *</label>
+              <input 
+                type="text" 
+                className="input-campo foco-roxo" 
+                placeholder="Local de entrega / destino" 
+                value={formDados.destino} 
+                onChange={(e) => setFormDados({ ...formDados, destino: e.target.value })} 
+              />
+            </div>
+
             <div className="input-grupo">
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
               <div className="input-wrapper-fixo">
