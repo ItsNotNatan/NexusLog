@@ -11,7 +11,8 @@ const db = require('../db');
 
 /**
  * Função principal que gera o backup em Excel.
- * Consulta as tabelas do PocketBase e escreve num ficheiro .xlsx.
+ * Consulta as tabelas do PocketBase e escreve num ficheiro .xlsx com 
+ * o formato exato do modelo de importação do sistema.
  */
 async function gerarBackupExcel() {
   try {
@@ -25,38 +26,69 @@ async function gerarBackupExcel() {
     // 2. Adicionar uma "Folha" para o Estoque
     const sheetEstoque = workbook.addWorksheet('Estoque Atual');
     
-    // Definir as colunas (cabeçalhos) e larguras
+    // ✨ COLUNAS DEFINIDAS EXATAMENTE COMO NO MODELO DO FRONTEND
     sheetEstoque.columns = [
-      { header: 'ID', key: 'id', width: 25 },
-      { header: 'DESENHO SAP', key: 'sap', width: 20 },
-      { header: 'PART NUMBER', key: 'pn', width: 20 },
+      { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
       { header: 'DESCRIÇÃO', key: 'desc', width: 40 },
-      { header: 'SALDO', key: 'saldo', width: 15 },
+      { header: 'FABRICANTE', key: 'pn', width: 25 },
+      { header: 'QTDE ENTRADA', key: 'qtd', width: 15 },
+      { header: 'REFERÊNCIA', key: 'ref', width: 20 },
+      { header: 'UNID. MEDIDA', key: 'unid', width: 15 },
+      { header: 'NUM DA NOTA FISCAL', key: 'nf', width: 20 },
+      { header: 'FORNECEDOR / REGISTRO', key: 'fornecedor', width: 25 },
+      { header: 'CENTRO DE CUSTO - WBS', key: 'wbs', width: 25 },
+      { header: 'NOME CENTRO DE CUSTO / PROJETO', key: 'projeto', width: 35 },
+      { header: 'EMISSÃO NF', key: 'emi', width: 15 },
+      { header: 'RECEB. NF', key: 'rec', width: 15 },
+      { header: 'Nº PEDIDO DE COMPRA / CPV', key: 'doc', width: 25 },
+      { header: 'VLR. UNITÁRIO NOTA FISCAL', key: 'val', width: 25 },
       { header: 'FILIAL', key: 'filial', width: 15 },
+      { header: 'DEPÓSITO', key: 'dep', width: 15 },
+      { header: 'ALOCAÇÃO', key: 'aloc', width: 20 }
     ];
 
-    // Estilizar o cabeçalho (fundo azul, texto branco)
-    sheetEstoque.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    sheetEstoque.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+    // Estilizar o cabeçalho idêntico ao modelo (fundo azul, texto branco)
+    const linhaCabecalho = sheetEstoque.getRow(1);
+    linhaCabecalho.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    });
+    linhaCabecalho.height = 25;
 
     // 3. Buscar os dados na base de dados
-    // Utilizamos a função listar do teu db.js para ir buscar tudo
     const estoque = await db.listar('estoque');
 
     // 4. Inserir os dados linha a linha no Excel
+    // Estamos a mapear as chaves que definimos nas colunas acima (sap, desc, pn, etc.)
+    // com as propriedades reais que vêm da base de dados.
     estoque.forEach(item => {
       sheetEstoque.addRow({
-        id: item.id,
         sap: item.desenho_sap || '-',
-        pn: item.part_number || '-',
         desc: item.descricao || '-',
-        saldo: item.quantidade_disponivel || 0,
+        pn: item.part_number || '-',
+        qtd: item.quantidade_disponivel || 0,
+        ref: item.referencia || '-',
+        unid: item.unidade_medida || 'Unid',
+        nf: item.nf_entrada || '-',
+        fornecedor: item.fornecedor || '-',
+        wbs: item.wbs || '-',
+        projeto: item.nome_projeto || '-',
+        emi: item.emissao_nf || '-',
+        rec: item.receb_nf || '-',
+        doc: item.documento_compras || '-',
+        val: item.valor_unitario || 0,
         filial: item.filial_id || '-',
+        dep: item.deposito || '-',
+        aloc: item.alocacao || '-'
       });
     });
 
     // 5. Configurar a pasta onde os backups vão ficar guardados
-    // Vai criar uma pasta "BackupsExcel" dentro da pasta "Servidor"
     const pastaDestino = path.join(__dirname, '../../BackupsExcel');
     
     // Se a pasta não existir, o Node.js cria-a automaticamente
@@ -65,7 +97,6 @@ async function gerarBackupExcel() {
     }
 
     // 6. Gerar o nome do ficheiro com a data e hora atual
-    // Exemplo: Backup_NexusLog_2026-09-11_08-30.xlsx
     const dataAtual = new Date();
     const dataFormatada = dataAtual.toISOString().replace(/T/, '_').replace(/:/g, '-').slice(0, 16);
     const nomeArquivo = `Backup_NexusLog_${dataFormatada}.xlsx`;
