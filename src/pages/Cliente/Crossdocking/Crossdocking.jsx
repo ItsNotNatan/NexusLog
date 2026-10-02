@@ -19,7 +19,7 @@ export default function Crossdocking() {
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
   
-  const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); // ✨ Começa em 1
+  const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
   const [anexos, setAnexos] = useState([]);
 
   const adicionarItemParcial = () => setItensParciais([...itensParciais, { id: Date.now(), desenhoSAP: '', quantidade: 1 }]);
@@ -78,7 +78,6 @@ export default function Crossdocking() {
       return;
     }
 
-    // ✨ ParseInt para garantir que nunca vai um número quebrado ou string
     const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
       desenho_sap_manual: i.desenhoSAP,
       quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
@@ -140,7 +139,6 @@ export default function Crossdocking() {
               className="input-campo foco-ciano" 
               placeholder="WBS do projeto" 
               value={formDados.wbs} 
-              // ✨ Formatador de WBS em tempo real
               onChange={(e) => setFormDados({...formDados, wbs: formatarWBS(e.target.value)})} 
             />
           </div>
@@ -156,7 +154,7 @@ export default function Crossdocking() {
               <span className="badge-fixo">Fixo</span>
             </div>
           </div>
-          {/* ✨ NOVA CAIXA: DESTINO (Ocupa as duas colunas inteiras) */}
+          {/* ✨ CAIXA DESTINO (Ocupa as duas colunas inteiras) */}
           <div className="input-grupo" style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> DESTINO *</label>
             <textarea 
@@ -227,20 +225,18 @@ export default function Crossdocking() {
                             placeholder="1" 
                             value={item.quantidade} 
                             onKeyDown={(e) => {
-                              // Bloqueia ponto, vírgula, sinal de menos, 'e' e 'E'
                               if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') {
                                 e.preventDefault();
                               }
                             }}
                             onBlur={(e) => {
-                              // Se o utilizador apagar o número e sair do campo, volta a 1 automaticamente
                               if (!e.target.value || parseInt(e.target.value, 10) < 1) {
                                 atualizarItemParcial(item.id, 'quantidade', 1);
                               }
                             }}
                             onChange={(e) => {
                               let val = e.target.value;
-                              if (val === '0') val = '1'; // Não permite que o utilizador comece a digitar 0
+                              if (val === '0') val = '1'; 
                               atualizarItemParcial(item.id, 'quantidade', val);
                             }} 
                           />
