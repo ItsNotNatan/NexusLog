@@ -44,7 +44,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       if (isReintegracao) tituloPrincipal = 'BOLETIM DE ENTRADA - COMUNICAÇÃO INTERNA: REINTEGRAÇÃO DE MATERIAIS';
       if (isCancelamento) tituloPrincipal = 'BOLETIM DE CANCELAMENTO - COMUNICAÇÃO INTERNA: ESTORNO DE SOLICITAÇÃO';
 
-      // Tratamento de datas (Data de entrega removida)
+      // Tratamento de datas (Data de entrega removida conforme solicitado)
       const dataSolicitacao = linha.dataSolicitacao || '';
 
       // Tratamento do Destino (se falhar, usa a observação)
@@ -104,9 +104,10 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         });
       }
 
-      // ✨ PREENCHER LINHAS VAZIAS PARA GARANTIR 20 LINHAS NO TOTAL
-      const minRows = 20;
-      for (let i = bodyRows.length; i <= minRows; i++) {
+      // ✨ GARANTIR EXATAMENTE 20 LINHAS DE ITENS NO TOTAL
+      // 1 linha de cabeçalho + 20 linhas de itens = 21 linhas totais
+      const totalLinhasDesejadas = 21; 
+      while (bodyRows.length < totalLinhasDesejadas) {
         bodyRows.push([
           { text: '', fontSize: 6, margin: [0, 4] }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
           { text: '', fontSize: 6 }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
@@ -123,18 +124,18 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         pageOrientation: 'landscape',
         pageMargins: [20, 15, 20, 15], // Margens de topo e fundo mais pequenas
         content: [
-          // CABEÇALHO COM TÍTULO (Linha única)
+          // CABEÇALHO COM TÍTULO (Linha única mais compacta)
           {
             table: {
               widths: ['100%'],
               body: [
                 [
-                  { text: tituloPrincipal, alignment: 'center', bold: true, fontSize: 11, fillColor: '#e2e8f0', margin: [0, 4] }
+                  { text: tituloPrincipal, alignment: 'center', bold: true, fontSize: 11, fillColor: '#e2e8f0', margin: [0, 2] }
                 ]
               ]
             },
             layout: 'noBorders',
-            margin: [0, 0, 0, 5] // Reduzimos o espaço abaixo do título
+            margin: [0, 0, 0, 4] 
           },
 
           // ÁREA DE INFORMAÇÕES SUPERIORES (3 COLUNAS)
@@ -147,52 +148,52 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   widths: ['35%', '65%'],
                   body: [
                     [
-                      { text: 'Formulário\nPASTA DRIVE', fontSize: 7, bold: true, color: '#1d4ed8', alignment: 'center', margin: [0, 2], border: [true, true, true, false] },
+                      { text: 'Formulário\nPASTA DRIVE', fontSize: 7, bold: true, color: '#1d4ed8', alignment: 'center', margin: [0, 1], border: [true, true, true, false] },
                       { 
                         stack: [
-                          { text: 'APROVAÇÃO:', fontSize: 6, bold: true, margin: [0, 0, 0, 1] },
+                          { text: 'APROVAÇÃO:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
                           { text: 'GESTÃO DA SEGURANÇA E PATRIMONIO/LOGÍSTICA E PROJETOS', fontSize: 6, bold: true, color: '#b91c1c' }
                         ], 
-                        fillColor: '#f1f5f9', border: [true, true, true, false], margin: [2, 2] 
+                        fillColor: '#f1f5f9', border: [true, true, true, false], margin: [2, 1] 
                       }
                     ],
                     [
                       { 
                         stack: [
-                          { text: 'ORIGEM MATERIAL:', fontSize: 6, bold: true, margin: [0, 0, 0, 1] },
+                          { text: 'ORIGEM MATERIAL:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
                           { text: nomeFilial || 'N/A', fontSize: 6, bold: true, color: '#b91c1c' }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 2], border: [true, false, true, false] 
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, false] 
                       },
                       {}
                     ],
                     [
                       { 
                         stack: [
-                          { text: 'DESTINO MATERIAL:', fontSize: 6, bold: true, margin: [0, 0, 0, 1] },
+                          { text: 'DESTINO MATERIAL:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
                           { text: destinoMaterial, fontSize: 6, bold: true, color: '#b91c1c' }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 2], border: [true, false, true, false] 
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, false] 
                       },
                       {}
                     ],
                     [
                       { 
                         stack: [
-                          { text: 'PROJETO TAREFA WBS:', fontSize: 6, bold: true, margin: [0, 0, 0, 1] },
+                          { text: 'PROJETO TAREFA WBS:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
                           { text: linha.wbs || 'N/A', fontSize: 6, bold: true }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 2], border: [true, false, true, false] 
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, false] 
                       },
                       {}
                     ],
                     [
                       { 
                         stack: [
-                          { text: 'NOME DA WBS:', fontSize: 6, bold: true, margin: [0, 0, 0, 1] },
+                          { text: 'NOME DA WBS:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
                           { text: ' ', fontSize: 6 }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 2], border: [true, false, true, true] 
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, true] 
                       },
                       {}
                     ]
@@ -204,151 +205,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
               {
                 width: '10%',
                 stack: [
-                  { text: 'PDF', alignment: 'center', bold: true, fontSize: 20, color: '#dc2626', margin: [0, 20, 0, 0] }
+                  { text: 'PDF', alignment: 'center', bold: true, fontSize: 20, color: '#dc2626', margin: [0, 15, 0, 0] }
                 ]
               },
-
-              // Coluna Direita: Bloco de Datas e Números
-              {
-                width: '45%',
-                table: {
-                  widths: ['50%', '50%'],
-                  body: [
-                    [
-                      { text: 'NÚMERO DO BS (SEQUENCIAL):', fontSize: 7, bold: true, alignment: 'right', margin: [0, 2, 4, 0], border: [false, false, false, false] },
-                      { 
-                        stack: [
-                          { text: '-= BS =-', alignment: 'center', fontSize: 7, bold: true, margin: [0, 1, 0, 1] },
-                          { text: bsNumero, alignment: 'center', fontSize: 16, bold: true, fillColor: '#86efac', margin: [0, 2] }
-                        ],
-                        border: [true, true, true, true]
-                      }
-                    ],
-                    [
-                      { text: 'NÚMERO FORMULÁRIO:\nP&S/CROSS DOCKING/LOGISTICA', fontSize: 6, bold: true, alignment: 'right', margin: [0, 2, 4, 0], border: [false, false, false, false] },
-                      { text: `PS: ${linha.ps || linha.id}`, alignment: 'center', fontSize: 9, bold: true, fillColor: '#a5f3fc', margin: [0, 2], border: [true, true, true, true] }
-                    ],
-                    // ✨ DATA DE ENTREGA REMOVIDA DAQUI
-                    [
-                      { text: 'DATA DO SOLICITAÇÃO FORMULÁRIO:', fontSize: 6, bold: true, alignment: 'right', margin: [0, 2, 4, 0], border: [false, false, false, false] },
-                      { text: dataSolicitacao, alignment: 'center', fontSize: 7, margin: [0, 2], border: [true, true, true, true] }
-                    ]
-                  ]
-                },
-                layout: 'noBorders' 
-              }
-            ],
-            columnGap: 10,
-            margin: [0, 0, 0, 5] // Reduzimos o espaço abaixo do bloco de info
-          },
-
-          // ÁREA DE ASSINATURAS E APROVAÇÕES
-          {
-            table: {
-              widths: ['33.3%', '33.3%', '33.4%'],
-              body: [
-                [
-                  { text: 'Aprovação / Recebimento', colSpan: 3, fontSize: 7, bold: true, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 1] },
-                  {}, {}
-                ],
-                [
-                  {
-                    stack: [
-                      { text: 'Solicitado por:', fontSize: 6, bold: true },
-                      { text: linha.solicitante || 'N/A', fontSize: 7, bold: true, alignment: 'center', fillColor: '#fef08a', margin: [10, 2, 10, 2] },
-                      { text: '________________________________', alignment: 'center', fontSize: 6, margin: [0, 10, 0, 0] },
-                      { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 6 },
-                      { text: 'Matrícula:', fontSize: 6, margin: [0, 2, 0, 0] }
-                    ],
-                    margin: [2, 2, 2, 2]
-                  },
-                  {
-                    stack: [
-                      { text: 'Separado e Double Check por:', fontSize: 6, bold: true },
-                      { text: ' ', fontSize: 7, margin: [0, 2, 0, 2] }, 
-                      { text: '________________________________', alignment: 'center', fontSize: 6, margin: [0, 10, 0, 0] },
-                      { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 6 },
-                      { text: 'Matrícula:', fontSize: 6, margin: [0, 2, 0, 0] }
-                    ],
-                    margin: [2, 2, 2, 2]
-                  },
-                  {
-                    stack: [
-                      { text: 'Recebido por:', fontSize: 6, bold: true },
-                      { text: ' ', fontSize: 7, margin: [0, 2, 0, 2] }, 
-                      { text: '________________________________', alignment: 'center', fontSize: 6, margin: [0, 10, 0, 0] },
-                      { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 6 },
-                      { text: 'Matrícula:', fontSize: 6, margin: [0, 2, 0, 0] }
-                    ],
-                    margin: [2, 2, 2, 2]
-                  }
-                ]
-              ]
-            },
-            margin: [0, 0, 0, 8] // Reduzimos o espaço abaixo das assinaturas
-          },
-
-          // TABELA PRINCIPAL DE ITENS
-          {
-            table: {
-              widths: colWidths,
-              headerRows: 1,
-              body: bodyRows
-            },
-            layout: {
-              hLineWidth: function (i, node) { return 1; },
-              vLineWidth: function (i, node) { return 1; },
-              hLineColor: function (i, node) { return '#cbd5e1'; },
-              vLineColor: function (i, node) { return '#cbd5e1'; },
-            }
-          }
-        ],
-        defaultStyle: { 
-          font: 'Roboto',
-          color: '#0f172a'
-        }
-      };
-
-      pdfMake.createPdf(docDefinition).open();
-
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      if (showAlert) showAlert("Erro", "Ocorreu um problema ao compilar os dados para o PDF.", "error");
-    } finally {
-      setGerando(false);
-      if (closeAlert) closeAlert();
-    }
-  };
-
-  return (
-    <span 
-      className="badge-pl"
-      onClick={handleGerarPdf}
-      style={{ 
-        cursor: gerando ? 'not-allowed' : 'pointer', 
-        transition: 'all 0.2s', 
-        userSelect: 'none',
-        opacity: gerando ? 0.6 : 1,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '4px'
-      }}
-      title="Clique para abrir o Boletim Detalhado em PDF numa nova aba"
-      onMouseOver={(e) => { 
-        if(!gerando) {
-          e.currentTarget.style.backgroundColor = '#dbeafe'; 
-          e.currentTarget.style.borderColor = '#93c5fd'; 
-        }
-      }}
-      onMouseOut={(e) => { 
-        if(!gerando) {
-          e.currentTarget.style.backgroundColor = '#eff6ff'; 
-          e.currentTarget.style.borderColor = '#bfdbfe'; 
-        }
-      }}
-    >
-      <FileText size={14} /> 
-      {gerando ? 'A Gerar...' : (linha.pl && linha.pl !== '-' && linha.pl !== '—' ? linha.pl : 'Gerar PDF')}
-    </span>
-  );
-}
