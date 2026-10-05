@@ -44,7 +44,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       if (isReintegracao) tituloPrincipal = 'BOLETIM DE ENTRADA - COMUNICAÇÃO INTERNA: REINTEGRAÇÃO DE MATERIAIS';
       if (isCancelamento) tituloPrincipal = 'BOLETIM DE CANCELAMENTO - COMUNICAÇÃO INTERNA: ESTORNO DE SOLICITAÇÃO';
 
-      // Tratamento de datas (Data de entrega removida conforme solicitado)
+      // Tratamento de datas (Data de entrega removida)
       const dataSolicitacao = linha.dataSolicitacao || '';
 
       // Tratamento do Destino (se falhar, usa a observação)
@@ -71,17 +71,17 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       ];
       
       const headerRow = [
-        { text: 'ITEM', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'DESENHO', bold: true, fontSize: 6, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'PART NUMBER', bold: true, fontSize: 6, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'QTD', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'UNID', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'DESCRIÇÃO', bold: true, fontSize: 6, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'FORNECEDOR', bold: true, fontSize: 6, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'ALOCAÇÃO', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'NF ENTRADA', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'VLOR UNIT', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'WBS', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] }
+        { text: 'ITEM', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 2] },
+        { text: 'DESENHO', bold: true, fontSize: 6, fillColor: '#bfdbfe', margin: [0, 2] },
+        { text: 'PART NUMBER', bold: true, fontSize: 6, fillColor: '#bfdbfe', margin: [0, 2] },
+        { text: 'QTD', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 2] },
+        { text: 'UNID', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 2] },
+        { text: 'DESCRIÇÃO', bold: true, fontSize: 6, fillColor: '#bfdbfe', margin: [0, 2] },
+        { text: 'FORNECEDOR', bold: true, fontSize: 6, fillColor: '#bfdbfe', margin: [0, 2] },
+        { text: 'ALOCAÇÃO', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 2] },
+        { text: 'NF ENTRADA', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 2] },
+        { text: 'VLOR UNIT', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 2] },
+        { text: 'WBS', bold: true, fontSize: 6, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 2] }
       ];
 
       let bodyRows = [headerRow];
@@ -89,27 +89,25 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       if (linha.itens && linha.itens.length > 0) {
         linha.itens.forEach((it, index) => {
           bodyRows.push([
-            { text: (index + 1).toString(), fontSize: 6, alignment: 'center', margin: [0, 4] },
-            { text: it.desenho_sap_manual || '-', fontSize: 6, margin: [0, 4] },
-            { text: it.part_number_manual || '-', fontSize: 6, bold: true, margin: [0, 4] },
-            { text: it.quantidade_solicitada || '-', fontSize: 6, alignment: 'center', margin: [0, 4] },
-            { text: it.unidade_medida_manual || 'Un', fontSize: 6, alignment: 'center', margin: [0, 4] },
-            { text: it.descricao_manual || '-', fontSize: 6, margin: [0, 4] },
-            { text: it.fornecedor || '-', fontSize: 6, margin: [0, 4] },
-            { text: it.alocacao || '-', fontSize: 6, alignment: 'center', margin: [0, 4] },
-            { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 6, alignment: 'center', margin: [0, 4] },
-            { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', fontSize: 6, alignment: 'center', margin: [0, 4] },
-            { text: it.wbs_element || '-', fontSize: 6, alignment: 'center', margin: [0, 4] }
+            { text: (index + 1).toString(), fontSize: 6, alignment: 'center', margin: [0, 2] },
+            { text: it.desenho_sap_manual || '-', fontSize: 6, margin: [0, 2] },
+            { text: it.part_number_manual || '-', fontSize: 6, bold: true, margin: [0, 2] },
+            { text: it.quantidade_solicitada || '-', fontSize: 6, alignment: 'center', margin: [0, 2] },
+            { text: it.unidade_medida_manual || 'Un', fontSize: 6, alignment: 'center', margin: [0, 2] },
+            { text: it.descricao_manual || '-', fontSize: 6, margin: [0, 2] },
+            { text: it.fornecedor || '-', fontSize: 6, margin: [0, 2] },
+            { text: it.alocacao || '-', fontSize: 6, alignment: 'center', margin: [0, 2] },
+            { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 6, alignment: 'center', margin: [0, 2] },
+            { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', fontSize: 6, alignment: 'center', margin: [0, 2] },
+            { text: it.wbs_element || '-', fontSize: 6, alignment: 'center', margin: [0, 2] }
           ]);
         });
       }
 
-      // ✨ GARANTIR EXATAMENTE 20 LINHAS DE ITENS NO TOTAL
-      // 1 linha de cabeçalho + 20 linhas de itens = 21 linhas totais
-      const totalLinhasDesejadas = 21; 
-      while (bodyRows.length < totalLinhasDesejadas) {
+      // ✨ GARANTE EXATAMENTE 20 LINHAS DE ITENS (Header = index 0. O total será 21)
+      while (bodyRows.length <= 20) {
         bodyRows.push([
-          { text: '', fontSize: 6, margin: [0, 4] }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
+          { text: '', fontSize: 6, margin: [0, 2] }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
           { text: '', fontSize: 6 }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
           { text: '', fontSize: 6 }, { text: '', fontSize: 6 }, { text: '', fontSize: 6 },
           { text: '', fontSize: 6 }, { text: '', fontSize: 6 }
@@ -122,37 +120,37 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const docDefinition = {
         pageSize: 'A4',
         pageOrientation: 'landscape',
-        pageMargins: [20, 15, 20, 15], // Margens de topo e fundo mais pequenas
+        pageMargins: [15, 15, 15, 15], // MARGENS REDUZIDAS PARA CABER NUMA PÁGINA
         content: [
-          // CABEÇALHO COM TÍTULO (Linha única mais compacta)
+          // CABEÇALHO COM TÍTULO
           {
             table: {
               widths: ['100%'],
               body: [
                 [
-                  { text: tituloPrincipal, alignment: 'center', bold: true, fontSize: 11, fillColor: '#e2e8f0', margin: [0, 2] }
+                  { text: tituloPrincipal, alignment: 'center', bold: true, fontSize: 10, fillColor: '#e2e8f0', margin: [0, 2] }
                 ]
               ]
             },
             layout: 'noBorders',
-            margin: [0, 0, 0, 4] 
+            margin: [0, 0, 0, 2] 
           },
 
           // ÁREA DE INFORMAÇÕES SUPERIORES (3 COLUNAS)
           {
             columns: [
-              // Coluna Esquerda: Bloco Cinza (Aprovação, Origem, Destino, etc)
+              // Coluna Esquerda: Bloco Cinza
               {
                 width: '45%',
                 table: {
                   widths: ['35%', '65%'],
                   body: [
                     [
-                      { text: 'Formulário\nPASTA DRIVE', fontSize: 7, bold: true, color: '#1d4ed8', alignment: 'center', margin: [0, 1], border: [true, true, true, false] },
+                      { text: 'Formulário\nPASTA DRIVE', fontSize: 6, bold: true, color: '#1d4ed8', alignment: 'center', margin: [0, 1], border: [true, true, true, false] },
                       { 
                         stack: [
-                          { text: 'APROVAÇÃO:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
-                          { text: 'GESTÃO DA SEGURANÇA E PATRIMONIO/LOGÍSTICA E PROJETOS', fontSize: 6, bold: true, color: '#b91c1c' }
+                          { text: 'APROVAÇÃO:', fontSize: 5, bold: true },
+                          { text: 'GESTÃO DA SEGURANÇA E PATRIMONIO/LOGÍSTICA E PROJETOS', fontSize: 5, bold: true, color: '#b91c1c' }
                         ], 
                         fillColor: '#f1f5f9', border: [true, true, true, false], margin: [2, 1] 
                       }
@@ -160,8 +158,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     [
                       { 
                         stack: [
-                          { text: 'ORIGEM MATERIAL:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
-                          { text: nomeFilial || 'N/A', fontSize: 6, bold: true, color: '#b91c1c' }
+                          { text: 'ORIGEM MATERIAL:', fontSize: 5, bold: true },
+                          { text: nomeFilial || 'N/A', fontSize: 5, bold: true, color: '#b91c1c' }
                         ], 
                         colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, false] 
                       },
@@ -170,8 +168,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     [
                       { 
                         stack: [
-                          { text: 'DESTINO MATERIAL:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
-                          { text: destinoMaterial, fontSize: 6, bold: true, color: '#b91c1c' }
+                          { text: 'DESTINO MATERIAL:', fontSize: 5, bold: true },
+                          { text: destinoMaterial, fontSize: 5, bold: true, color: '#b91c1c' }
                         ], 
                         colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, false] 
                       },
@@ -180,18 +178,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     [
                       { 
                         stack: [
-                          { text: 'PROJETO TAREFA WBS:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
-                          { text: linha.wbs || 'N/A', fontSize: 6, bold: true }
-                        ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, false] 
-                      },
-                      {}
-                    ],
-                    [
-                      { 
-                        stack: [
-                          { text: 'NOME DA WBS:', fontSize: 6, bold: true, margin: [0, 0, 0, 0] },
-                          { text: ' ', fontSize: 6 }
+                          { text: 'PROJETO TAREFA WBS:', fontSize: 5, bold: true },
+                          { text: linha.wbs || 'N/A', fontSize: 5, bold: true }
                         ], 
                         colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, true] 
                       },
@@ -205,6 +193,150 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
               {
                 width: '10%',
                 stack: [
-                  { text: 'PDF', alignment: 'center', bold: true, fontSize: 20, color: '#dc2626', margin: [0, 15, 0, 0] }
+                  { text: 'PDF', alignment: 'center', bold: true, fontSize: 16, color: '#dc2626', margin: [0, 10, 0, 0] }
                 ]
               },
+
+              // Coluna Direita: Bloco de Datas e Números
+              {
+                width: '45%',
+                table: {
+                  widths: ['50%', '50%'],
+                  body: [
+                    [
+                      { text: 'NÚMERO DO BS (SEQUENCIAL):', fontSize: 6, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
+                      { 
+                        stack: [
+                          { text: '-= BS =-', alignment: 'center', fontSize: 6, bold: true },
+                          { text: bsNumero, alignment: 'center', fontSize: 14, bold: true, fillColor: '#86efac' }
+                        ],
+                        border: [true, true, true, true]
+                      }
+                    ],
+                    [
+                      { text: 'NÚMERO FORMULÁRIO:\nP&S/CROSS DOCKING/LOGISTICA', fontSize: 5, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
+                      { text: `PS: ${linha.ps || linha.id}`, alignment: 'center', fontSize: 8, bold: true, fillColor: '#a5f3fc', margin: [0, 1], border: [true, true, true, true] }
+                    ],
+                    [
+                      { text: 'DATA DO SOLICITAÇÃO FORMULÁRIO:', fontSize: 5, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
+                      { text: dataSolicitacao, alignment: 'center', fontSize: 6, margin: [0, 1], border: [true, true, true, true] }
+                    ]
+                  ]
+                },
+                layout: 'noBorders' 
+              }
+            ],
+            columnGap: 10,
+            margin: [0, 0, 0, 2] 
+          },
+
+          // ÁREA DE ASSINATURAS E APROVAÇÕES
+          {
+            table: {
+              widths: ['33.3%', '33.3%', '33.4%'],
+              body: [
+                [
+                  { text: 'Aprovação / Recebimento', colSpan: 3, fontSize: 6, bold: true, fillColor: '#e2e8f0', alignment: 'center', margin: [0, 1] },
+                  {}, {}
+                ],
+                [
+                  {
+                    stack: [
+                      { text: 'Solicitado por:', fontSize: 5, bold: true },
+                      { text: linha.solicitante || 'N/A', fontSize: 6, bold: true, alignment: 'center', fillColor: '#fef08a', margin: [10, 1, 10, 1] },
+                      { text: '________________________________', alignment: 'center', fontSize: 5, margin: [0, 6, 0, 0] },
+                      { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 5 },
+                      { text: 'Matrícula:', fontSize: 5, margin: [0, 1, 0, 0] }
+                    ],
+                    margin: [2, 1, 2, 1]
+                  },
+                  {
+                    stack: [
+                      { text: 'Separado e Double Check por:', fontSize: 5, bold: true },
+                      { text: ' ', fontSize: 6, margin: [0, 1, 0, 1] }, 
+                      { text: '________________________________', alignment: 'center', fontSize: 5, margin: [0, 6, 0, 0] },
+                      { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 5 },
+                      { text: 'Matrícula:', fontSize: 5, margin: [0, 1, 0, 0] }
+                    ],
+                    margin: [2, 1, 2, 1]
+                  },
+                  {
+                    stack: [
+                      { text: 'Recebido por:', fontSize: 5, bold: true },
+                      { text: ' ', fontSize: 6, margin: [0, 1, 0, 1] }, 
+                      { text: '________________________________', alignment: 'center', fontSize: 5, margin: [0, 6, 0, 0] },
+                      { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 5 },
+                      { text: 'Matrícula:', fontSize: 5, margin: [0, 1, 0, 0] }
+                    ],
+                    margin: [2, 1, 2, 1]
+                  }
+                ]
+              ]
+            },
+            margin: [0, 0, 0, 2] 
+          },
+
+          // TABELA PRINCIPAL DE ITENS
+          {
+            table: {
+              widths: colWidths,
+              headerRows: 1,
+              body: bodyRows
+            },
+            layout: {
+              hLineWidth: function () { return 0.5; },
+              vLineWidth: function () { return 0.5; },
+              hLineColor: function () { return '#94a3b8'; },
+              vLineColor: function () { return '#94a3b8'; },
+            }
+          }
+        ],
+        defaultStyle: { 
+          font: 'Roboto',
+          color: '#0f172a'
+        }
+      };
+
+      pdfMake.createPdf(docDefinition).open();
+
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      if (showAlert) showAlert("Erro", "Ocorreu um problema ao compilar os dados para o PDF.", "error");
+    } finally {
+      setGerando(false);
+      if (closeAlert) closeAlert();
+    }
+  };
+
+  return (
+    <span 
+      className="badge-pl"
+      onClick={handleGerarPdf}
+      style={{ 
+        cursor: gerando ? 'not-allowed' : 'pointer', 
+        transition: 'all 0.2s', 
+        userSelect: 'none',
+        opacity: gerando ? 0.6 : 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px'
+      }}
+      title="Clique para abrir o Boletim Detalhado em PDF numa nova aba"
+      onMouseOver={(e) => { 
+        if(!gerando) {
+          e.currentTarget.style.backgroundColor = '#dbeafe'; 
+          e.currentTarget.style.borderColor = '#93c5fd'; 
+        }
+      }}
+      onMouseOut={(e) => { 
+        if(!gerando) {
+          e.currentTarget.style.backgroundColor = '#eff6ff'; 
+          e.currentTarget.style.borderColor = '#bfdbfe'; 
+        }
+      }}
+    >
+      <FileText size={14} /> 
+      {gerando ? 'A Gerar...' : (linha.pl && linha.pl !== '-' && linha.pl !== '—' ? linha.pl : 'Gerar PDF')}
+    </span>
+  );
+}
