@@ -104,7 +104,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         });
       }
 
-      // ✨ GARANTE EXATAMENTE 20 LINHAS DE ITENS (Total 21 com o cabeçalho)
+      // GARANTE EXATAMENTE 20 LINHAS DE ITENS (Total 21 com o cabeçalho)
       while (bodyRows.length <= 20) {
         bodyRows.push([
           { text: '', fontSize: 7, margin: [0, 3] }, { text: '', fontSize: 7 }, { text: '', fontSize: 7 },
@@ -136,52 +136,67 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             margin: [0, 0, 0, 4] 
           },
 
-          // ÁREA DE INFORMAÇÕES SUPERIORES (3 COLUNAS AJUSTADAS)
+          // ÁREA DE INFORMAÇÕES SUPERIORES
           {
             columns: [
               // Coluna Esquerda
               {
-                width: '42%', // ✨ Ajustado de 45% para 42%
+                width: '42%',
                 table: {
                   widths: ['35%', '65%'],
                   body: [
                     [
                       { text: 'Formulário\nPASTA DRIVE', fontSize: 7, bold: true, color: '#1d4ed8', alignment: 'center', margin: [0, 1], border: [true, true, true, false] },
                       { 
-                        stack: [
-                          { text: 'APROVAÇÃO:', fontSize: 6, bold: true },
+                        // ✨ Trocado "stack" por "text" para alinhar lado a lado!
+                        text: [
+                          { text: 'APROVAÇÃO: ', fontSize: 6, bold: true },
                           { text: 'GESTÃO DA SEGURANÇA E PATRIMONIO/LOGÍSTICA E PROJETOS', fontSize: 6, bold: true, color: '#b91c1c' }
                         ], 
-                        fillColor: '#f1f5f9', border: [true, true, true, false], margin: [2, 1] 
+                        fillColor: '#f1f5f9', border: [true, true, true, false], margin: [4, 4] 
                       }
                     ],
                     [
                       { 
-                        stack: [
-                          { text: 'ORIGEM MATERIAL:', fontSize: 6, bold: true },
+                        // ✨ Trocado "stack" por "text"
+                        text: [
+                          { text: 'ORIGEM MATERIAL: ', fontSize: 6, bold: true },
                           { text: nomeFilial || 'N/A', fontSize: 6, bold: true, color: '#b91c1c' }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, false] 
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, false] 
                       },
                       {}
                     ],
                     [
                       { 
-                        stack: [
-                          { text: 'DESTINO MATERIAL:', fontSize: 6, bold: true },
+                        // ✨ Trocado "stack" por "text"
+                        text: [
+                          { text: 'DESTINO MATERIAL: ', fontSize: 6, bold: true },
                           { text: destinoMaterial, fontSize: 6, bold: true, color: '#b91c1c' }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, false] 
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, false] 
                       },
                       {}
                     ],
                     [
                       { 
-                        stack: [
-                          { text: 'PROJETO TAREFA WBS:', fontSize: 6, bold: true },
+                        // ✨ Trocado "stack" por "text"
+                        text: [
+                          { text: 'PROJETO TAREFA WBS: ', fontSize: 6, bold: true },
                           { text: linha.wbs || 'N/A', fontSize: 6, bold: true }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [2, 1], border: [true, false, true, true] 
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, false] 
+                      },
+                      {}
+                    ],
+                    [
+                      { 
+                        // ✨ Trocado "stack" por "text"
+                        text: [
+                          { text: 'NOME DA WBS: ', fontSize: 6, bold: true },
+                          { text: ' ', fontSize: 6 }
+                        ], 
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, true] 
                       },
                       {}
                     ]
@@ -189,9 +204,9 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                 }
               },
               
-              // ✨ Coluna Centro: Nome da Filial (Substitui o "PDF")
+              // Coluna Centro: Nome da Filial
               {
-                width: '16%', // ✨ Ajustado de 10% para 16% para caber o nome da filial
+                width: '16%', 
                 stack: [
                   { 
                     text: nomeFilial ? nomeFilial.toUpperCase() : 'FILIAL', 
@@ -206,7 +221,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
 
               // Coluna Direita: Bloco de Datas e Números
               {
-                width: '42%', // ✨ Ajustado de 45% para 42%
+                width: '42%',
                 table: {
                   widths: ['50%', '50%'],
                   body: [
