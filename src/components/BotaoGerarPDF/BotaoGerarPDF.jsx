@@ -148,7 +148,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     [
                       { text: 'Formulário\nPASTA DRIVE', fontSize: 7, bold: true, color: '#1d4ed8', alignment: 'center', margin: [0, 1], border: [true, true, true, false] },
                       { 
-                        // ✨ Trocado "stack" por "text" para alinhar lado a lado!
                         text: [
                           { text: 'APROVAÇÃO: ', fontSize: 6, bold: true },
                           { text: 'GESTÃO DA SEGURANÇA E PATRIMONIO/LOGÍSTICA E PROJETOS', fontSize: 6, bold: true, color: '#b91c1c' }
@@ -156,20 +155,9 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                         fillColor: '#f1f5f9', border: [true, true, true, false], margin: [4, 4] 
                       }
                     ],
+                    // ✨ Bloco da "ORIGEM MATERIAL" foi removido daqui!
                     [
                       { 
-                        // ✨ Trocado "stack" por "text"
-                        text: [
-                          { text: 'ORIGEM MATERIAL: ', fontSize: 6, bold: true },
-                          { text: nomeFilial || 'N/A', fontSize: 6, bold: true, color: '#b91c1c' }
-                        ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, false] 
-                      },
-                      {}
-                    ],
-                    [
-                      { 
-                        // ✨ Trocado "stack" por "text"
                         text: [
                           { text: 'DESTINO MATERIAL: ', fontSize: 6, bold: true },
                           { text: destinoMaterial, fontSize: 6, bold: true, color: '#b91c1c' }
@@ -180,7 +168,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     ],
                     [
                       { 
-                        // ✨ Trocado "stack" por "text"
                         text: [
                           { text: 'PROJETO TAREFA WBS: ', fontSize: 6, bold: true },
                           { text: linha.wbs || 'N/A', fontSize: 6, bold: true }
@@ -191,7 +178,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     ],
                     [
                       { 
-                        // ✨ Trocado "stack" por "text"
                         text: [
                           { text: 'NOME DA WBS: ', fontSize: 6, bold: true },
                           { text: ' ', fontSize: 6 }
