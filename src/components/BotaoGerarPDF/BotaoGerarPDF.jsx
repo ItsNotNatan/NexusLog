@@ -70,7 +70,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         '15%'  // WBS
       ];
       
-      // ✨ Aumentámos a fontSize do cabeçalho da tabela de 6 para 7.5
       const headerRow = [
         { text: 'ITEM', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'DESENHO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
@@ -89,7 +88,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       
       if (linha.itens && linha.itens.length > 0) {
         linha.itens.forEach((it, index) => {
-          // ✨ Aumentámos a fontSize dos itens de 6 para 7
           bodyRows.push([
             { text: (index + 1).toString(), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.desenho_sap_manual || '-', fontSize: 7, margin: [0, 3] },
@@ -106,7 +104,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         });
       }
 
-      // ✨ GARANTE EXATAMENTE 20 LINHAS DE ITENS (Header = index 0. O total será 21)
+      // ✨ GARANTE EXATAMENTE 20 LINHAS DE ITENS (Total 21 com o cabeçalho)
       while (bodyRows.length <= 20) {
         bodyRows.push([
           { text: '', fontSize: 7, margin: [0, 3] }, { text: '', fontSize: 7 }, { text: '', fontSize: 7 },
@@ -130,7 +128,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
               widths: ['100%'],
               body: [
                 [
-                  // ✨ Título ligeiramente maior (de 10 para 11)
                   { text: tituloPrincipal, alignment: 'center', bold: true, fontSize: 11, fillColor: '#e2e8f0', margin: [0, 3] }
                 ]
               ]
@@ -139,17 +136,16 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             margin: [0, 0, 0, 4] 
           },
 
-          // ÁREA DE INFORMAÇÕES SUPERIORES (3 COLUNAS)
+          // ÁREA DE INFORMAÇÕES SUPERIORES (3 COLUNAS AJUSTADAS)
           {
             columns: [
-              // Coluna Esquerda: Bloco Cinza
+              // Coluna Esquerda
               {
-                width: '45%',
+                width: '42%', // ✨ Ajustado de 45% para 42%
                 table: {
                   widths: ['35%', '65%'],
                   body: [
                     [
-                      // ✨ Textos aumentados em +1 ponto
                       { text: 'Formulário\nPASTA DRIVE', fontSize: 7, bold: true, color: '#1d4ed8', alignment: 'center', margin: [0, 1], border: [true, true, true, false] },
                       { 
                         stack: [
@@ -193,17 +189,24 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                 }
               },
               
-              // Coluna Centro: Ícone PDF
+              // ✨ Coluna Centro: Nome da Filial (Substitui o "PDF")
               {
-                width: '10%',
+                width: '16%', // ✨ Ajustado de 10% para 16% para caber o nome da filial
                 stack: [
-                  { text: 'PDF', alignment: 'center', bold: true, fontSize: 18, color: '#dc2626', margin: [0, 10, 0, 0] }
+                  { 
+                    text: nomeFilial ? nomeFilial.toUpperCase() : 'FILIAL', 
+                    alignment: 'center', 
+                    bold: true, 
+                    fontSize: 10, 
+                    color: '#1e293b', 
+                    margin: [0, 10, 0, 0] 
+                  }
                 ]
               },
 
               // Coluna Direita: Bloco de Datas e Números
               {
-                width: '45%',
+                width: '42%', // ✨ Ajustado de 45% para 42%
                 table: {
                   widths: ['50%', '50%'],
                   body: [
