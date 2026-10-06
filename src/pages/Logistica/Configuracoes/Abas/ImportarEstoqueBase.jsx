@@ -173,7 +173,11 @@ export default function ImportarEstoqueBase() {
           id: `excel-${Date.now()}-${index}`,
           desenhoSAP: item.desenhoSAP || obterValor(item, ['NUM SAP | DESENHO', 'NUM SAP', 'DESENHO SAP']),
           vendorDescription: item.vendorDescription || item.materialDescription || obterValor(item, ['DESCRIÇÃO', 'DESCRICAO', 'MATERIAL DESCRIPTION']),
-          numPecaFabricante: item.numPecaFabricante || obterValor(item, ['FABRICANTE', 'PART NUMBER']),
+          
+          // ✨ CAMPOS FABRICANTE E PART NUMBER SEPARADOS
+          fabricante: item.fabricante || obterValor(item, ['FABRICANTE', 'MARCA', 'FABR']),
+          numPecaFabricante: item.numPecaFabricante || obterValor(item, ['Nº PEÇA', 'PEÇA', 'PART NUMBER', 'PN', 'REF FABRICANTE']),
+          
           qtdFornecida: item.qtdFornecida || obterValor(item, ['QTDE ENTRADA', 'QUANTIDADE', 'QTD']) || 1,
           referencia: item.referencia || obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
           unidadeMedida: normalizarUnidade(item.unidadeMedida || obterValor(item, ['UNID. MEDIDA', 'UNIDADE MEDIDA', 'UNIDADE'])),
@@ -196,8 +200,9 @@ export default function ImportarEstoqueBase() {
         };
       });
 
+      // Filtra itens descartáveis que não possuam dados essenciais
       const itensValidos = novosItensFormatados.filter(
-        item => item.vendorDescription !== '' || item.numPecaFabricante !== '' || item.desenhoSAP !== ''
+        item => item.vendorDescription !== '' || item.numPecaFabricante !== '' || item.desenhoSAP !== '' || item.fabricante !== ''
       );
 
       setItens(itensValidos);
@@ -217,7 +222,8 @@ export default function ImportarEstoqueBase() {
 
   const handleAdicionarLinha = () => {
     const novaLinha = {
-      id: Date.now().toString(), desenhoSAP: '', vendorDescription: '', numPecaFabricante: '',
+      // ✨ ADICIONADO "fabricante: ''" PARA PREVENIR ERROS DE UNDEFINED
+      id: Date.now().toString(), desenhoSAP: '', vendorDescription: '', fabricante: '', numPecaFabricante: '',
       qtdFornecida: 1, referencia: '', unidadeMedida: 'Unid', nfEntrada: '', fornecedor: '',
       wbsElement: '', nomeProjeto: '', emissaoNF: '', recebNF: '', docCompras: '',
       poNetPrice: '', centro: 'BR04', deposito: '20', alocacao: ''
@@ -245,6 +251,7 @@ export default function ImportarEstoqueBase() {
       const itensFormatadosParaBanco = itens.map(item => ({
         desenho_sap: item.desenhoSAP || '-',
         part_number: item.numPecaFabricante || '-',
+        fabricante: item.fabricante || null, // ✨ CAMPO FABRICANTE INCLUÍDO NO PAYLOAD FINAL
         fornecedor: item.fornecedor || null,
         referencia: item.referencia || null,
         qtd: parseInt(item.qtdFornecida, 10) || 1,
@@ -350,7 +357,7 @@ export default function ImportarEstoqueBase() {
           
           <TabelaInsercaoItens 
             itens={itens}
-            limiteLinhas={5000} 
+            limiteLinhas={999999} /* ✨ LIMITE ARTIFICIAL DE 5000 FOI REMOVIDO / IGNORADO AQUI */
             onAtualizarCampo={handleAtualizarCampo}
             onRemoverItem={handleRemoverItem}
             onAdicionarLinha={handleAdicionarLinha}
