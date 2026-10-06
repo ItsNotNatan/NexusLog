@@ -1,11 +1,6 @@
 // =================================================================
 // ARQUIVO: src/services/solicitacoesService.js
 // DESCRICAO: Logica de negocio das solicitacoes, agora sobre o PocketBase
-//
-// O comportamento e' o mesmo da versao Supabase. O que mudou foi COMO os
-// dados sao lidos: o PostgREST montava os "joins" na propria consulta
-// (solicitacoes!inner(...)), e aqui a busca e' feita em etapas e cruzada
-// em memoria. Cada trecho assim esta comentado no lugar.
 // =================================================================
 const db = require('../db');
 
@@ -223,6 +218,7 @@ const criarMaterial = async (solicitante, itens, anexos) => {
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
     desenho_sap_manual: i.desenhoSAP || null,
     part_number_manual: i.numPecaFabricante || null,
+    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
     descricao_manual: i.materialDescription || 'Sem descrição',
     quantidade_solicitada: Math.max(1, i.qtdSelecionada || 1),
     unidade_medida_manual: i.unidadeMedida || 'Unid',
@@ -251,6 +247,7 @@ const criarTransferencia = async (solicitante, itens, anexos) => {
   const itensDB = itens.map((i) => ({
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
     part_number_manual: i.numPecaFabricante || i.pn,
+    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
     descricao_manual: i.materialDescription || i.desc,
     quantidade_solicitada: Math.max(1, i.qtd || 1),
   }));
@@ -280,6 +277,7 @@ const criarEntrada = async (solicitante, itens, anexos) => {
   const itensDB = itens.map((i) => ({
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || '-',
     part_number_manual: i.part_number || i.numPecaFabricante || 'SEM-PN',
+    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
     descricao_manual: i.descricao || i.materialDescription || i.vendorDescription || 'Sem descrição',
     quantidade_solicitada: Math.max(1, i.qtd || i.qtdFornecida || 1),
     unidade_medida_manual: i.unidade_medida || i.unidadeMedida || 'Unid',
@@ -314,6 +312,7 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
     desenho_sap_manual: i.desenho_sap_manual,
     quantidade_solicitada: Math.max(1, i.quantidade_solicitada || 1),
     unidade_medida_manual: i.unidade_medida_manual,
+    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
   }));
 
   return salvarNoBanco(dados, itensDB, anexos, solicitante.nf);
@@ -352,6 +351,7 @@ const criarReintegracao = async (solicitante, itens, anexos) => {
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
     desenho_sap_manual: i.desenho_sap_manual || i.desenhoSAP || '-',
     part_number_manual: i.part_number_manual || i.part_number || '-',
+    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
     descricao_manual: i.descricao_manual || i.descricao || 'Sem descrição',
     quantidade_solicitada: Math.max(1, Number(i.quantidade_devolvida || i.quantidade_solicitada || 1)),
     unidade_medida_manual: i.unidade_medida_manual || i.unidade || 'Unid',
@@ -376,6 +376,7 @@ const cancelarPL = async (solicitante, anexos) => {
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
     desenho_sap_manual: i.desenho_sap_manual || i.desenhoSAP || '-',
     part_number_manual: i.part_number_manual || i.part_number || '-',
+    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
     descricao_manual: i.descricao_manual || i.descricao || 'Sem descrição',
     quantidade_solicitada: Math.max(1, Number(i.quantidade_solicitada || 1)),
     unidade_medida_manual: i.unidade_medida_manual || i.unidade || 'Unid',
@@ -386,13 +387,8 @@ const cancelarPL = async (solicitante, anexos) => {
 
 // ===================== APROVACAO / MUDANCA DE STATUS =====================
 
-// O Postgres gerava numero_pl com SERIAL. Aqui o proximo numero e' o maior
-// existente + 1, calculado dentro de uma fila para dois pedidos aprovados ao
-// mesmo tempo nao receberem o mesmo numero.
 const criarPackingList = async (solicitacaoId, status) =>
   db.emFila(async () => {
-    // solicitacao_id e' unico: se ja existe PL, nao cria outra (era o
-    // erro 23505 que o codigo antigo ignorava de proposito).
     const jaExiste = await db.um(
       'packing_lists',
       db.f('solicitacao_id = {:sid}', { sid: solicitacaoId })
@@ -416,12 +412,8 @@ const criarPackingList = async (solicitacaoId, status) =>
     return criada.numero_pl;
   });
 
-// Acha o id da solicitacao original citada na observacao de um cancelamento.
-// O front escreve "(Origem: PS-... / <id>)". O UUID solto e' aceito tambem,
-// para dados que vieram do tempo do Supabase.
 const acharIdOriginalNoTexto = (observacoes) => {
   if (!observacoes) return null;
-
   const porFormato = observacoes.match(/\/\s*([A-Za-z0-9_-]{10,})\s*\)/);
   if (porFormato) return porFormato[1];
 
@@ -444,9 +436,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     statusFinal = 'Concluído';
   }
 
-  // updated_at e' autodate no PocketBase: ele mesmo carimba a cada gravacao.
   const atualizacaoPS = { status: statusFinal };
-
   const foiAprovado = statusFinal === 'Em Separação' || statusFinal === 'Concluído';
 
   if (foiAprovado && !solicitacao.data_aprovacao_pl) {
@@ -468,7 +458,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
   await db.atualizar('solicitacoes', id, atualizacaoPS);
 
   let numeroPLGerado = null;
-
   const acabouDeSerAprovado = solicitacao.status === 'Pendente' && foiAprovado;
 
   if (!acabouDeSerAprovado && statusFinal === 'Concluído') {
@@ -519,6 +508,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             filial_id: estoqueAtual.filial_id || '',
             desenho_sap: estoqueAtual.desenho_sap,
             part_number: estoqueAtual.part_number,
+            fabricante: estoqueAtual.fabricante || '', // ✨ NOVA COLUNA: Passa para o novo estoque
             descricao: estoqueAtual.descricao,
             nf_entrada: estoqueAtual.nf_entrada,
             documento_compras: estoqueAtual.documento_compras,
@@ -554,6 +544,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             material_id: item.material_id || '',
             desenho_sap: item.desenho_sap_manual || item.desenho_sap || '-',
             part_number: item.part_number_manual || 'SEM-PN',
+            fabricante: item.fabricante || '', // ✨ NOVA COLUNA: Registra no estoque
             descricao: item.descricao_manual || 'Sem descrição',
             filial_id: solicitacao.filial_origem_id || '',
             nf_entrada: item.nf_entrada || 'SEM-NF',
@@ -578,9 +569,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const nfParaProcurar = itensEntrada[0].nf_entrada;
 
         if (nfParaProcurar && nfParaProcurar !== 'SEM-NF') {
-          // O PostgREST filtrava a solicitacao pela NF com um join
-          // (notas_fiscais!inner). Aqui: primeiro as NFs com esse numero,
-          // depois as solicitacoes de crossdocking pendentes dessas NFs.
           const notasComEsseNumero = await db.listar('notas_fiscais', {
             filter: db.f('numero_nf = {:nf}', { nf: String(nfParaProcurar) }),
             fields: 'solicitacao_id',
@@ -590,14 +578,11 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
           if (idsCandidatos.length > 0) {
             const candidatos = await db.listarPorIds('solicitacoes', 'id', idsCandidatos);
-
-            // O mais antigo primeiro - a fila de verdade.
             const crossdockingsPendentes = candidatos
               .filter((s) => s.tipo === 'Crossdocking' && s.status === 'Pendente')
               .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
 
             for (const cross of crossdockingsPendentes) {
-              // Ja consumiu uma Entrada antes: passa para o proximo da fila.
               if (cross.observacoes && cross.observacoes.includes('[NF VINCULADA]')) continue;
 
               let vinculouAlgo = false;
@@ -612,6 +597,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     estoque_id: estoqueCriado[index] ? estoqueCriado[index].id : null,
                     desenho_sap_manual: item.desenho_sap_manual,
                     part_number_manual: item.part_number_manual,
+                    fabricante: item.fabricante || null, // ✨ NOVA COLUNA
                     descricao_manual: item.descricao_manual,
                     quantidade_solicitada: item.quantidade_solicitada,
                     unidade_medida_manual: item.unidade_medida_manual,
@@ -628,7 +614,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 );
                 vinculouAlgo = true;
               } else {
-                // Crossdocking parcial: cruza os SAPs pedidos com os que chegaram.
+                // Crossdocking parcial
                 const itensPedidosCross = await db.listar('solicitacoes_itens', {
                   filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
                 });
@@ -653,7 +639,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 }
               }
 
-              // Fecha a fila: uma Entrada alimenta um Crossdocking so.
               if (vinculouAlgo) {
                 await db.atualizar('solicitacoes', cross.id, {
                   observacoes: (cross.observacoes || '') + '\n[NF VINCULADA]',
@@ -681,7 +666,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           const solOriginal = await db.porId('solicitacoes', idOriginalParaCancelar);
 
           if (solOriginal) {
-            // Pedido que ainda nem saiu do estoque: nao ha o que devolver.
             if (solOriginal.status === 'Pendente') deveDevolverAoEstoque = false;
 
             await db.atualizar('solicitacoes', idOriginalParaCancelar, { status: 'Cancelado' });
@@ -723,7 +707,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
 // ===================== ANEXOS =====================
 
-// URL gravada pelo upload: "/api/arquivos/<idDocumento>/<nome>"
 const extrairIdDocumento = (url) => {
   const m = String(url).match(/\/api\/arquivos\/([A-Za-z0-9_-]+)/);
   return m ? m[1] : null;
@@ -748,15 +731,12 @@ const salvarAnexosExtras = async (solicitacaoId, anexosArray) => {
 const deletarAnexo = async (anexoId) => {
   const anexo = await db.porId('anexos', anexoId);
 
-  // Apaga tambem o arquivo em si. No Supabase era o bucket "documentos";
-  // agora e' a colecao "documentos", e a URL guarda o id do registro.
   if (anexo && anexo.url_arquivo) {
     const idDocumento = extrairIdDocumento(anexo.url_arquivo);
     if (idDocumento) {
       try {
         await db.remover('documentos', idDocumento);
       } catch (erro) {
-        // Arquivo ja removido antes: nao impede apagar o anexo.
         console.warn(`[Anexo ${anexoId}] arquivo ja nao existia: ${erro.message}`);
       }
     }
@@ -801,7 +781,6 @@ const buscarHistoricoItem = async (estoqueId) => {
     filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }),
   });
 
-  // Uma consulta so para todas as solicitacoes envolvidas (em vez de uma por item).
   const solicitacoes = await db.listarPorIds(
     'solicitacoes',
     'id',
@@ -859,6 +838,7 @@ const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
     solicitacao_id: solicitacaoId,
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || i.desenho_sap_manual || null,
     part_number_manual: i.part_number || i.numPecaFabricante || i.part_number_manual || null,
+    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
     fornecedor: i.fornecedor || null,
     referencia: i.referencia || null,
     quantidade_solicitada: Math.max(
@@ -889,9 +869,6 @@ const listarDemandasPorEstoque = async (estoqueId) => {
     filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }),
   });
 
-  // O "solicitacoes!inner" do PostgREST vira: busca as solicitacoes dos itens
-  // e descarta os itens cuja solicitacao nao existe mais (era isso que o
-  // "inner" fazia).
   const solicitacoes = await db.listarPorIds(
     'solicitacoes',
     'id',
