@@ -17,16 +17,11 @@ export default function VisaoGeralEstoque({ perfil }) {
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
 
-  // ✨ ESTADOS DA PAGINAÇÃO
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 20;
 
-  // ✨ VERIFICAÇÃO DE PERMISSÃO DE EDIÇÃO
   const podeEditar = usuario?.cargo === 'ADM' || usuario?.cargo === 'LIDER';
 
-  // ==========================================
-  // ESTADOS DO HISTÓRICO E EDIÇÃO INLINE
-  // ==========================================
   const [modalAberto, setModalAberto] = useState(false);
   const [itemSelecionado, setItemSelecionado] = useState(null);
   const [historicoDemandas, setHistoricoDemandas] = useState([]);
@@ -68,7 +63,6 @@ export default function VisaoGeralEstoque({ perfil }) {
     
     buscarEstoque();
 
-    // ✨ SOCKET.IO: Atualiza o saldo instantaneamente se alguém der entrada/saída
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
@@ -110,7 +104,7 @@ export default function VisaoGeralEstoque({ perfil }) {
   };
 
   const startEditing = (id, field, value, type) => {
-    if (!podeEditar) return; // Bloqueio de segurança
+    if (!podeEditar) return; 
     
     setEditCell({ id, field });
     let valFormatado = value || "";
@@ -234,11 +228,7 @@ export default function VisaoGeralEstoque({ perfil }) {
     );
   };
 
-  // ==========================================
-  // FILTRAGEM E CÁLCULO DE KPIS
-  // ==========================================
   const estoqueFiltrado = estoque.filter(item => {
-    // FILTRO DE SEGURANÇA NO FRONTEND
     if (estoqueAtual && estoqueAtual !== 'TODOS') {
       const filialDoItem = item.filial_id || item.filial;
       if (filialDoItem !== estoqueAtual) {
@@ -251,8 +241,7 @@ export default function VisaoGeralEstoque({ perfil }) {
     const termo = termoPesquisa.toLowerCase();
     return (
       (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
-      (item.part_number && item.part_number.toLowerCase().includes(termo)) ||
-      (item.fabricante && item.fabricante.toLowerCase().includes(termo)) || // ✨ NOVO: Pesquisa por fabricante
+      (item.fabricante && item.fabricante.toLowerCase().includes(termo)) || 
       (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
       (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
       (item.fornecedor && item.fornecedor.toLowerCase().includes(termo)) ||
@@ -274,9 +263,6 @@ export default function VisaoGeralEstoque({ perfil }) {
 
   const formatarQtd = (num) => new Intl.NumberFormat('pt-BR').format(num);
 
-  // ==========================================
-  // LÓGICA DA PAGINAÇÃO
-  // ==========================================
   useEffect(() => {
     setPaginaAtual(1); 
   }, [termoPesquisa, estoqueAtual]);
@@ -286,9 +272,6 @@ export default function VisaoGeralEstoque({ perfil }) {
   const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, estoqueFiltrado.length);
   const estoquePaginado = estoqueFiltrado.slice(indexPrimeiroItem, paginaAtual * itensPorPagina);
 
-  // ==========================================
-  // EXPORTAR EXCEL
-  // ==========================================
   const handleExportarExcel = async () => {
     showLoading("A Gerar Excel", "Por favor, aguarde enquanto compilamos os dados do estoque...");
     
@@ -296,13 +279,11 @@ export default function VisaoGeralEstoque({ perfil }) {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Visão Geral do Estoque');
 
-      // ✨ ATUALIZAÇÃO NAS COLUNAS DE EXPORTAÇÃO
       worksheet.columns = [
         { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
         { header: 'REFERÊNCIA', key: 'ref', width: 20 },
         { header: 'DESCRIÇÃO', key: 'desc', width: 40 },
-        { header: 'PART NUMBER', key: 'pn', width: 25 },
-        { header: 'FABRICANTE / MARCA', key: 'fab', width: 25 }, // ✨ NOVA COLUNA AQUI
+        { header: 'FABRICANTE', key: 'fab', width: 25 }, 
         { header: 'QTDE ENTRADA', key: 'qtd', width: 15 },
         { header: 'UNID. MEDIDA', key: 'unid', width: 15 },
         { header: 'NUM DA NOTA FISCAL', key: 'nf', width: 15 },
@@ -329,8 +310,7 @@ export default function VisaoGeralEstoque({ perfil }) {
           sap: item.desenho_sap || '-',
           ref: item.referencia || '-',
           desc: item.descricao || '-',
-          pn: item.part_number || '-',
-          fab: item.fabricante || '-', // ✨ VALOR DA NOVA COLUNA
+          fab: item.fabricante || '-', 
           qtd: Number(item.quantidade_disponivel) || 0,
           unid: item.unidade_medida || '-',
           nf: item.nf_entrada || '-',
@@ -413,7 +393,7 @@ export default function VisaoGeralEstoque({ perfil }) {
             <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
-              placeholder="Buscar por SAP, PN, Fab, NF..."
+              placeholder="Buscar por SAP, Fabricante, NF..."
               value={termoPesquisa}
               onChange={(e) => setTermoPesquisa(e.target.value)}
               style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#f8fafc' }}
@@ -422,7 +402,7 @@ export default function VisaoGeralEstoque({ perfil }) {
         </div>
 
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2500px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2400px' }}>
             <thead>
               <tr style={{ backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', width: '40px', textAlign: 'center' }}></th>
@@ -431,9 +411,8 @@ export default function VisaoGeralEstoque({ perfil }) {
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', minWidth: '200px' }}>DESCRIÇÃO</th>
                 
-                {/* ✨ AS DUAS COLUNAS AGORA SEPARADAS */}
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>PART NUMBER (PN)</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE / MARCA</th>
+                {/* ✨ COLUNA FABRICANTE (PART NUMBER REMOVIDO) */}
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
                 
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>QTDE ENTRADA (SALDO)</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>UNID. MEDIDA</th>
@@ -452,9 +431,9 @@ export default function VisaoGeralEstoque({ perfil }) {
             </thead>
             <tbody>
               {carregando ? (
-                <tr><td colSpan="20" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><Loader2 className="animate-spin" size={28} style={{ margin: '0 auto' }} /></td></tr>
+                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><Loader2 className="animate-spin" size={28} style={{ margin: '0 auto' }} /></td></tr>
               ) : estoqueFiltrado.length === 0 ? (
-                <tr><td colSpan="20" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
+                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
               ) : (
                 estoquePaginado.map(item => (
                   <tr
@@ -484,10 +463,7 @@ export default function VisaoGeralEstoque({ perfil }) {
                       <CelulaEditavel item={item} field="descricao" style={{ color: '#475569' }} />
                     </td>
                     
-                    {/* ✨ CELULAS DO PART NUMBER E FABRICANTE SEPARADAS E EDITÁVEIS! */}
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="part_number" style={{ fontFamily: 'monospace', fontWeight: '600', color: '#1e293b' }} />
-                    </td>
+                    {/* ✨ CELULA EDITÁVEL DO FABRICANTE */}
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
                       <CelulaEditavel item={item} field="fabricante" style={{ color: '#475569' }} placeholder="Nome do Fabricante..." />
                     </td>
@@ -550,7 +526,6 @@ export default function VisaoGeralEstoque({ perfil }) {
           </table>
         </div>
 
-        {/* ✨ CONTROLOS DE PAGINAÇÃO */}
         {totalPaginas > 1 && (
           <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
             <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
@@ -579,7 +554,6 @@ export default function VisaoGeralEstoque({ perfil }) {
         )}
       </div>
 
-      {/* MODAL DE HISTÓRICO DE DEMANDAS */}
       {modalAberto && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '95%', maxWidth: '1400px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
@@ -590,7 +564,7 @@ export default function VisaoGeralEstoque({ perfil }) {
                   <PackageOpen size={20} color="#2563eb" /> Demandas Relacionadas
                 </h3>
                 <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '0.875rem' }}>
-                  Histórico de solicitações que contêm o item: <strong style={{ color: '#1e293b' }}>{itemSelecionado?.part_number}</strong> (NF: <strong style={{ color: '#1e293b' }}>{itemSelecionado?.nf_entrada}</strong>)
+                  Histórico de solicitações que contêm o item. (NF: <strong style={{ color: '#1e293b' }}>{itemSelecionado?.nf_entrada}</strong>)
                 </p>
               </div>
               <button onClick={fecharModal} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}>
