@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao.jsx
+// DESCRIÇÃO: Detalhamento expandido das solicitações com campo Fabricante corrigido
+// =================================================================
 import React from 'react';
 import { PackageX, Box, ArrowRightLeft, FileText, PackagePlus, Truck, RefreshCcw, XCircle, AlertCircle } from 'lucide-react';
 import MostrarArquivo from '../../../../components/MostrarArquivo/MostrarArquivo';
@@ -40,10 +44,9 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   };
 
   // ========================================================
-  // COMPONENTE: TABELA ULTRA DETALHADA (AGORA COM 17 COLUNAS EXATAS)
+  // COMPONENTE: TABELA ULTRA DETALHADA (17 COLUNAS EXATAS)
   // ========================================================
   const TabelaUltraDetalhada = ({ itens, corIcone, icone, titulo, corDestaque, bgDestaque }) => {
-    // ✨ SOBREPOSIÇÃO DE CORES PARA MODO VERMELHO
     const corIconeFinal = isRecusadoOuCancelado ? "#dc2626" : corIcone;
     const corDestaqueFinal = isRecusadoOuCancelado ? "#dc2626" : corDestaque;
     const bgDestaqueFinal = isRecusadoOuCancelado ? "#fef2f2" : bgDestaque;
@@ -98,7 +101,9 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || it.desenho_sap || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.referencia || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual || it.descricao || '-'}</td>
-                    <td style={{ padding: '12px', fontWeight: '700', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontFamily: 'monospace' }}>{it.part_number_manual || it.part_number || '-'}</td>
+                    
+                    {/* ✨ CORRIGIDO: Puxa o campo Fabricante */}
+                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante || '-'}</td>
                     
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       <span style={{ display: 'inline-block', backgroundColor: bgDestaqueFinal, color: corDestaqueFinal, padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem' }}>
@@ -192,7 +197,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
             <thead>
               <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>PART NUMBER</th>
+                {/* ✨ CORRIGIDO: Troca de PART NUMBER para FABRICANTE */}
+                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. TRANSFERIDA</th>
               </tr>
@@ -202,7 +208,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                 itensReais.map((it, idx) => (
                   <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
-                    <td style={{ padding: '12px 16px', fontWeight: '700', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontFamily: 'monospace' }}>{it.part_number_manual || '-'}</td>
+                    {/* ✨ CORRIGIDO: Puxa o campo Fabricante */}
+                    <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante || '-'}</td>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#fefce8', color: isRecusadoOuCancelado ? '#dc2626' : '#ca8a04', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#fef08a'}` }}>
@@ -338,7 +345,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
             <thead>
               <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>PART NUMBER</th>
+                {/* ✨ CORRIGIDO: Troca de PART NUMBER para FABRICANTE */}
+                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. DEVOLVIDA</th>
               </tr>
@@ -348,7 +356,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                 itensReais.map((it, idx) => (
                   <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
-                    <td style={{ padding: '12px 16px', fontWeight: '700', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontFamily: 'monospace' }}>{it.part_number_manual || '-'}</td>
+                    {/* ✨ CORRIGIDO: Puxa o campo Fabricante */}
+                    <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante || '-'}</td>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado || isCancelamento ? '#fef2f2' : '#fff7ed', color: isRecusadoOuCancelado || isCancelamento ? '#dc2626' : '#ea580c', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado || isCancelamento ? '#fecaca' : '#fed7aa'}` }}>
