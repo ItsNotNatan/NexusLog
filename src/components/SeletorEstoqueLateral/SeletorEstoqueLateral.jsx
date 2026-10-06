@@ -12,7 +12,7 @@ export default function SeletorEstoqueLateral({
   onAdicionarItem, 
   itensSelecionados = [], 
   bloquearTransferidos = false,
-  limiteMaximo = 20, // ✨ NOVA PROP DE LIMITE
+  limiteMaximo = 20,
   onRemoverItem, 
   onAtualizarQuantidade 
 }) {
@@ -42,11 +42,12 @@ export default function SeletorEstoqueLateral({
     const termo = busca.toLowerCase();
     return (
       (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
-      (item.materialDescription && item.materialDescription.toLowerCase().includes(termo)) ||
-      (item.numPecaFabricante && item.numPecaFabricante.toLowerCase().includes(termo)) ||
+      (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
+      (item.fabricante && item.fabricante.toLowerCase().includes(termo)) ||
       (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
+      (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
       (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
-      (item.part_number && item.part_number.toLowerCase().includes(termo))
+      (item.materialDescription && item.materialDescription.toLowerCase().includes(termo))
     );
   }) || [];
 
@@ -90,7 +91,7 @@ export default function SeletorEstoqueLateral({
             <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
-              placeholder="Buscar por SAP, PN, Descrição..."
+              placeholder="Buscar por SAP, Fabricante, Descrição..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               style={{ 
@@ -187,8 +188,14 @@ export default function SeletorEstoqueLateral({
                     </button>
                   </div>
 
-                  <div style={{ marginTop: '12px', fontSize: '0.9rem', color: '#475569', fontWeight: '600', fontFamily: 'monospace' }}>
-                    {item.part_number || item.numPecaFabricante || "S/N Fabricante"}
+                  {/* ✨ AQUI: SUBSTITUÍMOS O PART NUMBER PELO WBS E FABRICANTE */}
+                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: '700', fontFamily: 'monospace' }}>
+                      WBS: {item.wbs || item.wbs_element || "-"}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600' }}>
+                      Fab: {item.fabricante || "-"}
+                    </div>
                   </div>
 
                   {(item.nf || item.nf_entrada) && (item.nf !== "-" && item.nf_entrada !== "-") && (
@@ -266,7 +273,6 @@ export default function SeletorEstoqueLateral({
           <div style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "700", color: "#0f172a", fontSize: "1.05rem" }}>
             <Box size={20} color="#2563eb" /> Itens Selecionados
           </div>
-          {/* ✨ CONTADOR VISUAL ATUALIZADO */}
           <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#64748b', border: '1px solid #e2e8f0', padding: '4px 14px', borderRadius: '16px' }}>
             {itensSelecionados.length} / {limiteMaximo}
           </span>
@@ -283,7 +289,8 @@ export default function SeletorEstoqueLateral({
               <thead>
                 <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#2563eb", fontWeight: "700", textTransform: "uppercase" }}>DESENHO SAP</th>
-                  <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>PART NUMBER</th>
+                  {/* ✨ COLUNA FABRICANTE NO LUGAR DO PART NUMBER */}
+                  <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>FABRICANTE</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>DESCRIÇÃO</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>NF ENTRADA</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>ALOCAÇÃO</th>
@@ -296,74 +303,4 @@ export default function SeletorEstoqueLateral({
               </thead>
               <tbody>
                 {itensSelecionados.map((item) => {
-                  const qtdDesejada = item.qtdSelecionada !== undefined ? item.qtdSelecionada : (item.qtdTransferencia !== undefined ? item.qtdTransferencia : 1);
-                  const unidade = item.unidade_medida || item.unidadeMedida || 'Unid';
-                  
-                  const saldo = item.quantidade_disponivel ?? item.qtdFornecida ?? 0;
-                  const reservado = item.quantidade_reservada ?? item.qtdReservada ?? 0;
-                  const saldoLivreReal = Math.max(1, saldo - reservado);
-
-                  return (
-                    <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      <td style={{ padding: "16px", backgroundColor: "#f8fafc", color: "#2563eb", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {item.desenho_sap || item.desenhoSAP || "-"}
-                      </td>
-                      <td style={{ padding: "16px", fontWeight: "700", color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
-                        {item.part_number || item.numPecaFabricante || "-"}
-                      </td>
-                      <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", minWidth: "200px" }}>
-                        {item.descricao || item.materialDescription || "-"}
-                      </td>
-                      <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {item.nf_entrada || item.nf || "-"}
-                      </td>
-                      <td style={{ padding: "16px", color: "#2563eb", fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                        {item.alocacao || "CROSSDOCKING"}
-                      </td>
-                      <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {item.wbs_element || item.wbs || "-"}
-                      </td>
-                      <td style={{ padding: "16px", color: "#10b981", fontWeight: "600", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {saldo} <span style={{ fontSize: "0.75rem", fontWeight: "normal" }}>{unidade}</span>
-                      </td>
-                      <td style={{ padding: "16px", color: "#f59e0b", fontWeight: "600", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {reservado} <span style={{ fontSize: "0.75rem", fontWeight: "normal" }}>{unidade}</span>
-                      </td>
-                      <td style={{ padding: "16px", whiteSpace: "nowrap" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <input
-                            type="number"
-                            min="1"
-                            max={saldoLivreReal}
-                            value={qtdDesejada}
-                            onChange={(e) => onAtualizarQuantidade && onAtualizarQuantidade(item.id, e.target.value)}
-                            style={{
-                              width: "70px", border: "1px solid #e2e8f0", borderRadius: "8px",
-                              padding: "6px 12px", outline: "none", color: "#0f172a", textAlign: "center",
-                              backgroundColor: "#f8fafc", fontWeight: "500", fontSize: "0.875rem"
-                            }}
-                          />
-                          <span style={{ fontSize: "0.85rem", color: "#64748b" }}>{unidade}</span>
-                        </div>
-                      </td>
-                      <td style={{ textAlign: "center", padding: "16px" }}>
-                        <button
-                          onClick={() => onRemoverItem && onRemoverItem(item.id)}
-                          style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", transition: "color 0.2s" }}
-                          onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
-                          onMouseOut={(e) => e.currentTarget.style.color = '#64748b'}
-                        >
-                          <X size={18} strokeWidth={2.5} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+                  const
