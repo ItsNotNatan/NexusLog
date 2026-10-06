@@ -303,4 +303,74 @@ export default function SeletorEstoqueLateral({
               </thead>
               <tbody>
                 {itensSelecionados.map((item) => {
-                  const
+                  const qtdDesejada = item.qtdSelecionada !== undefined ? item.qtdSelecionada : (item.qtdTransferencia !== undefined ? item.qtdTransferencia : 1);
+                  const unidade = item.unidade_medida || item.unidadeMedida || 'Unid';
+                  
+                  const saldo = item.quantidade_disponivel ?? item.qtdFornecida ?? 0;
+                  const reservado = item.quantidade_reservada ?? item.qtdReservada ?? 0;
+                  const saldoLivreReal = Math.max(1, saldo - reservado);
+
+                  return (
+                    <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: "16px", backgroundColor: "#f8fafc", color: "#2563eb", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+                        {item.desenho_sap || item.desenhoSAP || "-"}
+                      </td>
+                      <td style={{ padding: "16px", fontWeight: "700", color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
+                        {item.fabricante || "-"}
+                      </td>
+                      <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", minWidth: "200px" }}>
+                        {item.descricao || item.materialDescription || "-"}
+                      </td>
+                      <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+                        {item.nf_entrada || item.nf || "-"}
+                      </td>
+                      <td style={{ padding: "16px", color: "#2563eb", fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                        {item.alocacao || "CROSSDOCKING"}
+                      </td>
+                      <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+                        {item.wbs_element || item.wbs || "-"}
+                      </td>
+                      <td style={{ padding: "16px", color: "#10b981", fontWeight: "600", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+                        {saldo} <span style={{ fontSize: "0.75rem", fontWeight: "normal" }}>{unidade}</span>
+                      </td>
+                      <td style={{ padding: "16px", color: "#f59e0b", fontWeight: "600", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+                        {reservado} <span style={{ fontSize: "0.75rem", fontWeight: "normal" }}>{unidade}</span>
+                      </td>
+                      <td style={{ padding: "16px", whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <input
+                            type="number"
+                            min="1"
+                            max={saldoLivreReal}
+                            value={qtdDesejada}
+                            onChange={(e) => onAtualizarQuantidade && onAtualizarQuantidade(item.id, e.target.value)}
+                            style={{
+                              width: "70px", border: "1px solid #e2e8f0", borderRadius: "8px",
+                              padding: "6px 12px", outline: "none", color: "#0f172a", textAlign: "center",
+                              backgroundColor: "#f8fafc", fontWeight: "500", fontSize: "0.875rem"
+                            }}
+                          />
+                          <span style={{ fontSize: "0.85rem", color: "#64748b" }}>{unidade}</span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: "center", padding: "16px" }}>
+                        <button
+                          onClick={() => onRemoverItem && onRemoverItem(item.id)}
+                          style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", transition: "color 0.2s" }}
+                          onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseOut={(e) => e.currentTarget.style.color = '#64748b'}
+                        >
+                          <X size={18} strokeWidth={2.5} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
