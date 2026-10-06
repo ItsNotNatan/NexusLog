@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/EntradaMaterial/EntradaMaterial.jsx
+// DESCRIÇÃO: Formulário de Entrada de Material pelo Cliente com validação corrigida
+// =================================================================
 import React, { useState, useContext } from 'react';
 import { User, Send, Paperclip, X, MapPin } from 'lucide-react'; 
 
@@ -27,6 +31,7 @@ export default function EntradaMaterial() {
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`, 
     desenhoSAP: '', 
+    fabricante: '', // ✨ NOVO CAMPO
     numPecaFabricante: '', 
     fornecedor: '',
     referencia: '', 
@@ -71,7 +76,8 @@ export default function EntradaMaterial() {
         desenhoSAP: item.desenhoSAP || obterValor(item, ['NUM SAP', 'DESENHO SAP', 'SAP']),
         referencia: item.referencia || obterValor(item, ['REFERÊNCIA', 'REFERENCIA']),
         vendorDescription: item.vendorDescription || item.materialDescription || obterValor(item, ['DESCRIÇÃO', 'DESCRICAO']),
-        numPecaFabricante: item.numPecaFabricante || obterValor(item, ['FABRICANTE', 'Nº PEÇA', 'PART NUMBER', 'PN']),
+        fabricante: item.fabricante || obterValor(item, ['FABRICANTE', 'MARCA', 'FABR']),
+        numPecaFabricante: item.numPecaFabricante || obterValor(item, ['Nº PEÇA', 'PART NUMBER', 'PN']),
         qtdFornecida: item.qtdFornecida || obterValor(item, ['QTDE ENTRADA', 'QTD', 'QUANTIDADE']) || 1,
         unidadeMedida: item.unidadeMedida || obterValor(item, ['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid',
         nfEntrada: item.nfEntrada || obterValor(item, ['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NOTA FISCAL']),
@@ -91,24 +97,21 @@ export default function EntradaMaterial() {
         alocacao: item.alocacao || obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
       }));
 
-      // ✨ VERIFICAÇÃO DE DIVERGÊNCIA: Pega em todos os WBS preenchidos na planilha e unifica
       const wbsPreenchidos = novosItensFormatados
-        .map(i => i.wbsElement.toUpperCase()) // Padroniza para comparar
+        .map(i => i.wbsElement.toUpperCase())
         .filter(w => w !== '');
       
       const wbsUnicosDaPlanilha = [...new Set(wbsPreenchidos)];
 
-      // ❌ Se houver mais do que 1 WBS diferente dentro do Excel, bloqueia a importação!
       if (wbsUnicosDaPlanilha.length > 1) {
         showAlert(
           "Planilha Bloqueada", 
           `A sua planilha contém múltiplos WBS diferentes (${wbsUnicosDaPlanilha.join(', ')}). A entrada de material deve ser feita para um único projeto por vez. Por favor, corrija a planilha e tente novamente.`, 
           "error"
         );
-        return; // Interrompe o processo e não carrega nada na tela!
+        return;
       }
 
-      // Se passou da trava, ou a planilha tem apenas 1 WBS, ou nenhum (neste caso usa o do form).
       const wbsDaPlanilha = novosItensFormatados.find(i => i.wbsElement !== '')?.wbsElement || '';
       
       if (wbsDaPlanilha) {
@@ -120,8 +123,7 @@ export default function EntradaMaterial() {
       }
 
       setItens(prev => {
-        const listaLimpa = prev.filter(i => i.numPecaFabricante !== '');
-        
+        const listaLimpa = prev.filter(i => (i.fabricante !== '' || i.desenhoSAP !== '' || i.vendorDescription !== ''));
         const listaAntigaAtualizada = listaLimpa.map(i => ({ ...i, wbsElement: wbsDaPlanilha ? formatarWBS(wbsDaPlanilha) : formDados.wbs }));
         
         const novaLista = [...listaAntigaAtualizada, ...novosItensFormatados];
@@ -180,8 +182,10 @@ export default function EntradaMaterial() {
       showAlert("Lista Vazia", "Adicione pelo menos um item à tabela para dar entrada.", "warning");
       return;
     }
-    if (itens.some(i => !i.numPecaFabricante || !i.qtdFornecida || i.qtdFornecida === '')) {
-      showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
+
+    // ✨ CORRIGIDO: Removida a verificação obrigatória de 'numPecaFabricante'
+    if (itens.some(i => !i.qtdFornecida || i.qtdFornecida === '' || Number(i.qtdFornecida) < 1)) {
+      showAlert("Dados da Tabela", "Preencha o campo de Quantidade em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
       return;
     }
 
@@ -206,6 +210,7 @@ export default function EntradaMaterial() {
         itens: itens.map(item => ({
           desenho_sap: item.desenhoSAP || '-',
           part_number: item.numPecaFabricante || '-',
+          fabricante: item.fabricante || null, // ✨ ENVIO DO FABRICANTE
           fornecedor: item.fornecedor || null,
           referencia: item.referencia || null,
           qtd: parseInt(item.qtdFornecida, 10) || 1,
