@@ -38,7 +38,7 @@ export default function TabelaInsercaoItens({
 
   const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
   const limiteAtingido = itens.length >= limiteLinhas;
-  const larguraMinimaTabela = '2900px'; // Ligeiramente aumentada para caber a nova coluna
+  const larguraMinimaTabela = '2750px'; // Reajustado após remover o Part Number
 
   const isWbsBloqueada = wbsGlobal !== undefined || bloquearWBS;
 
@@ -113,9 +113,8 @@ export default function TabelaInsercaoItens({
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
                 <th style={{ minWidth: '200px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESCRIÇÃO</th>
                 
-                {/* ✨ AS DUAS COLUNAS SEPARADAS: PART NUMBER E FABRICANTE */}
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>PART NUMBER (PN)</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE / MARCA</th>
+                {/* ✨ COLUNA FABRICANTE (PART NUMBER REMOVIDO) */}
+                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
                 
                 <th style={{ width: '120px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>QTDE ENTRADA</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
@@ -159,11 +158,6 @@ export default function TabelaInsercaoItens({
 
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.vendorDescription || ''} onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição" />
-                  </td>
-
-                  {/* ✨ INPUT DO PART NUMBER */}
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela badge-partnumber" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', fontWeight: '600' }} value={item.numPecaFabricante || ''} onChange={(e) => onAtualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
                   </td>
 
                   {/* ✨ NOVO INPUT DO FABRICANTE */}
@@ -299,10 +293,10 @@ export default function TabelaInsercaoItens({
                 </tr>
               ))}
               
-              {/* ✨ COLSPAN AUMENTADO PARA 19 DEVIDO À NOVA COLUNA */}
+              {/* ✨ COLSPAN REAJUSTADO PARA 18 DEVIDO À REMOÇÃO DO PART NUMBER */}
               {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
                 <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
-                  <td colSpan={19} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
+                  <td colSpan={18} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
                 </tr>
               ))}
             </tbody>
