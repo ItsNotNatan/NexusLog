@@ -83,10 +83,18 @@ export const processarExcelComProgresso = (file, onProgress) => {
 
             // Pega os campos cruciais para validação
             const desenho = obterValor(linha, ['NUM SAP', 'DESENHO SAP', 'SAP']);
-            const partNumber = obterValor(linha, ['FABRICANTE', 'Nº PEÇA', 'PART NUMBER', 'PN']);
+            
+            // ✨ SEPARAÇÃO DA BUSCA
+            // 1. Procura apenas as chaves do Part Number
+            const partNumber = obterValor(linha, ['Nº PEÇA', 'PART NUMBER', 'PN', 'NUMERO DA PECA']);
+            
+            // 2. Procura apenas as chaves de Fabricante/Marca
+            const nomeFabricante = obterValor(linha, ['FABRICANTE', 'MARCA', 'FABR']);
+            
             const desc = obterValor(linha, ['DESCRIÇÃO', 'DESCRICAO', 'MATERIAL DESCRIPTION']);
 
-            if (partNumber === '-' && desenho === '-' && desc === '-') {
+            // Se as 3 identificações estiverem vazias, ignora a linha
+            if (partNumber === '-' && desenho === '-' && desc === '-' && nomeFabricante === '-') {
               ignorados.push(`Linha ${i + 2}: Vazia ou sem identificador principal.`);
               continue;
             }
@@ -101,6 +109,7 @@ export const processarExcelComProgresso = (file, onProgress) => {
                 materialDescription: desc !== '-' ? desc : '',
                 vendorDescription: obterValor(linha, ['VENDOR DESCRIPTION', 'DESCRIÇÃO', 'DESCRICAO']) !== '-' ? obterValor(linha, ['VENDOR DESCRIPTION', 'DESCRIÇÃO', 'DESCRICAO']) : (desc !== '-' ? desc : ''),
                 numPecaFabricante: partNumber !== '-' ? partNumber : '',
+                fabricante: nomeFabricante !== '-' ? nomeFabricante : '', // ✨ ADICIONADO AQUI!
                 fornecedor: obterValor(linha, ['FORNECEDOR', 'REGISTRO']) !== '-' ? obterValor(linha, ['FORNECEDOR', 'REGISTRO']) : '',
                 qtdSelecionada: qtd,
                 qtdFornecida: qtd, // Duplo mapeamento para cobrir Cliente e Logística
