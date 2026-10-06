@@ -38,7 +38,7 @@ export default function TabelaInsercaoItens({
 
   const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
   const limiteAtingido = itens.length >= limiteLinhas;
-  const larguraMinimaTabela = '2750px';
+  const larguraMinimaTabela = '2900px'; // Ligeiramente aumentada para caber a nova coluna
 
   const isWbsBloqueada = wbsGlobal !== undefined || bloquearWBS;
 
@@ -111,14 +111,14 @@ export default function TabelaInsercaoItens({
               <tr>
                 <th style={{ width: '60px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
-                
-                {/* ✨ NOVA ORDEM DAS COLUNAS AQUI */}
                 <th style={{ minWidth: '200px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESCRIÇÃO</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
+                
+                {/* ✨ AS DUAS COLUNAS SEPARADAS: PART NUMBER E FABRICANTE */}
+                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>PART NUMBER (PN)</th>
+                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE / MARCA</th>
+                
                 <th style={{ width: '120px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>QTDE ENTRADA</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
-                {/* FIM DA NOVA ORDEM */}
-
                 <th style={{ width: '140px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>UNID. MEDIDA</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
@@ -157,13 +157,18 @@ export default function TabelaInsercaoItens({
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.desenhoSAP || ''} onChange={(e) => onAtualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP / Desenho" />
                   </td>
 
-                  {/* ✨ NOVA ORDEM DAS CÉLULAS AQUI */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.vendorDescription || ''} onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição" />
                   </td>
 
+                  {/* ✨ INPUT DO PART NUMBER */}
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela badge-partnumber" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', fontWeight: '600' }} value={item.numPecaFabricante || ''} onChange={(e) => onAtualizarCampo(item.id, 'numPecaFabricante', e.target.value)} placeholder="PN" />
+                  </td>
+
+                  {/* ✨ NOVO INPUT DO FABRICANTE */}
+                  <td style={{ padding: '8px' }}>
+                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fabricante || ''} onChange={(e) => onAtualizarCampo(item.id, 'fabricante', e.target.value)} placeholder="Nome do Fabricante" />
                   </td>
 
                   <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -196,7 +201,6 @@ export default function TabelaInsercaoItens({
                   <td style={{ padding: '8px' }}>
                     <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.referencia || ''} onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Referência" />
                   </td>
-                  {/* FIM DA NOVA ORDEM */}
 
                   <td style={{ padding: '8px' }}>
                     <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida || 'Unid'} onChange={(e) => onAtualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
@@ -295,9 +299,10 @@ export default function TabelaInsercaoItens({
                 </tr>
               ))}
               
+              {/* ✨ COLSPAN AUMENTADO PARA 19 DEVIDO À NOVA COLUNA */}
               {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
                 <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
-                  <td colSpan={18} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
+                  <td colSpan={19} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
                 </tr>
               ))}
             </tbody>
