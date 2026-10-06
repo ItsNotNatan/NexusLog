@@ -29,6 +29,7 @@ export default function EntradaEstoque() {
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`, 
     desenhoSAP: '', 
+    fabricante: '', // ✨ NOVO CAMPO
     numPecaFabricante: '', 
     fornecedor: '', 
     referencia: '', 
@@ -77,7 +78,6 @@ export default function EntradaEstoque() {
     }
   }, [estoqueAtual]);
 
-  // ✨ NOVA LÓGICA DE IMPORTAÇÃO: VALIDAÇÃO MAIS RÍGIDA CONTRA LINHAS FANTASMAS
   const handleImportarExcel = async (arquivo) => {
     try {
       showLoading("Processando Excel", "A procurar a aba e as colunas corretas. Por favor, aguarde...");
@@ -161,7 +161,8 @@ export default function EntradaEstoque() {
 
         const sap = puxarDado(['NUM SAP', 'DESENHO', 'SAP', 'CÓDIGO', 'CODIGO']);
         const desc = puxarDado(['DESCRIÇÃO', 'DESCRICAO', 'VENDOR']);
-        const numPeca = puxarDado(['FABRICANTE', 'PEÇA', 'PART NUMBER', 'PN', 'REF. FABRICANTE']);
+        const nomeFab = puxarDado(['FABRICANTE', 'MARCA', 'FABR']);
+        const numPeca = puxarDado(['PEÇA', 'PART NUMBER', 'PN', 'REF. FABRICANTE']);
         const qtd = parseInt(puxarDado(['QTDE ENTRADA', 'QTD', 'QUANTIDADE'])) || 1;
         const ref = puxarDado(['REFERÊNCIA', 'REFERENCIA']);
         const unid = puxarDado(['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid';
@@ -177,23 +178,21 @@ export default function EntradaEstoque() {
         const deposito = puxarDado(['DEPÓSITO', 'DEPOSITO', 'LOCAL ESTOQUE']);
         const alocacao = puxarDado(['ALOCAÇÃO', 'ALOCACAO']);
 
-        // ✨ BLOQUEIO REFORÇADO DE "LINHAS FANTASMAS"
-        // Agora exige que pelo menos o PN OU (SAP E Descrição) existam. 
-        // Formatações vazias ou células com um único caractere são ignoradas.
-        const linhaValida = (numPeca.length > 2) || (sap.length > 2 && desc.length > 3);
+        const linhaValida = (nomeFab.length > 1) || (sap.length > 2 && desc.length > 3) || (numPeca.length > 2);
 
         if (linhaValida) {
           novosItensFormatados.push({
             id: `excel-${Date.now()}-${rowNumber}`,
             desenhoSAP: sap,                       
             vendorDescription: desc,               
+            fabricante: nomeFab,                   
             numPecaFabricante: numPeca,            
             qtdFornecida: qtd,                
             referencia: ref, 
             unidadeMedida: unid,                 
             nfEntrada: nf,                         
             fornecedor: fornec,                    
-            wbsElement: wbs,                       
+            wbsElement: wbs,                        
             nomeProjeto: projeto,                  
             emissaoNF: emissao,                    
             recebNF: receb,                        
@@ -209,7 +208,7 @@ export default function EntradaEstoque() {
       closeAlert();
 
       setItens(prev => {
-        const listaLimpa = prev.filter(i => i.numPecaFabricante !== '' || i.desenhoSAP !== '');
+        const listaLimpa = prev.filter(i => (i.fabricante !== '' || i.desenhoSAP !== '' || i.vendorDescription !== ''));
         const novaLista = [...listaLimpa, ...novosItensFormatados];
 
         if (novaLista.length > LIMITE_LOGISTICA) {
@@ -275,8 +274,9 @@ export default function EntradaEstoque() {
       return;
     }
 
-    if (itens.some(i => !i.numPecaFabricante || !i.qtdFornecida || i.qtdFornecida === '')) {
-      showAlert("Dados da Tabela", "Preencha os campos obrigatórios (Nº Peça e Qtd) em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
+    // ✨ CORRIGIDO: Removida a verificação obrigatória de 'numPecaFabricante'
+    if (itens.some(i => !i.qtdFornecida || i.qtdFornecida === '' || Number(i.qtdFornecida) < 1)) {
+      showAlert("Dados da Tabela", "Preencha o campo de Quantidade em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
       return;
     }
 
@@ -304,6 +304,7 @@ export default function EntradaEstoque() {
         itens: itens.map(item => ({
           desenho_sap: item.desenhoSAP || '-',
           part_number: item.numPecaFabricante || '-',
+          fabricante: item.fabricante || null, // ✨ ENVIO DO FABRICANTE
           fornecedor: item.fornecedor || null,
           referencia: item.referencia || null,
           qtd: parseInt(item.qtdFornecida, 10) || 1,
