@@ -23,7 +23,8 @@ import BotaoAcaoGlobal from '../../../../components/BotaoAcaoGlobal/BotaoAcaoGlo
 
 export default function ImportarEstoqueBase() {
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
-  const { usuario } = useAuth();
+  // ✨ AQUI: Puxamos o estoqueAtual para saber qual filial está selecionada no cabeçalho
+  const { usuario, estoqueAtual } = useAuth(); 
   
   const [itens, setItens] = useState([]);
   const [salvando, setSalvando] = useState(false);
@@ -33,10 +34,12 @@ export default function ImportarEstoqueBase() {
     iniciarProcessamento, resetarProcessador
   } = useProcessadorExcel();
 
+  // ✨ Define a filial de destino baseada na seleção do cabeçalho
+  const filialDestino = estoqueAtual !== 'TODOS' ? estoqueAtual : (usuario?.filial_padrao_id || '');
+
   /**
    * 1. FUNÇÃO DE TRADUÇÃO ULTRA-TURBO
    * Apaga todos os espaços e símbolos para criar blocos de texto únicos.
-   * Exemplo: "Nº PEDIDO DE COMPRA / CPV" vira "NPEDIDODECOMPRACPV".
    */
   const obterValor = (itemExcel, palavrasChave) => {
     if (!itemExcel || typeof itemExcel !== 'object') return '';
@@ -46,19 +49,17 @@ export default function ImportarEstoqueBase() {
       if (!texto) return '';
       return String(texto)
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/[\u0300-\u036f]/g, "") 
         .toUpperCase()
-        .replace(/[^A-Z0-9]/g, ""); // APAGA TUDO o que não for letra ou número (junta tudo num bloco só)
+        .replace(/[^A-Z0-9]/g, ""); 
     };
 
     for (const palavra of palavrasChave) {
       const palavraLimpa = limparTexto(palavra);
       if (!palavraLimpa) continue;
       
-      // 1ª Tentativa: Correspondência EXATA
       let chaveEncontrada = chavesReais.find(k => limparTexto(k) === palavraLimpa);
 
-      // 2ª Tentativa: Se não achar igual, tenta ver se está contido
       if (!chaveEncontrada && palavraLimpa.length > 4) {
         chaveEncontrada = chavesReais.find(k => {
           const kLimpa = limparTexto(k);
@@ -75,7 +76,6 @@ export default function ImportarEstoqueBase() {
 
   /**
    * 2. FORMATADOR UNIVERSAL DE DATAS
-   * Resolve a anomalia das datas do Excel (números de série, pontos, barras).
    */
   const formatarDataExcel = (valor) => {
     if (!valor || valor === '-' || String(valor).trim() === '') return '';
@@ -87,7 +87,6 @@ export default function ImportarEstoqueBase() {
 
     let stringValor = String(valor).trim().split(' ')[0];
 
-    // Trata Números de Série do Excel (Ex: 45674)
     if (/^\d{4,5}$/.test(stringValor)) {
       const numeroDias = parseInt(stringValor, 10);
       const dataBaseExcel = new Date(Date.UTC(1899, 11, 30));
@@ -95,7 +94,6 @@ export default function ImportarEstoqueBase() {
       return dataConvertida.toISOString().split('T')[0];
     }
 
-    // Uniformiza pontos para barras (Ex: 04.02.2025 -> 04/02/2025)
     stringValor = stringValor.replace(/\./g, '/');
 
     const partes = stringValor.split(/[\/\-]/);
@@ -110,7 +108,6 @@ export default function ImportarEstoqueBase() {
         ano = partes[2];
         if (ano.length === 2) ano = '20' + ano; 
 
-        // Diferencia Formato Americano (M/D/A) do Brasileiro (D/M/A)
         if (parseInt(partes[1], 10) > 12) {
           mes = partes[0].padStart(2, '0');
           dia = partes[1].padStart(2, '0');
@@ -150,16 +147,13 @@ export default function ImportarEstoqueBase() {
     
     if (itensPlanilha && itensPlanilha.length > 0) {
       
-      // 👇 MAPEAMENTO ROBUSTO COM PRIORIZAÇÃO DOS DADOS PROCESSADOS E FALLBACKS
       const novosItensFormatados = itensPlanilha.map((item, index) => {
-        // Pedido de Compra / CPV
         let pedidoVal = item.docCompras;
         if (!pedidoVal || pedidoVal === '-') {
           pedidoVal = obterValor(item, ['DOC COMPRAS', 'DOCCOMPRAS', 'Nº PEDIDO DE COMPRA / CPV', 'PEDIDO DE COMPRA', 'CPV', 'COMPRAS']);
         }
         if (pedidoVal === '-') pedidoVal = '';
 
-        // Valor Unitário Nota Fiscal
         let precoVal = item.poNetPrice;
         if (!precoVal || precoVal === '-') {
           precoVal = obterValor(item, ['PO NET PRICE', 'PONETPRICE', 'VLR. UNITÁRIO NOTA FISCAL', 'VALOR UNITARIO NOTA FISCAL', 'VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'VLR UNITARIO']);
@@ -174,7 +168,6 @@ export default function ImportarEstoqueBase() {
           desenhoSAP: item.desenhoSAP || obterValor(item, ['NUM SAP | DESENHO', 'NUM SAP', 'DESENHO SAP']),
           vendorDescription: item.vendorDescription || item.materialDescription || obterValor(item, ['DESCRIÇÃO', 'DESCRICAO', 'MATERIAL DESCRIPTION']),
           
-          // ✨ CAMPOS FABRICANTE E PART NUMBER SEPARADOS
           fabricante: item.fabricante || obterValor(item, ['FABRICANTE', 'MARCA', 'FABR']),
           numPecaFabricante: item.numPecaFabricante || obterValor(item, ['Nº PEÇA', 'PEÇA', 'PART NUMBER', 'PN', 'REF FABRICANTE']),
           
@@ -186,21 +179,19 @@ export default function ImportarEstoqueBase() {
           wbsElement: String(item.wbs || obterValor(item, ['CENTRO DE CUSTO - WBS', 'CENTRO DE CUSTO WBS', 'WBS']) || '').trim(),
           nomeProjeto: item.nomeProjeto || obterValor(item, ['NOME CENTRO DE CUSTO / PROJETO', 'NOME CENTRO DE CUSTO', 'PROJETO']),
           
-          // As datas usam agora o formatador e os nomes exatos!
           emissaoNF: formatarDataExcel(item.emissaoNF || obterValor(item, ['EMISSÃO NF', 'EMISSAO NF'])),
           recebNF: formatarDataExcel(item.recebNF || obterValor(item, ['RECEB. NF', 'RECEB NF'])),
           
-          // Os pedidos e valores não vão roubar dados uns aos outros
           docCompras: pedidoVal ? String(pedidoVal).trim() : '',
           poNetPrice: precoVal || '',
           
-          centro: item.centro || obterValor(item, ['FILIAL']) || 'BR04',
+          // ✨ AQUI: Substituído o 'BR04' fixo pela filial dinâmica
+          centro: item.centro || obterValor(item, ['FILIAL']) || filialDestino,
           deposito: item.deposito || obterValor(item, ['DEPÓSITO', 'DEPOSITO']) || '20',
           alocacao: item.alocacao || obterValor(item, ['ALOCAÇÃO', 'ALOCACAO'])
         };
       });
 
-      // Filtra itens descartáveis que não possuam dados essenciais
       const itensValidos = novosItensFormatados.filter(
         item => item.vendorDescription !== '' || item.numPecaFabricante !== '' || item.desenhoSAP !== '' || item.fabricante !== ''
       );
@@ -222,11 +213,12 @@ export default function ImportarEstoqueBase() {
 
   const handleAdicionarLinha = () => {
     const novaLinha = {
-      // ✨ ADICIONADO "fabricante: ''" PARA PREVENIR ERROS DE UNDEFINED
       id: Date.now().toString(), desenhoSAP: '', vendorDescription: '', fabricante: '', numPecaFabricante: '',
       qtdFornecida: 1, referencia: '', unidadeMedida: 'Unid', nfEntrada: '', fornecedor: '',
       wbsElement: '', nomeProjeto: '', emissaoNF: '', recebNF: '', docCompras: '',
-      poNetPrice: '', centro: 'BR04', deposito: '20', alocacao: ''
+      poNetPrice: '', 
+      centro: filialDestino, // ✨ AQUI: Substituído o 'BR04' fixo pela filial dinâmica
+      deposito: '20', alocacao: ''
     };
     setItens([novaLinha, ...itens]);
   };
@@ -235,11 +227,16 @@ export default function ImportarEstoqueBase() {
    * GRAVAÇÃO FINAL NO BANCO DE DADOS
    */
   const handleGravarNoBanco = async () => {
+    // ✨ TRAVA DE SEGURANÇA: Obriga a escolher uma filial antes de gravar
+    if (!estoqueAtual || estoqueAtual === 'TODOS') {
+      return showAlert("Ação Bloqueada", "Por favor, selecione uma filial específica no cabeçalho antes de importar o estoque base.", "warning");
+    }
+
     if (itens.length === 0) return showAlert("Aviso", "A tabela está vazia.", "warning");
 
     const confirm = await showConfirm(
       "Salvar no Banco?", 
-      `Deseja registrar definitivamente estes ${itens.length} itens no estoque oficial?`, 
+      `Deseja registrar definitivamente estes ${itens.length} itens no estoque oficial da filial ${filialDestino}?`, 
       "warning", "Sim, Gravar"
     );
     if (!confirm) return;
@@ -251,7 +248,7 @@ export default function ImportarEstoqueBase() {
       const itensFormatadosParaBanco = itens.map(item => ({
         desenho_sap: item.desenhoSAP || '-',
         part_number: item.numPecaFabricante || '-',
-        fabricante: item.fabricante || null, // ✨ CAMPO FABRICANTE INCLUÍDO NO PAYLOAD FINAL
+        fabricante: item.fabricante || null, 
         fornecedor: item.fornecedor || null,
         referencia: item.referencia || null,
         qtd: parseInt(item.qtdFornecida, 10) || 1,
@@ -265,7 +262,7 @@ export default function ImportarEstoqueBase() {
         receb_nf: item.recebNF || null,
         documento_compras: item.docCompras || null,
         valor_unitario: item.poNetPrice || null,
-        centro: item.centro || 'BR04',
+        centro: item.centro || filialDestino, // ✨ AQUI: Substituído o 'BR04' fixo pela filial dinâmica
         deposito: item.deposito || '20',
         alocacao: item.alocacao || null
       }));
@@ -273,9 +270,9 @@ export default function ImportarEstoqueBase() {
       const dadosEnvio = {
         solicitante: {
           nome: usuario?.nome_completo || 'Sistema de Importação',
-          filial_id: usuario?.filial_padrao_id || 'BR04',
+          filial_id: filialDestino, // ✨ AQUI: Substituído o 'BR04' fixo pela filial dinâmica
           wbs: '-',
-          observacoes: 'Carga Base Inicial (Importação Excel)',
+          observacoes: `Carga Base Inicial (Importação Excel) - Filial ${filialDestino}`,
           tipo: 'Entrada'
         },
         itens: itensFormatadosParaBanco,
@@ -293,7 +290,7 @@ export default function ImportarEstoqueBase() {
         throw new Error(res.erro || "Falha ao gravar no banco.");
       }
 
-      showAlert("Sucesso!", "A carga base foi importada e salva no estoque com sucesso!", "success");
+      showAlert("Sucesso!", `A carga base foi importada e salva no estoque da filial ${filialDestino} com sucesso!`, "success");
       setItens([]); 
       resetarProcessador();
 
@@ -320,7 +317,7 @@ export default function ImportarEstoqueBase() {
             <Database size={20} color="#2563eb" /> Carga Inicial de Estoque
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '24px' }}>
-            Utilize esta ferramenta apenas para carregar o estoque físico inicial a partir de uma planilha Excel padronizada.
+            Utilize esta ferramenta apenas para carregar o estoque físico inicial a partir de uma planilha Excel padronizada. Os dados irão para a filial <strong>{filialDestino || 'selecionada no cabeçalho'}</strong>.
           </p>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
@@ -340,9 +337,9 @@ export default function ImportarEstoqueBase() {
             <div>
               <h4 style={{ margin: '0 0 8px 0', color: '#b45309', fontSize: '0.95rem' }}>Importante antes de importar:</h4>
               <ul style={{ margin: 0, paddingLeft: '20px', color: '#92400e', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <li>Selecione a filial correta no menu do topo antes de carregar o ficheiro.</li>
                 <li>A planilha deve seguir rigorosamente os cabeçalhos.</li>
                 <li>Saldos vazios serão considerados como "0" (Zero).</li>
-                <li>A importação é processada em blocos para não sobrecarregar o seu navegador.</li>
               </ul>
               <div style={{ marginTop: '12px' }}>
                 <ExemploExcel />
@@ -357,7 +354,7 @@ export default function ImportarEstoqueBase() {
           
           <TabelaInsercaoItens 
             itens={itens}
-            limiteLinhas={999999} /* ✨ LIMITE ARTIFICIAL DE 5000 FOI REMOVIDO / IGNORADO AQUI */
+            limiteLinhas={999999} 
             onAtualizarCampo={handleAtualizarCampo}
             onRemoverItem={handleRemoverItem}
             onAdicionarLinha={handleAdicionarLinha}
