@@ -1,37 +1,42 @@
 /// <reference path="../pb_data/types.d.ts" />
-// =========================================================================
-//  MIGRAÇÃO 2 - Adiciona a coluna 'fabricante' sem apagar dados
-// =========================================================================
 
 migrate((app) => {
-  // Função auxiliar para criar campos de texto (idêntica à do init)
-  const text = (name, opt = {}) => Object.assign({ type: 'text', name }, opt);
-
-  // 1. Atualizar tabela 'estoque'
+  // === ADICIONAR NA TABELA ESTOQUE ===
   const estoque = app.findCollectionByNameOrId("estoque");
   if (estoque) {
-    estoque.fields.push(text('fabricante', { max: 150 }));
+    // A forma mais segura de adicionar campos nas versões recentes do PocketBase
+    const campoFabricanteEstoque = new Field({
+      name: 'fabricante',
+      type: 'text',
+      max: 150
+    });
+    estoque.fields.add(campoFabricanteEstoque);
     app.save(estoque);
   }
 
-  // 2. Atualizar tabela 'solicitacoes_itens'
+  // === ADICIONAR NA TABELA SOLICITACOES_ITENS ===
   const solicitacoesItens = app.findCollectionByNameOrId("solicitacoes_itens");
   if (solicitacoesItens) {
-    solicitacoesItens.fields.push(text('fabricante', { max: 150 }));
+    const campoFabricanteItens = new Field({
+      name: 'fabricante',
+      type: 'text',
+      max: 150
+    });
+    solicitacoesItens.fields.add(campoFabricanteItens);
     app.save(solicitacoesItens);
   }
 
 }, (app) => {
-  // Lógica de reversão: caso precises de desfazer, ele remove a coluna
+  // === REVERSÃO (REMOVER CAMPOS) ===
   const estoque = app.findCollectionByNameOrId("estoque");
   if (estoque) {
-    estoque.fields = estoque.fields.filter(f => f.name !== 'fabricante');
+    estoque.fields.removeByName('fabricante');
     app.save(estoque);
   }
 
   const solicitacoesItens = app.findCollectionByNameOrId("solicitacoes_itens");
   if (solicitacoesItens) {
-    solicitacoesItens.fields = solicitacoesItens.fields.filter(f => f.name !== 'fabricante');
+    solicitacoesItens.fields.removeByName('fabricante');
     app.save(solicitacoesItens);
   }
 });
