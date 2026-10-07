@@ -1,3 +1,6 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
+// =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
@@ -50,18 +53,18 @@ const obterClasseBadgeTipo = (tipo) => {
 // ✨ FUNÇÃO AUXILIAR: Transforma o texto no formato do input datetime-local
 const converterParaInputDateTime = (dataString) => {
   if (!dataString || dataString === '-' || dataString === '—' || dataString === 'Disponível') return '';
-
+  
   const partes = dataString.split(' ');
   if (partes[0].includes('/')) {
     const [dia, mes, ano] = partes[0].split('/');
     let hora = '00:00';
-
+    
     if (partes.length >= 3 && partes[2].includes(':')) {
-      hora = partes[2];
+       hora = partes[2]; 
     } else if (partes.length === 2 && partes[1].includes(':')) {
-      hora = partes[1];
+       hora = partes[1]; 
     }
-
+    
     return `${ano}-${mes}-${dia}T${hora}`;
   }
   return '';
@@ -206,7 +209,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
                 : null;
-
+                
               return {
                 ...it,
                 desenho_sap_manual: obterValorSeguro(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
@@ -241,7 +244,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
               nfCrossdocking: item.nfCrossdocking || null,
-              itens: itensEnriquecidos
+              itens: itensEnriquecidos 
             };
           });
 
@@ -261,7 +264,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
       const SOCKET_URL = urlDoServidor();
       const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-
+      
       socket.on('solicitacoes_atualizadas', () => {
         console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
         buscarDados();
