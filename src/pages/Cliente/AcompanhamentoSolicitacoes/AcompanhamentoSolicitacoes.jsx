@@ -615,4 +615,71 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           {perfil === "logistica" && !isOperador ? (
                             linha.statusExibicao === 'Reintegrado' ? (
                               <span className="badge-status status-concluido"><CheckCircle2 size={14} /> Resolvido</span>
-                            ) : linha.statusExibicao === 'Cancelado' &&
+                            ) : linha.statusExibicao === 'Cancelado' && linha.tipo !== 'Cancelado' ? (
+                              <span className="badge-status status-cancelado"><AlertCircle size={14} /> Cancelamento Solicitado</span>
+                            ) : linha.status === 'Pendente' ? (
+                              statusBloqueado ? (
+                                <div title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '600' }}><AlertCircle size={14} /> Aguardando NF</div>
+                              ) : (
+                                <button className="btn-aprovar-acao" style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao); }}><RefreshCw size={14} /> Aprovar</button>
+                              )
+                            ) : (
+                              <select className="select-acao" value={linha.status} onChange={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value); }} style={{ padding: '4px 10px', border: '1px solid #bfdbfe', borderRadius: '999px', backgroundColor: '#eff6ff', fontSize: '0.75rem', color: '#2563eb', fontWeight: '600', outline: 'none', cursor: 'pointer' }}>
+                                <option value="Pendente" disabled>Pendente</option>
+                                <option value="Em Separação">Em Separação</option>
+                                <option value="Concluído">Concluído</option>
+                                <option value="Cancelado">Cancelado</option>
+                                <option value="Recusado">Recusado</option>
+                              </select>
+                            )
+                          ) : (
+                            renderBadgeStatus(linha.statusExibicao)
+                          )}
+                        </td>
+                      </tr>
+
+                      {isExpandida && (
+                        <tr>
+                          <td colSpan="8" className="td-expandida">
+                            <DetalhesSolicitacao item={linha} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
+
+                            {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
+                              <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
+                                <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
+                                <GerenciadorAnexos anexos={anexosNovos} setAnexos={setAnexosNovos} titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO" />
+                                {anexosNovos.length > 0 && (
+                                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
+                                    <button onClick={() => handleEnviarAnexosExtras(linha.idOriginal)} disabled={carregando} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", backgroundColor: carregando ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "600", cursor: carregando ? "not-allowed" : "pointer" }}><Upload size={16} />{carregando ? "A salvar..." : "Salvar Novos Anexos"}</button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </ScrollDuplo>
+
+        <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
+          <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+            Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
+          </div>
+          <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}><ChevronLeft size={16} /> Anterior</button>
+            {Array.from({ length: totalPaginas }, (_, index) => {
+              const numeroPagina = index + 1;
+              const ehAtiva = paginaAtual === numeroPagina;
+              return (<button key={numeroPagina} onClick={() => setPaginaAtual(numeroPagina)} disabled={carregando} style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: carregando ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease' }}>{numeroPagina}</button>);
+            })}
+            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 0.6 : 1 }}>Próxima <ChevronRight size={16} /></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
