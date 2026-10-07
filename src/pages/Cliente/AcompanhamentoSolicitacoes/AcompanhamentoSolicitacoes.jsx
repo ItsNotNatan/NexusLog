@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useMemo } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
@@ -47,19 +47,27 @@ const obterClasseBadgeTipo = (tipo) => {
   }
 };
 
+// ✨ FUNÇÃO AUXILIAR: Transforma o texto no formato do input datetime-local
 const converterParaInputDateTime = (dataString) => {
   if (!dataString || dataString === '-' || dataString === '—' || dataString === 'Disponível') return '';
+
   const partes = dataString.split(' ');
   if (partes[0].includes('/')) {
     const [dia, mes, ano] = partes[0].split('/');
     let hora = '00:00';
-    if (partes.length >= 3 && partes[2].includes(':')) hora = partes[2]; 
-    else if (partes.length === 2 && partes[1].includes(':')) hora = partes[1]; 
+
+    if (partes.length >= 3 && partes[2].includes(':')) {
+      hora = partes[2];
+    } else if (partes.length === 2 && partes[1].includes(':')) {
+      hora = partes[1];
+    }
+
     return `${ano}-${mes}-${dia}T${hora}`;
   }
   return '';
 };
 
+// ✨ FUNÇÃO AUXILIAR INTELIGENTE: Puxa o valor da solicitação ou cruza com o estoque
 const obterValorSeguro = (valItem, valEstoque) => {
   const validar = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== 'null';
   if (validar(valItem)) return valItem;
@@ -103,7 +111,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   let usuarioLogado = {};
   try {
     const dadosUsuario = localStorage.getItem('@NexusLog:usuario');
-    if (dadosUsuario && dadosUsuario !== 'undefined') usuarioLogado = JSON.parse(dadosUsuario);
+    if (dadosUsuario && dadosUsuario !== 'undefined') {
+      usuarioLogado = JSON.parse(dadosUsuario);
+    }
   } catch (erro) { }
 
   const token = localStorage.getItem('@NexusLog:token') || '';
@@ -117,13 +127,18 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       try {
         setCarregando(true);
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
-        
-        // ✨ OTIMIZAÇÃO DE LEITURA (1): Limita o resultado se não for pesquisa e puxa de imediato. 
-        // O estoque só será requisitado na linha do detalhe.
-        const limitParam = termoPesquisa ? 1000 : 100; 
-        const urlSolicitacoes = `/solicitacoes/listar?limit=${limitParam}&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
-        const resultadoSol = await apiFetch(urlSolicitacoes);
+        const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
+
+        // ✨ ADICIONADO "?rastreabilidade=true" PARA LER ITENS ZERADOS E RECUPERAR A REFERÊNCIA
+        const [resultadoSol, resultadoEst] = await Promise.all([
+          apiFetch(urlSolicitacoes),
+          apiFetch("/estoque/listar?rastreabilidade=true")
+        ]);
+
+        if (resultadoEst.sucesso) {
+          setEstoque(resultadoEst.dados);
+        }
 
         if (resultadoSol.sucesso) {
           const reints = resultadoSol.dados.filter(sol =>
@@ -134,6 +149,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           const cancelamentosAtivos = resultadoSol.dados.filter(sol =>
             sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
           );
+
+          const estoqueReferencia = resultadoEst.sucesso ? resultadoEst.dados : [];
 
           const dadosFormatados = resultadoSol.dados.map((item) => {
             let prefixo = "PS";
@@ -155,9 +172,14 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             }
 
             let statusFinalVisual = item.status;
-            const temPedidoDeCancelamento = cancelamentosAtivos.find(canc => canc.observacoes && canc.observacoes.includes(item.id));
 
-            if (item.tipo !== 'Cancelado' && temPedidoDeCancelamento) statusFinalVisual = 'Cancelado';
+            const temPedidoDeCancelamento = cancelamentosAtivos.find(canc =>
+              canc.observacoes && canc.observacoes.includes(item.idOriginal)
+            );
+
+            if (item.tipo !== 'Cancelado' && temPedidoDeCancelamento) {
+              statusFinalVisual = 'Cancelado';
+            }
             else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
               const qtdJaDevolvida = {};
               reints.forEach(reint => {
@@ -173,8 +195,38 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 return (Number(origItem.quantidade_solicitada) - devolvido) > 0;
               });
 
-              if (itensRestantes.length === 0 && (item.itens || []).length > 0) statusFinalVisual = 'Reintegrado';
+              if (itensRestantes.length === 0 && (item.itens || []).length > 0) {
+                statusFinalVisual = 'Reintegrado';
+              }
             }
+
+            // ✨ AQUI: ENRIQUECIMENTO DOS ITENS! 
+            // Cruza todos os campos da solicitação com a prateleira física (mesmo as zeradas)
+            const itensEnriquecidos = (item.itens || []).map(it => {
+              const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
+                ? estoqueReferencia.find(e => e.id === it.estoque_id)
+                : null;
+
+              return {
+                ...it,
+                desenho_sap_manual: obterValorSeguro(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
+                part_number_manual: obterValorSeguro(it.part_number_manual || it.part_number, itemFisico?.part_number),
+                descricao_manual: obterValorSeguro(it.descricao_manual || it.descricao, itemFisico?.descricao),
+                referencia: obterValorSeguro(it.referencia, itemFisico?.referencia),
+                fornecedor: obterValorSeguro(it.fornecedor, itemFisico?.fornecedor),
+                nf_entrada: obterValorSeguro(it.nf_entrada, itemFisico?.nf_entrada),
+                wbs_element: obterValorSeguro(it.wbs_element, itemFisico?.wbs),
+                nome_projeto: obterValorSeguro(it.nome_projeto, itemFisico?.nome_projeto),
+                emissao_nf: obterValorSeguro(it.emissao_nf, itemFisico?.emissao_nf),
+                receb_nf: obterValorSeguro(it.receb_nf, itemFisico?.receb_nf),
+                documento_compras: obterValorSeguro(it.documento_compras, itemFisico?.documento_compras),
+                valor_unitario_manual: obterValorSeguro(it.valor_unitario_manual, itemFisico?.valor_unitario),
+                centro: obterValorSeguro(it.centro, itemFisico?.centro),
+                deposito: obterValorSeguro(it.deposito, itemFisico?.deposito),
+                alocacao: obterValorSeguro(it.alocacao, itemFisico?.alocacao),
+                unidade_medida_manual: obterValorSeguro(it.unidade_medida_manual, itemFisico?.unidade_medida) || 'Unid'
+              };
+            });
 
             return {
               ...item,
@@ -189,8 +241,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
               nfCrossdocking: item.nfCrossdocking || null,
-              // ✨ OTIMIZAÇÃO (2): Mantém os itens leves até abrir a expansão.
-              itensLeves: item.itens 
+              itens: itensEnriquecidos
             };
           });
 
@@ -207,10 +258,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     if (token) {
       buscarDados();
+
       const SOCKET_URL = urlDoServidor();
       const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-      
+
       socket.on('solicitacoes_atualizadas', () => {
+        console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
         buscarDados();
       });
 
@@ -222,19 +275,23 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  const dadosFiltrados = useMemo(() => {
-    return dadosTabela.filter((item) => {
-      if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) return false;
-      if (filtroStatus !== 'Todos') {
-        if (filtroStatus === 'Pendente' && item.status !== 'Pendente') return false;
-        if (filtroStatus === 'Em Andamento' && (item.status !== 'Em Separação' && item.status !== 'Em Andamento')) return false;
-        if (filtroStatus === 'Concluído' && (item.status !== 'Concluído' && item.statusExibicao !== 'Reintegrado')) return false;
-        if (filtroStatus === 'Recusado' && item.status !== 'Recusado') return false;
-        if (filtroStatus === 'Cancelado' && (item.status !== 'Cancelado' && item.statusExibicao !== 'Cancelado')) return false;
-      }
-      return true;
-    });
-  }, [dadosTabela, estoqueAtual, filtroStatus]);
+  // ✨ FILTRO DUPLO SEGURO: Filtra pela Filial Atual + Status + Termo
+  const dadosFiltrados = dadosTabela.filter((item) => {
+    // Bloqueia qualquer filial que não seja a selecionada (se não for TODOS)
+    if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) {
+      return false;
+    }
+
+    if (filtroStatus !== 'Todos') {
+      if (filtroStatus === 'Pendente' && item.status !== 'Pendente') return false;
+      if (filtroStatus === 'Em Andamento' && (item.status !== 'Em Separação' && item.status !== 'Em Andamento')) return false;
+      if (filtroStatus === 'Concluído' && (item.status !== 'Concluído' && item.statusExibicao !== 'Reintegrado')) return false;
+      if (filtroStatus === 'Recusado' && item.status !== 'Recusado') return false;
+      if (filtroStatus === 'Cancelado' && (item.status !== 'Cancelado' && item.statusExibicao !== 'Cancelado')) return false;
+    }
+
+    return true;
+  });
 
   const kpiTotal = dadosFiltrados.length;
   const kpiPendentes = dadosFiltrados.filter((item) => item.status === "Pendente").length;
@@ -261,7 +318,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     try {
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/status`, {
-        method: 'PATCH', body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
+        method: 'PATCH',
+        body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
       });
 
       if (dados.sucesso) {
@@ -275,8 +333,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         setDadosTabela(prev => prev.map(sol => {
           if (sol.idOriginal === idSolicitacao) {
             let novoPl = sol.pl;
-            if (dados.numeroPL) novoPl = `PL #${dados.numeroPL}`;
-            else if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && sol.pl === '-') novoPl = `PL-${sol.id}`;
+            if (dados.numeroPL) {
+              novoPl = `PL #${dados.numeroPL}`;
+            } else if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && sol.pl === '-') {
+              novoPl = `PL-${sol.id}`;
+            }
             return {
               ...sol,
               status: novoStatus,
@@ -300,7 +361,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const lidarComMudancaDataEntrega = async (idSolicitacao, novaData) => {
     try {
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/local`, {
-        method: 'PATCH', body: JSON.stringify({ data_entrega: novaData ? new Date(novaData).toISOString() : null })
+        method: 'PATCH',
+        body: JSON.stringify({ data_entrega: novaData ? new Date(novaData).toISOString() : null })
       });
 
       if (dados.sucesso) {
@@ -316,7 +378,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         }
 
         setDadosTabela(prev => prev.map(sol => {
-          if (sol.idOriginal === idSolicitacao) return { ...sol, dataEntrega: dataFormatada };
+          if (sol.idOriginal === idSolicitacao) {
+            return { ...sol, dataEntrega: dataFormatada };
+          }
           return sol;
         }));
         showAlert("Data Atualizada", "A data e hora de entrega foram atualizadas com sucesso!", "success");
@@ -328,55 +392,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  // ✨ OTIMIZAÇÃO (3): Carrega o inventário e enriquece os itens no momento que o usuário expande a linha.
-  const toggleLinha = async (linhaObj) => {
-    const idUnico = `${linhaObj.prefixo}-${linhaObj.idOriginal}`;
-    if (linhaExpandida === idUnico) {
-      setLinhaExpandida(null);
-      setAnexosNovos([]);
-      return;
-    }
-    
-    if (estoque.length === 0) {
-      try {
-        const estRes = await apiFetch("/estoque/listar?rastreabilidade=true");
-        if (estRes.sucesso) setEstoque(estRes.dados);
-      } catch (e) {
-        console.error('Falha a ler o estoque para enriquecimento.');
-      }
-    }
-    setLinhaExpandida(idUnico);
+  const toggleLinha = (idUnico) => {
+    setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
     setAnexosNovos([]);
-  };
-
-  const getLinhaEnriquecida = (linha) => {
-    if (linha.itens && linha.itens.length > 0 && linha.itens[0].enriquecido) return linha;
-    
-    const itensEnriquecidos = (linha.itensLeves || []).map(it => {
-      const itemFisico = (it.estoque_id && estoque.length > 0) ? estoque.find(e => e.id === it.estoque_id) : null;
-      return {
-        ...it,
-        enriquecido: true,
-        desenho_sap_manual: obterValorSeguro(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
-        part_number_manual: obterValorSeguro(it.part_number_manual || it.part_number, itemFisico?.part_number),
-        descricao_manual: obterValorSeguro(it.descricao_manual || it.descricao, itemFisico?.descricao),
-        fabricante: obterValorSeguro(it.fabricante, itemFisico?.fabricante), // ✨ CAMPO FABRICANTE INCLUÍDO
-        referencia: obterValorSeguro(it.referencia, itemFisico?.referencia),
-        fornecedor: obterValorSeguro(it.fornecedor, itemFisico?.fornecedor),
-        nf_entrada: obterValorSeguro(it.nf_entrada, itemFisico?.nf_entrada),
-        wbs_element: obterValorSeguro(it.wbs_element, itemFisico?.wbs),
-        nome_projeto: obterValorSeguro(it.nome_projeto, itemFisico?.nome_projeto),
-        emissao_nf: obterValorSeguro(it.emissao_nf, itemFisico?.emissao_nf),
-        receb_nf: obterValorSeguro(it.receb_nf, itemFisico?.receb_nf),
-        documento_compras: obterValorSeguro(it.documento_compras, itemFisico?.documento_compras),
-        valor_unitario_manual: obterValorSeguro(it.valor_unitario_manual, itemFisico?.valor_unitario),
-        centro: obterValorSeguro(it.centro, itemFisico?.centro),
-        deposito: obterValorSeguro(it.deposito, itemFisico?.deposito),
-        alocacao: obterValorSeguro(it.alocacao, itemFisico?.alocacao),
-        unidade_medida_manual: obterValorSeguro(it.unidade_medida_manual, itemFisico?.unidade_medida) || 'Unid'
-      };
-    });
-    return { ...linha, itens: itensEnriquecidos };
   };
 
   const handleDeletarAnexo = async (idSolicitacao, anexo) => {
@@ -492,20 +510,22 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               ) : dadosPaginados.length === 0 ? (
                 <tr><td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
-                dadosPaginados.map((linha) => {
-                  const idUnico = `${linha.prefixo}-${linha.idOriginal}`;
+                dadosPaginados.map((linha, index) => {
+                  const idUnico = `${linha.prefixo}-${linha.id}-${index}`;
                   const isExpandida = linhaExpandida === idUnico;
                   const isCrossdocking = linha.tipo === 'Crossdocking';
                   let nfNoEstoque = true;
 
-                  if (isCrossdocking && linha.nfCrossdocking && estoque.length > 0) {
+                  if (isCrossdocking && linha.nfCrossdocking) {
                     nfNoEstoque = estoque.some(itemEstoque => String(itemEstoque.nf_entrada || '').trim() === String(linha.nfCrossdocking || '').trim() && String(itemEstoque.nf_entrada || '').trim() !== '');
                   }
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
-                  
+
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado' || linha.tipo === 'Cancelado';
+
+                  // ✨ AQUI ESTÁ A NOVA VERIFICAÇÃO PARA ESCONDER O BOTÃO GERAR PDF NA NF E ENTRADA
                   const esconderPL = linha.tipo === 'Nota Fiscal' || linha.tipo === 'Entrada';
-                  
+
                   const corTextoForte = isRecusadoOuCancelado ? "#991b1b" : "#1e293b";
                   const corTextoMedio = isRecusadoOuCancelado ? "#dc2626" : "#475569";
                   const corTextoFraco = isRecusadoOuCancelado ? "#ef4444" : "#64748b";
@@ -522,7 +542,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           transition: 'background-color 0.2s'
                         }}
                       >
-                        <td className="col-chevron" onClick={() => toggleLinha(linha)}>
+                        <td className="col-chevron" onClick={() => toggleLinha(idUnico)}>
                           <ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: corTextoFraco }} />
                         </td>
                         <td>
@@ -542,6 +562,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
 
                         <td>
+                          {/* ✨ O BOTÃO SÓ É MOSTRADO SE esconderPL FOR FALSO */}
                           {!esconderPL && linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
                             <BotaoGerarPDF
                               linha={linha}
@@ -570,9 +591,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                 value={converterParaInputDateTime(linha.dataEntrega)}
                                 onChange={(e) => lidarComMudancaDataEntrega(linha.idOriginal, e.target.value)}
                                 style={{
-                                  padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px',
-                                  border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#059669',
-                                  fontWeight: '600', outline: 'none', cursor: 'pointer'
+                                  padding: '4px 8px',
+                                  fontSize: '0.75rem',
+                                  borderRadius: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  backgroundColor: '#ffffff',
+                                  color: '#059669',
+                                  fontWeight: '600',
+                                  outline: 'none',
+                                  cursor: 'pointer'
                                 }}
                                 title="Altere a data e hora de entrega"
                               />
@@ -588,71 +615,4 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           {perfil === "logistica" && !isOperador ? (
                             linha.statusExibicao === 'Reintegrado' ? (
                               <span className="badge-status status-concluido"><CheckCircle2 size={14} /> Resolvido</span>
-                            ) : linha.statusExibicao === 'Cancelado' && linha.tipo !== 'Cancelado' ? (
-                              <span className="badge-status status-cancelado"><AlertCircle size={14} /> Cancelamento Solicitado</span>
-                            ) : linha.status === 'Pendente' ? (
-                              statusBloqueado ? (
-                                <div title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '600' }}><AlertCircle size={14} /> Aguardando NF</div>
-                              ) : (
-                                <button className="btn-aprovar-acao" style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao); }}><RefreshCw size={14} /> Aprovar</button>
-                              )
-                            ) : (
-                              <select className="select-acao" value={linha.status} onChange={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value); }} style={{ padding: '4px 10px', border: '1px solid #bfdbfe', borderRadius: '999px', backgroundColor: '#eff6ff', fontSize: '0.75rem', color: '#2563eb', fontWeight: '600', outline: 'none', cursor: 'pointer' }}>
-                                <option value="Pendente" disabled>Pendente</option>
-                                <option value="Em Separação">Em Separação</option>
-                                <option value="Concluído">Concluído</option>
-                                <option value="Cancelado">Cancelado</option>
-                                <option value="Recusado">Recusado</option>
-                              </select>
-                            )
-                          ) : (
-                            renderBadgeStatus(linha.statusExibicao)
-                          )}
-                        </td>
-                      </tr>
-
-                      {isExpandida && (
-                        <tr>
-                          <td colSpan="8" className="td-expandida">
-                            <DetalhesSolicitacao item={getLinhaEnriquecida(linha)} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
-
-                            {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
-                              <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
-                                <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
-                                <GerenciadorAnexos anexos={anexosNovos} setAnexos={setAnexosNovos} titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO" />
-                                {anexosNovos.length > 0 && (
-                                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
-                                    <button onClick={() => handleEnviarAnexosExtras(linha.idOriginal)} disabled={carregando} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", backgroundColor: carregando ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "600", cursor: carregando ? "not-allowed" : "pointer" }}><Upload size={16} />{carregando ? "A salvar..." : "Salvar Novos Anexos"}</button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </ScrollDuplo>
-
-        <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-          <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-            Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
-          </div>
-          <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}><ChevronLeft size={16} /> Anterior</button>
-            {Array.from({ length: totalPaginas }, (_, index) => {
-              const numeroPagina = index + 1;
-              const ehAtiva = paginaAtual === numeroPagina;
-              return (<button key={numeroPagina} onClick={() => setPaginaAtual(numeroPagina)} disabled={carregando} style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: carregando ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease' }}>{numeroPagina}</button>);
-            })}
-            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 0.6 : 1 }}>Próxima <ChevronRight size={16} /></button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+                            ) : linha.statusExibicao === 'Cancelado' &&
