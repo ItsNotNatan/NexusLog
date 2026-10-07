@@ -1,8 +1,8 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao.jsx
-// DESCRIÇÃO: Detalhamento expandido das solicitações com campo Fabricante corrigido
+// DESCRIÇÃO: Detalhamento expandido das solicitações com campo Fabricante corrigido e Paginação Otimizada
 // =================================================================
-import React from 'react';
+import React, { useState } from 'react';
 import { PackageX, Box, ArrowRightLeft, FileText, PackagePlus, Truck, RefreshCcw, XCircle, AlertCircle } from 'lucide-react';
 import MostrarArquivo from '../../../../components/MostrarArquivo/MostrarArquivo';
 
@@ -11,6 +11,45 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
 
   // ✨ IDENTIFICA SE DEVE ATIVAR O MODO VERMELHO
   const isRecusadoOuCancelado = item.statusExibicao === 'Recusado' || item.statusExibicao === 'Cancelado' || item.tipo === 'Cancelado';
+
+  // ========================================================
+  // LÓGICA DE PAGINAÇÃO OTIMIZADA PARA OS SUB-ITENS
+  // ========================================================
+  const [pagina, setPagina] = useState(1);
+  const itensPorPagina = 10;
+  const totalPaginas = Math.max(1, Math.ceil(itensReais.length / itensPorPagina));
+  const indexInicio = (pagina - 1) * itensPorPagina;
+  
+  // A tabela vai ler apenas este array menor, deixando a renderização instantânea!
+  const itensPaginados = itensReais.slice(indexInicio, indexInicio + itensPorPagina);
+
+  const PaginadorSubItens = () => {
+    if (totalPaginas <= 1) return null; // Esconde se tiver 10 itens ou menos
+    
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', backgroundColor: '#f8fafc', borderTop: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
+        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+          A mostrar <strong>{indexInicio + 1}</strong> a <strong>{Math.min(indexInicio + itensPorPagina, itensReais.length)}</strong> de <strong>{itensReais.length}</strong> itens (Página {pagina} de {totalPaginas})
+        </span>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={() => setPagina(p => Math.max(1, p - 1))}
+            disabled={pagina === 1}
+            style={{ display: 'flex', alignItems: 'center', padding: '4px 10px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: pagina === 1 ? '#f8fafc' : '#fff', color: pagina === 1 ? '#94a3b8' : '#334155', cursor: pagina === 1 ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+          >
+            Anterior
+          </button>
+          <button
+            onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+            disabled={pagina === totalPaginas}
+            style={{ display: 'flex', alignItems: 'center', padding: '4px 10px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: pagina === totalPaginas ? '#f8fafc' : '#fff', color: pagina === totalPaginas ? '#94a3b8' : '#334155', cursor: pagina === totalPaginas ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+          >
+            Próxima
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // ========================================================
   // LÓGICA DE SEPARAÇÃO DOS ANEXOS E FUNÇÕES AUXILIARES
@@ -101,16 +140,12 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || it.desenho_sap || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.referencia || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual || it.descricao || '-'}</td>
-                    
-                    {/* ✨ CORRIGIDO: Puxa o campo Fabricante */}
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante || '-'}</td>
-                    
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       <span style={{ display: 'inline-block', backgroundColor: bgDestaqueFinal, color: corDestaqueFinal, padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem' }}>
                         {it.quantidade_solicitada}
                       </span>
                     </td>
-                    
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', textAlign: 'center', fontSize: '0.8rem' }}>{it.unidade_medida_manual || 'Unid'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontFamily: 'monospace', fontSize: '0.8rem' }}>{it.nf_entrada || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', textTransform: 'uppercase', fontSize: '0.8rem' }}>{it.fornecedor || '-'}</td>
@@ -130,6 +165,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
               )}
             </tbody>
           </table>
+          {/* ✨ PAGINADOR INSERIDO LOGO ABAIXO DA TABELA */}
+          <PaginadorSubItens />
         </div>
 
         <RenderizarAnexos tituloLogistica={item.tipo === 'Entrada' ? "Documentos de Recebimento Final" : "Documentos de Liberação (Logística)"} />
@@ -143,7 +180,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   if (item.tipo === 'Material') {
     return (
       <TabelaUltraDetalhada 
-        itens={itensReais} 
+        itens={itensPaginados} 
         corIcone="#2563eb" 
         icone={<Box size={18} color="#2563eb" />} 
         titulo={isRecusadoOuCancelado ? "Itens Cancelados/Recusados" : "Itens Retirados do Estoque"}
@@ -159,7 +196,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   if (item.tipo === 'Entrada') {
     return (
       <TabelaUltraDetalhada 
-        itens={itensReais} 
+        itens={itensPaginados} 
         corIcone="#059669" 
         icone={<PackagePlus size={18} color="#059669" />} 
         titulo={isRecusadoOuCancelado ? "Entrada Cancelada/Recusada" : "Materiais Recebidos e Cadastrados"}
@@ -197,18 +234,16 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
             <thead>
               <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
-                {/* ✨ CORRIGIDO: Troca de PART NUMBER para FABRICANTE */}
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. TRANSFERIDA</th>
               </tr>
             </thead>
             <tbody>
-              {itensReais.length > 0 ? (
-                itensReais.map((it, idx) => (
+              {itensPaginados.length > 0 ? (
+                itensPaginados.map((it, idx) => (
                   <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
-                    {/* ✨ CORRIGIDO: Puxa o campo Fabricante */}
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante || '-'}</td>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -223,6 +258,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
               )}
             </tbody>
           </table>
+          {/* ✨ PAGINADOR INSERIDO LOGO ABAIXO DA TABELA */}
+          <PaginadorSubItens />
         </div>
 
         <RenderizarAnexos />
@@ -295,8 +332,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
               </tr>
             </thead>
             <tbody>
-              {itensReais.length > 0 ? (
-                itensReais.map((it, idx) => (
+              {itensPaginados.length > 0 ? (
+                itensPaginados.map((it, idx) => (
                   <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 16px', fontWeight: '700', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -311,6 +348,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
               )}
             </tbody>
           </table>
+          {/* ✨ PAGINADOR INSERIDO LOGO ABAIXO DA TABELA */}
+          <PaginadorSubItens />
         </div>
 
         <RenderizarAnexos 
@@ -345,18 +384,16 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
             <thead>
               <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
-                {/* ✨ CORRIGIDO: Troca de PART NUMBER para FABRICANTE */}
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. DEVOLVIDA</th>
               </tr>
             </thead>
             <tbody>
-              {itensReais.length > 0 ? (
-                itensReais.map((it, idx) => (
+              {itensPaginados.length > 0 ? (
+                itensPaginados.map((it, idx) => (
                   <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
-                    {/* ✨ CORRIGIDO: Puxa o campo Fabricante */}
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante || '-'}</td>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -371,6 +408,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
               )}
             </tbody>
           </table>
+          {/* ✨ PAGINADOR INSERIDO LOGO ABAIXO DA TABELA */}
+          <PaginadorSubItens />
         </div>
 
         <RenderizarAnexos tituloLogistica={isCancelamento ? "Documento de Cancelamento" : "Documento Final de Reintegração"} />
