@@ -71,6 +71,24 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais({});
   };
 
+  // ✨ NOVA FUNÇÃO: Transforma "R$ 1.234,56" num número limpo (1234.56) que o SAP entende
+  const limparEFormatarValor = (valorSujo) => {
+    if (!valorSujo || valorSujo === '-' || valorSujo === 'NaN') return "0.00";
+    
+    // Se for string, remove tudo o que não for número, vírgula ou ponto
+    let limpo = String(valorSujo).replace(/[^\d.,-]/g, '');
+    
+    // Converte formatação brasileira (1.234,56) para formato matemático (1234.56)
+    if (limpo.includes('.') && limpo.includes(',')) {
+      limpo = limpo.replace(/\./g, '').replace(',', '.');
+    } else if (limpo.includes(',')) {
+      limpo = limpo.replace(',', '.');
+    }
+
+    const numReal = parseFloat(limpo);
+    return isNaN(numReal) ? "0.00" : numReal.toFixed(2);
+  };
+
   const listaFiltrada = solicitacoes.filter(sol => {
     const termo = busca.toLowerCase();
     return sol.pl.toLowerCase().includes(termo) || 
@@ -86,7 +104,8 @@ export default function FormatacaoSAP() {
         origem: sol.pl,
         desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
         quantidade: item.quantidade_solicitada || item.qtd || 1,
-        valorUnitario: item.valor_unitario_manual || 0,
+        // ✨ CORREÇÃO: Aplica a função de limpeza ao valor unitário de forma segura
+        valorUnitario: limparEFormatarValor(item.valor_unitario_manual ?? item.valor_unitario ?? item.poNetPrice),
         wbs: sol.wbs || item.wbsOrigem || '-',
         destino: sol.filial || '-',
       }));
@@ -107,8 +126,7 @@ export default function FormatacaoSAP() {
 
   const gerarLinhaTsv = (item) => {
     const categoria = categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .';
-    const valorFormatado = Number(item.valorUnitario).toFixed(2);
-    return `${item.desenhoSAP}\t${item.quantidade}\t${valorFormatado}\t${item.wbs}\t${item.destino}\t${categoria}`;
+    return `${item.desenhoSAP}\t${item.quantidade}\t${item.valorUnitario}\t${item.wbs}\t${item.destino}\t${categoria}`;
   };
 
   const copiarLinha = (item) => {
@@ -263,7 +281,7 @@ export default function FormatacaoSAP() {
                         <td className="texto-cinza">{item.origem}</td>
                         <td className="texto-negrito">{item.desenhoSAP}</td>
                         <td className="texto-negrito">{item.quantidade}</td>
-                        <td>{Number(item.valorUnitario).toFixed(2)}</td>
+                        <td>{item.valorUnitario}</td>
                         <td className="texto-azul-link">{item.wbs}</td>
                         <td>{item.destino}</td>
                         <td>
