@@ -27,23 +27,23 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     }
   };
 
-  // ✨ NOVA FUNÇÃO AUXILIAR: Lida com valores numéricos ou strings que já vêm formatadas como R$
+  // ✨ NOVA FUNÇÃO AUXILIAR: Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
   const formatarMoedaPdf = (valor) => {
-    if (!valor || valor === '-' || valor === 'NaN') return '-';
+    if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
     // Se o valor já vier formatado do frontend com "R$", não tentamos calcular, apenas exibimos
     if (typeof valor === 'string' && valor.includes('R$')) return valor;
-    
+
     // Se for um número limpo, formatamos
     const numero = parseFloat(String(valor).replace(',', '.'));
     if (!isNaN(numero)) return `R$ ${numero.toFixed(2).replace('.', ',')}`;
-    
+
     return String(valor);
   };
 
   const handleGerarPdf = async (e) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     setGerando(true);
-    
+
     if (showLoading) {
       showLoading("Gerando Documento...", "A compilar os dados para o PDF. Por favor, aguarde a abertura do separador.");
     }
@@ -72,7 +72,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const colWidths = [
         '3%',  // ITEM
         '10%', // DESENHO
-        '15%', // REFERÊNCIA
+        '15%', // FABRICANTE
         '5%',  // QTD
         '5%',  // UNID
         '15%', // DESCRIÇÃO
@@ -82,37 +82,38 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         '7%',  // VALOR UNIT
         '15%'  // WBS
       ];
-      
+
       const headerRow = [
         { text: 'ITEM', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'DESENHO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
-        // ✨ CORREÇÃO AQUI: Cabeçalho alterado para REFERÊNCIA
-        { text: 'REFERÊNCIA', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
+        // ✨ CORREÇÃO AQUI: Cabeçalho alterado de PART NUMBER para FABRICANTE
+        { text: 'FABRICANTE', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
         { text: 'QTD', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'UNID', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'DESCRIÇÃO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
         { text: 'FORNECEDOR', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
         { text: 'ALOCAÇÃO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'NF ENTRADA', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'VLOR UNIT', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
+        { text: 'VLR. UNITÁRIO NOTA FISCAL', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] }, // ✨ CORREÇÃO DO TÍTULO AQUI
         { text: 'WBS', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] }
       ];
 
       let bodyRows = [headerRow];
-      
+
       if (linha.itens && linha.itens.length > 0) {
         linha.itens.forEach((it, index) => {
           bodyRows.push([
             { text: (index + 1).toString(), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.desenho_sap_manual || '-', fontSize: 7, margin: [0, 3] },
-            // ✨ CORREÇÃO AQUI: Puxa o campo referência
-            { text: it.referencia || '-', fontSize: 7, bold: true, margin: [0, 3] },
+            // ✨ CORREÇÃO AQUI: Puxa o campo fabricante em vez de part_number
+            { text: it.fabricante || it.fabricante_manual || '-', fontSize: 7, bold: true, margin: [0, 3] },
             { text: it.quantidade_solicitada || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.unidade_medida_manual || 'Un', fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.descricao_manual || '-', fontSize: 7, margin: [0, 3] },
             { text: it.fornecedor || '-', fontSize: 7, margin: [0, 3] },
             { text: it.alocacao || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
+            // ✨ CORREÇÃO AQUI: Extração segura do valor unitário usando a função atualizada
             { text: formatarMoedaPdf(it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.wbs_element || '-', fontSize: 7, alignment: 'center', margin: [0, 3] }
           ]);
@@ -135,7 +136,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const docDefinition = {
         pageSize: 'A4',
         pageOrientation: 'landscape',
-        pageMargins: [15, 15, 15, 15], 
+        pageMargins: [15, 15, 15, 15],
         content: [
           // CABEÇALHO COM TÍTULO
           {
@@ -148,7 +149,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
               ]
             },
             layout: 'noBorders',
-            margin: [0, 0, 0, 4] 
+            margin: [0, 0, 0, 4]
           },
 
           // ÁREA DE INFORMAÇÕES SUPERIORES
@@ -161,50 +162,50 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   widths: ['35%', '65%'],
                   body: [
                     [
-                      { 
+                      {
                         text: [
                           { text: 'DESTINO MATERIAL: ', fontSize: 6, bold: true },
                           { text: destinoMaterial, fontSize: 6, bold: true, color: '#b91c1c' }
-                        ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, true, true, false] 
+                        ],
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, true, true, false]
                       },
                       {}
                     ],
                     [
-                      { 
+                      {
                         text: [
                           { text: 'PROJETO TAREFA WBS: ', fontSize: 6, bold: true },
                           { text: linha.wbs || 'N/A', fontSize: 6, bold: true }
-                        ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, false] 
+                        ],
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, false]
                       },
                       {}
                     ],
                     [
-                      { 
+                      {
                         text: [
                           { text: 'NOME DA WBS: ', fontSize: 6, bold: true },
                           { text: ' ', fontSize: 6 }
-                        ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, true] 
+                        ],
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, true]
                       },
                       {}
                     ]
                   ]
                 }
               },
-              
+
               // Coluna Centro: Nome da Filial
               {
-                width: '16%', 
+                width: '16%',
                 stack: [
-                  { 
-                    text: nomeFilial ? nomeFilial.toUpperCase() : 'FILIAL', 
-                    alignment: 'center', 
-                    bold: true, 
-                    fontSize: 10, 
-                    color: '#1e293b', 
-                    margin: [0, 10, 0, 0] 
+                  {
+                    text: nomeFilial ? nomeFilial.toUpperCase() : 'FILIAL',
+                    alignment: 'center',
+                    bold: true,
+                    fontSize: 10,
+                    color: '#1e293b',
+                    margin: [0, 10, 0, 0]
                   }
                 ]
               },
@@ -217,7 +218,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   body: [
                     [
                       { text: 'NÚMERO DO BS (SEQUENCIAL):', fontSize: 7, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
-                      { 
+                      {
                         stack: [
                           { text: '-= BS =-', alignment: 'center', fontSize: 7, bold: true },
                           { text: bsNumero, alignment: 'center', fontSize: 15, bold: true, fillColor: '#86efac' }
@@ -235,11 +236,11 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     ]
                   ]
                 },
-                layout: 'noBorders' 
+                layout: 'noBorders'
               }
             ],
             columnGap: 10,
-            margin: [0, 0, 0, 4] 
+            margin: [0, 0, 0, 4]
           },
 
           // ÁREA DE ASSINATURAS E APROVAÇÕES
@@ -265,7 +266,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   {
                     stack: [
                       { text: 'Separado e Double Check por:', fontSize: 6, bold: true },
-                      { text: ' ', fontSize: 7, margin: [0, 1, 0, 1] }, 
+                      { text: ' ', fontSize: 7, margin: [0, 1, 0, 1] },
                       { text: '________________________________', alignment: 'center', fontSize: 6, margin: [0, 8, 0, 0] },
                       { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 6 },
                       { text: 'Matrícula:', fontSize: 6, margin: [0, 1, 0, 0] }
@@ -275,7 +276,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   {
                     stack: [
                       { text: 'Recebido por:', fontSize: 6, bold: true },
-                      { text: ' ', fontSize: 7, margin: [0, 1, 0, 1] }, 
+                      { text: ' ', fontSize: 7, margin: [0, 1, 0, 1] },
                       { text: '________________________________', alignment: 'center', fontSize: 6, margin: [0, 8, 0, 0] },
                       { text: 'Assinatura/carimbo', alignment: 'center', fontSize: 6 },
                       { text: 'Matrícula:', fontSize: 6, margin: [0, 1, 0, 0] }
@@ -285,7 +286,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                 ]
               ]
             },
-            margin: [0, 0, 0, 4] 
+            margin: [0, 0, 0, 4]
           },
 
           // TABELA PRINCIPAL DE ITENS
@@ -303,7 +304,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             }
           }
         ],
-        defaultStyle: { 
+        defaultStyle: {
           font: 'Roboto',
           color: '#0f172a'
         }
@@ -321,12 +322,12 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
   };
 
   return (
-    <span 
+    <span
       className="badge-pl"
       onClick={handleGerarPdf}
-      style={{ 
-        cursor: gerando ? 'not-allowed' : 'pointer', 
-        transition: 'all 0.2s', 
+      style={{
+        cursor: gerando ? 'not-allowed' : 'pointer',
+        transition: 'all 0.2s',
         userSelect: 'none',
         opacity: gerando ? 0.6 : 1,
         display: 'inline-flex',
@@ -334,20 +335,20 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         gap: '4px'
       }}
       title="Clique para abrir o Boletim Detalhado em PDF numa nova aba"
-      onMouseOver={(e) => { 
+      onMouseOver={(e) => {
         if(!gerando) {
-          e.currentTarget.style.backgroundColor = '#dbeafe'; 
-          e.currentTarget.style.borderColor = '#93c5fd'; 
+          e.currentTarget.style.backgroundColor = '#dbeafe';
+          e.currentTarget.style.borderColor = '#93c5fd';
         }
       }}
-      onMouseOut={(e) => { 
+      onMouseOut={(e) => {
         if(!gerando) {
-          e.currentTarget.style.backgroundColor = '#eff6ff'; 
-          e.currentTarget.style.borderColor = '#bfdbfe'; 
+          e.currentTarget.style.backgroundColor = '#eff6ff';
+          e.currentTarget.style.borderColor = '#bfdbfe';
         }
       }}
     >
-      <FileText size={14} /> 
+      <FileText size={14} />
       {gerando ? 'A Gerar...' : (linha.pl && linha.pl !== '-' && linha.pl !== '—' ? linha.pl : 'Gerar PDF')}
     </span>
   );
