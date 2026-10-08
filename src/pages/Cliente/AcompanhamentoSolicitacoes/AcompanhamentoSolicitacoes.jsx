@@ -1,6 +1,3 @@
-// =================================================================
-// ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
-// =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
@@ -133,7 +130,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
-        // ✨ ADICIONADO "?rastreabilidade=true" PARA LER ITENS ZERADOS E RECUPERAR A REFERÊNCIA
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
           apiFetch("/estoque/listar?rastreabilidade=true")
@@ -203,8 +199,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
-            // ✨ AQUI: ENRIQUECIMENTO DOS ITENS! 
-            // Cruza todos os campos da solicitação com a prateleira física (mesmo as zeradas)
             const itensEnriquecidos = (item.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
@@ -244,6 +238,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
               nfCrossdocking: item.nfCrossdocking || null,
+              deParaOrigem: item.deParaOrigem || item.filial_origem_id || item.filial || '-',
+              deParaDestino: item.deParaDestino || item.destino || item.wbs_destino || 'Não informado',
               itens: itensEnriquecidos 
             };
           });
@@ -278,9 +274,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  // ✨ FILTRO DUPLO SEGURO: Filtra pela Filial Atual + Status + Termo
   const dadosFiltrados = dadosTabela.filter((item) => {
-    // Bloqueia qualquer filial que não seja a selecionada (se não for TODOS)
     if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) {
       return false;
     }
@@ -501,7 +495,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>TIPO / ID (PS)</th>
                 <th>SOLICITANTE / WBS</th>
                 <th>Nº DA PL</th>
-                <th>FILIAL</th>
+                <th>DE ➔ PARA</th>
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
                 <th>STATUS {perfil === "logistica" && "/ AÇÃO"}</th>
@@ -523,12 +517,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                     nfNoEstoque = estoque.some(itemEstoque => String(itemEstoque.nf_entrada || '').trim() === String(linha.nfCrossdocking || '').trim() && String(itemEstoque.nf_entrada || '').trim() !== '');
                   }
                   const statusBloqueado = isCrossdocking && !nfNoEstoque;
-
+                  
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado' || linha.tipo === 'Cancelado';
-
-                  // ✨ AQUI ESTÁ A NOVA VERIFICAÇÃO PARA ESCONDER O BOTÃO GERAR PDF NA NF E ENTRADA
+                  
+                  // ✨ NOVA VERIFICAÇÃO AQUI
                   const esconderPL = linha.tipo === 'Nota Fiscal' || linha.tipo === 'Entrada';
-
+                  
                   const corTextoForte = isRecusadoOuCancelado ? "#991b1b" : "#1e293b";
                   const corTextoMedio = isRecusadoOuCancelado ? "#dc2626" : "#475569";
                   const corTextoFraco = isRecusadoOuCancelado ? "#ef4444" : "#64748b";
@@ -580,10 +574,29 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
 
                         <td>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f1f5f9', color: corTextoMedio, padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#cbd5e1'}`, whiteSpace: 'nowrap' }}>
-                            <MapPin size={12} /> {obterNomeFilialDinamico(linha.filial || linha.estoque)}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ 
+                              display: 'inline-flex', alignItems: 'center', gap: '4px', 
+                              backgroundColor: '#f1f5f9', color: corTextoMedio, 
+                              padding: '2px 6px', borderRadius: '4px', fontSize: '0.70rem', 
+                              fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap' 
+                            }}>
+                              De: {linha.tipo.includes('Transferencia') || linha.tipo.includes('Transfer.') ? linha.deParaOrigem : obterNomeFilialDinamico(linha.deParaOrigem)}
+                            </span>
+                            
+                            <span style={{ 
+                              display: 'inline-flex', alignItems: 'center', gap: '4px', 
+                              backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#eff6ff', 
+                              color: corDestaque, padding: '2px 6px', borderRadius: '4px', 
+                              fontSize: '0.70rem', fontWeight: '600', 
+                              border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#bfdbfe'}`, 
+                              whiteSpace: 'nowrap' 
+                            }}>
+                              Para: {linha.deParaDestino}
+                            </span>
+                          </div>
                         </td>
+
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
 
                         <td>
