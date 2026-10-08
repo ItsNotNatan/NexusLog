@@ -1,6 +1,5 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao.jsx
-// DESCRIÇÃO: Detalhamento expandido das solicitações com campo Fabricante e Valor Unitário corrigidos
 // =================================================================
 import React from 'react';
 import { PackageX, Box, ArrowRightLeft, FileText, PackagePlus, Truck, RefreshCcw, XCircle, AlertCircle } from 'lucide-react';
@@ -43,7 +42,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
     }
   };
 
-  // ✨ FUNÇÃO AUXILIAR: Lida com valores numéricos ou texto que já tenha "R$"
+  // ✨ FUNÇÃO AUXILIAR CORRIGIDA: Usa ?? para tratar valores numéricos puros (como 0) que eram ignorados.
   const formatarMoeda = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
     // Se o valor já tem R$ inserido pelo utilizador, não fazemos contas, apenas mostramos
@@ -133,9 +132,9 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#f87171' : '#64748b', fontSize: '0.8rem' }}>{formatarData(it.receb_nf)}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontFamily: 'monospace', fontSize: '0.8rem' }}>{it.documento_compras || '-'}</td>
                     
-                    {/* ✨ CORRIGIDO: Puxa o Valor Unitário com a nova função formatarMoeda */}
+                    {/* ✨ CORRIGIDO: Puxa o Valor Unitário com a nova função formatarMoeda protegida com ?? em vez de || */}
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontWeight: '500', fontSize: '0.85rem' }}>
-                      {formatarMoeda(it.valor_unitario_manual || it.valor_unitario || it.poNetPrice)}
+                      {formatarMoeda(it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice)}
                     </td>
                     
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.centro || '-'}</td>
