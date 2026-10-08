@@ -47,6 +47,17 @@ export default function VisaoGeralEstoque({ perfil }) {
     }
   };
 
+  // ✨ NOVA FUNÇÃO AUXILIAR: Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
+  const formatarMoedaLocal = (valor) => {
+    if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
+    if (typeof valor === 'string' && valor.includes('R$')) return valor;
+
+    const numero = parseFloat(String(valor).replace(',', '.'));
+    if (!isNaN(numero)) return `R$ ${numero.toFixed(2).replace('.', ',')}`;
+
+    return String(valor);
+  };
+
   useEffect(() => {
     const buscarEstoque = async () => {
       try {
@@ -158,7 +169,12 @@ export default function VisaoGeralEstoque({ perfil }) {
 
   const CelulaEditavel = ({ item, field, type = 'text', renderFn, style = {}, placeholder = "" }) => {
     const isEditing = editCell.id === item.id && editCell.field === field;
-    const val = item[field];
+    
+    // ✨ Fallbacks para garantir que campos alternativos são lidos
+    let val = item[field];
+    if (field === 'fabricante' && !val) val = item.fabricante_manual;
+    if (field === 'part_number' && !val) val = item.part_number_manual;
+    
     const displayVal = renderFn ? renderFn(val) : (val || '-');
 
     if (!podeEditar) {
@@ -242,6 +258,7 @@ export default function VisaoGeralEstoque({ perfil }) {
     return (
       (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
       (item.fabricante && item.fabricante.toLowerCase().includes(termo)) || 
+      (item.fabricante_manual && item.fabricante_manual.toLowerCase().includes(termo)) || 
       (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
       (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
       (item.fornecedor && item.fornecedor.toLowerCase().includes(termo)) ||
@@ -310,7 +327,7 @@ export default function VisaoGeralEstoque({ perfil }) {
           sap: item.desenho_sap || '-',
           ref: item.referencia || '-',
           desc: item.descricao || '-',
-          fab: item.fabricante || '-', 
+          fab: item.fabricante || item.fabricante_manual || '-', 
           qtd: Number(item.quantidade_disponivel) || 0,
           unid: item.unidade_medida || '-',
           nf: item.nf_entrada || '-',
@@ -505,7 +522,7 @@ export default function VisaoGeralEstoque({ perfil }) {
                     </td>
 
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="valor_unitario" type="text" renderFn={(val) => val ? `R$ ${Number(val).toFixed(2)}` : '-'} style={{ color: '#1e293b', fontWeight: '500' }} />
+                      <CelulaEditavel item={item} field="valor_unitario" type="text" renderFn={formatarMoedaLocal} style={{ color: '#1e293b', fontWeight: '500' }} />
                     </td>
 
                     <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
