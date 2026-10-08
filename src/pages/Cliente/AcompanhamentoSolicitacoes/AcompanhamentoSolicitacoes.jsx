@@ -69,7 +69,28 @@ const converterParaInputDateTime = (dataString) => {
   return '';
 };
 
-const obterValorSeguro = (valItem, valEstoque) => {
+// ✨ FUNÇÃO AUXILIAR CORRIGIDA: Trata o zero (0 ou 0.00) como valor inválido para o substituir pelo estoque
+const extrairValorValido = (valSolicitacao, valEstoque) => {
+  if (valSolicitacao !== undefined && valSolicitacao !== null && valSolicitacao !== '' && valSolicitacao !== '-' && valSolicitacao !== 'null') {
+    let limpo = String(valSolicitacao).replace(/[^\d.,-]/g, '');
+    if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
+    else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
+
+    const num = parseFloat(limpo);
+    if (!isNaN(num) && num > 0) {
+      return num;
+    }
+  }
+
+  if (valEstoque !== undefined && valEstoque !== null && valEstoque !== '' && valEstoque !== '-' && valEstoque !== 'null') {
+    return valEstoque;
+  }
+
+  return 0;
+};
+
+// Mantido para as outras variáveis que não são valores unitários
+const obterValorSeguroTexto = (valItem, valEstoque) => {
   const validar = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== 'null';
   if (validar(valItem)) return valItem;
   if (validar(valEstoque)) return valEstoque;
@@ -153,6 +174,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           const estoqueReferencia = resultadoEst.sucesso ? resultadoEst.dados : [];
 
           const dadosFormatados = resultadoSol.dados.map((item) => {
+            let prefixo = "PS";
+            const idNumerico = item.id.replace(/\D/g, "");
             let acaoTipo = "select";
             let acaoValor = item.status;
             let statusDestinoAprovacao = item.tipo === "Entrada" ? "Concluído" : "Em Separação";
@@ -198,34 +221,41 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
-            // ✨ AQUI: ENRIQUECIMENTO DOS ITENS (AGORA INCLUI O FABRICANTE!)
+            // ✨ AQUI: ENRIQUECIMENTO DOS ITENS COM A NOVA LÓGICA DE VALOR
             const itensEnriquecidos = (item.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
                 : null;
                 
+              const valSol = it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice;
+              const valEst = itemFisico?.valor_unitario;
+              const valorFinal = extrairValorValido(valSol, valEst);
+
+              const fabSol = it.fabricante || it.fabricante_manual;
+              const fabEst = itemFisico?.fabricante;
+              const fabFinal = (fabSol && fabSol !== '-' && fabSol !== 'null') ? fabSol : (fabEst || '-');
+
               return {
                 ...it,
-                desenho_sap_manual: obterValorSeguro(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
-                part_number_manual: obterValorSeguro(it.part_number_manual || it.part_number, itemFisico?.part_number),
-                descricao_manual: obterValorSeguro(it.descricao_manual || it.descricao, itemFisico?.descricao),
+                desenho_sap_manual: obterValorSeguroTexto(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
+                part_number_manual: obterValorSeguroTexto(it.part_number_manual || it.part_number, itemFisico?.part_number),
+                descricao_manual: obterValorSeguroTexto(it.descricao_manual || it.descricao, itemFisico?.descricao),
                 
-                // ✨ ESTA É A LINHA MÁGICA QUE FALTAVA PARA GARANTIR O FABRICANTE NO FRONTEND
-                fabricante: obterValorSeguro(it.fabricante || it.fabricante_manual, itemFisico?.fabricante),
+                fabricante_enriquecido: fabFinal, // ✨ Enviado para o Componente Filho
+                valor_unitario_enriquecido: valorFinal, // ✨ Enviado para o Componente Filho
                 
-                referencia: obterValorSeguro(it.referencia, itemFisico?.referencia),
-                fornecedor: obterValorSeguro(it.fornecedor, itemFisico?.fornecedor),
-                nf_entrada: obterValorSeguro(it.nf_entrada, itemFisico?.nf_entrada),
-                wbs_element: obterValorSeguro(it.wbs_element, itemFisico?.wbs),
-                nome_projeto: obterValorSeguro(it.nome_projeto, itemFisico?.nome_projeto),
-                emissao_nf: obterValorSeguro(it.emissao_nf, itemFisico?.emissao_nf),
-                receb_nf: obterValorSeguro(it.receb_nf, itemFisico?.receb_nf),
-                documento_compras: obterValorSeguro(it.documento_compras, itemFisico?.documento_compras),
-                valor_unitario_manual: obterValorSeguro(it.valor_unitario_manual, itemFisico?.valor_unitario),
-                centro: obterValorSeguro(it.centro, itemFisico?.centro),
-                deposito: obterValorSeguro(it.deposito, itemFisico?.deposito),
-                alocacao: obterValorSeguro(it.alocacao, itemFisico?.alocacao),
-                unidade_medida_manual: obterValorSeguro(it.unidade_medida_manual, itemFisico?.unidade_medida) || 'Unid'
+                referencia: obterValorSeguroTexto(it.referencia, itemFisico?.referencia),
+                fornecedor: obterValorSeguroTexto(it.fornecedor, itemFisico?.fornecedor),
+                nf_entrada: obterValorSeguroTexto(it.nf_entrada, itemFisico?.nf_entrada),
+                wbs_element: obterValorSeguroTexto(it.wbs_element, itemFisico?.wbs),
+                nome_projeto: obterValorSeguroTexto(it.nome_projeto, itemFisico?.nome_projeto),
+                emissao_nf: obterValorSeguroTexto(it.emissao_nf, itemFisico?.emissao_nf),
+                receb_nf: obterValorSeguroTexto(it.receb_nf, itemFisico?.receb_nf),
+                documento_compras: obterValorSeguroTexto(it.documento_compras, itemFisico?.documento_compras),
+                centro: obterValorSeguroTexto(it.centro, itemFisico?.centro),
+                deposito: obterValorSeguroTexto(it.deposito, itemFisico?.deposito),
+                alocacao: obterValorSeguroTexto(it.alocacao, itemFisico?.alocacao),
+                unidade_medida_manual: obterValorSeguroTexto(it.unidade_medida_manual, itemFisico?.unidade_medida) || 'Unid'
               };
             });
 
@@ -233,6 +263,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               ...item,
               idOriginal: item.id,
               id: item.ps || item.id,
+              prefixo: prefixo,
               statusExibicao: statusFinalVisual,
               statusDestinoAprovacao: statusDestinoAprovacao,
               acaoTipo: acaoTipo,
