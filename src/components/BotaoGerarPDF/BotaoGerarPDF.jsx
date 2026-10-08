@@ -73,7 +73,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const headerRow = [
         { text: 'ITEM', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'DESENHO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'REFERÊNCIA', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
+        { text: 'PART NUMBER', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
         { text: 'QTD', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'UNID', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'DESCRIÇÃO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
@@ -145,24 +145,15 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                 table: {
                   widths: ['35%', '65%'],
                   body: [
-                    [
-                      { text: 'Formulário\nPASTA DRIVE', fontSize: 7, bold: true, color: '#1d4ed8', alignment: 'center', margin: [0, 1], border: [true, true, true, false] },
-                      { 
-                        text: [
-                          { text: 'APROVAÇÃO: ', fontSize: 6, bold: true },
-                          { text: 'GESTÃO DA SEGURANÇA E PATRIMONIO/LOGÍSTICA E PROJETOS', fontSize: 6, bold: true, color: '#b91c1c' }
-                        ], 
-                        fillColor: '#f1f5f9', border: [true, true, true, false], margin: [4, 4] 
-                      }
-                    ],
                     // ✨ Bloco da "ORIGEM MATERIAL" foi removido daqui!
+                    // ✨ Bloco "Formulário PASTA DRIVE" foi removido daqui!
                     [
                       { 
                         text: [
                           { text: 'DESTINO MATERIAL: ', fontSize: 6, bold: true },
                           { text: destinoMaterial, fontSize: 6, bold: true, color: '#b91c1c' }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, false] 
+                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, true, true, false] 
                       },
                       {}
                     ],
@@ -223,7 +214,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     ],
                     [
                       { text: 'NÚMERO FORMULÁRIO:\nP&S/CROSS DOCKING/LOGISTICA', fontSize: 6, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
-                      { text: `${linha.ps || linha.id}`, alignment: 'center', fontSize: 9, bold: true, fillColor: '#a5f3fc', margin: [0, 1], border: [true, true, true, true] }
+                      { text: `PS: ${linha.ps || linha.id}`, alignment: 'center', fontSize: 9, bold: true, fillColor: '#a5f3fc', margin: [0, 1], border: [true, true, true, true] }
                     ],
                     [
                       { text: 'DATA DO SOLICITAÇÃO FORMULÁRIO:', fontSize: 6, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
