@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP
+// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Com Valores Unitários Enriquecidos)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
@@ -36,11 +36,21 @@ export default function FormatacaoSAP() {
     const buscarDados = async () => {
       try {
         setCarregando(true);
-        const resultado = await apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=100');
         
-        if (resultado.sucesso && resultado.dados) {
-          // ✨ FILTRO ESTRITO: Apenas os 3 tipos E OBRIGATÓRIAMENTE COM PL GERADA
-          const transferencias = resultado.dados.filter(
+        // ✨ CORREÇÃO CRUCIAL: Buscar as solicitações E o inventário ao mesmo tempo para cruzar dados!
+        const [resultadoSol, resultadoEst] = await Promise.all([
+          apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=100'),
+          apiFetch('/estoque/listar?rastreabilidade=true')
+        ]);
+
+        let estoqueReferencia = [];
+        if (resultadoEst && resultadoEst.sucesso && resultadoEst.dados) {
+          estoqueReferencia = resultadoEst.dados;
+        }
+        
+        if (resultadoSol && resultadoSol.sucesso && resultadoSol.dados) {
+          // Filtro estrito: Apenas os 3 tipos E obrigatoriamente com PL gerada
+          const transferencias = resultadoSol.dados.filter(
             s => (
               s.tipo === 'Material' || 
               s.tipo === 'Transferencia WBS' || 
@@ -48,7 +58,24 @@ export default function FormatacaoSAP() {
               s.tipo === 'Crossdocking'
             ) && (s.pl && s.pl !== '-' && s.pl !== '—')
           );
-          setSolicitacoes(transferencias);
+
+          // ✨ ENRIQUECIMENTO: Puxamos o valor unitário da prateleira (estoque físico)
+          const solicitacoesEnriquecidas = transferencias.map(sol => {
+            const itensEnriquecidos = (sol.itens || []).map(it => {
+              const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
+                ? estoqueReferencia.find(e => e.id === it.estoque_id)
+                : null;
+                
+              return {
+                ...it,
+                valor_unitario_enriquecido: it.valor_unitario_manual ?? itemFisico?.valor_unitario ?? null
+              };
+            });
+
+            return { ...sol, itens: itensEnriquecidos };
+          });
+
+          setSolicitacoes(solicitacoesEnriquecidas);
         }
       } catch (error) {
         console.error('Erro ao buscar dados:', error.message);
@@ -56,6 +83,7 @@ export default function FormatacaoSAP() {
         setCarregando(false);
       }
     };
+    
     buscarDados();
   }, []);
 
@@ -71,9 +99,9 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais({});
   };
 
-  // ✨ NOVA FUNÇÃO: Transforma "R$ 1.234,56" num número limpo (1234.56) que o SAP entende
+  // ✨ FUNÇÃO: Transforma "R$ 1.234,56" num número limpo (1234.56) que o SAP entende
   const limparEFormatarValor = (valorSujo) => {
-    if (!valorSujo || valorSujo === '-' || valorSujo === 'NaN') return "0.00";
+    if (valorSujo === undefined || valorSujo === null || valorSujo === '-' || String(valorSujo).trim() === 'NaN') return "0.00";
     
     // Se for string, remove tudo o que não for número, vírgula ou ponto
     let limpo = String(valorSujo).replace(/[^\d.,-]/g, '');
@@ -104,8 +132,8 @@ export default function FormatacaoSAP() {
         origem: sol.pl,
         desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
         quantidade: item.quantidade_solicitada || item.qtd || 1,
-        // ✨ CORREÇÃO: Aplica a função de limpeza ao valor unitário de forma segura
-        valorUnitario: limparEFormatarValor(item.valor_unitario_manual ?? item.valor_unitario ?? item.poNetPrice),
+        // ✨ CORREÇÃO: Aplica a função de limpeza ao valor unitário ENRIQUECIDO de forma segura
+        valorUnitario: limparEFormatarValor(item.valor_unitario_enriquecido),
         wbs: sol.wbs || item.wbsOrigem || '-',
         destino: sol.filial || '-',
       }));
