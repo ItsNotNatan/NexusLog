@@ -17,7 +17,15 @@ import {
 import logoComau from '../../assets/logo-comau.png';
 import { urlDaApi } from '../../services/api';
 
-const filtrosArray = ['Todos', 'Material', 'Transferencia WBS', 'Nota Fiscal', 'Entrada', 'Crossdocking', 'Reintegracao'];
+const filtrosArray = [
+  'Todos',
+  'Material',
+  'Transferencia WBS',
+  'Nota Fiscal',
+  'Entrada',
+  'Crossdocking',
+  'Reintegracao'
+];
 
 const renderBadgeStatus = (status) => {
   switch (status) {
@@ -29,7 +37,18 @@ const renderBadgeStatus = (status) => {
       );
     case 'Pendente':
       return (
-        <span className="badge-status status-pendente" style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '4px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        <span
+          className="badge-status status-pendente"
+          style={{
+            backgroundColor: '#fff3cd',
+            color: '#856404',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+        >
           Pendente
         </span>
       );
@@ -60,8 +79,8 @@ export default function PainelGeralSolicitacoes() {
 
   // 📄 CONTROLE DE PAGINAÇÃO REAL (10 por vez)
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [totalRegistros, setTotalRegistros] = useState(0); 
-  const itensPorPagina = 10; 
+  const [totalRegistros, setTotalRegistros] = useState(0);
+  const itensPorPagina = 10;
 
   // ✨ BUSCA DADOS PAGINADOS DO BACKEND
   useEffect(() => {
@@ -69,8 +88,11 @@ export default function PainelGeralSolicitacoes() {
       try {
         setCarregando(true);
 
-        const tipoFiltro = filtroAtivo === 'Transfer. WBS' ? 'Transferencia WBS' : filtroAtivo;
-        const urlSolicitacoes = `${urlDaApi()}/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${tipoFiltro !== 'Todos' ? tipoFiltro : ''}`;
+        const tipoFiltro =
+          filtroAtivo === 'Transfer. WBS' ? 'Transferencia WBS' : filtroAtivo;
+        const urlSolicitacoes = `${urlDaApi()}/solicitacoes/listar?page=${paginaAtual}&limit=${itensPorPagina}&busca=${termoPesquisa}&tipo=${
+          tipoFiltro !== 'Todos' ? tipoFiltro : ''
+        }`;
 
         const [resSolicitacoes, resEstoque] = await Promise.all([
           fetch(urlSolicitacoes),
@@ -85,19 +107,22 @@ export default function PainelGeralSolicitacoes() {
         }
 
         if (resSolicitacoes.ok && resultadoSol.sucesso) {
-          const dadosFormatados = resultadoSol.dados.map(item => ({
+          const dadosFormatados = resultadoSol.dados.map((item) => ({
             ...item,
-            // ✨ CORREÇÃO AQUI: Em vez de destruir a ID interna, usamos o campo "ps" que vem direto do backend
-            idNumerico: item.ps || item.id,
-            dataCriacaoFormatada: item.dataSolicitacao || new Date(item.created_at).toLocaleDateString('pt-BR'),
-            nfCrossdocking: item.notas_fiscais && item.notas_fiscais.length > 0 ? item.notas_fiscais[0].numero_nf : (item.notas_fiscais?.numero_nf || null)
+            idNumerico: item.id.replace(/\D/g, '') || item.id,
+            dataCriacaoFormatada:
+              item.dataSolicitacao ||
+              new Date(item.created_at).toLocaleDateString('pt-BR'),
+            nfCrossdocking:
+              item.notas_fiscais && item.notas_fiscais.length > 0
+                ? item.notas_fiscais[0].numero_nf
+                : item.notas_fiscais?.numero_nf || null
           }));
-          
           setSolicitacoes(dadosFormatados);
-          setTotalRegistros(resultadoSol.total || resultadoSol.dados.length); 
+          setTotalRegistros(resultadoSol.total || resultadoSol.dados.length);
         }
       } catch (error) {
-        console.error("Erro ao buscar dados paginados:", error);
+        console.error('Erro ao buscar dados paginados:', error);
       } finally {
         setCarregando(false);
       }
@@ -117,32 +142,45 @@ export default function PainelGeralSolicitacoes() {
   };
 
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
-    if (!window.confirm(`Tem certeza que deseja mudar o status da solicitação ${idSolicitacao} para "${novoStatus}"?`)) {
+    if (
+      !window.confirm(
+        `Tem certeza que deseja mudar o status da solicitação ${idSolicitacao} para "${novoStatus}"?`
+      )
+    ) {
       return;
     }
 
     let motivo = null;
     if (novoStatus === 'Recusado' || novoStatus === 'Cancelado') {
-      motivo = window.prompt("Por favor, informe o motivo do cancelamento/recusa:");
+      motivo = window.prompt(
+        'Por favor, informe o motivo do cancelamento/recusa:'
+      );
       if (!motivo) return;
     }
 
     try {
-      const resposta = await fetch(`${urlDaApi()}/solicitacoes/${idSolicitacao}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
-      });
+      const resposta = await fetch(
+        `${urlDaApi()}/solicitacoes/${idSolicitacao}/status`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
+        }
+      );
 
       if (resposta.ok) {
-        setSolicitacoes(prev => prev.map(sol => sol.id === idSolicitacao ? { ...sol, status: novoStatus } : sol));
+        setSolicitacoes((prev) =>
+          prev.map((sol) =>
+            sol.id === idSolicitacao ? { ...sol, status: novoStatus } : sol
+          )
+        );
         alert(`Status atualizado com sucesso!`);
       } else {
-        alert("Erro ao atualizar o status no servidor.");
+        alert('Erro ao atualizar o status no servidor.');
       }
     } catch (error) {
-      console.error("Erro de conexão:", error);
-      alert("Falha de conexão com o servidor.");
+      console.error('Erro de conexão:', error);
+      alert('Falha de conexão com o servidor.');
     }
   };
 
@@ -150,12 +188,14 @@ export default function PainelGeralSolicitacoes() {
 
   return (
     <div className="painel-geral-wrapper">
-
       <header className="painel-cabecalho">
         {/* ✨ 2. INSERÇÃO DA LOGO */}
         <img src={logoComau} alt="Logo COMAU" className="painel-logo" />
         <h1>Painel Geral de Solicitações</h1>
-        <p>Gerencie todas as solicitações — materiais, WBS, NFs, entradas, crossdocking e reintegrações</p>
+        <p>
+          Gerencie todas as solicitações — materiais, WBS, NFs, entradas,
+          crossdocking e reintegrações
+        </p>
       </header>
 
       {/* CARD KPIs SUPERIORES */}
@@ -166,25 +206,36 @@ export default function PainelGeralSolicitacoes() {
         </div>
         <div className="kpi-card-resumo kpi-pendentes">
           <span>Pendentes</span>
-          <strong>{solicitacoes.filter(s => s.status === 'Pendente').length}</strong>
+          <strong>
+            {solicitacoes.filter((s) => s.status === 'Pendente').length}
+          </strong>
         </div>
         <div className="kpi-card-resumo kpi-andamento">
           <span>Em Andamento</span>
-          <strong>{solicitacoes.filter(s => s.status === 'Em Separação').length}</strong>
+          <strong>
+            {solicitacoes.filter((s) => s.status === 'Em Separação').length}
+          </strong>
         </div>
         <div className="kpi-card-resumo kpi-concluidos">
           <span>Concluídos</span>
-          <strong>{solicitacoes.filter(s => s.status === 'Concluído').length}</strong>
+          <strong>
+            {solicitacoes.filter((s) => s.status === 'Concluído').length}
+          </strong>
         </div>
         <div className="kpi-card-resumo kpi-recusados">
           <span>Cancelados/Recusados</span>
-          <strong>{solicitacoes.filter(s => s.status === 'Cancelado' || s.status === 'Recusado').length}</strong>
+          <strong>
+            {
+              solicitacoes.filter(
+                (s) => s.status === 'Cancelado' || s.status === 'Recusado'
+              ).length
+            }
+          </strong>
         </div>
       </div>
 
       {/* ÁREA DA TABELA */}
       <div className="tabela-cartao-container">
-
         <div className="tabela-controlos-topo">
           <div className="filtros-botoes">
             {filtrosArray.map((filtro) => (
@@ -233,13 +284,27 @@ export default function PainelGeralSolicitacoes() {
             <tbody>
               {carregando ? (
                 <tr>
-                  <td colSpan="8" style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
+                  <td
+                    colSpan="8"
+                    style={{
+                      padding: '60px',
+                      textAlign: 'center',
+                      color: '#64748b'
+                    }}
+                  >
                     Carregando dados do servidor...
                   </td>
                 </tr>
               ) : solicitacoes.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                  <td
+                    colSpan="8"
+                    style={{
+                      padding: '40px',
+                      textAlign: 'center',
+                      color: '#94a3b8'
+                    }}
+                  >
                     Nenhuma solicitação encontrada para esta página.
                   </td>
                 </tr>
@@ -249,10 +314,17 @@ export default function PainelGeralSolicitacoes() {
                   let nfNoEstoque = true;
 
                   if (isCrossdocking && linha.nfCrossdocking) {
-                    nfNoEstoque = estoque.some(itemEstoque => {
-                      const nfEstoqueLimpa = String(itemEstoque.nf_entrada || '').trim();
-                      const nfSolicitacaoLimpa = String(linha.nfCrossdocking || '').trim();
-                      return nfEstoqueLimpa === nfSolicitacaoLimpa && nfEstoqueLimpa !== '';
+                    nfNoEstoque = estoque.some((itemEstoque) => {
+                      const nfEstoqueLimpa = String(
+                        itemEstoque.nf_entrada || ''
+                      ).trim();
+                      const nfSolicitacaoLimpa = String(
+                        linha.nfCrossdocking || ''
+                      ).trim();
+                      return (
+                        nfEstoqueLimpa === nfSolicitacaoLimpa &&
+                        nfEstoqueLimpa !== ''
+                      );
                     });
                   }
 
@@ -272,10 +344,15 @@ export default function PainelGeralSolicitacoes() {
 
                       <td>
                         <div className="bloco-id-multiplo">
-                          {/* ✨ CORREÇÃO AQUI: Removido o "PS : " fixo para não duplicar */}
-                          <span className="texto-ps-id">{linha.idNumerico}</span>
-                          <span className="nome-solicitante">{linha.solicitante}</span>
-                          <a href="#" className="link-wbs">{linha.wbs}</a>
+                          <span className="texto-ps-id">
+                            PS : {linha.idNumerico}
+                          </span>
+                          <span className="nome-solicitante">
+                            {linha.solicitante}
+                          </span>
+                          <a href="#" className="link-wbs">
+                            {linha.wbs}
+                          </a>
                         </div>
                       </td>
 
@@ -289,33 +366,49 @@ export default function PainelGeralSolicitacoes() {
                         )}
                       </td>
 
-                      <td className="texto-data">{linha.dataCriacaoFormatada}</td>
+                      <td className="texto-data">
+                        {linha.dataCriacaoFormatada}
+                      </td>
 
                       <td>
                         {linha.dataFinalizacao ? (
                           <div className="bloco-finalizacao">
-                            <span className="texto-data-verde">{linha.dataFinalizacao}</span>
-                            <button className="btn-editar-data"><Edit2 size={12} /> Editar</button>
+                            <span className="texto-data-verde">
+                              {linha.dataFinalizacao}
+                            </span>
+                            <button className="btn-editar-data">
+                              <Edit2 size={12} /> Editar
+                            </button>
+                          </div>
+                        ) : linha.status !== 'Cancelado' ? (
+                          <div className="bloco-finalizacao">
+                            <span className="texto-data-amarelo">
+                              não definido
+                            </span>
+                            <button className="btn-editar-data">
+                              <Edit2 size={12} /> Editar
+                            </button>
                           </div>
                         ) : (
-                          linha.status !== 'Cancelado' ? (
-                            <div className="bloco-finalizacao">
-                              <span className="texto-data-amarelo">não definido</span>
-                              <button className="btn-editar-data"><Edit2 size={12} /> Editar</button>
-                            </div>
-                          ) : (
-                            <span className="traco-vazio">—</span>
-                          )
+                          <span className="traco-vazio">—</span>
                         )}
                       </td>
 
                       <td>{renderBadgeStatus(linha.status)}</td>
 
-                      <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <td
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                      >
                         {linha.status === 'Pendente' ? (
                           statusBloqueado ? (
                             <div
-                              title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`}
+                              title={`Aguardando NF ${
+                                linha.nfCrossdocking || ''
+                              } dar entrada no estoque`}
                               style={{
                                 color: '#d97706',
                                 backgroundColor: '#fefce8',
@@ -345,7 +438,7 @@ export default function PainelGeralSolicitacoes() {
                                 cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '6px',
+                                gap: '6px'
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -371,10 +464,12 @@ export default function PainelGeralSolicitacoes() {
                               fontSize: '0.875rem',
                               color: '#334155',
                               outline: 'none',
-                              cursor: 'pointer',
+                              cursor: 'pointer'
                             }}
                           >
-                            <option value="Pendente" disabled>Pendente</option>
+                            <option value="Pendente" disabled>
+                              Pendente
+                            </option>
                             <option value="Em Separação">Em Separação</option>
                             <option value="Concluído">Concluído</option>
                             <option value="Cancelado">Cancelado</option>
@@ -390,18 +485,50 @@ export default function PainelGeralSolicitacoes() {
           </table>
 
           {/* 📄 CONTROLE DE PAGINAÇÃO COM BOTÕES NUMÉRICOS CLICÁVEIS */}
-          <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {solicitacoes.length} de <strong>{totalRegistros}</strong> resultados
+          <div
+            className="paginacao-container"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 24px',
+              backgroundColor: '#ffffff',
+              borderTop: '1px solid #f1f5f9'
+            }}
+          >
+            <div
+              className="paginacao-info"
+              style={{ fontSize: '0.875rem', color: '#64748b' }}
+            >
+              Página <strong>{paginaAtual}</strong> de{' '}
+              <strong>{totalPaginas}</strong> &middot; Exibindo{' '}
+              {solicitacoes.length} de <strong>{totalRegistros}</strong>{' '}
+              resultados
             </div>
-            
-            <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div
+              className="paginacao-botoes"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
               {/* Botão Anterior */}
-              <button 
-                className="btn-paginacao" 
-                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} 
+              <button
+                className="btn-paginacao"
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
                 disabled={paginaAtual === 1 || carregando}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 12px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#334155',
+                  cursor:
+                    paginaAtual === 1 || carregando ? 'not-allowed' : 'pointer',
+                  opacity: paginaAtual === 1 || carregando ? 0.6 : 1
+                }}
               >
                 <ChevronLeft size={16} /> Anterior
               </button>
@@ -410,7 +537,6 @@ export default function PainelGeralSolicitacoes() {
               {Array.from({ length: totalPaginas }, (_, index) => {
                 const numeroPagina = index + 1;
                 const ehAtiva = paginaAtual === numeroPagina;
-                
                 return (
                   <button
                     key={numeroPagina}
@@ -418,7 +544,7 @@ export default function PainelGeralSolicitacoes() {
                     disabled={carregando}
                     style={{
                       padding: '6px 12px',
-                      backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', 
+                      backgroundColor: ehAtiva ? '#ea580c' : '#ffffff',
                       color: ehAtiva ? '#ffffff' : '#334155',
                       border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`,
                       borderRadius: '6px',
@@ -434,18 +560,46 @@ export default function PainelGeralSolicitacoes() {
               })}
 
               {/* Botão Próxima */}
-              <button 
-                className="btn-paginacao" 
-                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} 
-                disabled={paginaAtual === totalPaginas || carregando || totalRegistros === 0}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistros === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistros === 0) ? 0.6 : 1 }}
+              <button
+                className="btn-paginacao"
+                onClick={() =>
+                  setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))
+                }
+                disabled={
+                  paginaAtual === totalPaginas ||
+                  carregando ||
+                  totalRegistros === 0
+                }
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 12px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#334155',
+                  cursor:
+                    paginaAtual === totalPaginas ||
+                    carregando ||
+                    totalRegistros === 0
+                      ? 'not-allowed'
+                      : 'pointer',
+                  opacity:
+                    paginaAtual === totalPaginas ||
+                    carregando ||
+                    totalRegistros === 0
+                      ? 0.6
+                      : 1
+                }}
               >
                 Próxima <ChevronRight size={16} />
               </button>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
