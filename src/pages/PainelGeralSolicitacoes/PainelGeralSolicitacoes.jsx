@@ -87,7 +87,8 @@ export default function PainelGeralSolicitacoes() {
         if (resSolicitacoes.ok && resultadoSol.sucesso) {
           const dadosFormatados = resultadoSol.dados.map(item => ({
             ...item,
-            idNumerico: item.id.replace(/\D/g, '') || item.id,
+            // ✨ CORREÇÃO AQUI: Em vez de destruir a ID interna, usamos o campo "ps" que vem direto do backend
+            idNumerico: item.ps || item.id,
             dataCriacaoFormatada: item.dataSolicitacao || new Date(item.created_at).toLocaleDateString('pt-BR'),
             nfCrossdocking: item.notas_fiscais && item.notas_fiscais.length > 0 ? item.notas_fiscais[0].numero_nf : (item.notas_fiscais?.numero_nf || null)
           }));
@@ -271,7 +272,8 @@ export default function PainelGeralSolicitacoes() {
 
                       <td>
                         <div className="bloco-id-multiplo">
-                          <span className="texto-ps-id">PS : {linha.idNumerico}</span>
+                          {/* ✨ CORREÇÃO AQUI: Removido o "PS : " fixo para não duplicar */}
+                          <span className="texto-ps-id">{linha.idNumerico}</span>
                           <span className="nome-solicitante">{linha.solicitante}</span>
                           <a href="#" className="link-wbs">{linha.wbs}</a>
                         </div>
