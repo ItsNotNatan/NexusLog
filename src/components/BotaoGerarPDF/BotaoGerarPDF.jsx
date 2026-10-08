@@ -27,6 +27,19 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     }
   };
 
+  // ✨ NOVA FUNÇÃO AUXILIAR: Lida com valores numéricos ou strings que já vêm formatadas como R$
+  const formatarMoedaPdf = (valor) => {
+    if (!valor || valor === '-' || valor === 'NaN') return '-';
+    // Se o valor já vier formatado do frontend com "R$", não tentamos calcular, apenas exibimos
+    if (typeof valor === 'string' && valor.includes('R$')) return valor;
+    
+    // Se for um número limpo, formatamos
+    const numero = parseFloat(String(valor).replace(',', '.'));
+    if (!isNaN(numero)) return `R$ ${numero.toFixed(2).replace('.', ',')}`;
+    
+    return String(valor);
+  };
+
   const handleGerarPdf = async (e) => {
     e.stopPropagation(); 
     setGerando(true);
@@ -73,7 +86,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const headerRow = [
         { text: 'ITEM', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'DESENHO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'PART NUMBER', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
+        { text: 'REFERÊNCIA', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
         { text: 'QTD', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'UNID', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'DESCRIÇÃO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
@@ -98,7 +111,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             { text: it.fornecedor || '-', fontSize: 7, margin: [0, 3] },
             { text: it.alocacao || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
-            { text: it.valor_unitario_manual ? `R$ ${Number(it.valor_unitario_manual).toFixed(2)}` : '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
+            // ✨ CORREÇÃO DA EXTRAÇÃO DO VALOR UNITÁRIO AQUI:
+            { text: formatarMoedaPdf(it.valor_unitario_manual || it.valor_unitario || it.poNetPrice), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.wbs_element || '-', fontSize: 7, alignment: 'center', margin: [0, 3] }
           ]);
         });
@@ -145,8 +159,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                 table: {
                   widths: ['35%', '65%'],
                   body: [
-                    // ✨ Bloco da "ORIGEM MATERIAL" foi removido daqui!
-                    // ✨ Bloco "Formulário PASTA DRIVE" foi removido daqui!
                     [
                       { 
                         text: [
