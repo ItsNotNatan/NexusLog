@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Com Valores Unitários Enriquecidos)
+// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Com correção de 0 -> Estoque Físico)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
@@ -32,12 +32,47 @@ export default function FormatacaoSAP() {
     'ZBE4'
   ];
 
+  // ✨ FUNÇÃO AUXILIAR: Se o valor da solicitação for 0, 0.00 ou nulo, busca obrigatoriamente do estoque
+  const extrairValorValido = (valSolicitacao, valEstoque) => {
+    if (valSolicitacao !== undefined && valSolicitacao !== null && valSolicitacao !== '' && valSolicitacao !== '-' && valSolicitacao !== 'null') {
+      let limpo = String(valSolicitacao).replace(/[^\d.,-]/g, '');
+      if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
+      else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
+
+      const num = parseFloat(limpo);
+      if (!isNaN(num) && num > 0) {
+        return num;
+      }
+    }
+
+    if (valEstoque !== undefined && valEstoque !== null && valEstoque !== '' && valEstoque !== '-' && valEstoque !== 'null') {
+      return valEstoque;
+    }
+
+    return 0;
+  };
+
+  // ✨ FUNÇÃO AUXILIAR: Formata para string de 2 casas decimais (ex: 1234.56) exigida pelo SAP
+  const limparEFormatarValor = (valorSujo) => {
+    if (valorSujo === undefined || valorSujo === null || valorSujo === '-' || String(valorSujo).trim() === 'NaN') return "0.00";
+    
+    let limpo = String(valorSujo).replace(/[^\d.,-]/g, '');
+    if (limpo.includes('.') && limpo.includes(',')) {
+      limpo = limpo.replace(/\./g, '').replace(',', '.');
+    } else if (limpo.includes(',')) {
+      limpo = limpo.replace(',', '.');
+    }
+
+    const numReal = parseFloat(limpo);
+    return isNaN(numReal) ? "0.00" : numReal.toFixed(2);
+  };
+
   useEffect(() => {
     const buscarDados = async () => {
       try {
         setCarregando(true);
         
-        // ✨ CORREÇÃO CRUCIAL: Buscar as solicitações E o inventário ao mesmo tempo para cruzar dados!
+        // Busca as solicitações e o estoque em simultâneo
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=100'),
           apiFetch('/estoque/listar?rastreabilidade=true')
@@ -49,7 +84,6 @@ export default function FormatacaoSAP() {
         }
         
         if (resultadoSol && resultadoSol.sucesso && resultadoSol.dados) {
-          // Filtro estrito: Apenas os 3 tipos E obrigatoriamente com PL gerada
           const transferencias = resultadoSol.dados.filter(
             s => (
               s.tipo === 'Material' || 
@@ -59,16 +93,25 @@ export default function FormatacaoSAP() {
             ) && (s.pl && s.pl !== '-' && s.pl !== '—')
           );
 
-          // ✨ ENRIQUECIMENTO: Puxamos o valor unitário da prateleira (estoque físico)
+          // ✨ ENRIQUECIMENTO INTELIGENTE: Ignora '0' na solicitação e vai ao estoque buscar o valor real!
           const solicitacoesEnriquecidas = transferencias.map(sol => {
             const itensEnriquecidos = (sol.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
                 : null;
-                
+
+              const valSol = it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice;
+              const valEst = itemFisico?.valor_unitario;
+              const valorFinal = extrairValorValido(valSol, valEst);
+
+              const fabSol = it.fabricante || it.fabricante_manual;
+              const fabEst = itemFisico?.fabricante;
+              const fabFinal = (fabSol && fabSol !== '-' && fabSol !== 'null') ? fabSol : (fabEst || '-');
+
               return {
                 ...it,
-                valor_unitario_enriquecido: it.valor_unitario_manual ?? itemFisico?.valor_unitario ?? null
+                fabricante_enriquecido: fabFinal,
+                valor_unitario_enriquecido: valorFinal
               };
             });
 
@@ -99,24 +142,6 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais({});
   };
 
-  // ✨ FUNÇÃO: Transforma "R$ 1.234,56" num número limpo (1234.56) que o SAP entende
-  const limparEFormatarValor = (valorSujo) => {
-    if (valorSujo === undefined || valorSujo === null || valorSujo === '-' || String(valorSujo).trim() === 'NaN') return "0.00";
-    
-    // Se for string, remove tudo o que não for número, vírgula ou ponto
-    let limpo = String(valorSujo).replace(/[^\d.,-]/g, '');
-    
-    // Converte formatação brasileira (1.234,56) para formato matemático (1234.56)
-    if (limpo.includes('.') && limpo.includes(',')) {
-      limpo = limpo.replace(/\./g, '').replace(',', '.');
-    } else if (limpo.includes(',')) {
-      limpo = limpo.replace(',', '.');
-    }
-
-    const numReal = parseFloat(limpo);
-    return isNaN(numReal) ? "0.00" : numReal.toFixed(2);
-  };
-
   const listaFiltrada = solicitacoes.filter(sol => {
     const termo = busca.toLowerCase();
     return sol.pl.toLowerCase().includes(termo) || 
@@ -132,8 +157,8 @@ export default function FormatacaoSAP() {
         origem: sol.pl,
         desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
         quantidade: item.quantidade_solicitada || item.qtd || 1,
-        // ✨ CORREÇÃO: Aplica a função de limpeza ao valor unitário ENRIQUECIDO de forma segura
         valorUnitario: limparEFormatarValor(item.valor_unitario_enriquecido),
+        fabricante: item.fabricante_enriquecido || '-',
         wbs: sol.wbs || item.wbsOrigem || '-',
         destino: sol.filial || '-',
       }));
