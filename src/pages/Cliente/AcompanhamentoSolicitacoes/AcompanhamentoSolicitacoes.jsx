@@ -50,7 +50,6 @@ const obterClasseBadgeTipo = (tipo) => {
   }
 };
 
-// ✨ FUNÇÃO AUXILIAR: Transforma o texto no formato do input datetime-local
 const converterParaInputDateTime = (dataString) => {
   if (!dataString || dataString === '-' || dataString === '—' || dataString === 'Disponível') return '';
   
@@ -70,7 +69,6 @@ const converterParaInputDateTime = (dataString) => {
   return '';
 };
 
-// ✨ FUNÇÃO AUXILIAR INTELIGENTE: Puxa o valor da solicitação ou cruza com o estoque
 const obterValorSeguro = (valItem, valEstoque) => {
   const validar = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== 'null';
   if (validar(valItem)) return valItem;
@@ -133,7 +131,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
-        // ✨ ADICIONADO "?rastreabilidade=true" PARA LER ITENS ZERADOS E RECUPERAR A REFERÊNCIA
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
           apiFetch("/estoque/listar?rastreabilidade=true")
@@ -201,8 +198,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
-            // ✨ AQUI: ENRIQUECIMENTO DOS ITENS! 
-            // Cruza todos os campos da solicitação com a prateleira física (mesmo as zeradas)
+            // ✨ AQUI: ENRIQUECIMENTO DOS ITENS (AGORA INCLUI O FABRICANTE!)
             const itensEnriquecidos = (item.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
@@ -213,6 +209,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 desenho_sap_manual: obterValorSeguro(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
                 part_number_manual: obterValorSeguro(it.part_number_manual || it.part_number, itemFisico?.part_number),
                 descricao_manual: obterValorSeguro(it.descricao_manual || it.descricao, itemFisico?.descricao),
+                
+                // ✨ ESTA É A LINHA MÁGICA QUE FALTAVA PARA GARANTIR O FABRICANTE NO FRONTEND
+                fabricante: obterValorSeguro(it.fabricante || it.fabricante_manual, itemFisico?.fabricante),
+                
                 referencia: obterValorSeguro(it.referencia, itemFisico?.referencia),
                 fornecedor: obterValorSeguro(it.fornecedor, itemFisico?.fornecedor),
                 nf_entrada: obterValorSeguro(it.nf_entrada, itemFisico?.nf_entrada),
@@ -232,7 +232,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             return {
               ...item,
               idOriginal: item.id,
-              // ✨ CORREÇÃO: Utiliza o 'ps' correto retornado pelo backend
               id: item.ps || item.id,
               statusExibicao: statusFinalVisual,
               statusDestinoAprovacao: statusDestinoAprovacao,
@@ -257,29 +256,22 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       }
     };
 
-    if (token) {
-      buscarDados();
+    buscarDados();
 
-      const SOCKET_URL = urlDoServidor();
-      const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-      
-      socket.on('solicitacoes_atualizadas', () => {
-        console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
-        buscarDados();
-      });
-
-      return () => socket.disconnect();
-    } else {
-      // ✨ Permite listar mesmo se não tiver token, útil se as rotas da API permitirem acesso sem autenticação.
+    const SOCKET_URL = urlDoServidor();
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    
+    socket.on('solicitacoes_atualizadas', () => {
+      console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
       buscarDados();
-    }
-  }, [filtroAtivo, termoPesquisa, token, estoqueAtual, showAlert, perfil]);
+    });
+
+    return () => socket.disconnect();
+  }, [filtroAtivo, termoPesquisa, estoqueAtual, showAlert, perfil]);
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
-  // ✨ FILTRO DUPLO SEGURO: Filtra pela Filial Atual + Status + Termo
   const dadosFiltrados = dadosTabela.filter((item) => {
-    // Bloqueia qualquer filial que não seja a selecionada (se não for TODOS)
     if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) {
       return false;
     }
@@ -525,7 +517,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado' || linha.tipo === 'Cancelado';
                   
-                  // ✨ AQUI ESTÁ A NOVA VERIFICAÇÃO PARA ESCONDER O BOTÃO GERAR PDF NA NF E ENTRADA
                   const esconderPL = linha.tipo === 'Nota Fiscal' || linha.tipo === 'Entrada';
                   
                   const corTextoForte = isRecusadoOuCancelado ? "#991b1b" : "#1e293b";
@@ -553,7 +544,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               {linha.entregaUrgente ? <Zap size={13} color="#ef4444" fill="#ef4444" /> : (isRecusadoOuCancelado ? <XCircle size={13} /> : <GitBranch size={13} />)}
                               {linha.tipo}
                             </span>
-                            {/* ✨ CORREÇÃO AQUI: Removemos o texto fixo "PS:" porque a variável linha.id já tem esse prefixo! */}
                             <span style={{ fontSize: "0.875rem", fontWeight: "700", color: corTextoForte, marginTop: "4px", display: "block", fontFamily: "monospace" }}>{linha.id}</span>
                           </div>
                         </td>
@@ -565,7 +555,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
 
                         <td>
-                          {/* ✨ O BOTÃO SÓ É MOSTRADO SE esconderPL FOR FALSO */}
                           {!esconderPL && linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
                             <BotaoGerarPDF
                               linha={linha}
