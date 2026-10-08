@@ -1,6 +1,5 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
-// DESCRIÇÃO: Painel de Acompanhamento (Corrigido para exibir dados ao Cliente público)
 // =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
@@ -120,6 +119,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   } catch (erro) { }
 
+  const token = localStorage.getItem('@NexusLog:token') || '';
   const isOperador = String(usuarioLogado.cargo || '').toLowerCase().trim().includes('operador');
   const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
 
@@ -156,8 +156,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           const estoqueReferencia = resultadoEst.sucesso ? resultadoEst.dados : [];
 
           const dadosFormatados = resultadoSol.dados.map((item) => {
-            let prefixo = "PS";
-            const idNumerico = item.id.replace(/\D/g, "");
             let acaoTipo = "select";
             let acaoValor = item.status;
             let statusDestinoAprovacao = item.tipo === "Entrada" ? "Concluído" : "Em Separação";
@@ -234,8 +232,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             return {
               ...item,
               idOriginal: item.id,
-              id: idNumerico || item.id,
-              prefixo: prefixo,
+              // ✨ CORREÇÃO: Utiliza o 'ps' correto retornado pelo backend
+              id: item.ps || item.id,
               statusExibicao: statusFinalVisual,
               statusDestinoAprovacao: statusDestinoAprovacao,
               acaoTipo: acaoTipo,
@@ -259,20 +257,23 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       }
     };
 
-    // ✨ CORREÇÃO CRUCIAL AQUI: Removido o bloqueio 'if (token)'!
-    // Agora o sistema carrega os dados para todos (incluindo o Cliente sem login)
-    buscarDados();
-
-    const SOCKET_URL = urlDoServidor();
-    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-    
-    socket.on('solicitacoes_atualizadas', () => {
-      console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
+    if (token) {
       buscarDados();
-    });
 
-    return () => socket.disconnect();
-  }, [filtroAtivo, termoPesquisa, estoqueAtual, showAlert, perfil]);
+      const SOCKET_URL = urlDoServidor();
+      const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+      
+      socket.on('solicitacoes_atualizadas', () => {
+        console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
+        buscarDados();
+      });
+
+      return () => socket.disconnect();
+    } else {
+      // ✨ Permite listar mesmo se não tiver token, útil se as rotas da API permitirem acesso sem autenticação.
+      buscarDados();
+    }
+  }, [filtroAtivo, termoPesquisa, token, estoqueAtual, showAlert, perfil]);
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
@@ -337,7 +338,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             if (dados.numeroPL) {
               novoPl = `PL #${dados.numeroPL}`;
             } else if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && sol.pl === '-') {
-              novoPl = `PL-${sol.id}`;
+              novoPl = `PL-${sol.idOriginal}`;
             }
             return {
               ...sol,
@@ -512,7 +513,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <tr><td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
                 dadosPaginados.map((linha, index) => {
-                  const idUnico = `${linha.prefixo}-${linha.id}-${index}`;
+                  const idUnico = `${linha.idOriginal}-${index}`;
                   const isExpandida = linhaExpandida === idUnico;
                   const isCrossdocking = linha.tipo === 'Crossdocking';
                   let nfNoEstoque = true;
@@ -524,6 +525,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado' || linha.tipo === 'Cancelado';
                   
+                  // ✨ AQUI ESTÁ A NOVA VERIFICAÇÃO PARA ESCONDER O BOTÃO GERAR PDF NA NF E ENTRADA
                   const esconderPL = linha.tipo === 'Nota Fiscal' || linha.tipo === 'Entrada';
                   
                   const corTextoForte = isRecusadoOuCancelado ? "#991b1b" : "#1e293b";
@@ -551,7 +553,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               {linha.entregaUrgente ? <Zap size={13} color="#ef4444" fill="#ef4444" /> : (isRecusadoOuCancelado ? <XCircle size={13} /> : <GitBranch size={13} />)}
                               {linha.tipo}
                             </span>
-                            <span style={{ fontSize: "0.875rem", fontWeight: "700", color: corTextoForte, marginTop: "4px", display: "block", fontFamily: "monospace" }}>{linha.prefixo}:{linha.id}</span>
+                            {/* ✨ CORREÇÃO AQUI: Removemos o texto fixo "PS:" porque a variável linha.id já tem esse prefixo! */}
+                            <span style={{ fontSize: "0.875rem", fontWeight: "700", color: corTextoForte, marginTop: "4px", display: "block", fontFamily: "monospace" }}>{linha.id}</span>
                           </div>
                         </td>
                         <td>
@@ -562,6 +565,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
 
                         <td>
+                          {/* ✨ O BOTÃO SÓ É MOSTRADO SE esconderPL FOR FALSO */}
                           {!esconderPL && linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
                             <BotaoGerarPDF
                               linha={linha}
