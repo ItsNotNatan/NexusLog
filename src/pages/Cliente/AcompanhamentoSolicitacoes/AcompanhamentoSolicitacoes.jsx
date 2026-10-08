@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
+// DESCRIÇÃO: Painel de Acompanhamento (Corrigido para exibir dados ao Cliente público)
+// =================================================================
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
@@ -116,7 +120,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   } catch (erro) { }
 
-  const token = localStorage.getItem('@NexusLog:token') || '';
   const isOperador = String(usuarioLogado.cargo || '').toLowerCase().trim().includes('operador');
   const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
 
@@ -130,6 +133,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
+        // ✨ ADICIONADO "?rastreabilidade=true" PARA LER ITENS ZERADOS E RECUPERAR A REFERÊNCIA
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
           apiFetch("/estoque/listar?rastreabilidade=true")
@@ -199,6 +203,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
+            // ✨ AQUI: ENRIQUECIMENTO DOS ITENS! 
+            // Cruza todos os campos da solicitação com a prateleira física (mesmo as zeradas)
             const itensEnriquecidos = (item.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
@@ -238,8 +244,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
               nfCrossdocking: item.nfCrossdocking || null,
-              deParaOrigem: item.deParaOrigem || item.filial_origem_id || item.filial || '-',
-              deParaDestino: item.deParaDestino || item.destino || item.wbs_destino || 'Não informado',
               itens: itensEnriquecidos 
             };
           });
@@ -255,26 +259,26 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       }
     };
 
-    if (token) {
+    // ✨ CORREÇÃO CRUCIAL AQUI: Removido o bloqueio 'if (token)'!
+    // Agora o sistema carrega os dados para todos (incluindo o Cliente sem login)
+    buscarDados();
+
+    const SOCKET_URL = urlDoServidor();
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    
+    socket.on('solicitacoes_atualizadas', () => {
+      console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
       buscarDados();
+    });
 
-      const SOCKET_URL = urlDoServidor();
-      const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-      
-      socket.on('solicitacoes_atualizadas', () => {
-        console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
-        buscarDados();
-      });
-
-      return () => socket.disconnect();
-    } else {
-      setCarregando(false);
-    }
-  }, [filtroAtivo, termoPesquisa, token, estoqueAtual, showAlert, perfil]);
+    return () => socket.disconnect();
+  }, [filtroAtivo, termoPesquisa, estoqueAtual, showAlert, perfil]);
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
+  // ✨ FILTRO DUPLO SEGURO: Filtra pela Filial Atual + Status + Termo
   const dadosFiltrados = dadosTabela.filter((item) => {
+    // Bloqueia qualquer filial que não seja a selecionada (se não for TODOS)
     if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) {
       return false;
     }
@@ -495,7 +499,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>TIPO / ID (PS)</th>
                 <th>SOLICITANTE / WBS</th>
                 <th>Nº DA PL</th>
-                <th>DE ➔ PARA</th>
+                <th>FILIAL</th>
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
                 <th>STATUS {perfil === "logistica" && "/ AÇÃO"}</th>
@@ -520,7 +524,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado' || linha.tipo === 'Cancelado';
                   
-                  // ✨ NOVA VERIFICAÇÃO AQUI
                   const esconderPL = linha.tipo === 'Nota Fiscal' || linha.tipo === 'Entrada';
                   
                   const corTextoForte = isRecusadoOuCancelado ? "#991b1b" : "#1e293b";
@@ -559,7 +562,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
 
                         <td>
-                          {/* ✨ O BOTÃO SÓ É MOSTRADO SE esconderPL FOR FALSO */}
                           {!esconderPL && linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
                             <BotaoGerarPDF
                               linha={linha}
@@ -574,29 +576,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
 
                         <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <span style={{ 
-                              display: 'inline-flex', alignItems: 'center', gap: '4px', 
-                              backgroundColor: '#f1f5f9', color: corTextoMedio, 
-                              padding: '2px 6px', borderRadius: '4px', fontSize: '0.70rem', 
-                              fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap' 
-                            }}>
-                              De: {linha.tipo.includes('Transferencia') || linha.tipo.includes('Transfer.') ? linha.deParaOrigem : obterNomeFilialDinamico(linha.deParaOrigem)}
-                            </span>
-                            
-                            <span style={{ 
-                              display: 'inline-flex', alignItems: 'center', gap: '4px', 
-                              backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#eff6ff', 
-                              color: corDestaque, padding: '2px 6px', borderRadius: '4px', 
-                              fontSize: '0.70rem', fontWeight: '600', 
-                              border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#bfdbfe'}`, 
-                              whiteSpace: 'nowrap' 
-                            }}>
-                              Para: {linha.deParaDestino}
-                            </span>
-                          </div>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f1f5f9', color: corTextoMedio, padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#cbd5e1'}`, whiteSpace: 'nowrap' }}>
+                            <MapPin size={12} /> {obterNomeFilialDinamico(linha.filial || linha.estoque)}
+                          </span>
                         </td>
-
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
 
                         <td>
