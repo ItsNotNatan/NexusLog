@@ -214,7 +214,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     ],
                     [
                       { text: 'NÚMERO FORMULÁRIO:\nP&S/CROSS DOCKING/LOGISTICA', fontSize: 6, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
-                      { text: `PS: ${linha.ps || linha.id}`, alignment: 'center', fontSize: 9, bold: true, fillColor: '#a5f3fc', margin: [0, 1], border: [true, true, true, true] }
+                      { text: `${linha.ps || linha.id}`, alignment: 'center', fontSize: 9, bold: true, fillColor: '#a5f3fc', margin: [0, 1], border: [true, true, true, true] }
                     ],
                     [
                       { text: 'DATA DO SOLICITAÇÃO FORMULÁRIO:', fontSize: 6, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
