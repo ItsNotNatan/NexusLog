@@ -27,8 +27,9 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     }
   };
 
+  // ✨ NOVA FUNÇÃO AUXILIAR: Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
   const formatarMoedaPdf = (valor) => {
-    if (!valor || valor === '-' || valor === 'NaN') return '-';
+    if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
     // Se o valor já vier formatado do frontend com "R$", não tentamos calcular, apenas exibimos
     if (typeof valor === 'string' && valor.includes('R$')) return valor;
     
@@ -92,7 +93,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         { text: 'FORNECEDOR', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
         { text: 'ALOCAÇÃO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'NF ENTRADA', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        // ✨ RESTAURANDO A COLUNA DO VLOR UNIT NO CABEÇALHO DO PDF
         { text: 'VLOR UNIT', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
         { text: 'WBS', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] }
       ];
@@ -111,8 +111,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             { text: it.fornecedor || '-', fontSize: 7, margin: [0, 3] },
             { text: it.alocacao || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
-            // ✨ RESTAURANDO O VALOR UNITÁRIO NAS LINHAS DO PDF COM FORMATAÇÃO SEGURA
-            { text: formatarMoedaPdf(it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice), fontSize: 7, alignment: 'center', margin: [0, 3] },
+            // ✨ CORREÇÃO CRÍTICA AQUI: Adicionado 'valor_unitario_enriquecido' para puxar do pai corretamente!
+            { text: formatarMoedaPdf(it.valor_unitario_enriquecido ?? it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.wbs_element || '-', fontSize: 7, alignment: 'center', margin: [0, 3] }
           ]);
         });
