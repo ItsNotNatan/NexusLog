@@ -259,6 +259,14 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               };
             });
 
+            // ✨ CORREÇÃO AQUI: Criamos uma variável para juntar Origem ➔ Destino
+            let wbsFinal = item.wbs_destino || item.wbs || "—";
+            if (item.tipo === "Transferencia WBS" || item.tipo === "Transfer. WBS") {
+              const origem = item.wbs_origem || "Desconhecido";
+              const destino = item.wbs_destino || "—";
+              wbsFinal = `${origem} ➔ ${destino}`;
+            }
+
             return {
               ...item,
               idOriginal: item.id,
@@ -272,6 +280,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
               nfCrossdocking: item.nfCrossdocking || null,
+              
+              // ✨ CORREÇÃO AQUI: Em vez de usar `item.wbs`, usamos a nossa string montada
+              wbs: wbsFinal, 
+
               itens: itensEnriquecidos 
             };
           });
