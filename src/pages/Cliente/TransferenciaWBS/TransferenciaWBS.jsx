@@ -107,7 +107,7 @@ export default function TransferenciaWBS() {
     setItensSelecionados(itensSelecionados.map(i => i.id === idOriginal ? { ...i, qtdTransferencia: qtdFormatada } : i));
   };
 
-  const handleEnviar = async () => {
+const handleEnviar = async () => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') { showAlert("Atenção", "Selecione uma filial de origem.", "warning"); return; }
     if (!formDados.nome || !formDados.wbsDestino) { showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS de Destino.", "warning"); return; }
     if (itensSelecionados.length === 0) { showAlert("Carrinho Vazio", "Selecione pelo menos um item para transferir.", "warning"); return; }
@@ -125,10 +125,14 @@ export default function TransferenciaWBS() {
     const payload = {
       solicitante: { ...formDados, tipo: 'Transferencia WBS', filial_origem: estoqueAtual },
       itens: itensSelecionados.map(item => ({
-        estoque_id: item.id, desenhoSAP: item.desenho_sap || item.desenhoSAP || '-', 
+        estoque_id: item.id, 
+        desenhoSAP: item.desenho_sap || item.desenhoSAP || '-', 
         numPecaFabricante: item.part_number || item.numPecaFabricante || '-',
+        fabricante: item.fabricante || null, // ✨ CORREÇÃO: Enviamos o fabricante
         materialDescription: item.descricao || item.materialDescription || '-',
-        qtd: item.qtdTransferencia, wbsOrigem: item.wbs || item.wbs_element || '-', alocacao: item.alocacao || '-'
+        qtd: item.qtdTransferencia, 
+        wbsOrigem: item.wbs || item.wbs_element || '-', 
+        alocacao: item.alocacao || '-'
       })),
       anexos: anexosProcessados 
     };
