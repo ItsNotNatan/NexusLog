@@ -218,7 +218,7 @@ const criarMaterial = async (solicitante, itens, anexos) => {
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
     desenho_sap_manual: i.desenhoSAP || null,
     part_number_manual: i.numPecaFabricante || null,
-    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
+    fabricante: i.fabricante || null, 
     descricao_manual: i.materialDescription || 'Sem descrição',
     quantidade_solicitada: Math.max(1, i.qtdSelecionada || 1),
     unidade_medida_manual: i.unidadeMedida || 'Unid',
@@ -247,7 +247,7 @@ const criarTransferencia = async (solicitante, itens, anexos) => {
   const itensDB = itens.map((i) => ({
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
     part_number_manual: i.numPecaFabricante || i.pn,
-    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
+    fabricante: i.fabricante || null, 
     descricao_manual: i.materialDescription || i.desc,
     quantidade_solicitada: Math.max(1, i.qtd || 1),
   }));
@@ -255,7 +255,6 @@ const criarTransferencia = async (solicitante, itens, anexos) => {
   return salvarNoBanco(dados, itensDB, anexos);
 };
 
-// Converte "1.234,56" / "1234.56" / "R$ 10" em numero.
 const limparValor = (valorFront) => {
   if (!valorFront) return 0;
   let v = String(valorFront).replace(/[^\d.,-]/g, '');
@@ -277,7 +276,7 @@ const criarEntrada = async (solicitante, itens, anexos) => {
   const itensDB = itens.map((i) => ({
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || '-',
     part_number_manual: i.part_number || i.numPecaFabricante || 'SEM-PN',
-    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
+    fabricante: i.fabricante || null, 
     descricao_manual: i.descricao || i.materialDescription || i.vendorDescription || 'Sem descrição',
     quantidade_solicitada: Math.max(1, i.qtd || i.qtdFornecida || 1),
     unidade_medida_manual: i.unidade_medida || i.unidadeMedida || 'Unid',
@@ -312,7 +311,7 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
     desenho_sap_manual: i.desenho_sap_manual,
     quantidade_solicitada: Math.max(1, i.quantidade_solicitada || 1),
     unidade_medida_manual: i.unidade_medida_manual,
-    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
+    fabricante: i.fabricante || null,
   }));
 
   return salvarNoBanco(dados, itensDB, anexos, solicitante.nf);
@@ -351,7 +350,7 @@ const criarReintegracao = async (solicitante, itens, anexos) => {
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
     desenho_sap_manual: i.desenho_sap_manual || i.desenhoSAP || '-',
     part_number_manual: i.part_number_manual || i.part_number || '-',
-    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
+    fabricante: i.fabricante || null,
     descricao_manual: i.descricao_manual || i.descricao || 'Sem descrição',
     quantidade_solicitada: Math.max(1, Number(i.quantidade_devolvida || i.quantidade_solicitada || 1)),
     unidade_medida_manual: i.unidade_medida_manual || i.unidade || 'Unid',
@@ -376,7 +375,7 @@ const cancelarPL = async (solicitante, anexos) => {
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
     desenho_sap_manual: i.desenho_sap_manual || i.desenhoSAP || '-',
     part_number_manual: i.part_number_manual || i.part_number || '-',
-    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
+    fabricante: i.fabricante || null,
     descricao_manual: i.descricao_manual || i.descricao || 'Sem descrição',
     quantidade_solicitada: Math.max(1, Number(i.quantidade_solicitada || 1)),
     unidade_medida_manual: i.unidade_medida_manual || i.unidade || 'Unid',
@@ -508,19 +507,16 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             filial_id: estoqueAtual.filial_id || '',
             desenho_sap: estoqueAtual.desenho_sap,
             part_number: estoqueAtual.part_number,
-            fabricante: estoqueAtual.fabricante || '', // ✨ NOVA COLUNA: Passa para o novo estoque
+            fabricante: estoqueAtual.fabricante || '',
             descricao: estoqueAtual.descricao,
             nf_entrada: estoqueAtual.nf_entrada,
             documento_compras: estoqueAtual.documento_compras,
             quantidade_disponivel: quantidadeRetirada,
             status: 'Disponível',
-            wbs: solicitacao.wbs_destino, // ✨ Aqui injetamos o NOVO WBS do Destino!
+            wbs: solicitacao.wbs_destino,
             nome_projeto: estoqueAtual.nome_projeto || '',
             is_transferencia: true,
-            
-            // ✨ CORREÇÃO: Mantém a MESMA alocação que o material original já possuía!
             alocacao: estoqueAtual.alocacao || '',
-            
             fornecedor: estoqueAtual.fornecedor || '',
             referencia: estoqueAtual.referencia || '',
             unidade_medida: estoqueAtual.unidade_medida || 'Unid',
@@ -547,7 +543,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             material_id: item.material_id || '',
             desenho_sap: item.desenho_sap_manual || item.desenho_sap || '-',
             part_number: item.part_number_manual || 'SEM-PN',
-            fabricante: item.fabricante || '', // ✨ NOVA COLUNA: Registra no estoque
+            fabricante: item.fabricante || '', 
             descricao: item.descricao_manual || 'Sem descrição',
             filial_id: solicitacao.filial_origem_id || '',
             nf_entrada: item.nf_entrada || 'SEM-NF',
@@ -600,7 +596,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     estoque_id: estoqueCriado[index] ? estoqueCriado[index].id : null,
                     desenho_sap_manual: item.desenho_sap_manual,
                     part_number_manual: item.part_number_manual,
-                    fabricante: item.fabricante || null, // ✨ NOVA COLUNA
+                    fabricante: item.fabricante || null,
                     descricao_manual: item.descricao_manual,
                     quantidade_solicitada: item.quantidade_solicitada,
                     unidade_medida_manual: item.unidade_medida_manual,
@@ -661,7 +657,9 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       solicitacao.tipo === 'Cancelado'
     ) {
       let deveDevolverAoEstoque = true;
+      let wbsDestinoTransferencia = null; // ✨ IDENTIFICADOR DE TRANSFERENCIA WBS
 
+      // 3.1 Identificar se é Cancelamento de Transferência WBS
       if (solicitacao.tipo === 'Cancelado' && solicitacao.observacoes) {
         const idOriginalParaCancelar = acharIdOriginalNoTexto(solicitacao.observacoes);
 
@@ -670,6 +668,11 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
           if (solOriginal) {
             if (solOriginal.status === 'Pendente') deveDevolverAoEstoque = false;
+            
+            // ✨ NOVO: Se foi uma Transferência WBS que já tinha sido aprovada, vamos buscar a linha amarela
+            if (solOriginal.tipo === 'Transferencia WBS' && (solOriginal.status === 'Em Separação' || solOriginal.status === 'Concluído')) {
+                wbsDestinoTransferencia = solOriginal.wbs_destino;
+            }
 
             await db.atualizar('solicitacoes', idOriginalParaCancelar, { status: 'Cancelado' });
 
@@ -679,6 +682,20 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               { status: 'Cancelado' }
             );
           }
+        }
+      } 
+      // 3.2 Identificar se é Reintegração de Transferência WBS (através da PL)
+      else if ((solicitacao.tipo === 'Reintegracao' || solicitacao.tipo === 'Reintegração') && solicitacao.observacoes) {
+        const matchPL = solicitacao.observacoes.match(/PL #(\d+)/);
+        if (matchPL) {
+           const numPL = matchPL[1];
+           const plOrigem = await db.um('packing_lists', db.f('numero_pl = {:n}', { n: Number(numPL) }));
+           if (plOrigem) {
+               const solOrigem = await db.porId('solicitacoes', plOrigem.solicitacao_id);
+               if (solOrigem && solOrigem.tipo === 'Transferencia WBS') {
+                   wbsDestinoTransferencia = solOrigem.wbs_destino;
+               }
+           }
         }
       }
 
@@ -696,10 +713,33 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
           const quantidadeDevolvida = Number(item.quantidade_solicitada || 0);
 
+          // ✨ 1. Devolver a quantidade ao item original
           await db.atualizar('estoque', item.estoque_id, {
             quantidade_disponivel: saldoAtual + quantidadeDevolvida,
             status: 'Disponível',
           });
+
+          // ✨ 2. Se a devolução for de uma Transferência WBS, abater a linha amarela no WBS de destino!
+          if (wbsDestinoTransferencia) {
+             const linhaAmarela = await db.um('estoque', db.f(
+                 'is_transferencia = true && wbs = {:wbs} && desenho_sap = {:sap} && filial_id = {:filial}',
+                 { 
+                     wbs: wbsDestinoTransferencia, 
+                     sap: estoqueAtual.desenho_sap || '',
+                     filial: estoqueAtual.filial_id || ''
+                 }
+             ));
+
+             if (linhaAmarela) {
+                 const novoSaldoAmarelo = Number(linhaAmarela.quantidade_disponivel || 0) - quantidadeDevolvida;
+                 const saldoSeguro = novoSaldoAmarelo < 0 ? 0 : novoSaldoAmarelo;
+                 
+                 await db.atualizar('estoque', linhaAmarela.id, {
+                     quantidade_disponivel: saldoSeguro,
+                     status: saldoSeguro <= 0 ? 'Zerado' : 'Disponível'
+                 });
+             }
+          }
         }
       }
     }
