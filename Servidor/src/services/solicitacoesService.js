@@ -517,7 +517,10 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             wbs: solicitacao.wbs_destino,
             nome_projeto: estoqueAtual.nome_projeto || '',
             is_transferencia: true,
-            alocacao: `Origem: ${solicitacao.wbs_origem || estoqueAtual.wbs || 'Desconhecida'}`,
+            
+            // ✨ CORREÇÃO: Agora o novo item herda a mesma alocação do item original!
+            alocacao: estoqueAtual.alocacao || '',
+            
             fornecedor: estoqueAtual.fornecedor || '',
             referencia: estoqueAtual.referencia || '',
             unidade_medida: estoqueAtual.unidade_medida || 'Unid',
