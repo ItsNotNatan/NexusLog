@@ -1,439 +1,647 @@
-// =================================================================
-// ARQUIVO: src/pages/Logistica/EntradaEstoque/EntradaEstoque.jsx
-// DESCRIÇÃO: Registo de Entrada de Estoque (Back-Office) utilizando a Tabela Componentizada
-// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
-import './EntradaEstoque.css';
-import { User, Send, Paperclip, X, Truck } from 'lucide-react';
-import ExcelJS from 'exceljs';
-
-import CarregarArquivo from '../../../components/CarregarArquivo/CarregarArquivo';
-import ModalProcessamento from '../../../components/ModalProcessamento/ModalProcessamento';
-import { useProcessadorExcel } from '../../../hooks/useProcessadorExcel';
-import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
-import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaInsercaoItens'; 
+import { Search, Loader2, PackageOpen, X, History, Download, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
-import { apiFetch, enviarArquivos } from '../../../services/api';
+import { apiFetch } from '../../../services/api';
+import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import { io } from 'socket.io-client';
+import './VisaoGeralEstoque.css';
 
-const LIMITE_LOGISTICA = 60;
-
-export default function EntradaEstoque() {
-  const { estoqueAtual } = useContext(AuthContext);
+export default function VisaoGeralEstoque({ perfil }) {
+  const { estoqueAtual, filiaisGlobais, usuario } = useContext(AuthContext);
   const { showAlert, showLoading, closeAlert } = useAlert();
-  
-  const [formDados, setFormDados] = useState({
-    nome: '', observacoes: ''
-  });
 
-  const gerarLinhaVazia = () => ({
-    id: `linha-vazia-${Date.now()}-${Math.random()}`, 
-    desenhoSAP: '', 
-    fabricante: '', // ✨ NOVO CAMPO
-    numPecaFabricante: '', 
-    fornecedor: '', 
-    referencia: '', 
-    qtdFornecida: 1, 
-    nfEntrada: '', 
-    unidadeMedida: 'Unid', 
-    vendorDescription: '', 
-    wbsElement: '', 
-    nomeProjeto: '', 
-    emissaoNF: '', 
-    recebNF: '', 
-    docCompras: '', 
-    poNetPrice: '', 
-    centro: '', 
-    deposito: '', 
-    alocacao: ''
-  });
+  const [estoque, setEstoque] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [termoPesquisa, setTermoPesquisa] = useState('');
 
-  const [itens, setItens] = useState([]);
-  const [anexos, setAnexos] = useState([]);
-  
-  const [nfsCrossdocking, setNfsCrossdocking] = useState([]);
-  const processador = useProcessadorExcel();
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 20;
+
+  const podeEditar = usuario?.cargo === 'ADM' || usuario?.cargo === 'LIDER';
+
+  const [modalAberto, setModalAberto] = useState(false);
+  const [itemSelecionado, setItemSelecionado] = useState(null);
+  const [historicoDemandas, setHistoricoDemandas] = useState([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [editCell, setEditCell] = useState({ id: null, field: null });
+  const [editValue, setEditValue] = useState("");
+
+  const obterNomeFilialDinamico = (codigo) => {
+    if (!codigo || codigo === '-') return 'N/D';
+    const codLimpo = String(codigo).toUpperCase().trim();
+    if (codLimpo === "TODOS") return "Todas as Filiais";
+    const filialEncontrada = filiaisGlobais.find(f => f.id === codLimpo);
+    return filialEncontrada ? filialEncontrada.nome : codigo;
+  };
+
+  const formatarData = (dataStr) => {
+    if (!dataStr || dataStr === '-') return '-';
+    if (dataStr.includes('/')) return dataStr;
+    try {
+      return new Date(dataStr).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    } catch {
+      return dataStr;
+    }
+  };
+
+  // Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
+  const formatarMoedaLocal = (valor) => {
+    if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
+    if (typeof valor === 'string' && valor.includes('R$')) return valor;
+
+    const numero = parseFloat(String(valor).replace(',', '.'));
+    if (!isNaN(numero)) return `R$ ${numero.toFixed(2).replace('.', ',')}`;
+
+    return String(valor);
+  };
 
   useEffect(() => {
-    const buscarCrossdockingsPendentes = async () => {
+    const buscarEstoque = async () => {
       try {
-        const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
-        const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
-        
-        if (resultado.sucesso && Array.isArray(resultado.dados)) {
-          const nfsAguardadas = resultado.dados
-            .filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente')
-            .map(sol => sol.nfCrossdocking)
-            .filter(nf => nf !== null && nf !== undefined && nf !== ''); 
-            
-          setNfsCrossdocking(nfsAguardadas);
-        }
+        setCarregando(true);
+        const urlEstoque = estoqueAtual === 'TODOS' ? '/estoque/listar' : `/estoque/listar?filial=${estoqueAtual}`;
+        const resposta = await apiFetch(urlEstoque);
+        if (resposta.sucesso) setEstoque(resposta.dados || []);
       } catch (error) {
-        console.error("Erro ao buscar as solicitações de Crossdocking:", error);
+        showAlert("Erro", "Não foi possível carregar os dados.", "error");
+      } finally {
+        setCarregando(false);
       }
     };
+    
+    buscarEstoque();
 
-    if (estoqueAtual) {
-      buscarCrossdockingsPendentes();
-    }
-  }, [estoqueAtual]);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); 
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    
+    socket.on('estoque_atualizado', () => {
+      console.log('⚡ Saldo de estoque alterado! Atualizando números...');
+      buscarEstoque();
+    });
 
-  const handleImportarExcel = async (arquivo) => {
+    return () => socket.disconnect();
+  }, [estoqueAtual, showAlert]);
+
+  const handleDuploCliqueItem = async (item) => {
+    setItemSelecionado(item);
+    setModalAberto(true);
+    setCarregandoHistorico(true);
+    setHistoricoDemandas([]);
+
     try {
-      showLoading("Processando Excel", "A procurar a aba e as colunas corretas. Por favor, aguarde...");
-      
-      const workbook = new ExcelJS.Workbook();
-      const buffer = await arquivo.arrayBuffer();
-      await workbook.xlsx.load(buffer);
-      
-      const novosItensFormatados = [];
-      let headerRowIndex = -1;
-      let mapColunas = {};
-      let worksheetParaLer = null;
+      const resposta = await apiFetch(`/solicitacoes/demandas/estoque/${item.id}`);
 
-      workbook.worksheets.forEach(worksheet => {
-        if (worksheetParaLer) return; 
+      if (resposta.sucesso && resposta.dados) {
+        setHistoricoDemandas(resposta.dados);
+      } else {
+        showAlert("Erro", resposta.erro || "Falha ao buscar o histórico.", "error");
+      }
+    } catch (error) {
+      console.error(error);
+      showAlert("Erro", "Falha ao buscar o histórico de demandas.", "error");
+    } finally {
+      setCarregandoHistorico(false);
+    }
+  };
 
-        worksheet.eachRow((row, rowNumber) => {
-          if (worksheetParaLer) return; 
-          if (rowNumber > 30) return; 
+  const fecharModal = () => {
+    setModalAberto(false);
+    setItemSelecionado(null);
+    setHistoricoDemandas([]);
+  };
 
-          const tempMap = {};
-          
-          row.eachCell((cell, colNumber) => {
-            let val = cell.value;
-            if (val && typeof val === 'object' && val.richText) {
-              val = val.richText.map(rt => rt.text).join('');
+  const startEditing = (id, field, value, type) => {
+    if (!podeEditar) return; 
+    
+    setEditCell({ id, field });
+    let valFormatado = value || "";
+    if (type === 'date' && valFormatado && valFormatado.includes('T')) {
+      valFormatado = valFormatado.split('T')[0];
+    }
+    setEditValue(valFormatado);
+  };
+
+  const saveEditing = async (id, field, originalValue) => {
+    if (String(editValue) !== String(originalValue || '')) {
+      let valorFinal = editValue;
+      if (field === 'quantidade_disponivel' || field === 'valor_unitario') {
+        if (field === 'valor_unitario' && typeof editValue === 'string') {
+           let v = editValue.replace(/[^\d.,-]/g, '');
+           if (v.includes('.') && v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
+           else if (v.includes(',')) v = v.replace(',', '.');
+           valorFinal = parseFloat(v) || 0;
+        } else {
+           valorFinal = editValue ? Number(editValue) : 0;
+        }
+      }
+
+      setEstoque(prev => prev.map(i => i.id === id ? { ...i, [field]: valorFinal } : i));
+
+      try {
+        const resposta = await apiFetch(`/estoque/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            [field]: valorFinal,
+            usuario_editor: usuario?.nome_completo || usuario?.nome || 'Logística'
+          })
+        });
+
+        if (resposta.sucesso) {
+          showAlert("Sucesso!", "A informação foi atualizada no sistema.", "success");
+        } else {
+          showAlert("Erro", "Falha ao atualizar o campo no servidor.", "error");
+        }
+      } catch (error) {
+        showAlert("Erro de Conexão", "Não foi possível ligar ao servidor.", "error");
+      }
+    }
+    setEditCell({ id: null, field: null });
+  };
+
+  const handleKeyDown = (e, id, field, originalValue) => {
+    if (e.key === 'Enter') saveEditing(id, field, originalValue);
+    if (e.key === 'Escape') setEditCell({ id: null, field: null });
+  };
+
+  const CelulaEditavel = ({ item, field, type = 'text', renderFn, style = {}, placeholder = "" }) => {
+    const isEditing = editCell.id === item.id && editCell.field === field;
+    
+    // Fallbacks para garantir que campos alternativos são lidos
+    let val = item[field];
+    if (field === 'fabricante' && !val) val = item.fabricante_manual;
+    if (field === 'part_number' && !val) val = item.part_number_manual;
+    
+    const displayVal = renderFn ? renderFn(val) : (val || '-');
+
+    if (!podeEditar) {
+      return <span style={{ display: 'inline-block', width: '100%', minHeight: '18px', ...style }}>{displayVal}</span>;
+    }
+
+    if (isEditing) {
+      return (
+        <input
+          autoFocus
+          type={type}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={() => saveEditing(item.id, field, val)}
+          onKeyDown={(e) => handleKeyDown(e, item.id, field, val)}
+          onClick={(e) => {
+            if (type === 'date' && e.target.showPicker) {
+              e.target.showPicker();
             }
-            const valStr = String(val || '').trim().toUpperCase();
-            if (valStr) tempMap[valStr] = colNumber;
-          });
+          }}
+          placeholder={placeholder}
+          style={{ 
+            width: '100%', 
+            padding: '6px 8px', 
+            boxSizing: 'border-box', 
+            border: '2px solid #3b82f6', 
+            borderRadius: '6px', 
+            outline: 'none', 
+            fontSize: '0.80rem', 
+            fontFamily: 'inherit',
+            cursor: type === 'date' ? 'pointer' : 'text'
+          }}
+        />
+      );
+    }
 
-          const temCabecalho = Object.keys(tempMap).some(k => 
-            k.includes('DESCRIÇÃO') || k.includes('DESCRICAO') || 
-            k.includes('CÓDIGO') || k.includes('CODIGO') || 
-            k.includes('SAP') || k.includes('PART NUMBER') || 
-            k.includes('FABRICANTE') || k.includes('QTDE ENTRADA')
-          );
+    return (
+      <div
+        onClick={(e) => { e.stopPropagation(); startEditing(item.id, field, val, type); }}
+        style={{ 
+          cursor: type === 'date' ? 'pointer' : 'text', 
+          border: '1px solid #e2e8f0', 
+          backgroundColor: '#f8fafc',
+          borderRadius: '6px', 
+          padding: '4px 8px', 
+          display: 'inline-block', 
+          width: '100%', 
+          minHeight: '26px', 
+          boxSizing: 'border-box',
+          transition: 'all 0.2s ease', 
+          ...style 
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.borderColor = '#93c5fd';
+          e.currentTarget.style.backgroundColor = '#ffffff';
+          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.borderColor = '#e2e8f0';
+          e.currentTarget.style.backgroundColor = '#f8fafc';
+          e.currentTarget.style.boxShadow = 'none';
+        }}
+        title="Clique para editar este valor manualmente"
+      >
+        {displayVal}
+      </div>
+    );
+  };
 
-          if (temCabecalho) {
-            headerRowIndex = rowNumber; 
-            mapColunas = tempMap;       
-            worksheetParaLer = worksheet;
-          }
+  const estoqueFiltrado = estoque.filter(item => {
+    if (estoqueAtual && estoqueAtual !== 'TODOS') {
+      const filialDoItem = item.filial_id || item.filial;
+      if (filialDoItem !== estoqueAtual) {
+        return false;
+      }
+    }
+
+    if (!termoPesquisa) return true;
+    
+    const termo = termoPesquisa.toLowerCase();
+    return (
+      (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
+      (item.fabricante && item.fabricante.toLowerCase().includes(termo)) || 
+      (item.fabricante_manual && item.fabricante_manual.toLowerCase().includes(termo)) || 
+      (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
+      (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
+      (item.fornecedor && item.fornecedor.toLowerCase().includes(termo)) ||
+      (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termo)) ||
+      (item.nome_projeto && item.nome_projeto.toLowerCase().includes(termo))
+    );
+  });
+
+  const kpiTotalItens = estoqueFiltrado.reduce((acc, item) => acc + (Number(item.quantidade_disponivel) || 0), 0);
+  const kpiReservados = estoqueFiltrado.reduce((acc, item) => acc + (Number(item.quantidade_reservada) || 0), 0);
+  
+  const kpiDisponiveis = Math.max(0, kpiTotalItens - kpiReservados);
+  
+  const kpiValorTotal = estoqueFiltrado.reduce((acc, item) => {
+    const qtd = Number(item.quantidade_disponivel) || 0;
+    const valor = Number(item.valor_unitario) || 0;
+    return acc + (qtd * valor);
+  }, 0);
+
+  const formatarQtd = (num) => new Intl.NumberFormat('pt-BR').format(num);
+
+  useEffect(() => {
+    setPaginaAtual(1); 
+  }, [termoPesquisa, estoqueAtual]);
+
+  const totalPaginas = Math.max(1, Math.ceil(estoqueFiltrado.length / itensPorPagina));
+  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
+  const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, estoqueFiltrado.length);
+  const estoquePaginado = estoqueFiltrado.slice(indexPrimeiroItem, paginaAtual * itensPorPagina);
+
+  const handleExportarExcel = async () => {
+    showLoading("A Gerar Excel", "Por favor, aguarde enquanto compilamos os dados do estoque...");
+    
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Visão Geral do Estoque');
+
+      worksheet.columns = [
+        { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
+        { header: 'REFERÊNCIA', key: 'ref', width: 20 },
+        { header: 'DESCRIÇÃO', key: 'desc', width: 40 },
+        { header: 'FABRICANTE', key: 'fab', width: 25 }, 
+        { header: 'QTDE ENTRADA', key: 'qtd', width: 15 },
+        { header: 'UNID. MEDIDA', key: 'unid', width: 15 },
+        { header: 'NUM DA NOTA FISCAL', key: 'nf', width: 15 },
+        { header: 'FORNECEDOR / REGISTRO', key: 'fornecedor', width: 25 },
+        { header: 'CENTRO DE CUSTO - WBS', key: 'wbs', width: 25 },
+        { header: 'NOME CENTRO DE CUSTO / PROJETO', key: 'projeto', width: 30 },
+        { header: 'EMISSÃO NF', key: 'emi', width: 18 },
+        { header: 'RECEB. NF', key: 'rec', width: 18 },
+        { header: 'Nº PEDIDO DE COMPRA / CPV', key: 'doc', width: 25 },
+        { header: 'VLR. UNITÁRIO NOTA FISCAL', key: 'val', width: 20 },
+        { header: 'FILIAL', key: 'filial', width: 15 },
+        { header: 'DEPÓSITO', key: 'dep', width: 15 },
+        { header: 'ALOCAÇÃO', key: 'aloc', width: 20 }
+      ];
+
+      worksheet.getRow(1).eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+
+      estoqueFiltrado.forEach(item => {
+        worksheet.addRow({
+          sap: item.desenho_sap || '-',
+          ref: item.referencia || '-',
+          desc: item.descricao || '-',
+          fab: item.fabricante || item.fabricante_manual || '-', 
+          qtd: Number(item.quantidade_disponivel) || 0,
+          unid: item.unidade_medida || '-',
+          nf: item.nf_entrada || '-',
+          fornecedor: item.fornecedor || '-',
+          wbs: item.wbs || '-',
+          projeto: item.nome_projeto || '-',
+          emi: formatarData(item.emissao_nf),
+          rec: formatarData(item.receb_nf),
+          doc: item.documento_compras || '-',
+          val: item.valor_unitario ? `R$ ${Number(item.valor_unitario).toFixed(2)}` : '-',
+          filial: obterNomeFilialDinamico(item.filial_id || item.filial),
+          dep: item.deposito || '-',
+          aloc: item.alocacao || '-'
         });
       });
 
-      if (!worksheetParaLer) {
-        closeAlert();
-        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados em nenhuma das abas da planilha. Verifique o ficheiro.", "error");
-        return;
-      }
-
-      worksheetParaLer.eachRow((row, rowNumber) => {
-        if (rowNumber <= headerRowIndex) return; 
-
-        const getVal = (colIndex) => {
-          if (!colIndex) return '';
-          const cell = row.getCell(colIndex);
-          const val = cell.value;
-          if (val === null || val === undefined) return '';
-          if (typeof val === 'object') {
-            if (val.result !== undefined && val.result !== null) return String(val.result).trim();
-            if (val.richText) return val.richText.map(rt => rt.text).join('').trim();
-            if (val instanceof Date) return val.toISOString().split('T')[0];
-          }
-          return String(val).trim();
-        };
-
-        const puxarDado = (palavrasChave) => {
-          const chavesReais = Object.keys(mapColunas);
-          for (const palavra of palavrasChave) {
-            const chaveEncontrada = chavesReais.find(k => k.includes(palavra));
-            if (chaveEncontrada) {
-              const numColuna = mapColunas[chaveEncontrada];
-              const valor = getVal(numColuna);
-              return valor === '-' ? '' : valor;
-            }
-          }
-          return '';
-        };
-
-        const sap = puxarDado(['NUM SAP', 'DESENHO', 'SAP', 'CÓDIGO', 'CODIGO']);
-        const desc = puxarDado(['DESCRIÇÃO', 'DESCRICAO', 'VENDOR']);
-        const nomeFab = puxarDado(['FABRICANTE', 'MARCA', 'FABR']);
-        const numPeca = puxarDado(['PEÇA', 'PART NUMBER', 'PN', 'REF. FABRICANTE']);
-        const qtd = parseInt(puxarDado(['QTDE ENTRADA', 'QTD', 'QUANTIDADE'])) || 1;
-        const ref = puxarDado(['REFERÊNCIA', 'REFERENCIA']);
-        const unid = puxarDado(['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid';
-        const nf = puxarDado(['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NFE ENTRADA', 'NOTA FISCAL']);
-        const fornec = puxarDado(['FORNECEDOR', 'REGISTRO']);
-        const wbs = puxarDado(['CENTRO DE CUSTO - WBS', 'WBS']);
-        const projeto = puxarDado(['NOME CENTRO DE CUSTO', 'PROJETO']);
-        const emissao = puxarDado(['EMISSÃO NF', 'EMISSAO', 'DATA EMISSÃO']);
-        const receb = puxarDado(['RECEB. NF', 'RECEBIMENTO']);
-        const docCompras = puxarDado(['PEDIDO DE COMPRA', 'CPV', 'COMPRAS']);
-        const preco = puxarDado(['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']);
-        const filialPlanilha = puxarDado(['FILIAL', 'CENTRO']);
-        const deposito = puxarDado(['DEPÓSITO', 'DEPOSITO', 'LOCAL ESTOQUE']);
-        const alocacao = puxarDado(['ALOCAÇÃO', 'ALOCACAO']);
-
-        const linhaValida = (nomeFab.length > 1) || (sap.length > 2 && desc.length > 3) || (numPeca.length > 2);
-
-        if (linhaValida) {
-          novosItensFormatados.push({
-            id: `excel-${Date.now()}-${rowNumber}`,
-            desenhoSAP: sap,                       
-            vendorDescription: desc,               
-            fabricante: nomeFab,                   
-            numPecaFabricante: numPeca,            
-            qtdFornecida: qtd,                
-            referencia: ref, 
-            unidadeMedida: unid,                 
-            nfEntrada: nf,                         
-            fornecedor: fornec,                    
-            wbsElement: wbs,                        
-            nomeProjeto: projeto,                  
-            emissaoNF: emissao,                    
-            recebNF: receb,                        
-            docCompras: docCompras,                
-            poNetPrice: preco,                     
-            centro: filialPlanilha,                
-            deposito: deposito,                    
-            alocacao: alocacao                     
-          });
-        }
-      });
-
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Visao_Geral_Estoque_${new Date().toISOString().split('T')[0]}.xlsx`);
+      
+    } catch (err) {
+      console.error(err);
+      showAlert("Erro na Exportação", "Houve um problema ao gerar o arquivo Excel.", "error");
+    } finally {
       closeAlert();
-
-      setItens(prev => {
-        const listaLimpa = prev.filter(i => (i.fabricante !== '' || i.desenhoSAP !== '' || i.vendorDescription !== ''));
-        const novaLista = [...listaLimpa, ...novosItensFormatados];
-
-        if (novaLista.length > LIMITE_LOGISTICA) {
-          showAlert("Limite de Linhas Excedido", `A planilha contém mais itens do que o limite permitido. Foram importados os primeiros ${LIMITE_LOGISTICA} itens (de um total detetado de ${novaLista.length}).`, "warning");
-          return novaLista.slice(0, LIMITE_LOGISTICA);
-        }
-
-        return novaLista;
-      });
-
-    } catch (error) {
-      console.error(error);
-      showAlert("Erro de Leitura", "Falha ao ler o ficheiro Excel. Verifique se o documento está corrompido.", "error");
     }
   };
-
-  const adicionarLinhaEmBranco = () => {
-    if (itens.length < LIMITE_LOGISTICA) {
-      setItens([...itens, gerarLinhaVazia()]);
-    } else {
-      showAlert("Limite Atingido", `O limite máximo é de ${LIMITE_LOGISTICA} itens.`, "warning");
-    }
-  };
-
-  const atualizarCampo = (id, campo, novoValor) => {
-    setItens(itens.map(item => {
-      if (item.id === id) {
-        let valorValidado = novoValor;
-        if (campo === 'qtdFornecida') {
-          if (novoValor === '') {
-            valorValidado = ''; 
-          } else {
-            valorValidado = parseInt(novoValor, 10);
-            if (isNaN(valorValidado) || valorValidado < 1) valorValidado = 1;
-          }
-        }
-        return { ...item, [campo]: valorValidado };
-      }
-      return item;
-    }));
-  };
-
-  const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
-  const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
-  
-  const removerItem = (idParaRemover) => {
-    setItens(itens.filter(item => item.id !== idParaRemover));
-  };
-
-  const handleEnviar = async () => {
-    if (!estoqueAtual || estoqueAtual === 'TODOS') {
-      showAlert("Ação Bloqueada", "Por favor, selecione uma filial específica no topo da página antes de registar a entrada.", "warning");
-      return;
-    }
-
-    if (!formDados.nome) {
-      showAlert("Campos Obrigatórios", "Preencha o Nome do operador.", "warning");
-      return;
-    }
-    
-    if (itens.length === 0) {
-      showAlert("Lista Vazia", "Adicione pelo menos um item à tabela para registar a entrada.", "warning");
-      return;
-    }
-
-    // ✨ CORRIGIDO: Removida a verificação obrigatória de 'numPecaFabricante'
-    if (itens.some(i => !i.qtdFornecida || i.qtdFornecida === '' || Number(i.qtdFornecida) < 1)) {
-      showAlert("Dados da Tabela", "Preencha o campo de Quantidade em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
-      return;
-    }
-
-    try {
-      showLoading("Registar Entrada", "A gravar dados no sistema...");
-      const anexosProcessados = [];
-      if (anexos.length > 0) {
-        let enviados;
-        try {
-          enviados = await enviarArquivos(anexos);
-        } catch (erroUpload) {
-          showAlert("Erro de Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
-          return;
-        }
-
-        anexosProcessados.push(...enviados.map((anexo) => ({ ...anexo, origem: 'logistica' })));
-      }
-
-      const payload = {
-        solicitante: { 
-          ...formDados, 
-          tipo: 'Entrada', 
-          filial_id: estoqueAtual 
-        },
-        itens: itens.map(item => ({
-          desenho_sap: item.desenhoSAP || '-',
-          part_number: item.numPecaFabricante || '-',
-          fabricante: item.fabricante || null, // ✨ ENVIO DO FABRICANTE
-          fornecedor: item.fornecedor || null,
-          referencia: item.referencia || null,
-          qtd: parseInt(item.qtdFornecida, 10) || 1,
-          unidade_medida: item.unidadeMedida || 'Unid',
-          nf_entrada: item.nfEntrada || null,
-          descricao: item.vendorDescription || 'Sem descrição',
-          materialDescription: item.vendorDescription || 'Sem descrição',
-          wbs_element: item.wbsElement || '-',
-          nome_projeto: item.nomeProjeto || null,
-          emissao_nf: item.emissaoNF || null,
-          receb_nf: item.recebNF || null,
-          documento_compras: item.docCompras || null,
-          valor_unitario: item.poNetPrice || null,
-          centro: item.centro || null,
-          deposito: item.deposito || null,
-          alocacao: item.alocacao || null
-        })),
-        anexos: anexosProcessados 
-      };
-
-      const dados = await apiFetch('/solicitacoes/entrada', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-
-      if (dados.sucesso || dados.ps_id || dados.ps) {
-        closeAlert();
-        showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps_id || dados.ps}`, "success");
-        setFormDados({ nome: '', observacoes: '' }); 
-        setItens([]);
-        setAnexos([]);
-      } else {
-        closeAlert();
-        showAlert("Erro no Servidor", dados.erro, "error");
-      }
-    } catch (error) {
-      closeAlert();
-      showAlert("Erro de Conexão", `Falha ao conectar com o servidor. Motivo: ${error.message}`, "error");
-    }
-  };
-
-  const nfsNormalizadas = nfsCrossdocking.map(nf => String(nf).trim().toUpperCase());
-  const nfsNaTabela = itens
-    .map(i => String(i.nfEntrada || '').trim().toUpperCase())
-    .filter(nf => nf !== '' && nfsNormalizadas.includes(nf));
-    
-  const nfsUnicasEncontradas = [...new Set(nfsNaTabela)];
-  const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
 
   return (
-    <div className="estoque-wrapper">
-      <ModalProcessamento estaProcessando={processador.estaProcessando} concluido={processador.concluido} estadoProgresso={processador.estadoProgresso} resultado={processador.resultado} erroFatal={processador.erroFatal} onClose={processador.resetarProcessador} />
+    <div className="visao-geral-container">
 
-      <header className="estoque-cabecalho">
-        <h1>Entrada de Estoque</h1>
-        <p>Cadastro detalhado de itens — Back-Office Logística</p>
+      <header className="vg-header">
+        <div className="vg-header-titulos">
+          <h1>Visão Geral do Estoque</h1>
+          <p style={{ color: '#64748b', margin: 0 }}>
+            {podeEditar ? (
+              <>Dê um clique nas <strong style={{color: '#2563eb'}}>caixinhas</strong> para <strong>editar um campo manualmente</strong> ou duplo clique na linha para ver o <strong>histórico de fluxos</strong>.</>
+            ) : (
+              <>Dê um duplo clique na linha para ver o <strong>histórico de fluxos</strong> detalhado do material.</>
+            )}
+          </p>
+        </div>
+        <button className="btn-exportar-excel" onClick={handleExportarExcel}>
+          <Download size={18} /> Exportar Excel
+        </button>
       </header>
 
-      <div className="estoque-cartao form-cartao">
-        <div className="form-header">
-          <div className="form-header-esquerda">
-            <div className="icone-fundo-azul" style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', backgroundColor: '#eff6ff', color: '#2563eb' }}><User size={18} /></div>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, color: '#0f172a' }}>Operador Responsável</h2>
+      <div className="vg-dashboard-cartao">
+        <div className="vg-dash-esquerda">
+          <div className="icone-cifrao">
+            <DollarSign size={28} />
+          </div>
+          <div className="vg-dash-textos">
+            <span>VALOR TOTAL DO ESTOQUE</span>
+            <strong>
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpiValorTotal)}
+            </strong>
           </div>
         </div>
         
-        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-          <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>NOME *</label>
-            <input type="text" className="input-campo" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none' }} />
+        <div className="vg-dash-direita">
+          <div className="kpi-mini-card">
+            <span>Volume Total (Qtd)</span>
+            <strong className="kpi-black">{formatarQtd(kpiTotalItens)}</strong>
           </div>
-          
-          <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>OBSERVAÇÕES</label>
-            <textarea className="input-campo" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})} style={{ minHeight: '42px', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none', resize: 'vertical' }}></textarea>
+          <div className="kpi-mini-card">
+            <span>Saldo Disponível</span>
+            <strong className="kpi-green">{formatarQtd(kpiDisponiveis)}</strong>
+          </div>
+          <div className="kpi-mini-card">
+            <span>Total Reservado</span>
+            <strong className="kpi-orange">{formatarQtd(kpiReservados)}</strong>
           </div>
         </div>
       </div>
 
-      {temCrossdockingAguardando && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '16px',
-          backgroundColor: '#e0f2fe', border: '1px solid #bae6fd',
-          padding: '16px 24px', borderRadius: '12px', marginBottom: '24px',
-          color: '#0369a1', animation: 'fadeIn 0.3s ease-in-out'
-        }}>
-          <div style={{ backgroundColor: '#bae6fd', padding: '10px', borderRadius: '50%', color: '#0284c7' }}>
-            <Truck size={24} />
+      <div className="tabela-wrapper">
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ position: 'relative', width: '300px' }}>
+            <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              placeholder="Buscar por SAP, Fabricante, NF..."
+              value={termoPesquisa}
+              onChange={(e) => setTermoPesquisa(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#f8fafc' }}
+            />
           </div>
-          <div>
-            <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '4px' }}>
-              Crossdocking Identificado!
-            </strong>
-            <span style={{ fontSize: '0.85rem' }}>
-              A Nota Fiscal <strong>{nfsUnicasEncontradas.join(', ')}</strong> pertence a uma solicitação de Crossdocking pendente. Ao registar esta entrada, o pedido de Crossdocking ficará automaticamente disponível para aprovação e separação!
-            </span>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '2400px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', width: '40px', textAlign: 'center' }}></th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', width: '80px' }}>ESTOQUE</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', minWidth: '200px' }}>DESCRIÇÃO</th>
+                
+                {/* COLUNA FABRICANTE */}
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
+                
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>QTDE ENTRADA (SALDO)</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>UNID. MEDIDA</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>CENTRO DE CUSTO - WBS</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NOME CENTRO DE CUSTO / PROJETO</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>EMISSÃO NF</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>RECEB. NF</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>Nº PEDIDO DE COMPRA / CPV</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>VLR. UNITÁRIO NOTA FISCAL</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FILIAL</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>DEPÓSITO</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>ALOCAÇÃO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {carregando ? (
+                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><Loader2 className="animate-spin" size={28} style={{ margin: '0 auto' }} /></td></tr>
+              ) : estoqueFiltrado.length === 0 ? (
+                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
+              ) : (
+                estoquePaginado.map(item => {
+                  // LÓGICA DE CORES DA TRANSFERÊNCIA WBS
+                  const isTransferido = item.is_transferencia || item.isTransferencia;
+                  const corFundo = isTransferido ? '#fefce8' : 'transparent';
+                  const corBorda = isTransferido ? '#fde047' : '#f1f5f9';
+
+                  // CÁLCULO DE SALDO REAL (Disponível - Reservado)
+                  const reservado = Number(item.quantidade_reservada) || 0;
+                  const saldoAtual = Number(item.quantidade_disponivel) || 0;
+                  const saldoLivre = Math.max(0, saldoAtual - reservado);
+
+                  return (
+                    <tr
+                      key={item.id}
+                      onDoubleClick={() => handleDuploCliqueItem(item)}
+                      style={{ backgroundColor: corFundo, borderBottom: `1px solid ${corBorda}`, transition: 'background-color 0.2s', cursor: 'default' }}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = isTransferido ? '#fef9c3' : '#f8fafc'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = corFundo}
+                    >
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }} title="Duplo clique na linha para ver demandas">
+                        <History size={16} color="#94a3b8" />
+                      </td>
+
+                      <td style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>
+                        <span style={{ backgroundColor: '#e2e8f0', padding: '4px 8px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                          {item.filial_id || item.filial || '-'}
+                        </span>
+                      </td>
+
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="desenho_sap" style={{ fontFamily: 'monospace', color: '#2563eb', fontWeight: '600' }} />
+                        
+                        {/* SELO AMARELO DE TRANSFERÊNCIA */}
+                        {isTransferido && (
+                          <div style={{ marginTop: '6px' }}>
+                            <span style={{ 
+                              backgroundColor: '#fef08a', color: '#ca8a04', 
+                              padding: '2px 8px', borderRadius: '4px', 
+                              fontSize: '0.65rem', fontWeight: 'bold', 
+                              textTransform: 'uppercase', letterSpacing: '0.05em',
+                              border: '1px solid #fde047'
+                            }}>
+                              ★ Transferência WBS
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="referencia" style={{ color: '#475569' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="descricao" style={{ color: '#475569' }} />
+                      </td>
+                      
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="fabricante" style={{ color: '#475569' }} placeholder="Nome do Fabricante..." />
+                      </td>
+
+                      {/* COLUNA DE SALDO COM INDICADOR DE RESERVA */}
+                      <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem' }}>
+                        {podeEditar ? (
+                           <CelulaEditavel item={item} field="quantidade_disponivel" type="number" style={{ color: '#10b981', fontWeight: '700' }} />
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ backgroundColor: '#ecfdf5', padding: '4px 12px', borderRadius: '999px', border: '1px solid #a7f3d0', display: 'inline-block', color: '#10b981', fontWeight: '700' }}>
+                              {saldoLivre} livre
+                            </span>
+                            {reservado > 0 && (
+                              <span style={{ fontSize: '0.70rem', color: '#f59e0b', fontWeight: '600' }}>
+                                ({reservado} reservado)
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem', textAlign: 'center' }}>
+                        <CelulaEditavel item={item} field="unidade_medida" style={{ color: '#64748b' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="nf_entrada" style={{ color: '#475569', fontFamily: 'monospace' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="fornecedor" style={{ color: '#475569', textTransform: 'uppercase' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="wbs" style={{ color: '#2563eb', fontFamily: 'monospace', fontWeight: '500' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="nome_projeto" style={{ color: '#475569' }} placeholder="Nome do Projeto..." />
+                      </td>
+
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="emissao_nf" type="date" renderFn={formatarData} style={{ color: '#64748b' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="receb_nf" type="date" renderFn={formatarData} style={{ color: '#64748b' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="documento_compras" style={{ color: '#475569' }} />
+                      </td>
+
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="valor_unitario" type="text" renderFn={formatarMoedaLocal} style={{ color: '#1e293b', fontWeight: '500' }} />
+                      </td>
+
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontWeight: '600', border: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
+                          <CelulaEditavel item={item} field="filial_id" renderFn={obterNomeFilialDinamico} />
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="deposito" style={{ color: '#475569' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                        <CelulaEditavel item={item} field="alocacao" style={{ color: '#3b82f6', fontFamily: 'monospace', fontWeight: '600' }} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {totalPaginas > 1 && (
+          <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
+            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {estoqueFiltrado.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{indexUltimoItem}</strong> de <strong>{estoqueFiltrado.length}</strong> itens
+            </div>
+            <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button 
+                className="btn-paginacao" 
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} 
+                disabled={paginaAtual === 1 || carregando} 
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}
+              >
+                <ChevronLeft size={16} /> Anterior
+              </button>
+              
+              <button 
+                className="btn-paginacao" 
+                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} 
+                disabled={paginaAtual === totalPaginas || carregando || estoqueFiltrado.length === 0} 
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || estoqueFiltrado.length === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || estoqueFiltrado.length === 0) ? 0.6 : 1 }}
+              >
+                Próxima <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {modalAberto && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '95%', maxWidth: '1400px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
+
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <PackageOpen size={20} color="#2563eb" /> Demandas Relacionadas
+                </h3>
+                <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '0.875rem' }}>
+                  Histórico de solicitações que contêm o item. (NF: <strong style={{ color: '#1e293b' }}>{itemSelecionado?.nf_entrada}</strong>)
+                </p>
+              </div>
+              <button onClick={fecharModal} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1, backgroundColor: '#f4f5f7' }}>
+              {carregandoHistorico ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  <Loader2 className="animate-spin" size={32} style={{ margin: '0 auto 12px auto', color: '#3b82f6' }} />
+                  <p>Buscando histórico na base de dados...</p>
+                </div>
+              ) : historicoDemandas.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', backgroundColor: '#fff', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                  Nenhuma demanda registada para este item específico.
+                </div>
+              ) : (
+                <TabelaDemandas dados={historicoDemandas} />
+              )}
+            </div>
+
           </div>
         </div>
       )}
 
-      <TabelaInsercaoItens 
-        itens={itens}
-        limiteLinhas={LIMITE_LOGISTICA} 
-        onAtualizarCampo={atualizarCampo}
-        onRemoverItem={removerItem}
-        onAdicionarLinha={adicionarLinhaEmBranco}
-        onImportarExcel={handleImportarExcel}
-      />
-
-      <div className="form-cartao" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', marginTop: '24px' }}>
-        <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>ANEXOS (OPCIONAL - Notas Fiscais, Manuais, Fotos)</label>
-          <div style={{ marginTop: '8px' }}>
-            <CarregarArquivo variante="botao" accept=".pdf, .jpg, .png, .xlsx" label="Anexar Arquivo" icone={<Paperclip size={16} />} onFileSelect={handleAnexar} />
-          </div>
-          {anexos.length > 0 && (
-            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {anexos.map((arquivo, index) => (
-                <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', width: 'fit-content', minWidth: '300px' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#334155' }}>{arquivo.name}</span>
-                  <button onClick={() => removerAnexo(index)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={16} /></button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <BotaoAcaoGlobal texto="Registrar Entrada" icone={<Send size={16} />} cor="verde" onClick={handleEnviar} />
     </div>
   );
 }
