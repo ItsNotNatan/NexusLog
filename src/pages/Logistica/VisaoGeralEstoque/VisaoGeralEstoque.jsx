@@ -47,7 +47,7 @@ export default function VisaoGeralEstoque({ perfil }) {
     }
   };
 
-  // ✨ NOVA FUNÇÃO AUXILIAR: Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
+  // Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
   const formatarMoedaLocal = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
     if (typeof valor === 'string' && valor.includes('R$')) return valor;
@@ -170,7 +170,7 @@ export default function VisaoGeralEstoque({ perfil }) {
   const CelulaEditavel = ({ item, field, type = 'text', renderFn, style = {}, placeholder = "" }) => {
     const isEditing = editCell.id === item.id && editCell.field === field;
     
-    // ✨ Fallbacks para garantir que campos alternativos são lidos
+    // Fallbacks para garantir que campos alternativos são lidos
     let val = item[field];
     if (field === 'fabricante' && !val) val = item.fabricante_manual;
     if (field === 'part_number' && !val) val = item.part_number_manual;
@@ -428,7 +428,7 @@ export default function VisaoGeralEstoque({ perfil }) {
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', minWidth: '200px' }}>DESCRIÇÃO</th>
                 
-                {/* ✨ COLUNA FABRICANTE (PART NUMBER REMOVIDO) */}
+                {/* COLUNA FABRICANTE */}
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
                 
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>QTDE ENTRADA (SALDO)</th>
@@ -452,92 +452,135 @@ export default function VisaoGeralEstoque({ perfil }) {
               ) : estoqueFiltrado.length === 0 ? (
                 <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
               ) : (
-                estoquePaginado.map(item => (
-                  <tr
-                    key={item.id}
-                    onDoubleClick={() => handleDuploCliqueItem(item)}
-                    style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.2s', cursor: 'default' }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }} title="Duplo clique na linha para ver demandas">
-                      <History size={16} color="#94a3b8" />
-                    </td>
+                estoquePaginado.map(item => {
+                  // LÓGICA DE CORES DA TRANSFERÊNCIA WBS
+                  const isTransferido = item.is_transferencia || item.isTransferencia;
+                  const corFundo = isTransferido ? '#fefce8' : 'transparent';
+                  
+                  // AQUI: Se for transferido, a borda inferior (sublinhado) fica mais grossa e amarela
+                  const estiloBordaInferior = isTransferido 
+                    ? '3px solid #eab308' 
+                    : '1px solid #f1f5f9';
 
-                    <td style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>
-                      <span style={{ backgroundColor: '#e2e8f0', padding: '4px 8px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
-                        {item.filial_id || item.filial || '-'}
-                      </span>
-                    </td>
+                  // CÁLCULO DE SALDO REAL (Disponível - Reservado)
+                  const reservado = Number(item.quantidade_reservada) || 0;
+                  const saldoAtual = Number(item.quantidade_disponivel) || 0;
+                  const saldoLivre = Math.max(0, saldoAtual - reservado);
 
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="desenho_sap" style={{ fontFamily: 'monospace', color: '#2563eb', fontWeight: '600' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="referencia" style={{ color: '#475569' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="descricao" style={{ color: '#475569' }} />
-                    </td>
-                    
-                    {/* ✨ CELULA EDITÁVEL DO FABRICANTE */}
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="fabricante" style={{ color: '#475569' }} placeholder="Nome do Fabricante..." />
-                    </td>
+                  return (
+                    <tr
+                      key={item.id}
+                      onDoubleClick={() => handleDuploCliqueItem(item)}
+                      style={{ 
+                        backgroundColor: corFundo, 
+                        borderBottom: estiloBordaInferior, 
+                        transition: 'background-color 0.2s', 
+                        cursor: 'default' 
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = isTransferido ? '#fef9c3' : '#f8fafc'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = corFundo}
+                    >
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }} title="Duplo clique na linha para ver demandas">
+                        <History size={16} color="#94a3b8" />
+                      </td>
 
-                    <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem' }}>
-                      {podeEditar ? (
-                         <CelulaEditavel item={item} field="quantidade_disponivel" type="number" style={{ color: '#10b981', fontWeight: '700' }} />
-                      ) : (
-                        <span style={{ backgroundColor: '#ecfdf5', padding: '4px 12px', borderRadius: '999px', border: '1px solid #a7f3d0', display: 'inline-block', color: '#10b981', fontWeight: '700' }}>
-                          {item.quantidade_disponivel || 0}
+                      <td style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>
+                        <span style={{ backgroundColor: '#e2e8f0', padding: '4px 8px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                          {item.filial_id || item.filial || '-'}
                         </span>
-                      )}
-                    </td>
+                      </td>
 
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem', textAlign: 'center' }}>
-                      <CelulaEditavel item={item} field="unidade_medida" style={{ color: '#64748b' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="nf_entrada" style={{ color: '#475569', fontFamily: 'monospace' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="fornecedor" style={{ color: '#475569', textTransform: 'uppercase' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="wbs" style={{ color: '#2563eb', fontFamily: 'monospace', fontWeight: '500' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="nome_projeto" style={{ color: '#475569' }} placeholder="Nome do Projeto..." />
-                    </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="desenho_sap" style={{ fontFamily: 'monospace', color: '#2563eb', fontWeight: '600' }} />
+                        
+                        {/* SELO AMARELO DE TRANSFERÊNCIA */}
+                        {isTransferido && (
+                          <div style={{ marginTop: '6px' }}>
+                            <span style={{ 
+                              backgroundColor: '#fef08a', color: '#ca8a04', 
+                              padding: '2px 8px', borderRadius: '4px', 
+                              fontSize: '0.65rem', fontWeight: 'bold', 
+                              textTransform: 'uppercase', letterSpacing: '0.05em',
+                              border: '1px solid #fde047'
+                            }}>
+                              ★ Transferência WBS
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="referencia" style={{ color: '#475569' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="descricao" style={{ color: '#475569' }} />
+                      </td>
+                      
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="fabricante" style={{ color: '#475569' }} placeholder="Nome do Fabricante..." />
+                      </td>
 
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="emissao_nf" type="date" renderFn={formatarData} style={{ color: '#64748b' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="receb_nf" type="date" renderFn={formatarData} style={{ color: '#64748b' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="documento_compras" style={{ color: '#475569' }} />
-                    </td>
+                      {/* COLUNA DE SALDO COM INDICADOR DE RESERVA */}
+                      <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem' }}>
+                        {podeEditar ? (
+                           <CelulaEditavel item={item} field="quantidade_disponivel" type="number" style={{ color: '#10b981', fontWeight: '700' }} />
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ backgroundColor: '#ecfdf5', padding: '4px 12px', borderRadius: '999px', border: '1px solid #a7f3d0', display: 'inline-block', color: '#10b981', fontWeight: '700' }}>
+                              {saldoLivre} livre
+                            </span>
+                            {reservado > 0 && (
+                              <span style={{ fontSize: '0.70rem', color: '#f59e0b', fontWeight: '600' }}>
+                                ({reservado} reservado)
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
 
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="valor_unitario" type="text" renderFn={formatarMoedaLocal} style={{ color: '#1e293b', fontWeight: '500' }} />
-                    </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem', textAlign: 'center' }}>
+                        <CelulaEditavel item={item} field="unidade_medida" style={{ color: '#64748b' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="nf_entrada" style={{ color: '#475569', fontFamily: 'monospace' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="fornecedor" style={{ color: '#475569', textTransform: 'uppercase' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="wbs" style={{ color: '#2563eb', fontFamily: 'monospace', fontWeight: '500' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="nome_projeto" style={{ color: '#475569' }} placeholder="Nome do Projeto..." />
+                      </td>
 
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontWeight: '600', border: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
-                        <CelulaEditavel item={item} field="filial_id" renderFn={obterNomeFilialDinamico} />
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
-                      <CelulaEditavel item={item} field="deposito" style={{ color: '#475569' }} />
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
-                      <CelulaEditavel item={item} field="alocacao" style={{ color: '#3b82f6', fontFamily: 'monospace', fontWeight: '600' }} />
-                    </td>
-                  </tr>
-                ))
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="emissao_nf" type="date" renderFn={formatarData} style={{ color: '#64748b' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="receb_nf" type="date" renderFn={formatarData} style={{ color: '#64748b' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="documento_compras" style={{ color: '#475569' }} />
+                      </td>
+
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="valor_unitario" type="text" renderFn={formatarMoedaLocal} style={{ color: '#1e293b', fontWeight: '500' }} />
+                      </td>
+
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontWeight: '600', border: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
+                          <CelulaEditavel item={item} field="filial_id" renderFn={obterNomeFilialDinamico} />
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
+                        <CelulaEditavel item={item} field="deposito" style={{ color: '#475569' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                        <CelulaEditavel item={item} field="alocacao" style={{ color: '#3b82f6', fontFamily: 'monospace', fontWeight: '600' }} />
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
