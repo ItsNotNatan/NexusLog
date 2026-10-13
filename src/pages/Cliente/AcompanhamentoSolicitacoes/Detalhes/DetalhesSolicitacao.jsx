@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao.jsx
-// DESCRIÇÃO: Detalhamento expandido das solicitações com campo Fabricante e Valor Unitário corrigidos
+// DESCRIÇÃO: Detalhamento expandido das solicitações (Sem Valor Estimado na NF)
 // =================================================================
 import React from 'react';
 import { PackageX, Box, ArrowRightLeft, FileText, PackagePlus, Truck, RefreshCcw, XCircle, AlertCircle } from 'lucide-react';
@@ -43,13 +43,10 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
     }
   };
 
-  // ✨ FUNÇÃO AUXILIAR CORRIGIDA: Usa ?? para tratar valores numéricos puros (como 0) que eram ignorados.
   const formatarMoeda = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
-    // Se o valor já tem R$ inserido pelo utilizador, não fazemos contas, apenas mostramos
     if (typeof valor === 'string' && valor.includes('R$')) return valor;
     
-    // Se for número limpo, formatamos com a vírgula
     const numero = parseFloat(String(valor).replace(',', '.'));
     if (!isNaN(numero)) return `R$ ${numero.toFixed(2).replace('.', ',')}`;
     
@@ -57,7 +54,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   };
 
   // ========================================================
-  // COMPONENTE: TABELA ULTRA DETALHADA (17 COLUNAS EXATAS)
+  // COMPONENTE: TABELA ULTRA DETALHADA
   // ========================================================
   const TabelaUltraDetalhada = ({ itens, corIcone, icone, titulo, corDestaque, bgDestaque }) => {
     const corIconeFinal = isRecusadoOuCancelado ? "#dc2626" : corIcone;
@@ -114,16 +111,12 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || it.desenho_sap || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.referencia || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual || it.descricao || '-'}</td>
-                    
-                    {/* ✨ CORRIGIDO: Puxa o campo fabricante_enriquecido que definimos na função de extração */}
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante_enriquecido ?? it.fabricante ?? it.fabricante_manual ?? '-'}</td>
-                    
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       <span style={{ display: 'inline-block', backgroundColor: bgDestaqueFinal, color: corDestaqueFinal, padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem' }}>
                         {it.quantidade_solicitada}
                       </span>
                     </td>
-                    
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', textAlign: 'center', fontSize: '0.8rem' }}>{it.unidade_medida_manual || 'Unid'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontFamily: 'monospace', fontSize: '0.8rem' }}>{it.nf_entrada || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', textTransform: 'uppercase', fontSize: '0.8rem' }}>{it.fornecedor || '-'}</td>
@@ -132,12 +125,9 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#f87171' : '#64748b', fontSize: '0.8rem' }}>{formatarData(it.emissao_nf)}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#f87171' : '#64748b', fontSize: '0.8rem' }}>{formatarData(it.receb_nf)}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontFamily: 'monospace', fontSize: '0.8rem' }}>{it.documento_compras || '-'}</td>
-                    
-                    {/* ✨ CORRIGIDO: Puxa o valor unitário enriquecido usando a função formatarMoeda */}
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontWeight: '500', fontSize: '0.85rem' }}>
                       {formatarMoeda(it.valor_unitario_enriquecido ?? it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice)}
                     </td>
-                    
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.centro || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.deposito || '-'}</td>
                     <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.alocacao || '-'}</td>
@@ -215,9 +205,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
             <thead>
               <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
-                
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
-                
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. TRANSFERIDA</th>
               </tr>
@@ -227,10 +215,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                 itensReais.map((it, idx) => (
                   <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
-                    
-                    {/* ✨ CORRIGIDO: Puxa o campo fabricante_enriquecido */}
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante_enriquecido ?? it.fabricante ?? it.fabricante_manual ?? '-'}</td>
-                    
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#fefce8', color: isRecusadoOuCancelado ? '#dc2626' : '#ca8a04', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#fef08a'}` }}>
@@ -252,13 +237,9 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   }
 
   // ========================================================
-  // 4. VISUAL: NOTA FISCAL
+  // 4. VISUAL: NOTA FISCAL (🚀 Atualizado: Removido o Valor Estimado)
   // ========================================================
   if (item.tipo === 'Nota Fiscal') {
-    const valorEstimado = itensReais[0]?.valor_unitario_manual 
-      ? formatarMoeda(itensReais[0].valor_unitario_manual) 
-      : 'R$ 0,00';
-
     return (
       <div className="area-expandida-cliente" style={{ padding: '24px' }}>
         {isRecusadoOuCancelado && (
@@ -268,14 +249,13 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </div>
         )}
         
+        {/* ✨ Aqui deixamos apenas a "Descrição / Motivo", ocupando 100% da largura de forma limpa */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '32px', fontSize: '0.875rem', marginBottom: '16px' }}>
           <div style={{ flex: 1 }}>
             <span style={{ color: isRecusadoOuCancelado ? '#991b1b' : '#1e293b', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Descrição / Motivo:</span>
-            <span style={{ color: isRecusadoOuCancelado ? '#dc2626' : '#475569', lineHeight: '1.5' }}>{itensReais[0]?.descricao_manual || item.observacoes}</span>
-          </div>
-          <div style={{ minWidth: '150px' }}>
-            <span style={{ color: isRecusadoOuCancelado ? '#991b1b' : '#1e293b', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Valor Estimado:</span>
-            <span style={{ color: isRecusadoOuCancelado ? '#dc2626' : '#059669', fontWeight: '700', fontSize: '1.1rem' }}>{valorEstimado}</span>
+            <span style={{ color: isRecusadoOuCancelado ? '#dc2626' : '#475569', lineHeight: '1.5' }}>
+              {itensReais[0]?.descricao_manual || item.observacoes}
+            </span>
           </div>
         </div>
 
@@ -378,10 +358,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                 itensReais.map((it, idx) => (
                   <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
-                    
-                    {/* ✨ CORRIGIDO: Puxa o campo fabricante_enriquecido */}
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante_enriquecido ?? it.fabricante ?? it.fabricante_manual ?? '-'}</td>
-                    
                     <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado || isCancelamento ? '#fef2f2' : '#fff7ed', color: isRecusadoOuCancelado || isCancelamento ? '#dc2626' : '#ea580c', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado || isCancelamento ? '#fecaca' : '#fed7aa'}` }}>
