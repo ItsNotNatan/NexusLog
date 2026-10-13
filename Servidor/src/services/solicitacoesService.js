@@ -1,8 +1,25 @@
 // =================================================================
 // ARQUIVO: src/services/solicitacoesService.js
-// DESCRICAO: Logica de negocio das solicitacoes, agora sobre o PocketBase
+// DESCRICAO: Logica de negocio das solicitacoes com limite de 2000 caracteres
 // =================================================================
 const db = require('../db');
+
+// ✨ CONFIGURAÇÃO DE LIMITE: Atualizado para os 2000 caracteres configurados na BD
+const LIMITE_CARACTERES = 2000;
+
+// ✨ FUNÇÃO DE PROTEÇÃO COM INDICADOR DE ALERTA
+const limitarTexto = (texto) => {
+  if (!texto) return '-';
+  const str = String(texto).trim();
+  
+  if (str.length <= LIMITE_CARACTERES) {
+    return str;
+  }
+  
+  // Corta o texto reservando espaço para o alerta visual
+  const textoCortado = str.substring(0, LIMITE_CARACTERES - 25);
+  return `${textoCortado}... [LIMITE ATINGIDO]`;
+};
 
 const limparIdEstoque = (id) => {
   if (!id) return null;
@@ -223,7 +240,7 @@ const criarMaterial = async (solicitante, itens, anexos) => {
     desenho_sap_manual: i.desenhoSAP || null,
     part_number_manual: i.numPecaFabricante || null,
     fabricante: i.fabricante || null, 
-    descricao_manual: i.materialDescription || 'Sem descrição',
+    descricao_manual: limitarTexto(i.materialDescription || 'Sem descrição'),
     quantidade_solicitada: Math.max(1, i.qtdSelecionada || 1),
     unidade_medida_manual: i.unidadeMedida || 'Unid',
     fornecedor: i.fornecedor || null,
@@ -256,7 +273,7 @@ const criarTransferencia = async (solicitante, itens, anexos) => {
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
     part_number_manual: i.numPecaFabricante || i.pn || i.part_number_manual,
     fabricante: i.fabricante || null, 
-    descricao_manual: i.materialDescription || i.desc || i.descricao_manual,
+    descricao_manual: limitarTexto(i.materialDescription || i.desc || i.descricao_manual),
     quantidade_solicitada: Math.max(1, i.qtd || i.qtdTransferencia || 1),
   }));
 
@@ -285,7 +302,7 @@ const criarEntrada = async (solicitante, itens, anexos) => {
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || '-',
     part_number_manual: i.part_number || i.numPecaFabricante || 'SEM-PN',
     fabricante: i.fabricante || null, 
-    descricao_manual: i.descricao || i.materialDescription || i.vendorDescription || 'Sem descrição',
+    descricao_manual: limitarTexto(i.descricao || i.materialDescription || i.vendorDescription || 'Sem descrição'),
     quantidade_solicitada: Math.max(1, i.qtd || i.qtdFornecida || 1),
     unidade_medida_manual: i.unidade_medida || i.unidadeMedida || 'Unid',
     valor_unitario_manual: limparValor(i.valor_unitario || i.poNetPrice),
@@ -320,6 +337,7 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
     quantidade_solicitada: Math.max(1, i.quantidade_solicitada || 1),
     unidade_medida_manual: i.unidade_medida_manual,
     fabricante: i.fabricante || null,
+    descricao_manual: limitarTexto(i.descricao_manual),
   }));
 
   return salvarNoBanco(dados, itensDB, anexos, solicitante.nf);
@@ -336,7 +354,7 @@ const criarNotaFiscal = async (solicitante, anexos) => {
   };
 
   const itensDB = [{
-    descricao_manual: solicitante.descricao,
+    descricao_manual: limitarTexto(solicitante.descricao),
     quantidade_solicitada: 1,
     valor_unitario_manual: limparValor(solicitante.valorEstimado || '0'),
   }];
@@ -359,7 +377,7 @@ const criarReintegracao = async (solicitante, itens, anexos) => {
     desenho_sap_manual: i.desenho_sap_manual || i.desenhoSAP || '-',
     part_number_manual: i.part_number_manual || i.part_number || '-',
     fabricante: i.fabricante || null,
-    descricao_manual: i.descricao_manual || i.descricao || 'Sem descrição',
+    descricao_manual: limitarTexto(i.descricao_manual || i.descricao || 'Sem descrição'),
     quantidade_solicitada: Math.max(1, Number(i.quantidade_devolvida || i.quantidade_solicitada || 1)),
     unidade_medida_manual: i.unidade_medida_manual || i.unidade || 'Unid',
     wbs_element: i.wbs_element || null,
@@ -384,7 +402,7 @@ const cancelarPL = async (solicitante, anexos) => {
     desenho_sap_manual: i.desenho_sap_manual || i.desenhoSAP || '-',
     part_number_manual: i.part_number_manual || i.part_number || '-',
     fabricante: i.fabricante || null,
-    descricao_manual: i.descricao_manual || i.descricao || 'Sem descrição',
+    descricao_manual: limitarTexto(i.descricao_manual || i.descricao || 'Sem descrição'),
     quantidade_solicitada: Math.max(1, Number(i.quantidade_solicitada || 1)),
     unidade_medida_manual: i.unidade_medida_manual || i.unidade || 'Unid',
   }));
@@ -716,6 +734,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           let estoqueAtual = await db.porId('estoque', item.estoque_id);
           const quantidadeDevolvida = Number(item.quantidade_solicitada || 0);
 
+          // ✨ MAGIA AQUI: Se a linha raiz foi apagada, ressuscitá-la com base nos dados do momento do pedido
           if (!estoqueAtual) {
               console.log(`⚠️ Linha de estoque raiz ${item.estoque_id} não encontrada. Recriando...`);
               try {
@@ -929,8 +948,7 @@ const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
     ),
     nf_entrada: i.nf_entrada || i.nfEntrada || null,
     unidade_medida_manual: i.unidade_medida || i.unidadeMedida || i.unidade_medida_manual || 'Unid',
-    descricao_manual:
-      i.descricao || i.vendorDescription || i.materialDescription || i.descricao_manual || 'Sem descrição',
+    descricao_manual: limitarTexto(i.descricao || i.vendorDescription || i.materialDescription || i.descricao_manual || 'Sem descrição'),
     wbs_element: i.wbs_element || i.wbsElement || i.wbs || null,
     nome_projeto: i.nome_projeto || i.nomeProjeto || null,
     emissao_nf: i.emissao_nf || i.emissaoNF || null,
