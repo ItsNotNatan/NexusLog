@@ -1,13 +1,24 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao.jsx
-// DESCRIÇÃO: Detalhamento expandido das solicitações com campo Fabricante e Valor Unitário corrigidos
+// DESCRIÇÃO: Detalhamento expandido com Paginação Interna para Alta Performance
 // =================================================================
-import React from 'react';
+import React, { useState } from 'react';
 import { PackageX, Box, ArrowRightLeft, FileText, PackagePlus, Truck, RefreshCcw, XCircle, AlertCircle } from 'lucide-react';
 import MostrarArquivo from '../../../../components/MostrarArquivo/MostrarArquivo';
 
 export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   const itensReais = item.itens || [];
+
+  // ✨ ESTADOS PARA A PAGINAÇÃO INTERNA DOS ITENS
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 10; // Podes aumentar para 15 ou 20 se preferires
+  
+  const totalPaginas = Math.max(1, Math.ceil(itensReais.length / itensPorPagina));
+  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
+  const indexUltimoItem = paginaAtual * itensPorPagina;
+  
+  // O array cortado que vai ser efetivamente desenhado na tela (super leve!)
+  const itensPaginados = itensReais.slice(indexPrimeiroItem, indexUltimoItem);
 
   // ✨ IDENTIFICA SE DEVE ATIVAR O MODO VERMELHO
   const isRecusadoOuCancelado = item.statusExibicao === 'Recusado' || item.statusExibicao === 'Cancelado' || item.tipo === 'Cancelado';
@@ -43,23 +54,49 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
     }
   };
 
-  // ✨ FUNÇÃO AUXILIAR CORRIGIDA: Usa ?? para tratar valores numéricos puros (como 0) que eram ignorados.
   const formatarMoeda = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
-    // Se o valor já tem R$ inserido pelo utilizador, não fazemos contas, apenas mostramos
     if (typeof valor === 'string' && valor.includes('R$')) return valor;
     
-    // Se for número limpo, formatamos com a vírgula
     const numero = parseFloat(String(valor).replace(',', '.'));
     if (!isNaN(numero)) return `R$ ${numero.toFixed(2).replace('.', ',')}`;
     
     return String(valor);
   };
 
+  // ✨ COMPONENTE REUTILIZÁVEL DO PAGINADOR
+  const RenderizarPaginacao = () => {
+    if (totalPaginas <= 1) return null; // Esconde se não houver mais do que 1 página
+    
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
+        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+          Mostrando <strong>{indexPrimeiroItem + 1}</strong> a <strong>{Math.min(indexUltimoItem, itensReais.length)}</strong> de <strong>{itensReais.length}</strong> itens
+        </span>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
+            disabled={paginaAtual === 1}
+            style={{ padding: '4px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: paginaAtual === 1 ? '#f1f5f9' : '#ffffff', color: paginaAtual === 1 ? '#94a3b8' : '#334155', cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: '500', transition: 'all 0.2s' }}
+          >
+            Anterior
+          </button>
+          <button
+            onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
+            disabled={paginaAtual === totalPaginas}
+            style={{ padding: '4px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: paginaAtual === totalPaginas ? '#f1f5f9' : '#ffffff', color: paginaAtual === totalPaginas ? '#94a3b8' : '#334155', cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: '500', transition: 'all 0.2s' }}
+          >
+            Próxima
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // ========================================================
-  // COMPONENTE: TABELA ULTRA DETALHADA (17 COLUNAS EXATAS)
+  // COMPONENTE: TABELA ULTRA DETALHADA
   // ========================================================
-  const TabelaUltraDetalhada = ({ itens, corIcone, icone, titulo, corDestaque, bgDestaque }) => {
+  const TabelaUltraDetalhada = ({ corIcone, icone, titulo, corDestaque, bgDestaque }) => {
     const corIconeFinal = isRecusadoOuCancelado ? "#dc2626" : corIcone;
     const corDestaqueFinal = isRecusadoOuCancelado ? "#dc2626" : corDestaque;
     const bgDestaqueFinal = isRecusadoOuCancelado ? "#fef2f2" : bgDestaque;
@@ -84,70 +121,71 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: '600' }}>{titulo}</h3>
         </div>
 
-        <div style={{ overflowX: 'auto', border: `1px solid ${borderCorFinal}`, borderRadius: '8px', backgroundColor: '#ffffff', paddingTop: '12px', width: '100%', maxWidth: '78vw' }}>
-          <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '2400px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>NUM SAP | DESENHO</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>REFERÊNCIA</th>
-                <th style={{ minWidth: '200px', padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTDE ENTRADA</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>UNID. MEDIDA</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>NUM DA NOTA FISCAL</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FORNECEDOR / REGISTRO</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>CENTRO DE CUSTO - WBS</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>NOME CENTRO DE CUSTO / PROJETO</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>EMISSÃO NF</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>RECEB. NF</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>Nº PEDIDO DE COMPRA / CPV</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>VLR. UNITÁRIO NOTA FISCAL</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FILIAL</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DEPÓSITO</th>
-                <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>ALOCAÇÃO</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itens.length > 0 ? (
-                itens.map((it, idx) => (
-                  <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || it.desenho_sap || '-'}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.referencia || '-'}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual || it.descricao || '-'}</td>
-                    
-                    {/* ✨ CORRIGIDO: Puxa o campo fabricante_enriquecido que definimos na função de extração */}
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante_enriquecido ?? it.fabricante ?? it.fabricante_manual ?? '-'}</td>
-                    
-                    <td style={{ padding: '12px', textAlign: 'center' }}>
-                      <span style={{ display: 'inline-block', backgroundColor: bgDestaqueFinal, color: corDestaqueFinal, padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem' }}>
-                        {it.quantidade_solicitada}
-                      </span>
-                    </td>
-                    
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', textAlign: 'center', fontSize: '0.8rem' }}>{it.unidade_medida_manual || 'Unid'}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontFamily: 'monospace', fontSize: '0.8rem' }}>{it.nf_entrada || '-'}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', textTransform: 'uppercase', fontSize: '0.8rem' }}>{it.fornecedor || '-'}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#dc2626' : '#2563eb', fontFamily: 'monospace', fontSize: '0.8rem', fontWeight: '600' }}>{it.wbs_element || it.wbs || '-'}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.nome_projeto || '-'}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#f87171' : '#64748b', fontSize: '0.8rem' }}>{formatarData(it.emissao_nf)}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#f87171' : '#64748b', fontSize: '0.8rem' }}>{formatarData(it.receb_nf)}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontFamily: 'monospace', fontSize: '0.8rem' }}>{it.documento_compras || '-'}</td>
-                    
-                    {/* ✨ CORRIGIDO: Puxa o valor unitário enriquecido usando a função formatarMoeda */}
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontWeight: '500', fontSize: '0.85rem' }}>
-                      {formatarMoeda(it.valor_unitario_enriquecido ?? it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice)}
-                    </td>
-                    
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.centro || '-'}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.deposito || '-'}</td>
-                    <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.alocacao || '-'}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr><td colSpan="17" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '32px' }}>Nenhum detalhe de item encontrado.</td></tr>
-              )}
-            </tbody>
-          </table>
+        <div style={{ border: `1px solid ${borderCorFinal}`, borderRadius: '8px', backgroundColor: '#ffffff', width: '100%', maxWidth: '78vw' }}>
+          <div style={{ overflowX: 'auto', paddingTop: '12px' }}>
+            <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '2400px', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>NUM SAP | DESENHO</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>REFERÊNCIA</th>
+                  <th style={{ minWidth: '200px', padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTDE ENTRADA</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>UNID. MEDIDA</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>NUM DA NOTA FISCAL</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FORNECEDOR / REGISTRO</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>CENTRO DE CUSTO - WBS</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>NOME CENTRO DE CUSTO / PROJETO</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>EMISSÃO NF</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>RECEB. NF</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>Nº PEDIDO DE COMPRA / CPV</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>VLR. UNITÁRIO NOTA FISCAL</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FILIAL</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DEPÓSITO</th>
+                  <th style={{ padding: '12px', borderBottom: `1px solid ${borderCorFinal}`, fontSize: '0.70rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>ALOCAÇÃO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itensPaginados.length > 0 ? (
+                  itensPaginados.map((it, idx) => (
+                    <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || it.desenho_sap || '-'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.referencia || '-'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual || it.descricao || '-'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante_enriquecido ?? it.fabricante ?? it.fabricante_manual ?? '-'}</td>
+                      
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        <span style={{ display: 'inline-block', backgroundColor: bgDestaqueFinal, color: corDestaqueFinal, padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem' }}>
+                          {it.quantidade_solicitada}
+                        </span>
+                      </td>
+                      
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', textAlign: 'center', fontSize: '0.8rem' }}>{it.unidade_medida_manual || 'Unid'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontFamily: 'monospace', fontSize: '0.8rem' }}>{it.nf_entrada || '-'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', textTransform: 'uppercase', fontSize: '0.8rem' }}>{it.fornecedor || '-'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#dc2626' : '#2563eb', fontFamily: 'monospace', fontSize: '0.8rem', fontWeight: '600' }}>{it.wbs_element || it.wbs || '-'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.nome_projeto || '-'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#f87171' : '#64748b', fontSize: '0.8rem' }}>{formatarData(it.emissao_nf)}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#f87171' : '#64748b', fontSize: '0.8rem' }}>{formatarData(it.receb_nf)}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontFamily: 'monospace', fontSize: '0.8rem' }}>{it.documento_compras || '-'}</td>
+                      
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontWeight: '500', fontSize: '0.85rem' }}>
+                        {formatarMoeda(it.valor_unitario_enriquecido ?? it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice)}
+                      </td>
+                      
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.centro || '-'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.deposito || '-'}</td>
+                      <td style={{ padding: '12px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.8rem' }}>{it.alocacao || '-'}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan="17" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '32px' }}>Nenhum detalhe de item encontrado.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {/* ✨ RENDERIZA A PAGINAÇÃO AQUI (Dentro do container branco da tabela) */}
+          <RenderizarPaginacao />
         </div>
 
         <RenderizarAnexos tituloLogistica={item.tipo === 'Entrada' ? "Documentos de Recebimento Final" : "Documentos de Liberação (Logística)"} />
@@ -161,7 +199,6 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   if (item.tipo === 'Material') {
     return (
       <TabelaUltraDetalhada 
-        itens={itensReais} 
         corIcone="#2563eb" 
         icone={<Box size={18} color="#2563eb" />} 
         titulo={isRecusadoOuCancelado ? "Itens Cancelados/Recusados" : "Itens Retirados do Estoque"}
@@ -177,7 +214,6 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   if (item.tipo === 'Entrada') {
     return (
       <TabelaUltraDetalhada 
-        itens={itensReais} 
         corIcone="#059669" 
         icone={<PackagePlus size={18} color="#059669" />} 
         titulo={isRecusadoOuCancelado ? "Entrada Cancelada/Recusada" : "Materiais Recebidos e Cadastrados"}
@@ -210,40 +246,38 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: '600' }}>Itens Transferidos</h3>
         </div>
 
-        <div style={{ overflowX: 'auto', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, borderRadius: '8px', backgroundColor: '#ffffff', paddingTop: '12px', width: '100%', maxWidth: '78vw' }}>
-          <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
-                
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
-                
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. TRANSFERIDA</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itensReais.length > 0 ? (
-                itensReais.map((it, idx) => (
-                  <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
-                    
-                    {/* ✨ CORRIGIDO: Puxa o campo fabricante_enriquecido */}
-                    <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante_enriquecido ?? it.fabricante ?? it.fabricante_manual ?? '-'}</td>
-                    
-                    <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#fefce8', color: isRecusadoOuCancelado ? '#dc2626' : '#ca8a04', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#fef08a'}` }}>
-                        {it.quantidade_solicitada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{it.unidade_medida_manual}</span>
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr><td colSpan="4" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '24px' }}>Nenhum item encontrado.</td></tr>
-              )}
-            </tbody>
-          </table>
+        <div style={{ border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, borderRadius: '8px', backgroundColor: '#ffffff', width: '100%', maxWidth: '78vw' }}>
+          <div style={{ overflowX: 'auto', paddingTop: '12px' }}>
+            <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. TRANSFERIDA</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itensPaginados.length > 0 ? (
+                  itensPaginados.map((it, idx) => (
+                    <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
+                      <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante_enriquecido ?? it.fabricante ?? it.fabricante_manual ?? '-'}</td>
+                      <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#fefce8', color: isRecusadoOuCancelado ? '#dc2626' : '#ca8a04', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#fef08a'}` }}>
+                          {it.quantidade_solicitada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{it.unidade_medida_manual}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan="4" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '24px' }}>Nenhum item encontrado.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <RenderizarPaginacao />
         </div>
 
         <RenderizarAnexos />
@@ -307,31 +341,34 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: '600' }}>Volumes do Crossdocking</h3>
         </div>
 
-        <div style={{ overflowX: 'auto', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, borderRadius: '8px', backgroundColor: '#ffffff', paddingTop: '12px', width: '100%', maxWidth: '78vw' }}>
-          <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP / REFERÊNCIA</th>
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>VOLUME SOLICITADO</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itensReais.length > 0 ? (
-                itensReais.map((it, idx) => (
-                  <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px 16px', fontWeight: '700', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#faf5ff', color: isRecusadoOuCancelado ? '#dc2626' : '#9333ea', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e9d5ff'}` }}>
-                        {it.quantidade_solicitada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{it.unidade_medida_manual}</span>
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr><td colSpan="2" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '24px' }}>Saída Total (Sem itens especificados). Veja os anexos.</td></tr>
-              )}
-            </tbody>
-          </table>
+        <div style={{ border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, borderRadius: '8px', backgroundColor: '#ffffff', width: '100%', maxWidth: '78vw' }}>
+          <div style={{ overflowX: 'auto', paddingTop: '12px' }}>
+            <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP / REFERÊNCIA</th>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>VOLUME SOLICITADO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itensPaginados.length > 0 ? (
+                  itensPaginados.map((it, idx) => (
+                    <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 16px', fontWeight: '700', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#faf5ff', color: isRecusadoOuCancelado ? '#dc2626' : '#9333ea', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e9d5ff'}` }}>
+                          {it.quantidade_solicitada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{it.unidade_medida_manual}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan="2" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '24px' }}>Saída Total (Sem itens especificados). Veja os anexos.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <RenderizarPaginacao />
         </div>
 
         <RenderizarAnexos 
@@ -361,40 +398,38 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </h3>
         </div>
 
-        <div style={{ overflowX: 'auto', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, borderRadius: '8px', backgroundColor: '#ffffff', paddingTop: '12px', width: '100%', maxWidth: '78vw' }}>
-          <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
-                
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
-                
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
-                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. DEVOLVIDA</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itensReais.length > 0 ? (
-                itensReais.map((it, idx) => (
-                  <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
-                    
-                    {/* ✨ CORRIGIDO: Puxa o campo fabricante_enriquecido */}
-                    <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante_enriquecido ?? it.fabricante ?? it.fabricante_manual ?? '-'}</td>
-                    
-                    <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado || isCancelamento ? '#fef2f2' : '#fff7ed', color: isRecusadoOuCancelado || isCancelamento ? '#dc2626' : '#ea580c', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado || isCancelamento ? '#fecaca' : '#fed7aa'}` }}>
-                        + {it.quantidade_solicitada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{it.unidade_medida_manual}</span>
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr><td colSpan="4" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '24px' }}>O Cancelamento foi registado sem itens individuais especificados.</td></tr>
-              )}
-            </tbody>
-          </table>
+        <div style={{ border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, borderRadius: '8px', backgroundColor: '#ffffff', width: '100%', maxWidth: '78vw' }}>
+          <div style={{ overflowX: 'auto', paddingTop: '12px' }}>
+            <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
+                  <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. DEVOLVIDA</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itensPaginados.length > 0 ? (
+                  itensPaginados.map((it, idx) => (
+                    <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#64748b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
+                      <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontSize: '0.85rem' }}>{it.fabricante_enriquecido ?? it.fabricante ?? it.fabricante_manual ?? '-'}</td>
+                      <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#991b1b' : '#334155', fontSize: '0.85rem' }}>{it.descricao_manual}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado || isCancelamento ? '#fef2f2' : '#fff7ed', color: isRecusadoOuCancelado || isCancelamento ? '#dc2626' : '#ea580c', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado || isCancelamento ? '#fecaca' : '#fed7aa'}` }}>
+                          + {it.quantidade_solicitada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{it.unidade_medida_manual}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan="4" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '24px' }}>O Cancelamento foi registado sem itens individuais especificados.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <RenderizarPaginacao />
         </div>
 
         <RenderizarAnexos tituloLogistica={isCancelamento ? "Documento de Cancelamento" : "Documento Final de Reintegração"} />
