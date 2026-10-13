@@ -122,9 +122,15 @@ export default function TransferenciaWBS() {
       }
     }
 
+    // ✨ CORREÇÃO CRÍTICA DO PAYLOAD DE TRANSFERÊNCIA
     const payload = {
-      // ✨ CORREÇÃO: "wbs" no payload reflete exatamente o estado "wbsDestino"
-      solicitante: { ...formDados, wbs: formDados.wbsDestino, tipo: 'Transferencia WBS', filial_origem: estoqueAtual },
+      solicitante: { 
+        ...formDados, 
+        wbs: formDados.wbsDestino, // Mantido para compatibilidade
+        wbs_destino: formDados.wbsDestino, // Passando explícito para a API
+        tipo: 'Transferencia WBS', 
+        filial_origem: estoqueAtual 
+      },
       itens: itensSelecionados.map(item => ({
         estoque_id: item.id, 
         desenhoSAP: item.desenho_sap || item.desenhoSAP || '-', 
@@ -132,7 +138,8 @@ export default function TransferenciaWBS() {
         fabricante: item.fabricante || null, 
         materialDescription: item.descricao || item.materialDescription || '-',
         qtd: item.qtdTransferencia, 
-        wbsOrigem: item.wbs || item.wbs_element || '-', 
+        // ✨ CORREÇÃO AQUI: Garante a passagem rigorosa do WBS da prateleira do item para montar "Origem -> Destino"
+        wbsOrigem: item.wbs || item.wbs_element || 'Desconhecido', 
         alocacao: item.alocacao || '-'
       })),
       anexos: anexosProcessados 
