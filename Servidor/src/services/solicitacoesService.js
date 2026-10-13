@@ -110,7 +110,6 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
   }
 
   if (busca) {
-    // O "~" do PocketBase equivale ao ILIKE %valor% do Postgres.
     condicoes.push('(ps ~ {:busca} || nome_solicitante ~ {:busca} || wbs_destino ~ {:busca} || wbs_origem ~ {:busca})');
     parametros.busca = busca;
   }
@@ -123,8 +122,6 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
   const solicitacoes = resultado.items;
   const ids = solicitacoes.map((s) => s.id);
 
-  // ---- O que o PostgREST trazia junto no select, buscado em bloco --------
-  // Uma consulta por tabela relacionada (e nao uma por solicitacao).
   const [itens, anexos, packingLists, notasFiscais] = await Promise.all([
     db.listarPorIds('solicitacoes_itens', 'solicitacao_id', ids),
     db.listarPorIds('anexos', 'solicitacao_id', ids),
@@ -155,13 +152,21 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
     const plFinal = sol.pl || (numeroPL ? `PL #${numeroPL}` : null);
     const dataAprovacaoValida = sol.data_aprovacao_pl || (sol.status !== 'Pendente' ? sol.updated_at : null);
 
+    // ✨ CORREÇÃO: Formatação limpa do WBS, impedindo N/A's ou nulos na origem de mancharem o título
+    let wbsExibicao = sol.wbs_destino || '—';
+    if (sol.tipo === 'Transferencia WBS' || sol.tipo === 'Transfer. WBS') {
+       const origemLimpa = (sol.wbs_origem && sol.wbs_origem !== 'N/A' && sol.wbs_origem !== 'null') ? sol.wbs_origem : 'Estoque / Desconhecida';
+       const destinoLimpo = (sol.wbs_destino && sol.wbs_destino !== 'N/A' && sol.wbs_destino !== 'null') ? sol.wbs_destino : '—';
+       wbsExibicao = `${origemLimpa} ➔ ${destinoLimpo}`;
+    }
+
     return {
       id: sol.id,
       ps: sol.ps,
       tipo: sol.tipo,
       nfCrossdocking: listaNF.length > 0 ? listaNF[0].numero_nf : null,
       solicitante: sol.nome_solicitante || 'Não informado',
-      wbs: sol.tipo === 'Transferencia WBS' ? `${sol.wbs_origem} ➔ ${sol.wbs_destino}` : sol.wbs_destino || '—',
+      wbs: wbsExibicao, 
       pl: plFinal,
       filial: sol.filial_origem_id || '-',
       dataSolicitacao:
@@ -232,12 +237,17 @@ const criarMaterial = async (solicitante, itens, anexos) => {
 };
 
 const criarTransferencia = async (solicitante, itens, anexos) => {
-  const wbsOrig = itens && itens.length > 0 ? itens[0].wbsOrigem : null;
+  // ✨ CORREÇÃO DA ORIGEM: Certifica-se de que a origem do WBS é puxada inteligentemente da primeira linha do carrinho
+  let wbsOrig = null;
+  if (itens && itens.length > 0) {
+      wbsOrig = itens[0].wbsOrigem || itens[0].wbs || itens[0].wbs_element || null;
+  }
+
   const dados = {
     tipo: 'Transferencia WBS',
     nome_solicitante: solicitante.nome,
     wbs_origem: wbsOrig,
-    wbs_destino: solicitante.wbs,
+    wbs_destino: solicitante.wbs || solicitante.wbs_destino,
     observacoes: solicitante.observacoes,
     entrega_urgente: solicitante.entregaUrgente || false,
     status: 'Pendente',
@@ -246,10 +256,10 @@ const criarTransferencia = async (solicitante, itens, anexos) => {
 
   const itensDB = itens.map((i) => ({
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
-    part_number_manual: i.numPecaFabricante || i.pn,
+    part_number_manual: i.numPecaFabricante || i.pn || i.part_number_manual,
     fabricante: i.fabricante || null, 
-    descricao_manual: i.materialDescription || i.desc,
-    quantidade_solicitada: Math.max(1, i.qtd || 1),
+    descricao_manual: i.materialDescription || i.desc || i.descricao_manual,
+    quantidade_solicitada: Math.max(1, i.qtd || i.qtdTransferencia || 1),
   }));
 
   return salvarNoBanco(dados, itensDB, anexos);
@@ -516,7 +526,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             wbs: solicitacao.wbs_destino,
             nome_projeto: estoqueAtual.nome_projeto || '',
             is_transferencia: true,
-            alocacao: estoqueAtual.alocacao || '',
+            alocacao: `Origem: ${solicitacao.wbs_origem || estoqueAtual.wbs || 'Desconhecida'}`,
             fornecedor: estoqueAtual.fornecedor || '',
             referencia: estoqueAtual.referencia || '',
             unidade_medida: estoqueAtual.unidade_medida || 'Unid',
@@ -657,9 +667,8 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       solicitacao.tipo === 'Cancelado'
     ) {
       let deveDevolverAoEstoque = true;
-      let wbsDestinoTransferencia = null; // ✨ IDENTIFICADOR DE TRANSFERENCIA WBS
+      let wbsDestinoTransferencia = null; 
 
-      // 3.1 Identificar se é Cancelamento de Transferência WBS
       if (solicitacao.tipo === 'Cancelado' && solicitacao.observacoes) {
         const idOriginalParaCancelar = acharIdOriginalNoTexto(solicitacao.observacoes);
 
@@ -669,7 +678,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           if (solOriginal) {
             if (solOriginal.status === 'Pendente') deveDevolverAoEstoque = false;
             
-            // ✨ NOVO: Se foi uma Transferência WBS que já tinha sido aprovada, vamos buscar a linha amarela
             if (solOriginal.tipo === 'Transferencia WBS' && (solOriginal.status === 'Em Separação' || solOriginal.status === 'Concluído')) {
                 wbsDestinoTransferencia = solOriginal.wbs_destino;
             }
@@ -684,7 +692,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           }
         }
       } 
-      // 3.2 Identificar se é Reintegração de Transferência WBS (através da PL)
       else if ((solicitacao.tipo === 'Reintegracao' || solicitacao.tipo === 'Reintegração') && solicitacao.observacoes) {
         const matchPL = solicitacao.observacoes.match(/PL #(\d+)/);
         if (matchPL) {
@@ -713,13 +720,11 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
           const quantidadeDevolvida = Number(item.quantidade_solicitada || 0);
 
-          // ✨ 1. Devolver a quantidade ao item original
           await db.atualizar('estoque', item.estoque_id, {
             quantidade_disponivel: saldoAtual + quantidadeDevolvida,
             status: 'Disponível',
           });
 
-          // ✨ 2. Se a devolução for de uma Transferência WBS, abater a linha amarela no WBS de destino!
           if (wbsDestinoTransferencia) {
              const linhaAmarela = await db.um('estoque', db.f(
                  'is_transferencia = true && wbs = {:wbs} && desenho_sap = {:sap} && filial_id = {:filial}',
@@ -881,7 +886,7 @@ const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
     solicitacao_id: solicitacaoId,
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || i.desenho_sap_manual || null,
     part_number_manual: i.part_number || i.numPecaFabricante || i.part_number_manual || null,
-    fabricante: i.fabricante || null, // ✨ NOVA COLUNA
+    fabricante: i.fabricante || null, 
     fornecedor: i.fornecedor || null,
     referencia: i.referencia || null,
     quantidade_solicitada: Math.max(
