@@ -52,15 +52,51 @@ const obterClasseBadgeTipo = (tipo) => {
 
 const converterParaInputDateTime = (dataString) => {
   if (!dataString || dataString === '-' || dataString === '—' || dataString === 'Disponível') return '';
+  
   const partes = dataString.split(' ');
   if (partes[0].includes('/')) {
     const [dia, mes, ano] = partes[0].split('/');
     let hora = '00:00';
-    if (partes.length >= 3 && partes[2].includes(':')) hora = partes[2]; 
-    else if (partes.length === 2 && partes[1].includes(':')) hora = partes[1]; 
+    
+    if (partes.length >= 3 && partes[2].includes(':')) {
+       hora = partes[2]; 
+    } else if (partes.length === 2 && partes[1].includes(':')) {
+       hora = partes[1]; 
+    }
+    
     return `${ano}-${mes}-${dia}T${hora}`;
   }
   return '';
+};
+
+// ✨ FUNÇÃO AUXILIAR SIMPLIFICADA PARA NÚMEROS
+const obterValorSeguroNumero = (valItem, valEstoque) => {
+  const processarNumero = (valor) => {
+    if (valor === undefined || valor === null || valor === '-' || valor === '') return 0;
+    
+    let limpo = String(valor).replace(/[^\d.,-]/g, '');
+    if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
+    else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
+    
+    const numeroFinal = parseFloat(limpo);
+    return isNaN(numeroFinal) ? 0 : numeroFinal;
+  };
+
+  const num1 = processarNumero(valItem);
+  if (num1 > 0) return num1;
+  
+  const num2 = processarNumero(valEstoque);
+  if (num2 > 0) return num2;
+
+  return 0;
+};
+
+// ✨ FUNÇÃO AUXILIAR SIMPLIFICADA PARA TEXTO
+const obterValorSeguroTexto = (valItem, valEstoque) => {
+  const validar = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== 'null';
+  if (validar(valItem)) return valItem;
+  if (validar(valEstoque)) return valEstoque;
+  return '-';
 };
 
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
@@ -76,13 +112,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   };
 
   useEffect(() => {
-    if (!carregandoInicial && perfil === 'cliente' && estoqueAtual === 'TODOS') {
-      showAlert("Ação Restrita", "Para visualizar o acompanhamento, selecione uma filial específica no topo da página.", "warning");
-      navigate('/cliente/consulta-estoque');
+    if (!carregandoInicial) {
+      if (perfil === 'cliente' && estoqueAtual === 'TODOS') {
+        showAlert("Ação Restrita", "Para visualizar o acompanhamento, selecione uma filial específica no topo da página.", "warning");
+        navigate('/cliente/consulta-estoque');
+      }
     }
   }, [estoqueAtual, perfil, navigate, showAlert, carregandoInicial]);
 
   const [dadosTabela, setDadosTabela] = useState([]);
+  const [estoque, setEstoque] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [termoPesquisa, setTermoPesquisa] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -92,13 +131,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [paginaAtual, setPaginaAtual] = useState(1);
 
   const itensPorPagina = 10;
-  
+
   let usuarioLogado = {};
   try {
     const dadosUsuario = localStorage.getItem('@NexusLog:usuario');
-    if (dadosUsuario && dadosUsuario !== 'undefined') usuarioLogado = JSON.parse(dadosUsuario);
+    if (dadosUsuario && dadosUsuario !== 'undefined') {
+      usuarioLogado = JSON.parse(dadosUsuario);
+    }
   } catch (erro) { }
 
+  const token = localStorage.getItem('@NexusLog:token') || '';
   const isOperador = String(usuarioLogado.cargo || '').toLowerCase().trim().includes('operador');
   const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
 
@@ -109,40 +151,71 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       try {
         setCarregando(true);
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
+
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
 
-        // ✨ OTIMIZAÇÃO: Apenas pede as solicitações. O backend já faz tudo.
-        const resultadoSol = await apiFetch(urlSolicitacoes);
+        const [resultadoSol, resultadoEst] = await Promise.all([
+          apiFetch(urlSolicitacoes),
+          apiFetch("/estoque/listar?rastreabilidade=true")
+        ]);
+
+        if (resultadoEst.sucesso) {
+          setEstoque(resultadoEst.dados);
+        }
 
         if (resultadoSol.sucesso) {
           const reints = resultadoSol.dados.filter(sol =>
-            (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') && (sol.status === 'Em Separação' || sol.status === 'Concluído')
+            (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
+            (sol.status === 'Em Separação' || sol.status === 'Concluído')
           );
-          const cancelamentosAtivos = resultadoSol.dados.filter(sol => sol.tipo === 'Cancelado' && sol.status !== 'Recusado');
+
+          const cancelamentosAtivos = resultadoSol.dados.filter(sol =>
+            sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
+          );
+
+          const estoqueReferencia = resultadoEst.sucesso ? resultadoEst.dados : [];
 
           const dadosFormatados = resultadoSol.dados.map((item) => {
+            let prefixo = "PS";
+            const idNumerico = item.id.replace(/\D/g, "");
             let acaoTipo = "select";
             let acaoValor = item.status;
             let statusDestinoAprovacao = item.tipo === "Entrada" ? "Concluído" : "Em Separação";
 
-            if (item.status === "Pendente") { acaoTipo = "botao"; acaoValor = "Aprovar"; } 
-            else if (item.status === "Em Separação" || item.status === "Em Andamento") { acaoValor = "Em Separação"; }
+            if (item.status === "Pendente") {
+              acaoTipo = "botao";
+              acaoValor = "Aprovar";
+            } else if (item.status === "Em Separação" || item.status === "Em Andamento") {
+              acaoValor = "Em Separação";
+            }
+
+            let numeroPL = "-";
+            if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
+              numeroPL = item.pl || item.bs || "-";
+            }
 
             let statusFinalVisual = item.status;
-            const temPedidoDeCancelamento = cancelamentosAtivos.find(canc => canc.observacoes && canc.observacoes.includes(item.idOriginal));
+
+            const temPedidoDeCancelamento = cancelamentosAtivos.find(canc =>
+              canc.observacoes && canc.observacoes.includes(item.idOriginal)
+            );
 
             if (item.tipo !== 'Cancelado' && temPedidoDeCancelamento) {
               statusFinalVisual = 'Cancelado';
-            } else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && item.pl && item.pl !== '-') {
+            }
+            else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
               const qtdJaDevolvida = {};
               reints.forEach(reint => {
-                if (reint.observacoes && reint.observacoes.includes(item.pl)) {
-                  (reint.itens || []).forEach(it => { qtdJaDevolvida[it.estoque_id] = (qtdJaDevolvida[it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0); });
+                if (reint.observacoes && reint.observacoes.includes(numeroPL)) {
+                  (reint.itens || []).forEach(it => {
+                    qtdJaDevolvida[it.estoque_id] = (qtdJaDevolvida[it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
+                  });
                 }
               });
 
               const itensRestantes = (item.itens || []).filter(origItem => {
-                return (Number(origItem.quantidade_solicitada) - (qtdJaDevolvida[origItem.estoque_id] || 0)) > 0;
+                const devolvido = qtdJaDevolvida[origItem.estoque_id] || 0;
+                return (Number(origItem.quantidade_solicitada) - devolvido) > 0;
               });
 
               if (itensRestantes.length === 0 && (item.itens || []).length > 0) {
@@ -150,14 +223,48 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
+            const itensEnriquecidos = (item.itens || []).map(it => {
+              const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
+                ? estoqueReferencia.find(e => e.id === it.estoque_id)
+                : null;
+                
+              return {
+                ...it,
+                desenho_sap_manual: obterValorSeguroTexto(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
+                part_number_manual: obterValorSeguroTexto(it.part_number_manual || it.part_number, itemFisico?.part_number),
+                descricao_manual: obterValorSeguroTexto(it.descricao_manual || it.descricao, itemFisico?.descricao),
+                fabricante_enriquecido: obterValorSeguroTexto(it.fabricante || it.fabricante_manual, itemFisico?.fabricante),
+                valor_unitario_enriquecido: obterValorSeguroNumero(it.valor_unitario_manual || it.valor_unitario || it.poNetPrice, itemFisico?.valor_unitario),
+                referencia: obterValorSeguroTexto(it.referencia, itemFisico?.referencia),
+                fornecedor: obterValorSeguroTexto(it.fornecedor, itemFisico?.fornecedor),
+                nf_entrada: obterValorSeguroTexto(it.nf_entrada, itemFisico?.nf_entrada),
+                wbs_element: obterValorSeguroTexto(it.wbs_element || it.wbs, itemFisico?.wbs),
+                nome_projeto: obterValorSeguroTexto(it.nome_projeto, itemFisico?.nome_projeto),
+                emissao_nf: obterValorSeguroTexto(it.emissao_nf, itemFisico?.emissao_nf),
+                receb_nf: obterValorSeguroTexto(it.receb_nf, itemFisico?.receb_nf),
+                documento_compras: obterValorSeguroTexto(it.documento_compras, itemFisico?.documento_compras),
+                centro: obterValorSeguroTexto(it.centro, itemFisico?.centro),
+                deposito: obterValorSeguroTexto(it.deposito, itemFisico?.deposito),
+                alocacao: obterValorSeguroTexto(it.alocacao, itemFisico?.alocacao),
+                unidade_medida_manual: obterValorSeguroTexto(it.unidade_medida_manual, itemFisico?.unidade_medida)
+              };
+            });
+
             return {
               ...item,
-              idOriginal: item.idOriginal || item.id,
+              idOriginal: item.id,
               id: item.ps || item.id,
+              prefixo: prefixo,
               statusExibicao: statusFinalVisual,
-              statusDestinoAprovacao,
-              acaoTipo,
-              acaoValor,
+              statusDestinoAprovacao: statusDestinoAprovacao,
+              acaoTipo: acaoTipo,
+              acaoValor: acaoValor,
+              dataSolicitacao: item.dataSolicitacao || "-",
+              dataEntrega: item.dataEntrega || "-",
+              pl: numeroPL,
+              nfCrossdocking: item.nfCrossdocking || null,
+              wbs: item.wbs || '—', 
+              itens: itensEnriquecidos 
             };
           });
 
@@ -176,7 +283,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     const SOCKET_URL = urlDoServidor();
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-    socket.on('solicitacoes_atualizadas', () => buscarDados());
+    
+    socket.on('solicitacoes_atualizadas', () => {
+      console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
+      buscarDados();
+    });
 
     return () => socket.disconnect();
   }, [filtroAtivo, termoPesquisa, estoqueAtual, showAlert, perfil]);
@@ -184,7 +295,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
 
   const dadosFiltrados = dadosTabela.filter((item) => {
-    if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) return false;
+    if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) {
+      return false;
+    }
+
     if (filtroStatus !== 'Todos') {
       if (filtroStatus === 'Pendente' && item.status !== 'Pendente') return false;
       if (filtroStatus === 'Em Andamento' && (item.status !== 'Em Separação' && item.status !== 'Em Andamento')) return false;
@@ -192,6 +306,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (filtroStatus === 'Recusado' && item.status !== 'Recusado') return false;
       if (filtroStatus === 'Cancelado' && (item.status !== 'Cancelado' && item.statusExibicao !== 'Cancelado')) return false;
     }
+
     return true;
   });
 
@@ -220,7 +335,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     try {
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/status`, {
-        method: 'PATCH', body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
+        method: 'PATCH',
+        body: JSON.stringify({ status: novoStatus, motivo_recusa: motivo })
       });
 
       if (dados.sucesso) {
@@ -234,10 +350,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         setDadosTabela(prev => prev.map(sol => {
           if (sol.idOriginal === idSolicitacao) {
             let novoPl = sol.pl;
-            if (dados.numeroPL) novoPl = `PL #${dados.numeroPL}`;
-            else if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && sol.pl === '-') novoPl = `PL-${sol.idOriginal}`;
+            if (dados.numeroPL) {
+              novoPl = `PL #${dados.numeroPL}`;
+            } else if ((novoStatus === 'Em Separação' || novoStatus === 'Concluído') && sol.pl === '-') {
+              novoPl = `PL-${sol.idOriginal}`;
+            }
             return {
-              ...sol, status: novoStatus, statusExibicao: novoStatus, acaoValor: novoStatus,
+              ...sol,
+              status: novoStatus,
+              statusExibicao: novoStatus,
+              acaoValor: novoStatus,
               pl: (novoStatus === 'Pendente' || novoStatus === 'Recusado' || novoStatus === 'Cancelado') ? '-' : novoPl,
               acaoTipo: novoStatus === 'Pendente' ? 'botao' : 'select'
             };
@@ -256,7 +378,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const lidarComMudancaDataEntrega = async (idSolicitacao, novaData) => {
     try {
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/local`, {
-        method: 'PATCH', body: JSON.stringify({ data_entrega: novaData ? new Date(novaData).toISOString() : null })
+        method: 'PATCH',
+        body: JSON.stringify({ data_entrega: novaData ? new Date(novaData).toISOString() : null })
       });
 
       if (dados.sucesso) {
@@ -270,42 +393,75 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           const min = String(dataObj.getMinutes()).padStart(2, '0');
           dataFormatada = `${dia}/${mes}/${ano} às ${hora}:${min}`;
         }
-        setDadosTabela(prev => prev.map(sol => sol.idOriginal === idSolicitacao ? { ...sol, dataEntrega: dataFormatada } : sol));
+
+        setDadosTabela(prev => prev.map(sol => {
+          if (sol.idOriginal === idSolicitacao) {
+            return { ...sol, dataEntrega: dataFormatada };
+          }
+          return sol;
+        }));
         showAlert("Data Atualizada", "A data e hora de entrega foram atualizadas com sucesso!", "success");
       } else {
         showAlert("Erro", dados.erro || "Falha ao salvar a data de entrega.", "error");
       }
-    } catch (error) { showAlert("Erro de Conexão", "Não foi possível conectar ao servidor.", "error"); }
+    } catch (error) {
+      showAlert("Erro de Conexão", "Não foi possível conectar ao servidor.", "error");
+    }
   };
 
-  const toggleLinha = (idUnico) => { setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico); setAnexosNovos([]); };
+  const toggleLinha = (idUnico) => {
+    setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
+    setAnexosNovos([]);
+  };
 
   const handleDeletarAnexo = async (idSolicitacao, anexo) => {
     const confirmar = await showConfirm("Excluir Anexo", `Tem a certeza que deseja apagar o ficheiro "${anexo.nome_arquivo}"?`, "error", "Sim, Apagar");
     if (!confirmar) return;
+
     try {
       const dados = await apiFetch(`/solicitacoes/anexo/${anexo.id}`, { method: "DELETE" });
       if (dados.sucesso) {
-        setDadosTabela((prev) => prev.map((sol) => sol.idOriginal === idSolicitacao ? { ...sol, anexos: sol.anexos.filter((a) => a.id !== anexo.id) } : sol));
-      } else { showAlert("Erro", "Não foi possível apagar o anexo.", "error"); }
-    } catch (error) { showAlert("Erro de Conexão", "Falha ao comunicar com o servidor.", "error"); }
+        setDadosTabela((prev) => prev.map((sol) => {
+          if (sol.idOriginal === idSolicitacao) return { ...sol, anexos: sol.anexos.filter((a) => a.id !== anexo.id) };
+          return sol;
+        }));
+      } else {
+        showAlert("Erro", "Não foi possível apagar o anexo.", "error");
+      }
+    } catch (error) {
+      showAlert("Erro de Conexão", "Falha ao comunicar com o servidor.", "error");
+    }
   };
 
   const handleEnviarAnexosExtras = async (idSolicitacao) => {
     if (anexosNovos.length === 0) return;
+
     try {
       setCarregando(true);
       let anexosProcessados = [];
-      try { anexosProcessados = await enviarArquivos(anexosNovos); } catch (erroUpload) {
+      try {
+        anexosProcessados = await enviarArquivos(anexosNovos);
+      } catch (erroUpload) {
         showAlert("Erro no Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
-        setCarregando(false); return;
+        setCarregando(false);
+        return;
       }
+
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/anexos`, { method: "POST", body: JSON.stringify({ anexos: anexosProcessados }) });
+
       if (dados.sucesso) {
         showAlert("Sucesso!", "Novos anexos integrados na base de dados com sucesso.", "success");
-        setAnexosNovos([]); setLinhaExpandida(null); window.location.reload();
-      } else { showAlert("Erro do Servidor", dados.erro, "error"); }
-    } catch (error) { showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error"); } finally { setCarregando(false); }
+        setAnexosNovos([]);
+        setLinhaExpandida(null);
+        window.location.reload();
+      } else {
+        showAlert("Erro do Servidor", dados.erro, "error");
+      }
+    } catch (error) {
+      showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
+    } finally {
+      setCarregando(false);
+    }
   };
 
   if (carregandoInicial || (perfil === 'cliente' && estoqueAtual === 'TODOS')) return null;
@@ -374,8 +530,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 dadosPaginados.map((linha, index) => {
                   const idUnico = `${linha.idOriginal}-${index}`;
                   const isExpandida = linhaExpandida === idUnico;
+                  const isCrossdocking = linha.tipo === 'Crossdocking';
+                  let nfNoEstoque = true;
+
+                  if (isCrossdocking && linha.nfCrossdocking) {
+                    nfNoEstoque = estoque.some(itemEstoque => String(itemEstoque.nf_entrada || '').trim() === String(linha.nfCrossdocking || '').trim() && String(itemEstoque.nf_entrada || '').trim() !== '');
+                  }
+                  const statusBloqueado = isCrossdocking && !nfNoEstoque;
                   
                   const isRecusadoOuCancelado = linha.statusExibicao === 'Recusado' || linha.statusExibicao === 'Cancelado' || linha.tipo === 'Cancelado';
+                  
                   const esconderPL = linha.tipo === 'Nota Fiscal' || linha.tipo === 'Entrada';
                   
                   const corTextoForte = isRecusadoOuCancelado ? "#991b1b" : "#1e293b";
@@ -388,7 +552,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                     <React.Fragment key={idUnico}>
                       <tr
                         className={isExpandida ? "tr-expandida" : ""}
-                        style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '', borderBottom: isRecusadoOuCancelado ? '1px solid #fecaca' : '1px solid #f1f5f9', transition: 'background-color 0.2s' }}
+                        style={{
+                          backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '',
+                          borderBottom: isRecusadoOuCancelado ? '1px solid #fecaca' : '1px solid #f1f5f9',
+                          transition: 'background-color 0.2s'
+                        }}
                       >
                         <td className="col-chevron" onClick={() => toggleLinha(idUnico)}>
                           <ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: corTextoFraco }} />
@@ -408,25 +576,46 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             {linha.wbs && <span style={{ fontSize: "0.75rem", color: corDestaque, fontWeight: "500" }}>{linha.wbs}</span>}
                           </div>
                         </td>
+
                         <td>
                           {!esconderPL && linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
-                            <BotaoGerarPDF linha={linha} nomeFilial={obterNomeFilialDinamico(linha.filial || linha.estoque)} showAlert={showAlert} showLoading={showLoading} closeAlert={closeAlert} />
+                            <BotaoGerarPDF
+                              linha={linha}
+                              nomeFilial={obterNomeFilialDinamico(linha.filial || linha.estoque)}
+                              showAlert={showAlert}
+                              showLoading={showLoading}
+                              closeAlert={closeAlert}
+                            />
                           ) : (
                             <span className="traco-vazio" style={{ color: corTextoFraco }}>—</span>
                           )}
                         </td>
+
                         <td>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f1f5f9', color: corTextoMedio, padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#cbd5e1'}`, whiteSpace: 'nowrap' }}>
                             <MapPin size={12} /> {obterNomeFilialDinamico(linha.filial || linha.estoque)}
                           </span>
                         </td>
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
+
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                               <input
-                                type="datetime-local" value={converterParaInputDateTime(linha.dataEntrega)} onChange={(e) => lidarComMudancaDataEntrega(linha.idOriginal, e.target.value)}
-                                style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#059669', fontWeight: '600', outline: 'none', cursor: 'pointer' }}
+                                type="datetime-local"
+                                value={converterParaInputDateTime(linha.dataEntrega)}
+                                onChange={(e) => lidarComMudancaDataEntrega(linha.idOriginal, e.target.value)}
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '0.75rem',
+                                  borderRadius: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  backgroundColor: '#ffffff',
+                                  color: '#059669',
+                                  fontWeight: '600',
+                                  outline: 'none',
+                                  cursor: 'pointer'
+                                }}
                                 title="Altere a data e hora de entrega"
                               />
                             </div>
@@ -436,6 +625,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             </span>
                           )}
                         </td>
+
                         <td>
                           {perfil === "logistica" && !isOperador ? (
                             linha.statusExibicao === 'Reintegrado' ? (
@@ -443,7 +633,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             ) : linha.statusExibicao === 'Cancelado' && linha.tipo !== 'Cancelado' ? (
                               <span className="badge-status status-cancelado"><AlertCircle size={14} /> Cancelamento Solicitado</span>
                             ) : linha.status === 'Pendente' ? (
-                              linha.statusBloqueado ? (
+                              statusBloqueado ? (
                                 <div title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '600' }}><AlertCircle size={14} /> Aguardando NF</div>
                               ) : (
                                 <button className="btn-aprovar-acao" style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao); }}><RefreshCw size={14} /> Aprovar</button>
@@ -467,6 +657,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         <tr>
                           <td colSpan="8" className="td-expandida">
                             <DetalhesSolicitacao item={linha} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
+
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
                               <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
                                 <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
