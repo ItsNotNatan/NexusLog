@@ -152,7 +152,6 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
     const plFinal = sol.pl || (numeroPL ? `PL #${numeroPL}` : null);
     const dataAprovacaoValida = sol.data_aprovacao_pl || (sol.status !== 'Pendente' ? sol.updated_at : null);
 
-    // ✨ CORREÇÃO: Formatação limpa do WBS, impedindo N/A's ou nulos na origem de mancharem o título
     let wbsExibicao = sol.wbs_destino || '—';
     if (sol.tipo === 'Transferencia WBS' || sol.tipo === 'Transfer. WBS') {
        const origemLimpa = (sol.wbs_origem && sol.wbs_origem !== 'N/A' && sol.wbs_origem !== 'null') ? sol.wbs_origem : 'Estoque / Desconhecida';
@@ -166,7 +165,7 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
       tipo: sol.tipo,
       nfCrossdocking: listaNF.length > 0 ? listaNF[0].numero_nf : null,
       solicitante: sol.nome_solicitante || 'Não informado',
-      wbs: wbsExibicao, 
+      wbs: wbsExibicao,
       pl: plFinal,
       filial: sol.filial_origem_id || '-',
       dataSolicitacao:
@@ -237,7 +236,6 @@ const criarMaterial = async (solicitante, itens, anexos) => {
 };
 
 const criarTransferencia = async (solicitante, itens, anexos) => {
-  // ✨ CORREÇÃO DA ORIGEM: Certifica-se de que a origem do WBS é puxada inteligentemente da primeira linha do carrinho
   let wbsOrig = null;
   if (itens && itens.length > 0) {
       wbsOrig = itens[0].wbsOrigem || itens[0].wbs || itens[0].wbs_element || null;
@@ -526,7 +524,8 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             wbs: solicitacao.wbs_destino,
             nome_projeto: estoqueAtual.nome_projeto || '',
             is_transferencia: true,
-            alocacao: `Origem: ${solicitacao.wbs_origem || estoqueAtual.wbs || 'Desconhecida'}`,
+            // ✨ CORREÇÃO: Limpamos o prefixo "Origem: " da Alocação
+            alocacao: estoqueAtual.alocacao || '',
             fornecedor: estoqueAtual.fornecedor || '',
             referencia: estoqueAtual.referencia || '',
             unidade_medida: estoqueAtual.unidade_medida || 'Unid',
@@ -834,7 +833,7 @@ const buscarHistoricoItem = async (estoqueId) => {
     'id',
     itens.map((i) => i.solicitacao_id)
   );
-  const porId = Object.fromEntries(solicitacoes.map((s) => [s.id, s]));
+  const porId = Object.fromEntries(solicitacoes.map((s) => [s.id, solicitacaoParaFront(s)]));
 
   return itens.map((item) => {
     const sol = porId[item.solicitacao_id];
