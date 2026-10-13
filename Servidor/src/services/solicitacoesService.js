@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/services/solicitacoesService.js
-// DESCRICAO: Logica de negocio das solicitacoes com limite de 2000 caracteres
+// DESCRICAO: Logica de negocio das solicitacoes com limite de 2000 caracteres e FIX do Crossdocking
 // =================================================================
 const db = require('../db');
 
@@ -106,7 +106,8 @@ const salvarNoBanco = async (dadosPrincipais, itensArray, anexosArray = [], nume
   }
 
   if (numeroDaNota) {
-    await db.criar('notas_fiscais', { solicitacao_id: idGerado, numero_nf: String(numeroDaNota) });
+    // ✨ FIX CROSSDOCKING: Garantimos que a NF é guardada limpa, sem espaços inúteis, para facilitar o Match depois
+    await db.criar('notas_fiscais', { solicitacao_id: idGerado, numero_nf: String(numeroDaNota).trim() });
   }
 
   return { id: idGerado, ps: psGerado };
@@ -591,11 +592,11 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         );
 
         // ---- Crossdocking: fila FIFO por numero de NF ----
-        const nfParaProcurar = itensEntrada[0].nf_entrada;
+        const nfParaProcurar = String(itensEntrada[0].nf_entrada || '').trim(); // ✨ FIX CROSSDOCKING: Tirar espaços inúteis da NF
 
-        if (nfParaProcurar && nfParaProcurar !== 'SEM-NF') {
+        if (nfParaProcurar && nfParaProcurar !== 'SEM-NF' && nfParaProcurar !== '-') {
           const notasComEsseNumero = await db.listar('notas_fiscais', {
-            filter: db.f('numero_nf = {:nf}', { nf: String(nfParaProcurar) }),
+            filter: db.f('numero_nf = {:nf}', { nf: nfParaProcurar }),
             fields: 'solicitacao_id',
           });
 
@@ -614,6 +615,9 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               const isParcial = cross.observacoes && cross.observacoes.includes('[Saída Parcial]');
 
               if (!isParcial) {
+                // ✨ FIX TOTAL: Limpa primeiro para garantir que não há duplicação e cria os itens fresquinhos
+                await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
+
                 // Crossdocking total: libera tudo de uma vez.
                 await db.criarVarios(
                   'solicitacoes_itens',
@@ -639,20 +643,22 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 );
                 vinculouAlgo = true;
               } else {
-                // Crossdocking parcial
+                // ✨ FIX PARCIAL: Match Inteligente ignorando espaços vazios e maiúsculas/minúsculas
                 const itensPedidosCross = await db.listar('solicitacoes_itens', {
-                  filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
+                  filter: db.f('solicitacao_id = {:sid}', { sid: cross.id })
                 });
 
                 for (const pedido of itensPedidosCross) {
-                  if (!pedido.desenho_sap_manual) continue;
+                  const sapCross = String(pedido.desenho_sap_manual || '').trim().toUpperCase();
+                  const pnCross = String(pedido.part_number_manual || '').trim().toUpperCase();
 
-                  const itemEstoqueCriado = estoqueCriado.find(
-                    (e) =>
-                      e.desenho_sap &&
-                      e.desenho_sap !== '-' &&
-                      e.desenho_sap.toUpperCase() === String(pedido.desenho_sap_manual).toUpperCase()
-                  );
+                  if (!sapCross && !pnCross) continue;
+
+                  const itemEstoqueCriado = estoqueCriado.find((e) => {
+                    const sapE = String(e.desenho_sap || '').trim().toUpperCase();
+                    const pnE = String(e.part_number || '').trim().toUpperCase();
+                    return (sapE && sapE !== '-' && sapE === sapCross) || (pnE && pnE !== '-' && pnE === pnCross);
+                  });
 
                   if (itemEstoqueCriado) {
                     await db.atualizar('solicitacoes_itens', pedido.id, {
@@ -730,11 +736,9 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         for (const item of itensReintegracao) {
           if (!item.estoque_id) continue;
 
-          // 1. Procurar a linha raiz no estoque (Pode existir ou ter sido apagada)
           let estoqueAtual = await db.porId('estoque', item.estoque_id);
           const quantidadeDevolvida = Number(item.quantidade_solicitada || 0);
 
-          // ✨ MAGIA AQUI: Se a linha raiz foi apagada, ressuscitá-la com base nos dados do momento do pedido
           if (!estoqueAtual) {
               console.log(`⚠️ Linha de estoque raiz ${item.estoque_id} não encontrada. Recriando...`);
               try {
@@ -777,7 +781,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               });
           }
 
-          // 3. Abate na Linha de Transferência (A linha amarela)
           if (wbsDestinoTransferencia) {
              const linhaAmarela = await db.um('estoque', db.f(
                  'is_transferencia = true && wbs = {:wbs} && desenho_sap = {:sap} && filial_id = {:filial}',
@@ -930,6 +933,7 @@ const atualizarLocalizacao = async (id, dadosLocal) => {
   return true;
 };
 
+// ✨ CORREÇÃO CRÍTICA DO BUG DE EDIÇÃO: Agora preserva o estoque_id original quando a logística edita um pedido!
 const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
   await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: solicitacaoId }));
 
@@ -937,6 +941,7 @@ const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
 
   const itensDB = itens.map((i) => ({
     solicitacao_id: solicitacaoId,
+    estoque_id: limparIdEstoque(i.estoque_id || i.idBD), // ✨ A PEÇA CHAVE QUE FALTAVA
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || i.desenho_sap_manual || null,
     part_number_manual: i.part_number || i.numPecaFabricante || i.part_number_manual || null,
     fabricante: i.fabricante || null, 
