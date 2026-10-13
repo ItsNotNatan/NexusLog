@@ -69,32 +69,34 @@ const converterParaInputDateTime = (dataString) => {
   return '';
 };
 
-// ✨ FUNÇÃO AUXILIAR CORRIGIDA: Trata o zero (0 ou 0.00) como valor inválido para o substituir pelo estoque
-const extrairValorValido = (valSolicitacao, valEstoque) => {
-  if (valSolicitacao !== undefined && valSolicitacao !== null && valSolicitacao !== '' && valSolicitacao !== '-' && valSolicitacao !== 'null') {
-    let limpo = String(valSolicitacao).replace(/[^\d.,-]/g, '');
+// ✨ FUNÇÃO AUXILIAR SIMPLIFICADA PARA NÚMEROS
+const obterValorSeguroNumero = (valItem, valEstoque) => {
+  const processarNumero = (valor) => {
+    if (valor === undefined || valor === null || valor === '-' || valor === '') return 0;
+    
+    let limpo = String(valor).replace(/[^\d.,-]/g, '');
     if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
     else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
+    
+    const numeroFinal = parseFloat(limpo);
+    return isNaN(numeroFinal) ? 0 : numeroFinal;
+  };
 
-    const num = parseFloat(limpo);
-    if (!isNaN(num) && num > 0) {
-      return num;
-    }
-  }
-
-  if (valEstoque !== undefined && valEstoque !== null && valEstoque !== '' && valEstoque !== '-' && valEstoque !== 'null') {
-    return valEstoque;
-  }
+  const num1 = processarNumero(valItem);
+  if (num1 > 0) return num1;
+  
+  const num2 = processarNumero(valEstoque);
+  if (num2 > 0) return num2;
 
   return 0;
 };
 
-// Mantido para as outras variáveis que não são valores unitários
+// ✨ FUNÇÃO AUXILIAR SIMPLIFICADA PARA TEXTO
 const obterValorSeguroTexto = (valItem, valEstoque) => {
   const validar = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== 'null';
   if (validar(valItem)) return valItem;
   if (validar(valEstoque)) return valEstoque;
-  return '';
+  return '-';
 };
 
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
@@ -221,33 +223,22 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
-            // ✨ AQUI: ENRIQUECIMENTO DOS ITENS COM A NOVA LÓGICA DE VALOR
             const itensEnriquecidos = (item.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
                 : null;
                 
-              const valSol = it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice;
-              const valEst = itemFisico?.valor_unitario;
-              const valorFinal = extrairValorValido(valSol, valEst);
-
-              const fabSol = it.fabricante || it.fabricante_manual;
-              const fabEst = itemFisico?.fabricante;
-              const fabFinal = (fabSol && fabSol !== '-' && fabSol !== 'null') ? fabSol : (fabEst || '-');
-
               return {
                 ...it,
                 desenho_sap_manual: obterValorSeguroTexto(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
                 part_number_manual: obterValorSeguroTexto(it.part_number_manual || it.part_number, itemFisico?.part_number),
                 descricao_manual: obterValorSeguroTexto(it.descricao_manual || it.descricao, itemFisico?.descricao),
-                
-                fabricante_enriquecido: fabFinal, // ✨ Enviado para o Componente Filho
-                valor_unitario_enriquecido: valorFinal, // ✨ Enviado para o Componente Filho
-                
+                fabricante_enriquecido: obterValorSeguroTexto(it.fabricante || it.fabricante_manual, itemFisico?.fabricante),
+                valor_unitario_enriquecido: obterValorSeguroNumero(it.valor_unitario_manual || it.valor_unitario || it.poNetPrice, itemFisico?.valor_unitario),
                 referencia: obterValorSeguroTexto(it.referencia, itemFisico?.referencia),
                 fornecedor: obterValorSeguroTexto(it.fornecedor, itemFisico?.fornecedor),
                 nf_entrada: obterValorSeguroTexto(it.nf_entrada, itemFisico?.nf_entrada),
-                wbs_element: obterValorSeguroTexto(it.wbs_element, itemFisico?.wbs),
+                wbs_element: obterValorSeguroTexto(it.wbs_element || it.wbs, itemFisico?.wbs),
                 nome_projeto: obterValorSeguroTexto(it.nome_projeto, itemFisico?.nome_projeto),
                 emissao_nf: obterValorSeguroTexto(it.emissao_nf, itemFisico?.emissao_nf),
                 receb_nf: obterValorSeguroTexto(it.receb_nf, itemFisico?.receb_nf),
@@ -255,17 +246,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 centro: obterValorSeguroTexto(it.centro, itemFisico?.centro),
                 deposito: obterValorSeguroTexto(it.deposito, itemFisico?.deposito),
                 alocacao: obterValorSeguroTexto(it.alocacao, itemFisico?.alocacao),
-                unidade_medida_manual: obterValorSeguroTexto(it.unidade_medida_manual, itemFisico?.unidade_medida) || 'Unid'
+                unidade_medida_manual: obterValorSeguroTexto(it.unidade_medida_manual, itemFisico?.unidade_medida)
               };
             });
-
-            // ✨ CORREÇÃO AQUI: Criamos uma variável para juntar Origem ➔ Destino
-            let wbsFinal = item.wbs_destino || item.wbs || "—";
-            if (item.tipo === "Transferencia WBS" || item.tipo === "Transfer. WBS") {
-              const origem = item.wbs_origem || "Desconhecido";
-              const destino = item.wbs_destino || "—";
-              wbsFinal = `${origem} ➔ ${destino}`;
-            }
 
             return {
               ...item,
@@ -281,8 +264,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               pl: numeroPL,
               nfCrossdocking: item.nfCrossdocking || null,
               
-              // ✨ CORREÇÃO AQUI: Em vez de usar `item.wbs`, usamos a nossa string montada
-              wbs: wbsFinal, 
+              // ✨ CORREÇÃO AQUI: Nós removemos a lógica confusa que reescrevia a WBS!
+              // Agora, confiamos no backend que já envia o texto correto (Ex: "WBS1 -> WBS2")
+              wbs: item.wbs || '—', 
 
               itens: itensEnriquecidos 
             };
