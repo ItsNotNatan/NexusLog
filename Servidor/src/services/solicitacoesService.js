@@ -524,7 +524,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             wbs: solicitacao.wbs_destino,
             nome_projeto: estoqueAtual.nome_projeto || '',
             is_transferencia: true,
-            // ✨ CORREÇÃO: Limpamos o prefixo "Origem: " da Alocação
             alocacao: estoqueAtual.alocacao || '',
             fornecedor: estoqueAtual.fornecedor || '',
             referencia: estoqueAtual.referencia || '',
@@ -713,17 +712,58 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         for (const item of itensReintegracao) {
           if (!item.estoque_id) continue;
 
-          const estoqueAtual = await db.porId('estoque', item.estoque_id);
-          if (!estoqueAtual) continue;
-
-          const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
+          // 1. Procurar a linha raiz no estoque (Pode existir ou ter sido apagada)
+          let estoqueAtual = await db.porId('estoque', item.estoque_id);
           const quantidadeDevolvida = Number(item.quantidade_solicitada || 0);
 
-          await db.atualizar('estoque', item.estoque_id, {
-            quantidade_disponivel: saldoAtual + quantidadeDevolvida,
-            status: 'Disponível',
-          });
+          // ✨ MAGIA AQUI: Se a linha raiz foi apagada, ressuscitá-la com base nos dados do momento do pedido
+          if (!estoqueAtual) {
+              console.log(`⚠️ Linha de estoque raiz ${item.estoque_id} não encontrada. Recriando...`);
+              try {
+                  // Lê os detalhes originais do item de saída para reconstruir a linha
+                  const novaLinha = await db.criar('estoque', {
+                      material_id: item.material_id || '',
+                      filial_id: solicitacao.filial_origem_id || '',
+                      desenho_sap: item.desenho_sap_manual || item.desenhoSAP || '-',
+                      part_number: item.part_number_manual || '-',
+                      fabricante: item.fabricante || '',
+                      descricao: item.descricao_manual || 'Item Reintegrado',
+                      nf_entrada: item.nf_entrada || '',
+                      documento_compras: item.documento_compras || '',
+                      quantidade_disponivel: quantidadeDevolvida,
+                      status: 'Disponível',
+                      wbs: item.wbs_element || '',
+                      nome_projeto: item.nome_projeto || '',
+                      is_transferencia: false, // A raiz nunca é uma transferência
+                      alocacao: item.alocacao || '',
+                      fornecedor: item.fornecedor || '',
+                      referencia: item.referencia || '',
+                      unidade_medida: item.unidade_medida_manual || 'Unid',
+                      emissao_nf: item.emissao_nf || '',
+                      receb_nf: item.receb_nf || '',
+                      valor_unitario: item.valor_unitario_manual || 0,
+                      centro: item.centro || '',
+                      deposito: item.deposito || ''
+                  });
+                  // Atribui o novo estoqueAtual para continuar a lógica
+                  estoqueAtual = novaLinha; 
+                  
+                  // Opcional: Atualizar o item da solicitação de reintegração com o novo ID de estoque
+                  await db.atualizar('solicitacoes_itens', item.id, { estoque_id: novaLinha.id });
+              } catch (e) {
+                  console.error("Falha ao recriar linha de estoque", e);
+                  continue; // Se não conseguir criar, salta para o próximo item
+              }
+          } else {
+              // 2. A linha raiz existe, apenas devolvemos o saldo
+              const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
+              await db.atualizar('estoque', estoqueAtual.id, {
+                quantidade_disponivel: saldoAtual + quantidadeDevolvida,
+                status: 'Disponível',
+              });
+          }
 
+          // 3. Abate na Linha de Transferência (A linha amarela)
           if (wbsDestinoTransferencia) {
              const linhaAmarela = await db.um('estoque', db.f(
                  'is_transferencia = true && wbs = {:wbs} && desenho_sap = {:sap} && filial_id = {:filial}',
