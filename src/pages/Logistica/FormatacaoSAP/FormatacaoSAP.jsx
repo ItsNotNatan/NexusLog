@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Com cópia infalível)
+// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Cópia silenciosa com feedback visual)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
@@ -18,6 +18,9 @@ export default function FormatacaoSAP() {
   const [selecionados, setSelecionados] = useState([]); 
   const [categoriaGeral, setCategoriaGeral] = useState('');
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
+  
+  // ✨ NOVO: Estado para controlar o feedback visual do botão de copiar
+  const [copiadoSucesso, setCopiadoSucesso] = useState(false);
 
   const opcoesCategoria = [
     'Preencher .', 
@@ -32,7 +35,6 @@ export default function FormatacaoSAP() {
     'ZBE4'
   ];
 
-  // ✨ FUNÇÃO AUXILIAR: Se o valor da solicitação for 0, 0.00 ou nulo, busca obrigatoriamente do estoque
   const extrairValorValido = (valSolicitacao, valEstoque) => {
     if (valSolicitacao !== undefined && valSolicitacao !== null && valSolicitacao !== '' && valSolicitacao !== '-' && valSolicitacao !== 'null') {
       let limpo = String(valSolicitacao).replace(/[^\d.,-]/g, '');
@@ -52,7 +54,6 @@ export default function FormatacaoSAP() {
     return 0;
   };
 
-  // ✨ FUNÇÃO AUXILIAR: Formata para string de 2 casas decimais (ex: 1234.56) exigida pelo SAP
   const limparEFormatarValor = (valorSujo) => {
     if (valorSujo === undefined || valorSujo === null || valorSujo === '-' || String(valorSujo).trim() === 'NaN') return "0.00";
     
@@ -72,7 +73,6 @@ export default function FormatacaoSAP() {
       try {
         setCarregando(true);
         
-        // Busca as solicitações e o estoque em simultâneo
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=100'),
           apiFetch('/estoque/listar?rastreabilidade=true')
@@ -93,7 +93,6 @@ export default function FormatacaoSAP() {
             ) && (s.pl && s.pl !== '-' && s.pl !== '—')
           );
 
-          // ✨ ENRIQUECIMENTO INTELIGENTE: Ignora '0' na solicitação e vai ao estoque buscar o valor real!
           const solicitacoesEnriquecidas = transferencias.map(sol => {
             const itensEnriquecidos = (sol.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
@@ -179,31 +178,22 @@ export default function FormatacaoSAP() {
 
   const gerarLinhaTsv = (item) => {
     const categoria = categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .';
-    // Utiliza \t para formatar os separadores de coluna
     return `${item.desenhoSAP}\t${item.quantidade}\t${item.valorUnitario}\t${item.wbs}\t${item.destino}\t${categoria}`;
   };
 
-  // ✨ NOVA FUNÇÃO DE CÓPIA INFALÍVEL
   const forcarCopiaClipboard = (texto) => {
     try {
-      // Cria um textarea escondido
       const textArea = document.createElement("textarea");
       textArea.value = texto;
-      
-      // Esconde-o da vista
       textArea.style.position = "fixed";
       textArea.style.left = "-999999px";
       textArea.style.top = "-999999px";
       document.body.appendChild(textArea);
       
-      // Foca e seleciona o texto todo
       textArea.focus();
       textArea.select();
       
-      // Força o comando clássico de copiar (suportado em qualquer lado)
       const sucesso = document.execCommand('copy');
-      
-      // Remove o textarea
       document.body.removeChild(textArea);
       
       return sucesso;
@@ -215,22 +205,25 @@ export default function FormatacaoSAP() {
 
   const copiarLinha = (item) => {
     const texto = gerarLinhaTsv(item);
-    const copiado = forcarCopiaClipboard(texto);
-    if (!copiado) alert("Ocorreu um erro ao tentar copiar a linha. Tente novamente.");
+    forcarCopiaClipboard(texto);
+    // ✨ Alert removido! Cópia silenciosa.
   };
 
   const copiarTudo = () => {
     if (itensConsolidados.length === 0) return;
     
-    // Junta todas as linhas separando-as por uma quebra de linha (\n)
     const textoCompleto = itensConsolidados.map(gerarLinhaTsv).join('\n');
-    
     const copiado = forcarCopiaClipboard(textoCompleto);
     
+    // ✨ FEEDBACK VISUAL SILENCIOSO
     if (copiado) {
-      alert('Dados copiados para a área de transferência! Vá ao SAP (ou Excel) e cole (Ctrl+V).');
+      setCopiadoSucesso(true);
+      // Remove o estado de "Copiado!" após 2 segundos
+      setTimeout(() => {
+        setCopiadoSucesso(false);
+      }, 2000);
     } else {
-      alert("Houve um problema de permissão no navegador ao tentar copiar os dados.");
+      console.error("Houve um problema de permissão no navegador ao tentar copiar os dados.");
     }
   };
 
@@ -349,8 +342,14 @@ export default function FormatacaoSAP() {
                   </select>
                 </div>
                 
-                <button className="sap-btn-copiar-tudo" onClick={copiarTudo}>
-                  <Copy size={16} /> Copiar Tudo para SAP
+                {/* ✨ BOTÃO INTELIGENTE: Muda de cor e texto quando a cópia é bem sucedida */}
+                <button 
+                  className="sap-btn-copiar-tudo" 
+                  onClick={copiarTudo}
+                  style={copiadoSucesso ? { backgroundColor: '#10b981', color: '#ffffff', border: '1px solid #059669' } : {}}
+                >
+                  {copiadoSucesso ? <CheckCircle2 size={16} /> : <Copy size={16} />} 
+                  {copiadoSucesso ? 'Copiado com Sucesso!' : 'Copiar Tudo para SAP'}
                 </button>
               </div>
 
