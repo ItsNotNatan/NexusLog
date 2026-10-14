@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, PackageOpen, X, History, Download, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Loader2, PackageOpen, X, History, Download, DollarSign, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
@@ -15,7 +15,10 @@ export default function VisaoGeralEstoque({ perfil }) {
 
   const [estoque, setEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  
   const [termoPesquisa, setTermoPesquisa] = useState('');
+  // ✨ NOVO: Estado para o nosso novo filtro dropdown
+  const [filtroTipo, setFiltroTipo] = useState('TODOS');
 
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 20;
@@ -47,7 +50,6 @@ export default function VisaoGeralEstoque({ perfil }) {
     }
   };
 
-  // Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
   const formatarMoedaLocal = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
     if (typeof valor === 'string' && valor.includes('R$')) return valor;
@@ -170,7 +172,6 @@ export default function VisaoGeralEstoque({ perfil }) {
   const CelulaEditavel = ({ item, field, type = 'text', renderFn, style = {}, placeholder = "" }) => {
     const isEditing = editCell.id === item.id && editCell.field === field;
     
-    // Fallbacks para garantir que campos alternativos são lidos
     let val = item[field];
     if (field === 'fabricante' && !val) val = item.fabricante_manual;
     if (field === 'part_number' && !val) val = item.part_number_manual;
@@ -244,7 +245,9 @@ export default function VisaoGeralEstoque({ perfil }) {
     );
   };
 
+  // ✨ LÓGICA ATUALIZADA: Aplica a pesquisa de texto E o novo filtro de dropdown
   const estoqueFiltrado = estoque.filter(item => {
+    // 1. Filtro da Filial Global
     if (estoqueAtual && estoqueAtual !== 'TODOS') {
       const filialDoItem = item.filial_id || item.filial;
       if (filialDoItem !== estoqueAtual) {
@@ -252,6 +255,18 @@ export default function VisaoGeralEstoque({ perfil }) {
       }
     }
 
+    // 2. Novo Filtro Dropdown (Status do Estoque)
+    if (filtroTipo !== 'TODOS') {
+      const reservado = Number(item.quantidade_reservada) || 0;
+      const saldoAtual = Number(item.quantidade_disponivel) || 0;
+      const saldoLivre = Math.max(0, saldoAtual - reservado);
+
+      if (filtroTipo === 'COM_SALDO' && saldoLivre <= 0) return false;
+      if (filtroTipo === 'ZERADOS' && saldoLivre > 0) return false;
+      if (filtroTipo === 'TRANSFERENCIAS' && !item.is_transferencia && !item.isTransferencia) return false;
+    }
+
+    // 3. Filtro de Pesquisa de Texto
     if (!termoPesquisa) return true;
     
     const termo = termoPesquisa.toLowerCase();
@@ -281,8 +296,9 @@ export default function VisaoGeralEstoque({ perfil }) {
   const formatarQtd = (num) => new Intl.NumberFormat('pt-BR').format(num);
 
   useEffect(() => {
+    // Volta à primeira página sempre que se pesquisa ou se muda um filtro
     setPaginaAtual(1); 
-  }, [termoPesquisa, estoqueAtual]);
+  }, [termoPesquisa, estoqueAtual, filtroTipo]);
 
   const totalPaginas = Math.max(1, Math.ceil(estoqueFiltrado.length / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
@@ -405,17 +421,48 @@ export default function VisaoGeralEstoque({ perfil }) {
       </div>
 
       <div className="tabela-wrapper">
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ position: 'relative', width: '300px' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          
+          <div style={{ position: 'relative', width: '100%', maxWidth: '350px' }}>
             <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               placeholder="Buscar por SAP, Fabricante, NF..."
               value={termoPesquisa}
               onChange={(e) => setTermoPesquisa(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#f8fafc' }}
+              style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#f8fafc', transition: 'all 0.2s ease' }}
+              onFocus={(e) => { e.target.style.borderColor = '#93c5fd'; e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'; }}
+              onBlur={(e) => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
             />
           </div>
+
+          {/* ✨ AQUI ESTÁ O NOVO FILTRO (Na zona direita solicitada) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Filter size={16} color="#64748b" />
+            <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>Exibir:</span>
+            <select
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+              style={{ 
+                padding: '8px 12px', 
+                borderRadius: '8px', 
+                border: '1px solid #cbd5e1', 
+                outline: 'none', 
+                backgroundColor: '#ffffff', 
+                color: '#334155', 
+                fontSize: '0.875rem', 
+                cursor: 'pointer',
+                fontWeight: '500',
+                minWidth: '200px'
+              }}
+            >
+              <option value="TODOS">Todos os Itens do Estoque</option>
+              <option value="COM_SALDO">Apenas Itens com Saldo</option>
+              <option value="ZERADOS">Apenas Itens Zerados</option>
+              <option value="TRANSFERENCIAS">Transferências WBS (Selos)</option>
+            </select>
+          </div>
+
         </div>
 
         <div style={{ overflowX: 'auto' }}>
@@ -428,7 +475,6 @@ export default function VisaoGeralEstoque({ perfil }) {
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', minWidth: '200px' }}>DESCRIÇÃO</th>
                 
-                {/* COLUNA FABRICANTE */}
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
                 
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>QTDE ENTRADA (SALDO)</th>
@@ -450,19 +496,16 @@ export default function VisaoGeralEstoque({ perfil }) {
               {carregando ? (
                 <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><Loader2 className="animate-spin" size={28} style={{ margin: '0 auto' }} /></td></tr>
               ) : estoqueFiltrado.length === 0 ? (
-                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado.</td></tr>
+                <tr><td colSpan="19" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}><PackageOpen size={48} style={{ opacity: 0.3, display: 'block', margin: '0 auto 12px auto' }} /> Nenhum material encontrado com estes filtros.</td></tr>
               ) : (
                 estoquePaginado.map(item => {
-                  // LÓGICA DE CORES DA TRANSFERÊNCIA WBS
                   const isTransferido = item.is_transferencia || item.isTransferencia;
                   const corFundo = isTransferido ? '#fefce8' : 'transparent';
                   
-                  // AQUI: Se for transferido, a borda inferior (sublinhado) fica mais grossa e amarela
                   const estiloBordaInferior = isTransferido 
                     ? '3px solid #eab308' 
                     : '1px solid #f1f5f9';
 
-                  // CÁLCULO DE SALDO REAL (Disponível - Reservado)
                   const reservado = Number(item.quantidade_reservada) || 0;
                   const saldoAtual = Number(item.quantidade_disponivel) || 0;
                   const saldoLivre = Math.max(0, saldoAtual - reservado);
@@ -493,7 +536,6 @@ export default function VisaoGeralEstoque({ perfil }) {
                       <td style={{ padding: '12px 16px', fontSize: '0.80rem' }}>
                         <CelulaEditavel item={item} field="desenho_sap" style={{ fontFamily: 'monospace', color: '#2563eb', fontWeight: '600' }} />
                         
-                        {/* SELO AMARELO DE TRANSFERÊNCIA */}
                         {isTransferido && (
                           <div style={{ marginTop: '6px' }}>
                             <span style={{ 
@@ -519,7 +561,6 @@ export default function VisaoGeralEstoque({ perfil }) {
                         <CelulaEditavel item={item} field="fabricante" style={{ color: '#475569' }} placeholder="Nome do Fabricante..." />
                       </td>
 
-                      {/* COLUNA DE SALDO COM INDICADOR DE RESERVA */}
                       <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem' }}>
                         {podeEditar ? (
                            <CelulaEditavel item={item} field="quantidade_disponivel" type="number" style={{ color: '#10b981', fontWeight: '700' }} />
