@@ -44,6 +44,8 @@ export default function SeletorEstoqueLateral({
       (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
       (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
       (item.fabricante && item.fabricante.toLowerCase().includes(termo)) ||
+      // ✨ SEGURANÇA: Procura também no fabricante inserido manualmente
+      (item.fabricante_manual && item.fabricante_manual.toLowerCase().includes(termo)) ||
       (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
       (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
       (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
@@ -133,6 +135,9 @@ export default function SeletorEstoqueLateral({
               const corBorda = isTransferido ? '#fef08a' : '#e2e8f0';
               const botaoBloqueado = bloquearTransferidos && isTransferido;
 
+              // ✨ SEGURANÇA: Usar fabricante ou fabricante_manual
+              const fabFinal = item.fabricante || item.fabricante_manual || "-";
+
               return (
                 <div 
                   key={idUnicoItem} 
@@ -188,13 +193,12 @@ export default function SeletorEstoqueLateral({
                     </button>
                   </div>
 
-                  {/* ✨ AQUI: SUBSTITUÍMOS O PART NUMBER PELO WBS E FABRICANTE */}
                   <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <div style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: '700', fontFamily: 'monospace' }}>
                       WBS: {item.wbs || item.wbs_element || "-"}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600' }}>
-                      Fab: {item.fabricante || "-"}
+                      Fab: {fabFinal}
                     </div>
                   </div>
 
@@ -289,7 +293,6 @@ export default function SeletorEstoqueLateral({
               <thead>
                 <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#2563eb", fontWeight: "700", textTransform: "uppercase" }}>DESENHO SAP</th>
-                  {/* ✨ COLUNA FABRICANTE NO LUGAR DO PART NUMBER */}
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>FABRICANTE</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>DESCRIÇÃO</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>NF ENTRADA</th>
@@ -310,13 +313,16 @@ export default function SeletorEstoqueLateral({
                   const reservado = item.quantidade_reservada ?? item.qtdReservada ?? 0;
                   const saldoLivreReal = Math.max(1, saldo - reservado);
 
+                  // ✨ SEGURANÇA: Usar fabricante ou fabricante_manual
+                  const fabFinalSel = item.fabricante || item.fabricante_manual || "-";
+
                   return (
                     <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
                       <td style={{ padding: "16px", backgroundColor: "#f8fafc", color: "#2563eb", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {item.desenho_sap || item.desenhoSAP || "-"}
                       </td>
                       <td style={{ padding: "16px", fontWeight: "700", color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
-                        {item.fabricante || "-"}
+                        {fabFinalSel}
                       </td>
                       <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", minWidth: "200px" }}>
                         {item.descricao || item.materialDescription || "-"}
