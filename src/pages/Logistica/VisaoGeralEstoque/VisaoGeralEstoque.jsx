@@ -1,9 +1,14 @@
+// =================================================================
+// ARQUIVO: src/pages/Logistica/VisaoGeralEstoque/VisaoGeralEstoque.jsx
+// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import { Search, Loader2, PackageOpen, X, History, Download, DollarSign, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
+// ✨ IMPORTAR O NOVO MODAL
+import FiltroEstoque from '../../../components/FiltroEstoque/FiltroEstoque'; 
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { io } from 'socket.io-client';
@@ -15,10 +20,19 @@ export default function VisaoGeralEstoque({ perfil }) {
 
   const [estoque, setEstoque] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  
   const [termoPesquisa, setTermoPesquisa] = useState('');
-  // ✨ NOVO: Estado para o nosso novo filtro dropdown
-  const [filtroTipo, setFiltroTipo] = useState('TODOS');
+
+  // ✨ ESTADOS PARA OS FILTROS AVANÇADOS
+  const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
+  const [filtrosAvancados, setFiltrosAvancados] = useState({
+    sap: '',
+    wbs: '',
+    nf: '',
+    pedido: '',
+    fabricante: '',
+    fornecedor: '',
+    status_saldo: 'TODOS'
+  });
 
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 20;
@@ -197,17 +211,7 @@ export default function VisaoGeralEstoque({ perfil }) {
             }
           }}
           placeholder={placeholder}
-          style={{ 
-            width: '100%', 
-            padding: '6px 8px', 
-            boxSizing: 'border-box', 
-            border: '2px solid #3b82f6', 
-            borderRadius: '6px', 
-            outline: 'none', 
-            fontSize: '0.80rem', 
-            fontFamily: 'inherit',
-            cursor: type === 'date' ? 'pointer' : 'text'
-          }}
+          style={{ width: '100%', padding: '6px 8px', boxSizing: 'border-box', border: '2px solid #3b82f6', borderRadius: '6px', outline: 'none', fontSize: '0.80rem', fontFamily: 'inherit', cursor: type === 'date' ? 'pointer' : 'text' }}
         />
       );
     }
@@ -215,29 +219,9 @@ export default function VisaoGeralEstoque({ perfil }) {
     return (
       <div
         onClick={(e) => { e.stopPropagation(); startEditing(item.id, field, val, type); }}
-        style={{ 
-          cursor: type === 'date' ? 'pointer' : 'text', 
-          border: '1px solid #e2e8f0', 
-          backgroundColor: '#f8fafc',
-          borderRadius: '6px', 
-          padding: '4px 8px', 
-          display: 'inline-block', 
-          width: '100%', 
-          minHeight: '26px', 
-          boxSizing: 'border-box',
-          transition: 'all 0.2s ease', 
-          ...style 
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.borderColor = '#93c5fd';
-          e.currentTarget.style.backgroundColor = '#ffffff';
-          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)';
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.borderColor = '#e2e8f0';
-          e.currentTarget.style.backgroundColor = '#f8fafc';
-          e.currentTarget.style.boxShadow = 'none';
-        }}
+        style={{ cursor: type === 'date' ? 'pointer' : 'text', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderRadius: '6px', padding: '4px 8px', display: 'inline-block', width: '100%', minHeight: '26px', boxSizing: 'border-box', transition: 'all 0.2s ease', ...style }}
+        onMouseOver={(e) => { e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.backgroundColor = '#ffffff'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)'; }}
+        onMouseOut={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.backgroundColor = '#f8fafc'; e.currentTarget.style.boxShadow = 'none'; }}
         title="Clique para editar este valor manualmente"
       >
         {displayVal}
@@ -245,30 +229,57 @@ export default function VisaoGeralEstoque({ perfil }) {
     );
   };
 
-  // ✨ LÓGICA ATUALIZADA: Aplica a pesquisa de texto E o novo filtro de dropdown
+  // ✨ FUNÇÃO AUXILIAR DOS FILTROS AVANÇADOS (Verifica se contém nas tags ou no range)
+  const verificaFiltroAvancado = (valorItem, valorFiltro) => {
+    if (!valorFiltro) return true;
+    
+    // Se for Intervalo (Range) ex: "123 - 456"
+    if (valorFiltro.includes(' - ')) {
+      const [de, ate] = valorFiltro.split(' - ');
+      const val = String(valorItem).toUpperCase();
+      const limiteInf = de ? String(de).toUpperCase() : null;
+      const limiteSup = ate ? String(ate).toUpperCase() : null;
+
+      if (limiteInf && limiteSup) return val >= limiteInf && val <= limiteSup;
+      if (limiteInf) return val >= limiteInf;
+      if (limiteSup) return val <= limiteSup;
+    }
+    
+    // Se forem Múltiplas Tags separadas por vírgula
+    const tagsArray = valorFiltro.split(',');
+    return tagsArray.includes(String(valorItem));
+  };
+
+  // ✨ APLICAÇÃO DE TODOS OS FILTROS AO MESMO TEMPO
   const estoqueFiltrado = estoque.filter(item => {
-    // 1. Filtro da Filial Global
+    // 1. Filtro da Filial Global (Header)
     if (estoqueAtual && estoqueAtual !== 'TODOS') {
       const filialDoItem = item.filial_id || item.filial;
-      if (filialDoItem !== estoqueAtual) {
-        return false;
-      }
+      if (filialDoItem !== estoqueAtual) return false;
     }
 
-    // 2. Novo Filtro Dropdown (Status do Estoque)
-    if (filtroTipo !== 'TODOS') {
+    // 2. Filtros Avançados (Modal)
+    const fab = item.fabricante || item.fabricante_manual || '';
+    if (!verificaFiltroAvancado(item.desenho_sap, filtrosAvancados.sap)) return false;
+    if (!verificaFiltroAvancado(item.wbs, filtrosAvancados.wbs)) return false;
+    if (!verificaFiltroAvancado(item.nf_entrada, filtrosAvancados.nf)) return false;
+    if (!verificaFiltroAvancado(item.documento_compras, filtrosAvancados.pedido)) return false;
+    if (!verificaFiltroAvancado(fab, filtrosAvancados.fabricante)) return false;
+    if (!verificaFiltroAvancado(item.fornecedor, filtrosAvancados.fornecedor)) return false;
+
+    // Status do Saldo (Especial do Modal)
+    if (filtrosAvancados.status_saldo !== 'TODOS') {
       const reservado = Number(item.quantidade_reservada) || 0;
       const saldoAtual = Number(item.quantidade_disponivel) || 0;
       const saldoLivre = Math.max(0, saldoAtual - reservado);
 
-      if (filtroTipo === 'COM_SALDO' && saldoLivre <= 0) return false;
-      if (filtroTipo === 'ZERADOS' && saldoLivre > 0) return false;
-      if (filtroTipo === 'TRANSFERENCIAS' && !item.is_transferencia && !item.isTransferencia) return false;
+      if (filtrosAvancados.status_saldo === 'COM_SALDO' && saldoLivre <= 0) return false;
+      if (filtrosAvancados.status_saldo === 'ZERADOS' && saldoLivre > 0) return false;
+      if (filtrosAvancados.status_saldo === 'TRANSFERENCIAS' && !item.is_transferencia && !item.isTransferencia) return false;
     }
 
-    // 3. Filtro de Pesquisa de Texto
+    // 3. Pesquisa Rápida por Texto
     if (!termoPesquisa) return true;
-    
     const termo = termoPesquisa.toLowerCase();
     return (
       (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
@@ -296,9 +307,8 @@ export default function VisaoGeralEstoque({ perfil }) {
   const formatarQtd = (num) => new Intl.NumberFormat('pt-BR').format(num);
 
   useEffect(() => {
-    // Volta à primeira página sempre que se pesquisa ou se muda um filtro
     setPaginaAtual(1); 
-  }, [termoPesquisa, estoqueAtual, filtroTipo]);
+  }, [termoPesquisa, estoqueAtual, filtrosAvancados]);
 
   const totalPaginas = Math.max(1, Math.ceil(estoqueFiltrado.length / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
@@ -372,6 +382,16 @@ export default function VisaoGeralEstoque({ perfil }) {
     }
   };
 
+  // Funções para manipular o estado do Modal de Filtros
+  const handleFiltroChange = (e) => {
+    const { name, value } = e.target;
+    setFiltrosAvancados(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleLimparFiltros = () => {
+    setFiltrosAvancados({ sap: '', wbs: '', nf: '', pedido: '', fabricante: '', fornecedor: '', status_saldo: 'TODOS' });
+  };
+
   return (
     <div className="visao-geral-container">
 
@@ -436,31 +456,26 @@ export default function VisaoGeralEstoque({ perfil }) {
             />
           </div>
 
-          {/* ✨ AQUI ESTÁ O NOVO FILTRO (Na zona direita solicitada) */}
+          {/* ✨ BOTÃO DOS FILTROS AVANÇADOS (Igual à imagem) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Filter size={16} color="#64748b" />
-            <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>Exibir:</span>
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
+            <button 
+              onClick={() => setModalFiltroAberto(true)}
               style={{ 
-                padding: '8px 12px', 
-                borderRadius: '8px', 
-                border: '1px solid #cbd5e1', 
-                outline: 'none', 
-                backgroundColor: '#ffffff', 
-                color: '#334155', 
-                fontSize: '0.875rem', 
-                cursor: 'pointer',
-                fontWeight: '500',
-                minWidth: '200px'
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', 
+                backgroundColor: '#ffffff', color: '#334155', fontSize: '0.875rem', 
+                fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' 
               }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
             >
-              <option value="TODOS">Todos os Itens do Estoque</option>
-              <option value="COM_SALDO">Apenas Itens com Saldo</option>
-              <option value="ZERADOS">Apenas Itens Zerados</option>
-              <option value="TRANSFERENCIAS">Transferências WBS (Selos)</option>
-            </select>
+              <Filter size={18} color="#475569" />
+              Filtros Avançados
+              {/* Mostra um pequeno ponto se algum filtro estiver ativo */}
+              {Object.values(filtrosAvancados).some(v => v !== '' && v !== 'TODOS') && (
+                <span style={{ width: '8px', height: '8px', backgroundColor: '#3b82f6', borderRadius: '50%', marginLeft: '4px' }}></span>
+              )}
+            </button>
           </div>
 
         </div>
@@ -474,9 +489,7 @@ export default function VisaoGeralEstoque({ perfil }) {
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', minWidth: '200px' }}>DESCRIÇÃO</th>
-                
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
-                
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>QTDE ENTRADA (SALDO)</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>UNID. MEDIDA</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
@@ -691,6 +704,16 @@ export default function VisaoGeralEstoque({ perfil }) {
           </div>
         </div>
       )}
+
+      {/* ✨ RENDERIZAÇÃO DO NOSSO NOVO MODAL */}
+      <FiltroEstoque
+        estoque={estoque}
+        filtros={filtrosAvancados}
+        aberto={modalFiltroAberto}
+        onClose={() => setModalFiltroAberto(false)}
+        onFiltroChange={handleFiltroChange}
+        onLimpar={handleLimparFiltros}
+      />
 
     </div>
   );
