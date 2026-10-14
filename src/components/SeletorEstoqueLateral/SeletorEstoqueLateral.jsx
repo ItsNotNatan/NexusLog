@@ -6,15 +6,15 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check, Box, X } from 'lucide-react';
 import { AuthContext } from '../../contexts/AuthContext';
 
-export default function SeletorEstoqueLateral({
-  estoque,
-  carregando,
-  onAdicionarItem,
-  itensSelecionados = [],
+export default function SeletorEstoqueLateral({ 
+  estoque, 
+  carregando, 
+  onAdicionarItem, 
+  itensSelecionados = [], 
   bloquearTransferidos = false,
   limiteMaximo = 20,
-  onRemoverItem,
-  onAtualizarQuantidade
+  onRemoverItem, 
+  onAtualizarQuantidade 
 }) {
   const { estoqueAtual } = useContext(AuthContext);
 
@@ -43,6 +43,8 @@ export default function SeletorEstoqueLateral({
     return (
       (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
       (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
+      // ✨ Adicionada a busca por Documento de Compras (Pedido/CPV)
+      (item.documento_compras && item.documento_compras.toLowerCase().includes(termo)) ||
       (item.fabricante && item.fabricante.toLowerCase().includes(termo)) ||
       (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
       (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
@@ -93,7 +95,7 @@ export default function SeletorEstoqueLateral({
             <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
-              placeholder="Buscar por SAP, Fabricante, Descrição..."
+              placeholder="Buscar por SAP, Pedido CPV, Descrição..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               style={{
@@ -190,13 +192,13 @@ export default function SeletorEstoqueLateral({
                     </button>
                   </div>
 
-                  {/* ✨ AQUI: SUBSTITUÍMOS O PART NUMBER PELO WBS E FABRICANTE */}
+                  {/* ✨ AQUI: SUBSTITUIÇÃO PARA O PEDIDO DE COMPRA / CPV NO CARD */}
                   <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <div style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: '700', fontFamily: 'monospace' }}>
                       WBS: {item.wbs || item.wbs_element || "-"}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600' }}>
-                      Fab: {item.fabricante || "-"}
+                      Pedido/CPV: {item.documento_compras || "-"}
                     </div>
                   </div>
 
@@ -291,8 +293,8 @@ export default function SeletorEstoqueLateral({
               <thead>
                 <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#2563eb", fontWeight: "700", textTransform: "uppercase" }}>DESENHO SAP</th>
-                  {/* ✨ COLUNA FABRICANTE NO LUGAR DO PART NUMBER */}
-                  <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>FABRICANTE</th>
+                  {/* ✨ AQUI: SUBSTITUIÇÃO PARA O PEDIDO DE COMPRA / CPV NO CABEÇALHO DA TABELA */}
+                  <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>Nº PEDIDO DE COMPRA / CPV</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>DESCRIÇÃO</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>NF ENTRADA</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>ALOCAÇÃO</th>
@@ -317,8 +319,9 @@ export default function SeletorEstoqueLateral({
                       <td style={{ padding: "16px", backgroundColor: "#f8fafc", color: "#2563eb", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {item.desenho_sap || item.desenhoSAP || "-"}
                       </td>
+                      {/* ✨ AQUI: SUBSTITUIÇÃO PARA O PEDIDO DE COMPRA / CPV NA CÉLULA */}
                       <td style={{ padding: "16px", fontWeight: "700", color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
-                        {item.fabricante || "-"}
+                        {item.documento_compras || "-"}
                       </td>
                       <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", minWidth: "200px" }}>
                         {item.descricao || item.materialDescription || "-"}
