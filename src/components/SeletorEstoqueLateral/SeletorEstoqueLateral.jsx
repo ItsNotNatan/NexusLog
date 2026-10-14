@@ -6,17 +6,16 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check, Box, X } from 'lucide-react';
 import { AuthContext } from '../../contexts/AuthContext';
 
-export default function SeletorEstoqueLateral({ 
-  estoque, 
-  carregando, 
-  onAdicionarItem, 
-  itensSelecionados = [], 
+export default function SeletorEstoqueLateral({
+  estoque,
+  carregando,
+  onAdicionarItem,
+  itensSelecionados = [],
   bloquearTransferidos = false,
   limiteMaximo = 20,
-  onRemoverItem, 
-  onAtualizarQuantidade 
+  onRemoverItem,
+  onAtualizarQuantidade
 }) {
-  
   const { estoqueAtual } = useContext(AuthContext);
 
   const [busca, setBusca] = useState('');
@@ -30,13 +29,14 @@ export default function SeletorEstoqueLateral({
   const estoqueFiltrado = estoque?.filter(item => {
     const filialItem = item.filial_id || item.filial || item.filial_origem_id;
     if (estoqueAtual && estoqueAtual !== 'TODOS' && filialItem && filialItem !== estoqueAtual) {
-      return false; 
+      return false;
     }
 
     const idDoItem = item.idBD || item.id;
-    const jaEstaSelecionado = itensSelecionados.some(selecionado => 
+    const jaEstaSelecionado = itensSelecionados.some(selecionado =>
       selecionado.estoque_id === idDoItem || selecionado.id === idDoItem || selecionado.idBD === idDoItem
     );
+    
     if (jaEstaSelecionado) return false;
 
     const termo = busca.toLowerCase();
@@ -44,8 +44,6 @@ export default function SeletorEstoqueLateral({
       (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
       (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
       (item.fabricante && item.fabricante.toLowerCase().includes(termo)) ||
-      // ✨ SEGURANÇA: Procura também no fabricante inserido manualmente
-      (item.fabricante_manual && item.fabricante_manual.toLowerCase().includes(termo)) ||
       (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
       (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
       (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
@@ -53,10 +51,12 @@ export default function SeletorEstoqueLateral({
     );
   }) || [];
 
-  useEffect(() => { setPaginaAtual(1); }, [busca, estoqueAtual]);
+  useEffect(() => { 
+    setPaginaAtual(1); 
+  }, [busca, estoqueAtual]);
 
   const totalPaginas = Math.ceil(estoqueFiltrado.length / itensPorPagina) || 1;
-  
+
   useEffect(() => {
     if (paginaAtual > totalPaginas) setPaginaAtual(totalPaginas);
   }, [estoqueFiltrado.length, totalPaginas, paginaAtual]);
@@ -65,7 +65,7 @@ export default function SeletorEstoqueLateral({
   const itensPaginados = estoqueFiltrado.slice(indexInicio, indexInicio + itensPorPagina);
 
   const copiarParaAreaTransferencia = (e, texto, idUnico) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     if (!texto || texto === "SEM SAP") return;
     navigator.clipboard.writeText(texto);
     setCopiadoId(idUnico);
@@ -96,9 +96,9 @@ export default function SeletorEstoqueLateral({
               placeholder="Buscar por SAP, Fabricante, Descrição..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              style={{ 
-                width: '100%', padding: '8px 12px 8px 36px', borderRadius: '8px', 
-                backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', outline: 'none', 
+              style={{
+                width: '100%', padding: '8px 12px 8px 36px', borderRadius: '8px',
+                backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', outline: 'none',
                 fontSize: '0.85rem', boxSizing: 'border-box'
               }}
             />
@@ -135,14 +135,11 @@ export default function SeletorEstoqueLateral({
               const corBorda = isTransferido ? '#fef08a' : '#e2e8f0';
               const botaoBloqueado = bloquearTransferidos && isTransferido;
 
-              // ✨ SEGURANÇA: Usar fabricante ou fabricante_manual
-              const fabFinal = item.fabricante || item.fabricante_manual || "-";
-
               return (
-                <div 
-                  key={idUnicoItem} 
-                  style={{ 
-                    padding: '16px', borderBottom: `1px solid ${corBorda}`, backgroundColor: corFundo, 
+                <div
+                  key={idUnicoItem}
+                  style={{
+                    padding: '16px', borderBottom: `1px solid ${corBorda}`, backgroundColor: corFundo,
                     display: 'flex', flexDirection: 'column', alignItems: 'flex-start', transition: 'background-color 0.2s'
                   }}
                 >
@@ -153,14 +150,14 @@ export default function SeletorEstoqueLateral({
                   )}
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                    <div 
+                    <div
                       onMouseEnter={() => setHoverId(idUnicoItem)}
                       onMouseLeave={() => setHoverId(null)}
                       style={{ display: 'flex', alignItems: 'center' }}
                     >
-                      <span style={{ 
-                        backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb', 
-                        padding: '4px 16px', borderRadius: '999px', fontSize: '0.9rem', 
+                      <span style={{
+                        backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb',
+                        padding: '4px 16px', borderRadius: '999px', fontSize: '0.9rem',
                         fontWeight: '700', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '8px'
                       }}>
                         {textoSAP}
@@ -183,9 +180,9 @@ export default function SeletorEstoqueLateral({
                     <button
                       onClick={() => !botaoBloqueado && onAdicionarItem(item, index)}
                       disabled={botaoBloqueado}
-                      style={{ 
-                        background: 'none', border: 'none', cursor: botaoBloqueado ? 'not-allowed' : 'pointer', 
-                        color: botaoBloqueado ? '#cbd5e1' : '#2563eb', padding: '4px', display: 'flex' 
+                      style={{
+                        background: 'none', border: 'none', cursor: botaoBloqueado ? 'not-allowed' : 'pointer',
+                        color: botaoBloqueado ? '#cbd5e1' : '#2563eb', padding: '4px', display: 'flex'
                       }}
                       title={botaoBloqueado ? "Material já transferido" : "Adicionar Item"}
                     >
@@ -193,12 +190,13 @@ export default function SeletorEstoqueLateral({
                     </button>
                   </div>
 
+                  {/* ✨ AQUI: SUBSTITUÍMOS O PART NUMBER PELO WBS E FABRICANTE */}
                   <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <div style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: '700', fontFamily: 'monospace' }}>
                       WBS: {item.wbs || item.wbs_element || "-"}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600' }}>
-                      Fab: {fabFinal}
+                      Fab: {item.fabricante || "-"}
                     </div>
                   </div>
 
@@ -237,7 +235,7 @@ export default function SeletorEstoqueLateral({
 
         {!carregando && estoqueFiltrado.length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-            <button 
+            <button
               onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
               disabled={paginaAtual <= 1}
               style={{
@@ -251,7 +249,7 @@ export default function SeletorEstoqueLateral({
               <ChevronLeft size={18} />
             </button>
             <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>Página {paginaAtual} de {totalPaginas}</span>
-            <button 
+            <button
               onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
               disabled={paginaAtual >= totalPaginas}
               style={{
@@ -293,6 +291,7 @@ export default function SeletorEstoqueLateral({
               <thead>
                 <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#2563eb", fontWeight: "700", textTransform: "uppercase" }}>DESENHO SAP</th>
+                  {/* ✨ COLUNA FABRICANTE NO LUGAR DO PART NUMBER */}
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>FABRICANTE</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>DESCRIÇÃO</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>NF ENTRADA</th>
@@ -313,16 +312,13 @@ export default function SeletorEstoqueLateral({
                   const reservado = item.quantidade_reservada ?? item.qtdReservada ?? 0;
                   const saldoLivreReal = Math.max(1, saldo - reservado);
 
-                  // ✨ SEGURANÇA: Usar fabricante ou fabricante_manual
-                  const fabFinalSel = item.fabricante || item.fabricante_manual || "-";
-
                   return (
                     <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
                       <td style={{ padding: "16px", backgroundColor: "#f8fafc", color: "#2563eb", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {item.desenho_sap || item.desenhoSAP || "-"}
                       </td>
                       <td style={{ padding: "16px", fontWeight: "700", color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
-                        {fabFinalSel}
+                        {item.fabricante || "-"}
                       </td>
                       <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", minWidth: "200px" }}>
                         {item.descricao || item.materialDescription || "-"}
