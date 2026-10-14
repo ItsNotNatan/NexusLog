@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Com correção de 0 -> Estoque Físico)
+// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Com cópia infalível)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
@@ -179,19 +179,59 @@ export default function FormatacaoSAP() {
 
   const gerarLinhaTsv = (item) => {
     const categoria = categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .';
+    // Utiliza \t para formatar os separadores de coluna
     return `${item.desenhoSAP}\t${item.quantidade}\t${item.valorUnitario}\t${item.wbs}\t${item.destino}\t${categoria}`;
+  };
+
+  // ✨ NOVA FUNÇÃO DE CÓPIA INFALÍVEL
+  const forcarCopiaClipboard = (texto) => {
+    try {
+      // Cria um textarea escondido
+      const textArea = document.createElement("textarea");
+      textArea.value = texto;
+      
+      // Esconde-o da vista
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      
+      // Foca e seleciona o texto todo
+      textArea.focus();
+      textArea.select();
+      
+      // Força o comando clássico de copiar (suportado em qualquer lado)
+      const sucesso = document.execCommand('copy');
+      
+      // Remove o textarea
+      document.body.removeChild(textArea);
+      
+      return sucesso;
+    } catch (err) {
+      console.error('Falha ao tentar copiar o texto: ', err);
+      return false;
+    }
   };
 
   const copiarLinha = (item) => {
     const texto = gerarLinhaTsv(item);
-    navigator.clipboard.writeText(texto);
+    const copiado = forcarCopiaClipboard(texto);
+    if (!copiado) alert("Ocorreu um erro ao tentar copiar a linha. Tente novamente.");
   };
 
   const copiarTudo = () => {
     if (itensConsolidados.length === 0) return;
+    
+    // Junta todas as linhas separando-as por uma quebra de linha (\n)
     const textoCompleto = itensConsolidados.map(gerarLinhaTsv).join('\n');
-    navigator.clipboard.writeText(textoCompleto);
-    alert('Dados copiados para a área de transferência! Pronto para colar no SAP.');
+    
+    const copiado = forcarCopiaClipboard(textoCompleto);
+    
+    if (copiado) {
+      alert('Dados copiados para a área de transferência! Vá ao SAP (ou Excel) e cole (Ctrl+V).');
+    } else {
+      alert("Houve um problema de permissão no navegador ao tentar copiar os dados.");
+    }
   };
 
   return (
