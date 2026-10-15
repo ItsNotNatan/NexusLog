@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/services/solicitacoesService.js
-// DESCRICAO: Logica de negocio das solicitacoes (Limite 2000 chars + Protocolos de Resgate WBS e Crossdocking)
+// DESCRICAO: Lógica de negócio (Cura Universal e Sincronização Just-in-Time do Crossdocking)
 // =================================================================
 const db = require('../db');
 
@@ -513,7 +513,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
   }
 
   if (acabouDeSerAprovado) {
-    numeroPLGerado = await criarPackingList(id, statusFinal === 'Concluído' ? 'Concluído' : 'Em Separação');
+    numeroPLGerado = await criarPackingList(id, statusFinal === 'Concluído' ? 'Em Separação' : 'Em Separação');
 
     if (numeroPLGerado) {
       await db.atualizar('solicitacoes', id, { pl: `PL #${numeroPLGerado}` });
@@ -522,7 +522,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     const tiposDeSaida = ['Material', 'Transferencia WBS', 'Crossdocking'];
 
     // =========================================================================
-    // ✨ LÓGICA DE RESGATE: CURA AUTOMÁTICA DE CROSSDOCKING ANTIGOS ANTES DA BAIXA
+    // ✨ LÓGICA DE RESGATE: CURA AUTOMÁTICA DE CROSSDOCKING E EDIÇÕES MANUAIS
     // =========================================================================
     if (solicitacao.tipo === 'Crossdocking') {
       const nfCrossdocking = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
@@ -533,19 +533,16 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const isTotal = itensAtuais.length === 0;
         const isParcial = solicitacao.observacoes && solicitacao.observacoes.includes('[Saída Parcial]');
 
-        // 1. Busca ampla na base de dados (case-insensitive para não falhar com "nf-123")
         const candidatosEstoque = await db.listar('estoque', {
-            filter: db.f('nf_entrada ~ {:nf}', { nf: numeroNFCross })
+            filter: db.f('nf_entrada ~ {:nf}', { nf: numeroNFCross }) 
         });
 
-        // ✨ 2. FILTRO CIRÚRGICO JAVASCRIPT: Garante que "12345" nunca vai puxar "123456789"
         const estoqueDisponivelNF = candidatosEstoque.filter(e => 
             String(e.nf_entrada || '').trim().toUpperCase() === numeroNFCross
         );
 
         if (estoqueDisponivelNF.length > 0) {
             if (isTotal && !isParcial) {
-                // CURA TOTAL
                 console.log(`[RESGATE] Restaurando Crossdocking Total antigo: ${id}`);
                 await db.criarVarios(
                     'solicitacoes_itens',
@@ -566,29 +563,50 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                         nome_projeto: e.nome_projeto,
                         centro: e.centro,
                         deposito: e.deposito,
-                        alocacao: e.alocacao || '-' // Já removido o texto de teste daqui
+                        alocacao: e.alocacao || '-' 
                     }))
                 );
-            } else if (isParcial) {
-                // CURA PARCIAL
-                console.log(`[RESGATE] Restaurando vínculos de Crossdocking Parcial antigo: ${id}`);
+            } else {
+                // ✨ SINCRONIZAÇÃO JUST-IN-TIME: Atualiza a fotografia do pedido com os saldos editados da prateleira!
+                console.log(`[RESGATE E SYNC] Sincronizando vínculos e quantidades do Crossdocking: ${id}`);
                 for (const pedido of itensAtuais) {
-                    if (pedido.estoque_id) continue;
+                    let itemFisico = null;
 
-                    const sapCross = String(pedido.desenho_sap_manual || '').trim().toUpperCase();
-                    const pnCross = String(pedido.part_number_manual || '').trim().toUpperCase();
+                    if (pedido.estoque_id) {
+                        // O item não perdeu a matrícula, vamos apenas ver como ele está agora na prateleira
+                        itemFisico = estoqueDisponivelNF.find(e => e.id === pedido.estoque_id);
+                    } else {
+                        // Perdeu a matrícula, procuramos pelo SAP/PN
+                        const sapCross = String(pedido.desenho_sap_manual || '').trim().toUpperCase();
+                        const pnCross = String(pedido.part_number_manual || '').trim().toUpperCase();
 
-                    const itemFisico = estoqueDisponivelNF.find(e => {
-                        const sapE = String(e.desenho_sap || '').trim().toUpperCase();
-                        const pnE = String(e.part_number || '').trim().toUpperCase();
-                        return (sapE && sapE !== '-' && sapE === sapCross) || (pnE && pnE !== '-' && pnE === pnCross);
-                    });
+                        itemFisico = estoqueDisponivelNF.find(e => {
+                            const sapE = String(e.desenho_sap || '').trim().toUpperCase();
+                            const pnE = String(e.part_number || '').trim().toUpperCase();
+                            return (sapE && sapE !== '-' && sapE === sapCross) || (pnE && pnE !== '-' && pnE === pnCross);
+                        });
+                    }
 
                     if (itemFisico) {
-                        await db.atualizar('solicitacoes_itens', pedido.id, {
-                            estoque_id: itemFisico.id,
-                            alocacao: itemFisico.alocacao || '-'
-                        });
+                        const atualizacoes = {};
+
+                        // Se estava quebrado, conserta
+                        if (!pedido.estoque_id) {
+                            atualizacoes.estoque_id = itemFisico.id;
+                            atualizacoes.alocacao = itemFisico.alocacao || '-';
+                        }
+
+                        // ✨ SE FOR CROSSDOCKING TOTAL, ATUALIZA A QUANTIDADE SOLICITADA PARA SER IGUAL À PRATELEIRA!
+                        // (Assim ignoramos a fotografia velha e abatemos os 20 em vez dos 10 originais)
+                        if (!isParcial) {
+                            if (Number(pedido.quantidade_solicitada) !== Number(itemFisico.quantidade_disponivel)) {
+                                atualizacoes.quantidade_solicitada = Number(itemFisico.quantidade_disponivel);
+                            }
+                        }
+
+                        if (Object.keys(atualizacoes).length > 0) {
+                            await db.atualizar('solicitacoes_itens', pedido.id, atualizacoes);
+                        }
                     }
                 }
             }
@@ -599,6 +617,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     // ---------- 1. SAIDAS: baixa no estoque ----------
     if (tiposDeSaida.includes(solicitacao.tipo)) {
       
+      // Lemos os itens NOVAMENTE da base de dados, para garantir que apanhamos a sincronização feita acima!
       const itensPedidos = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
       });
@@ -610,7 +629,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         if (!estoqueAtual) continue;
 
         const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
-        const quantidadeRetirada = Number(item.quantidade_solicitada || 0);
+        const quantidadeRetirada = Number(item.quantidade_solicitada || 0); // ✨ Agora isto terá o valor atualizado (ex: 20)!
 
         const novoSaldo = saldoAtual - quantidadeRetirada;
         const saldoFinalSeguro = novoSaldo < 0 ? 0 : novoSaldo;
@@ -688,13 +707,11 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const nfParaProcurar = String(itensEntrada[0].nf_entrada || '').trim().toUpperCase();
 
         if (nfParaProcurar && nfParaProcurar !== 'SEM-NF' && nfParaProcurar !== '-') {
-          // 1. Busca ampla case-insensitive no banco
           const notasCandidatas = await db.listar('notas_fiscais', {
             filter: db.f('numero_nf ~ {:nf}', { nf: nfParaProcurar }),
             fields: 'solicitacao_id,numero_nf',
           });
 
-          // ✨ 2. FILTRO CIRÚRGICO JAVASCRIPT: Garante o Match exato!
           const idsCandidatos = notasCandidatas
             .filter((n) => String(n.numero_nf || '').trim().toUpperCase() === nfParaProcurar)
             .map((n) => n.solicitacao_id)
@@ -1002,14 +1019,13 @@ const atualizarLocalizacao = async (id, dadosLocal) => {
   return true;
 };
 
-// ✨ CORREÇÃO CRÍTICA DO BUG DE EDIÇÃO: Agora preserva o estoque_id original quando a logística edita um pedido!
 const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
   await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: solicitacaoId }));
   if (!itens || itens.length === 0) return true;
 
   const itensDB = itens.map((i) => ({
     solicitacao_id: solicitacaoId,
-    estoque_id: limparIdEstoque(i.estoque_id || i.idBD), // ✨ A PEÇA CHAVE QUE FALTAVA
+    estoque_id: limparIdEstoque(i.estoque_id || i.idBD),
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || i.desenho_sap_manual || null,
     part_number_manual: i.part_number || i.numPecaFabricante || i.part_number_manual || null,
     fabricante: i.fabricante || null, 
