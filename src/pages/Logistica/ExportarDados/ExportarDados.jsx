@@ -10,10 +10,9 @@ import {
 } from 'lucide-react';
 
 import { apiFetch } from '../../../services/api';
-import { AuthContext } from '../../../contexts/AuthContext'; // ✨ Importação do Contexto
+import { AuthContext } from '../../../contexts/AuthContext'; 
 
 export default function ExportarDados() {
-  // ✨ Puxa a filial selecionada no Header
   const { estoqueAtual } = useContext(AuthContext);
 
   const [dadosTabela, setDadosTabela] = useState([]);
@@ -50,12 +49,11 @@ export default function ExportarDados() {
     return `${dia}/${mes}/${ano} ${hora}:${min}`;
   };
 
-  // 🔄 CARREGAMENTO DOS DADOS (Agora com Filtro de Filial)
+  // 🔄 CARREGAMENTO DOS DADOS
   useEffect(() => {
     const carregarDadosExportacao = async () => {
       try {
         setCarregando(true);
-        // ✨ O Relatório passa a respeitar a filial escolhida no cabeçalho
         const filtroFilial = estoqueAtual && estoqueAtual !== 'TODOS' ? `&filial=${estoqueAtual}` : '';
         const resultado = await apiFetch(`/solicitacoes/listar?limit=1000${filtroFilial}`);
 
@@ -102,6 +100,7 @@ export default function ExportarDados() {
               id: item.ps || `PS:${item.id.replace(/\D/g, '') || item.id}`,
               solicitante: item.solicitante || 'Não informado',
               wbs: item.wbs || '-',
+              tipo: item.tipo || '-', // ✨ Extraímos o TIPO aqui
               status: item.status || 'Pendente',
               pl: plApresentacao,
               criacaoPsFormatada: formatarDataHora(item.dataCriacaoISO || item.created_at),
@@ -124,7 +123,7 @@ export default function ExportarDados() {
     };
 
     carregarDadosExportacao();
-  }, [estoqueAtual]); // ✨ Recarrega ao mudar a filial
+  }, [estoqueAtual]); 
 
   const listaFiltrada = dadosTabela.filter((item) => {
     const termo = busca.toLowerCase();
@@ -132,7 +131,8 @@ export default function ExportarDados() {
       item.id.toLowerCase().includes(termo) ||
       item.solicitante.toLowerCase().includes(termo) ||
       item.wbs.toLowerCase().includes(termo) ||
-      item.pl.toLowerCase().includes(termo);
+      item.pl.toLowerCase().includes(termo) ||
+      item.tipo.toLowerCase().includes(termo); // ✨ Também permitimos pesquisar pelo tipo
 
     const bateStatus = filtroStatus === 'Todos os Status' || item.status === filtroStatus;
     return batePesquisa && bateStatus;
@@ -156,20 +156,21 @@ export default function ExportarDados() {
       return;
     }
 
-    const cabecalho = "PS_ID;SOLICITANTE;WBS;STATUS_PS;PL;CRIACAO_PS;EXPIRACAO_FINALIZACAO_PL;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
+    // ✨ Adicionada a coluna TIPO no cabeçalho
+    const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;EXPIRACAO_FINALIZACAO_PL;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
     const linhas = listaFiltrada.map(row => {
       const leadTimeExport = row.leadTime !== null ? row.leadTime.toFixed(2) : '';
       const targetExport = row.dentroTarget === true ? 'Dentro' : (row.dentroTarget === false ? 'Fora' : '');
       const valorExport = row.valorTotal > 0 ? row.valorTotal.toFixed(2) : '';
       
-      return `"${row.id}";"${row.solicitante}";"${row.wbs}";"${row.status}";"${row.pl}";"${row.criacaoPsFormatada}";"${row.finalizacaoPlFormatada}";"${leadTimeExport}";"${targetExport}";"${row.itensCount}";"${valorExport}"`;
+      // ✨ Adicionada a propriedade row.tipo
+      return `"${row.id}";"${row.solicitante}";"${row.wbs}";"${row.tipo}";"${row.status}";"${row.pl}";"${row.criacaoPsFormatada}";"${row.finalizacaoPlFormatada}";"${leadTimeExport}";"${targetExport}";"${row.itensCount}";"${valorExport}"`;
     }).join("\n");
 
     const blob = new Blob([cabecalho + linhas], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    // ✨ ATUALIZAÇÃO DO NOME DO FICHEIRO PARA STOCKLOG
     link.setAttribute('download', `RELATORIO_STOCKLOG_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
@@ -234,7 +235,7 @@ export default function ExportarDados() {
           </div>
           <div className="pesquisa-exportar-wrapper">
             <Search className="icone-pesquisa-exportar" size={16} />
-            <input type="text" placeholder="Buscar PS, PL, WBS..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+            <input type="text" placeholder="Buscar PS, PL, WBS, Tipo..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
         </div>
 
@@ -256,6 +257,8 @@ export default function ExportarDados() {
                   <th>PS ID</th>
                   <th>SOLICITANTE</th>
                   <th>WBS</th>
+                  {/* ✨ Adicionada coluna TIPO */}
+                  <th>TIPO</th>
                   <th>STATUS PS</th>
                   <th>PL</th>
                   <th>CRIAÇÃO PS</th>
@@ -269,7 +272,8 @@ export default function ExportarDados() {
               <tbody>
                 {listaFiltrada.length === 0 ? (
                   <tr>
-                    <td colSpan="11" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                    {/* ✨ colSpan alterado de 11 para 12 devido à nova coluna */}
+                    <td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                       Nenhum registo encontrado com os filtros atuais.
                     </td>
                   </tr>
@@ -279,6 +283,12 @@ export default function ExportarDados() {
                       <td className="fonte-negrito">{linha.id}</td>
                       <td>{linha.solicitante}</td>
                       <td><span className="link-azul">{linha.wbs}</span></td>
+                      {/* ✨ Mostra o Tipo de Solicitação na tabela */}
+                      <td>
+                        <span style={{ fontWeight: '500', color: '#475569' }}>
+                          {linha.tipo}
+                        </span>
+                      </td>
                       <td><span className="badge-status-simples">{linha.status}</span></td>
                       <td>{linha.pl !== '-' ? <span className="link-azul">{linha.pl}</span> : <span className="texto-cinza">-</span>}</td>
                       <td className="texto-cinza">{linha.criacaoPsFormatada}</td>
