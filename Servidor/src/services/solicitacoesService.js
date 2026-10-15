@@ -533,14 +533,19 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const isTotal = itensAtuais.length === 0;
         const isParcial = solicitacao.observacoes && solicitacao.observacoes.includes('[Saída Parcial]');
 
-        // Procura todo o estoque físico que já deu entrada com esta Nota Fiscal
-        const estoqueDisponivelNF = await db.listar('estoque', {
-            filter: db.f('nf_entrada ~ {:nf}', { nf: numeroNFCross }) // '~' atua como LIKE ignorando case
+        // 1. Busca ampla na base de dados (case-insensitive para não falhar com "nf-123")
+        const candidatosEstoque = await db.listar('estoque', {
+            filter: db.f('nf_entrada ~ {:nf}', { nf: numeroNFCross })
         });
+
+        // ✨ 2. FILTRO CIRÚRGICO JAVASCRIPT: Garante que "12345" nunca vai puxar "123456789"
+        const estoqueDisponivelNF = candidatosEstoque.filter(e => 
+            String(e.nf_entrada || '').trim().toUpperCase() === numeroNFCross
+        );
 
         if (estoqueDisponivelNF.length > 0) {
             if (isTotal && !isParcial) {
-                // CURA TOTAL: O pedido antigo não tinha itens. Injeta a lista inteira baseada no estoque.
+                // CURA TOTAL
                 console.log(`[RESGATE] Restaurando Crossdocking Total antigo: ${id}`);
                 await db.criarVarios(
                     'solicitacoes_itens',
@@ -551,7 +556,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                         part_number_manual: e.part_number,
                         fabricante: e.fabricante,
                         descricao_manual: e.descricao,
-                        quantidade_solicitada: e.quantidade_disponivel, // Puxa tudo o que sobrou
+                        quantidade_solicitada: e.quantidade_disponivel,
                         unidade_medida_manual: e.unidade_medida,
                         valor_unitario_manual: e.valor_unitario,
                         fornecedor: e.fornecedor,
@@ -561,14 +566,14 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                         nome_projeto: e.nome_projeto,
                         centro: e.centro,
                         deposito: e.deposito,
-                        alocacao: 'CROSSDOCKING (TOTAL - RESGATADO)'
+                        alocacao: e.alocacao || '-' // Já removido o texto de teste daqui
                     }))
                 );
             } else if (isParcial) {
-                // CURA PARCIAL: Procura itens que perderam o estoque_id e volta a vinculá-los.
+                // CURA PARCIAL
                 console.log(`[RESGATE] Restaurando vínculos de Crossdocking Parcial antigo: ${id}`);
                 for (const pedido of itensAtuais) {
-                    if (pedido.estoque_id) continue; // Já está são e salvo
+                    if (pedido.estoque_id) continue;
 
                     const sapCross = String(pedido.desenho_sap_manual || '').trim().toUpperCase();
                     const pnCross = String(pedido.part_number_manual || '').trim().toUpperCase();
@@ -582,7 +587,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     if (itemFisico) {
                         await db.atualizar('solicitacoes_itens', pedido.id, {
                             estoque_id: itemFisico.id,
-                            alocacao: 'Vinculado à NF (Resgatado)'
+                            alocacao: itemFisico.alocacao || '-'
                         });
                     }
                 }
@@ -594,7 +599,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     // ---------- 1. SAIDAS: baixa no estoque ----------
     if (tiposDeSaida.includes(solicitacao.tipo)) {
       
-      // ✨ Rebuscamos a lista de itens, porque o "Resgate" pode ter acabado de injetar novas linhas!
       const itensPedidos = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
       });
@@ -617,7 +621,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           status: novoStatusEstoque,
         });
 
-        // Transferencia entre WBS: o material sai de um WBS e nasce no outro.
         if (solicitacao.tipo === 'Transferencia WBS') {
           await db.criar('estoque', {
             material_id: estoqueAtual.material_id || '',
@@ -682,15 +685,20 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         );
 
         // ---- Crossdocking: fila FIFO por numero de NF ----
-        const nfParaProcurar = String(itensEntrada[0].nf_entrada || '').trim(); // ✨ FIX CROSSDOCKING: Tirar espaços inúteis
+        const nfParaProcurar = String(itensEntrada[0].nf_entrada || '').trim().toUpperCase();
 
         if (nfParaProcurar && nfParaProcurar !== 'SEM-NF' && nfParaProcurar !== '-') {
-          const notasComEsseNumero = await db.listar('notas_fiscais', {
-            filter: db.f('numero_nf = {:nf}', { nf: nfParaProcurar }),
-            fields: 'solicitacao_id',
+          // 1. Busca ampla case-insensitive no banco
+          const notasCandidatas = await db.listar('notas_fiscais', {
+            filter: db.f('numero_nf ~ {:nf}', { nf: nfParaProcurar }),
+            fields: 'solicitacao_id,numero_nf',
           });
 
-          const idsCandidatos = notasComEsseNumero.map((n) => n.solicitacao_id).filter(Boolean);
+          // ✨ 2. FILTRO CIRÚRGICO JAVASCRIPT: Garante o Match exato!
+          const idsCandidatos = notasCandidatas
+            .filter((n) => String(n.numero_nf || '').trim().toUpperCase() === nfParaProcurar)
+            .map((n) => n.solicitacao_id)
+            .filter(Boolean);
 
           if (idsCandidatos.length > 0) {
             const candidatos = await db.listarPorIds('solicitacoes', 'id', idsCandidatos);
@@ -705,7 +713,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               const isParcial = cross.observacoes && cross.observacoes.includes('[Saída Parcial]');
 
               if (!isParcial) {
-                // ✨ FIX TOTAL: Limpa primeiro para garantir que não há duplicação e cria os itens fresquinhos
                 await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
 
                 await db.criarVarios(
@@ -727,12 +734,11 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     nome_projeto: item.nome_projeto,
                     centro: item.centro,
                     deposito: item.deposito,
-                    alocacao: 'CROSSDOCKING (TOTAL)',
+                    alocacao: item.alocacao || '-', // Sem frase técnica
                   }))
                 );
                 vinculouAlgo = true;
               } else {
-                // ✨ FIX PARCIAL: Match Inteligente ignorando espaços vazios e maiúsculas/minúsculas
                 const itensPedidosCross = await db.listar('solicitacoes_itens', {
                   filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
                 });
@@ -754,7 +760,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                   if (itemEstoqueCriado) {
                     await db.atualizar('solicitacoes_itens', pedido.id, {
                       estoque_id: itemEstoqueCriado.id,
-                      alocacao: 'Vinculado à NF (Aguardando Aprovação)',
+                      alocacao: itemEstoqueCriado.alocacao || '-',
                     });
                     vinculouAlgo = true;
                   }
