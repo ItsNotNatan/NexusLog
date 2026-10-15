@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/services/solicitacoesService.js
-// DESCRICAO: Lógica de negócio (Cura Universal e Sincronização Just-in-Time do Crossdocking)
+// DESCRICAO: Lógica de negócio (Cura Universal e Match Inteligente WBS)
 // =================================================================
 const db = require('../db');
 
@@ -106,7 +106,6 @@ const salvarNoBanco = async (dadosPrincipais, itensArray, anexosArray = [], nume
   }
 
   if (numeroDaNota) {
-    // ✨ FIX CROSSDOCKING: Garantimos que a NF é guardada limpa, sem espaços inúteis
     await db.criar('notas_fiscais', { solicitacao_id: idGerado, numero_nf: String(numeroDaNota).trim() });
   }
 
@@ -171,7 +170,6 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
     const plFinal = sol.pl || (numeroPL ? `PL #${numeroPL}` : null);
     const dataAprovacaoValida = sol.data_aprovacao_pl || (sol.status !== 'Pendente' ? sol.updated_at : null);
 
-    // ✨ LÓGICA INTELIGENTE DE RESGATE DA WBS PARA APRESENTAÇÃO
     let wbsExibicao = sol.wbs_destino || '';
 
     if (sol.tipo === 'Transferencia WBS' || sol.tipo === 'Transfer. WBS') {
@@ -567,16 +565,13 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     }))
                 );
             } else {
-                // ✨ SINCRONIZAÇÃO JUST-IN-TIME: Atualiza a fotografia do pedido com os saldos editados da prateleira!
                 console.log(`[RESGATE E SYNC] Sincronizando vínculos e quantidades do Crossdocking: ${id}`);
                 for (const pedido of itensAtuais) {
                     let itemFisico = null;
 
                     if (pedido.estoque_id) {
-                        // O item não perdeu a matrícula, vamos apenas ver como ele está agora na prateleira
                         itemFisico = estoqueDisponivelNF.find(e => e.id === pedido.estoque_id);
                     } else {
-                        // Perdeu a matrícula, procuramos pelo SAP/PN
                         const sapCross = String(pedido.desenho_sap_manual || '').trim().toUpperCase();
                         const pnCross = String(pedido.part_number_manual || '').trim().toUpperCase();
 
@@ -590,14 +585,11 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     if (itemFisico) {
                         const atualizacoes = {};
 
-                        // Se estava quebrado, conserta
                         if (!pedido.estoque_id) {
                             atualizacoes.estoque_id = itemFisico.id;
                             atualizacoes.alocacao = itemFisico.alocacao || '-';
                         }
 
-                        // ✨ SE FOR CROSSDOCKING TOTAL, ATUALIZA A QUANTIDADE SOLICITADA PARA SER IGUAL À PRATELEIRA!
-                        // (Assim ignoramos a fotografia velha e abatemos os 20 em vez dos 10 originais)
                         if (!isParcial) {
                             if (Number(pedido.quantidade_solicitada) !== Number(itemFisico.quantidade_disponivel)) {
                                 atualizacoes.quantidade_solicitada = Number(itemFisico.quantidade_disponivel);
@@ -617,7 +609,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     // ---------- 1. SAIDAS: baixa no estoque ----------
     if (tiposDeSaida.includes(solicitacao.tipo)) {
       
-      // Lemos os itens NOVAMENTE da base de dados, para garantir que apanhamos a sincronização feita acima!
       const itensPedidos = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
       });
@@ -629,7 +620,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         if (!estoqueAtual) continue;
 
         const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
-        const quantidadeRetirada = Number(item.quantidade_solicitada || 0); // ✨ Agora isto terá o valor atualizado (ex: 20)!
+        const quantidadeRetirada = Number(item.quantidade_solicitada || 0); 
 
         const novoSaldo = saldoAtual - quantidadeRetirada;
         const saldoFinalSeguro = novoSaldo < 0 ? 0 : novoSaldo;
@@ -703,7 +694,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           }))
         );
 
-        // ---- Crossdocking: fila FIFO por numero de NF ----
         const nfParaProcurar = String(itensEntrada[0].nf_entrada || '').trim().toUpperCase();
 
         if (nfParaProcurar && nfParaProcurar !== 'SEM-NF' && nfParaProcurar !== '-') {
@@ -751,7 +741,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     nome_projeto: item.nome_projeto,
                     centro: item.centro,
                     deposito: item.deposito,
-                    alocacao: item.alocacao || '-', // Sem frase técnica
+                    alocacao: item.alocacao || '-', 
                   }))
                 );
                 vinculouAlgo = true;
@@ -884,6 +874,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                   await db.atualizar('solicitacoes_itens', item.id, { estoque_id: novaLinha.id });
               } catch (e) { continue; }
           } else {
+              // Devolve as quantidades à Linha Original (Mantém o WBS de origem intacto)
               const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
               await db.atualizar('estoque', estoqueAtual.id, {
                 quantidade_disponivel: saldoAtual + quantidadeDevolvida,
@@ -892,14 +883,27 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           }
 
           if (wbsDestinoTransferencia) {
-             const linhaAmarela = await db.um('estoque', db.f(
-                 'is_transferencia = true && wbs = {:wbs} && desenho_sap = {:sap} && filial_id = {:filial}',
-                 { 
-                     wbs: wbsDestinoTransferencia, 
-                     sap: estoqueAtual.desenho_sap || '',
-                     filial: estoqueAtual.filial_id || ''
-                 }
-             ));
+             // ✨ MATCH INTELIGENTE PARA ACHAR A LINHA AMARELA E DESCONTAR
+             const sapOrigin = String(estoqueAtual.desenho_sap || '').trim().toUpperCase();
+             const pnOrigin = String(estoqueAtual.part_number || '').trim().toUpperCase();
+             const wbsDestinoLimpo = String(wbsDestinoTransferencia || '').trim().toUpperCase();
+
+             // 1. Busca todas as transferências amarelas desta filial
+             const candidatosAmarelos = await db.listar('estoque', {
+                 filter: db.f('is_transferencia = true && filial_id = {:filial}', { filial: estoqueAtual.filial_id || '' })
+             });
+
+             // 2. Filtro cirúrgico com TRIM e UPPERCASE para ignorar espaços inúteis e letras
+             const linhaAmarela = candidatosAmarelos.find(e => {
+                 const sapE = String(e.desenho_sap || '').trim().toUpperCase();
+                 const pnE = String(e.part_number || '').trim().toUpperCase();
+                 const wbsE = String(e.wbs || '').trim().toUpperCase();
+                 
+                 const bateWbs = wbsE === wbsDestinoLimpo;
+                 const bateSapPn = (sapE && sapE !== '-' && sapE === sapOrigin) || (pnE && pnE !== '-' && pnE === pnOrigin);
+                 
+                 return bateWbs && bateSapPn;
+             });
 
              if (linhaAmarela) {
                  const novoSaldoAmarelo = Number(linhaAmarela.quantidade_disponivel || 0) - quantidadeDevolvida;
@@ -909,6 +913,8 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                      quantidade_disponivel: saldoSeguro,
                      status: saldoSeguro <= 0 ? 'Zerado' : 'Disponível'
                  });
+             } else {
+                 console.warn(`[REINTEGRACAO] Linha Amarela nao encontrada para SAP ${sapOrigin} e WBS ${wbsDestinoLimpo}`);
              }
           }
         }
