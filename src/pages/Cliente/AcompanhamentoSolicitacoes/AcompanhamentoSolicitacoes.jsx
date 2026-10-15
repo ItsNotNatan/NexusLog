@@ -264,6 +264,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               pl: numeroPL,
               nfCrossdocking: item.nfCrossdocking || null,
               wbs: item.wbs || '—', 
+              destino: item.destino || 'Não informado', // ✨ LÓGICA: Extraímos o destino para usar na nossa caixinha
               itens: itensEnriquecidos 
             };
           });
@@ -515,7 +516,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>TIPO / ID (PS)</th>
                 <th>SOLICITANTE / WBS</th>
                 <th>Nº DA PL</th>
-                <th>FILIAL</th>
+                {/* ✨ NOVO CABEÇALHO COM A SETA */}
+                <th>DE ➔ PARA</th>
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
                 <th>STATUS {perfil === "logistica" && "/ AÇÃO"}</th>
@@ -591,11 +593,41 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           )}
                         </td>
 
+                        {/* ✨ CÉLULA: DE ➔ PARA COM CAIXINHAS EMPILHADAS */}
                         <td>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f1f5f9', color: corTextoMedio, padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#cbd5e1'}`, whiteSpace: 'nowrap' }}>
-                            <MapPin size={12} /> {obterNomeFilialDinamico(linha.filial || linha.estoque)}
-                          </span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            {/* Caixa DE (Origem) */}
+                            <span style={{ 
+                              display: 'inline-block', 
+                              backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc', 
+                              color: corTextoMedio, 
+                              padding: '4px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: '600', 
+                              border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#e2e8f0'}`, 
+                              whiteSpace: 'nowrap' 
+                            }}>
+                              De: {obterNomeFilialDinamico(linha.filial || linha.estoque)}
+                            </span>
+
+                            {/* Caixa PARA (Destino) */}
+                            <span style={{ 
+                              display: 'inline-block', 
+                              backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#eff6ff', 
+                              color: isRecusadoOuCancelado ? '#dc2626' : '#2563eb', 
+                              padding: '4px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: '600', 
+                              border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#bfdbfe'}`, 
+                              whiteSpace: 'nowrap' 
+                            }}>
+                              Para: {linha.destino}
+                            </span>
+                          </div>
                         </td>
+
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
 
                         <td>
