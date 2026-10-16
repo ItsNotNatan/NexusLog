@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/services/solicitacoesService.js
-// DESCRICAO: Logica de negocio das solicitacoes (Cura Universal, Sync JIT robusto e Fix do Destino)
+// DESCRICAO: Lógica de negócio (Cura Universal para TODAS as edições e Baixas)
 // =================================================================
 const db = require('../db');
 
@@ -281,7 +281,7 @@ const criarTransferencia = async (solicitante, itens, anexos) => {
     nome_solicitante: solicitante.nome,
     wbs_origem: wbsOrig,
     wbs_destino: solicitante.wbs || solicitante.wbs_destino,
-    destino: solicitante.destino, // ✨ ADDED
+    destino: solicitante.destino,
     observacoes: solicitante.observacoes,
     entrega_urgente: solicitante.entregaUrgente || false,
     status: 'Pendente',
@@ -312,7 +312,7 @@ const criarEntrada = async (solicitante, itens, anexos) => {
     tipo: 'Entrada',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
-    destino: solicitante.destino, // ✨ ADDED
+    destino: solicitante.destino,
     observacoes: solicitante.observacoes,
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -347,7 +347,7 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
     tipo: 'Crossdocking',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
-    destino: solicitante.destino, // ✨ ADDED
+    destino: solicitante.destino,
     observacoes: solicitante.observacoes,
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -369,7 +369,7 @@ const criarNotaFiscal = async (solicitante, anexos) => {
     tipo: 'Nota Fiscal',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
-    destino: solicitante.destino, // ✨ ADDED
+    destino: solicitante.destino,
     observacoes: solicitante.observacoes,
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -389,7 +389,7 @@ const criarReintegracao = async (solicitante, itens, anexos) => {
     tipo: 'Reintegracao',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
-    destino: solicitante.destino, // ✨ ADDED
+    destino: solicitante.destino,
     observacoes: `[Reintegração] Originado da PL #${solicitante.pl_origem}. ${solicitante.observacoes || ''}`.trim(),
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -415,7 +415,7 @@ const cancelarPL = async (solicitante, anexos) => {
     tipo: 'Cancelado',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
-    destino: solicitante.destino, // ✨ ADDED
+    destino: solicitante.destino,
     observacoes: solicitante.observacoes,
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -526,11 +526,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
     const tiposDeSaida = ['Material', 'Transferencia WBS', 'Crossdocking'];
 
-    // =========================================================================
-    // ✨ LÓGICA DE RESGATE: CURA AUTOMÁTICA DE CROSSDOCKING E EDIÇÕES MANUAIS
-    // =========================================================================
     if (solicitacao.tipo === 'Crossdocking') {
-      
       let numeroNFCross = null;
       const nfCrossdocking = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
       
@@ -558,7 +554,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
         if (estoqueDisponivelNF.length > 0) {
             if (isTotal && !isParcial) {
-                console.log(`[RESGATE] Restaurando Crossdocking Total antigo: ${id}`);
                 await db.criarVarios(
                     'solicitacoes_itens',
                     estoqueDisponivelNF.map(e => ({
@@ -582,7 +577,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     }))
                 );
             } else {
-                console.log(`[RESGATE E SYNC] Sincronizando vínculos e quantidades do Crossdocking: ${id}`);
                 for (const pedido of itensAtuais) {
                     let itemFisico = null;
 
@@ -631,10 +625,37 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       });
 
       for (const item of itensPedidos) {
-        if (!item.estoque_id) continue;
+        let estoqueAtual = null;
 
-        const estoqueAtual = await db.porId('estoque', item.estoque_id);
-        if (!estoqueAtual) continue;
+        if (item.estoque_id) {
+          estoqueAtual = await db.porId('estoque', item.estoque_id);
+        }
+
+        // ✨ CURA UNIVERSAL PARA TODAS AS SAÍDAS: Reconecta a prateleira se o ID se perder após uma edição no frontend
+        if (!estoqueAtual) {
+          console.log(`[CURA UNIVERSAL] Restaurando ligação de estoque perdida para o item: ${item.desenho_sap_manual}`);
+          const sapItem = String(item.desenho_sap_manual || '').trim().toUpperCase();
+          const pnItem = String(item.part_number_manual || '').trim().toUpperCase();
+
+          const candidatosEstoque = await db.listar('estoque', {
+            filter: db.f('filial_id = {:filial}', { filial: solicitacao.filial_origem_id })
+          });
+
+          estoqueAtual = candidatosEstoque.find(e => {
+            const sapE = String(e.desenho_sap || '').trim().toUpperCase();
+            const pnE = String(e.part_number || '').trim().toUpperCase();
+            return (sapE && sapE !== '-' && sapE === sapItem) || (pnE && pnE !== '-' && pnE === pnItem);
+          });
+
+          if (estoqueAtual) {
+            await db.atualizar('solicitacoes_itens', item.id, { estoque_id: estoqueAtual.id });
+          }
+        }
+
+        if (!estoqueAtual) {
+          console.warn(`[FALHA NA BAIXA] Prateleira não encontrada para o item SAP: ${item.desenho_sap_manual}`);
+          continue;
+        }
 
         const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
         const quantidadeRetirada = Number(item.quantidade_solicitada || 0); 
@@ -643,7 +664,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const saldoFinalSeguro = novoSaldo < 0 ? 0 : novoSaldo;
         const novoStatusEstoque = saldoFinalSeguro <= 0 ? 'Zerado' : 'Disponível';
 
-        await db.atualizar('estoque', item.estoque_id, {
+        await db.atualizar('estoque', estoqueAtual.id, {
           quantidade_disponivel: saldoFinalSeguro,
           status: novoStatusEstoque,
         });
@@ -891,7 +912,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                   await db.atualizar('solicitacoes_itens', item.id, { estoque_id: novaLinha.id });
               } catch (e) { continue; }
           } else {
-              // Devolve as quantidades à Linha Original (Mantém o WBS de origem intacto)
               const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
               await db.atualizar('estoque', estoqueAtual.id, {
                 quantidade_disponivel: saldoAtual + quantidadeDevolvida,
@@ -900,17 +920,14 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           }
 
           if (wbsDestinoTransferencia) {
-             // MATCH INTELIGENTE PARA ACHAR A LINHA AMARELA E DESCONTAR
              const sapOrigin = String(estoqueAtual.desenho_sap || '').trim().toUpperCase();
              const pnOrigin = String(estoqueAtual.part_number || '').trim().toUpperCase();
              const wbsDestinoLimpo = String(wbsDestinoTransferencia || '').trim().toUpperCase();
 
-             // 1. Busca todas as transferências amarelas desta filial
              const candidatosAmarelos = await db.listar('estoque', {
                  filter: db.f('is_transferencia = true && filial_id = {:filial}', { filial: estoqueAtual.filial_id || '' })
              });
 
-             // 2. Filtro cirúrgico com TRIM e UPPERCASE para ignorar espaços inúteis e letras
              const linhaAmarela = candidatosAmarelos.find(e => {
                  const sapE = String(e.desenho_sap || '').trim().toUpperCase();
                  const pnE = String(e.part_number || '').trim().toUpperCase();
@@ -1048,7 +1065,7 @@ const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
 
   const itensDB = itens.map((i) => ({
     solicitacao_id: solicitacaoId,
-    estoque_id: limparIdEstoque(i.estoque_id || i.idBD),
+    estoque_id: limparIdEstoque(i.estoque_id || i.idBD), 
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || i.desenho_sap_manual || null,
     part_number_manual: i.part_number || i.numPecaFabricante || i.part_number_manual || null,
     fabricante: i.fabricante || null, 
