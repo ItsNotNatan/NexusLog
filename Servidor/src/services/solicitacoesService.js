@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/services/solicitacoesService.js
-// DESCRICAO: Lógica de negócio (Cura Universal, Sync JIT robusto e Fix do Destino)
+// DESCRICAO: Logica de negocio das solicitacoes (Cura Universal, Sync JIT robusto e Fix do Destino)
 // =================================================================
 const db = require('../db');
 
@@ -202,7 +202,6 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
       wbs: wbsExibicao,
       pl: plFinal,
       filial: sol.filial_origem_id || '-',
-      // ✨ FIX PROBLEMA 2: Enviamos a coluna Destino diretamente para o Frontend!
       destino: sol.destino || 'Não informado',
       dataSolicitacao:
         new Date(sol.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
@@ -229,7 +228,6 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
         : sol.status === 'Concluído' ? 'Disponível' : null,
 
       status: sol.status,
-      // ✨ FIX PROBLEMA 2: As observações estão intactas, agora combinadas com o Destino.
       observacoes: db.txt(sol.observacoes),
       entregaUrgente: sol.entrega_urgente,
       anexos: anexosPorSol[sol.id] || [],
@@ -283,6 +281,7 @@ const criarTransferencia = async (solicitante, itens, anexos) => {
     nome_solicitante: solicitante.nome,
     wbs_origem: wbsOrig,
     wbs_destino: solicitante.wbs || solicitante.wbs_destino,
+    destino: solicitante.destino, // ✨ ADDED
     observacoes: solicitante.observacoes,
     entrega_urgente: solicitante.entregaUrgente || false,
     status: 'Pendente',
@@ -313,6 +312,7 @@ const criarEntrada = async (solicitante, itens, anexos) => {
     tipo: 'Entrada',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
+    destino: solicitante.destino, // ✨ ADDED
     observacoes: solicitante.observacoes,
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -347,6 +347,7 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
     tipo: 'Crossdocking',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
+    destino: solicitante.destino, // ✨ ADDED
     observacoes: solicitante.observacoes,
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -368,6 +369,7 @@ const criarNotaFiscal = async (solicitante, anexos) => {
     tipo: 'Nota Fiscal',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
+    destino: solicitante.destino, // ✨ ADDED
     observacoes: solicitante.observacoes,
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -387,6 +389,7 @@ const criarReintegracao = async (solicitante, itens, anexos) => {
     tipo: 'Reintegracao',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
+    destino: solicitante.destino, // ✨ ADDED
     observacoes: `[Reintegração] Originado da PL #${solicitante.pl_origem}. ${solicitante.observacoes || ''}`.trim(),
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -412,6 +415,7 @@ const cancelarPL = async (solicitante, anexos) => {
     tipo: 'Cancelado',
     nome_solicitante: solicitante.nome,
     wbs_destino: solicitante.wbs,
+    destino: solicitante.destino, // ✨ ADDED
     observacoes: solicitante.observacoes,
     status: 'Pendente',
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
@@ -527,7 +531,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     // =========================================================================
     if (solicitacao.tipo === 'Crossdocking') {
       
-      // ✨ FIX PROBLEMA 1: Procuramos a NF na capa do pedido e, se falhar, nas peças (Entrada)
       let numeroNFCross = null;
       const nfCrossdocking = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
       
