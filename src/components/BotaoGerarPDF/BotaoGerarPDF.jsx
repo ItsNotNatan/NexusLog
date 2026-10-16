@@ -1,3 +1,6 @@
+// =================================================================
+// ARQUIVO: src/components/BotaoGerarPDF/BotaoGerarPDF.jsx
+// =================================================================
 import React, { useState } from 'react';
 import { FileText } from 'lucide-react';
 
@@ -27,7 +30,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     }
   };
 
-  // ✨ NOVA FUNÇÃO AUXILIAR: Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
+  // Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
   const formatarMoedaPdf = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
     // Se o valor já vier formatado do frontend com "R$", não tentamos calcular, apenas exibimos
@@ -60,8 +63,18 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       // Tratamento de datas
       const dataSolicitacao = linha.dataSolicitacao || '';
 
-      // Tratamento do Destino
-      const destinoMaterial = linha.destino || linha.deParaDestino || linha.observacoes || 'N/A';
+      // ✨ LÓGICA ATUALIZADA: Tratamento Inteligente de Destino e Observações
+      // Destino: Prioriza a nova propriedade, se for 'Não informado', 'N/A' ou vazio, usa um placeholder mais limpo.
+      let destinoMaterial = linha.destino || linha.deParaDestino || 'N/A';
+      if (destinoMaterial === 'Não informado' || destinoMaterial.trim() === '') {
+        destinoMaterial = 'N/A';
+      }
+
+      // Observações: Puxa o campo real de observações da base de dados.
+      let observacoesTexto = linha.observacoes || 'N/A';
+      if (observacoesTexto.trim() === '') {
+        observacoesTexto = 'N/A';
+      }
 
       // Tratamento do PL/BS
       const bsNumero = linha.pl ? linha.pl.replace(/PL #|BS/g, '').trim() : '';
@@ -109,9 +122,9 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             { text: it.unidade_medida_manual || 'Un', fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.descricao_manual || '-', fontSize: 7, margin: [0, 3] },
             { text: it.fornecedor || '-', fontSize: 7, margin: [0, 3] },
-            { text: it.alocacao || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
+            // Filtro visual para remover anotações técnicas do servidor na coluna Alocação
+            { text: (it.alocacao || '').startsWith('CROSSDOCKING') ? 'CROSSDOCKING' : (it.alocacao || '-'), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
-            // ✨ CORREÇÃO CRÍTICA AQUI: Adicionado 'valor_unitario_enriquecido' para puxar do pai corretamente!
             { text: formatarMoedaPdf(it.valor_unitario_enriquecido ?? it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.wbs_element || '-', fontSize: 7, alignment: 'center', margin: [0, 3] }
           ]);
@@ -180,10 +193,11 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                       {}
                     ],
                     [
+                      // ✨ AQUI ESTÁ A SUBSTITUIÇÃO DO NOME DA WBS PELAS OBSERVAÇÕES
                       { 
                         text: [
-                          { text: 'NOME DA WBS: ', fontSize: 6, bold: true },
-                          { text: ' ', fontSize: 6 }
+                          { text: 'OBSERVAÇÕES: ', fontSize: 6, bold: true },
+                          { text: observacoesTexto, fontSize: 6 }
                         ], 
                         colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, true] 
                       },
