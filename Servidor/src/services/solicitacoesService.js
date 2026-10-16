@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/services/solicitacoesService.js
-// DESCRICAO: Lógica de negócio (Cura Universal e Match Inteligente WBS)
+// DESCRICAO: Lógica de negócio (Cura Universal, Sync JIT robusto e Fix do Destino)
 // =================================================================
 const db = require('../db');
 
@@ -202,6 +202,8 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
       wbs: wbsExibicao,
       pl: plFinal,
       filial: sol.filial_origem_id || '-',
+      // ✨ FIX PROBLEMA 2: Enviamos a coluna Destino diretamente para o Frontend!
+      destino: sol.destino || 'Não informado',
       dataSolicitacao:
         new Date(sol.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
         ' ' +
@@ -227,6 +229,7 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
         : sol.status === 'Concluído' ? 'Disponível' : null,
 
       status: sol.status,
+      // ✨ FIX PROBLEMA 2: As observações estão intactas, agora combinadas com o Destino.
       observacoes: db.txt(sol.observacoes),
       entregaUrgente: sol.entrega_urgente,
       anexos: anexosPorSol[sol.id] || [],
@@ -523,8 +526,19 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     // ✨ LÓGICA DE RESGATE: CURA AUTOMÁTICA DE CROSSDOCKING E EDIÇÕES MANUAIS
     // =========================================================================
     if (solicitacao.tipo === 'Crossdocking') {
+      
+      // ✨ FIX PROBLEMA 1: Procuramos a NF na capa do pedido e, se falhar, nas peças (Entrada)
+      let numeroNFCross = null;
       const nfCrossdocking = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
-      const numeroNFCross = nfCrossdocking ? String(nfCrossdocking.numero_nf).trim().toUpperCase() : null;
+      
+      if (nfCrossdocking && nfCrossdocking.numero_nf) {
+          numeroNFCross = String(nfCrossdocking.numero_nf).trim().toUpperCase();
+      } else {
+          const primeiroItemCross = await db.um('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: id }));
+          if (primeiroItemCross && primeiroItemCross.nf_entrada && primeiroItemCross.nf_entrada !== '-') {
+              numeroNFCross = String(primeiroItemCross.nf_entrada).trim().toUpperCase();
+          }
+      }
 
       if (numeroNFCross) {
         let itensAtuais = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
@@ -883,7 +897,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           }
 
           if (wbsDestinoTransferencia) {
-             // ✨ MATCH INTELIGENTE PARA ACHAR A LINHA AMARELA E DESCONTAR
+             // MATCH INTELIGENTE PARA ACHAR A LINHA AMARELA E DESCONTAR
              const sapOrigin = String(estoqueAtual.desenho_sap || '').trim().toUpperCase();
              const pnOrigin = String(estoqueAtual.part_number || '').trim().toUpperCase();
              const wbsDestinoLimpo = String(wbsDestinoTransferencia || '').trim().toUpperCase();
