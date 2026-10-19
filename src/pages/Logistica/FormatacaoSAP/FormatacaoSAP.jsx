@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Agora com Paginação)
+// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Com Paginação e Cópia Limpa)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
@@ -20,9 +20,9 @@ export default function FormatacaoSAP() {
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
   const [copiadoSucesso, setCopiadoSucesso] = useState(false);
 
-  // ✨ NOVO: Estados para controlar a paginação da tabela
+  // ✨ ESTADOS PARA CONTROLAR A PAGINAÇÃO
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const itensPorPagina = 15; // Podes ajustar quantos itens aparecem por página
+  const itensPorPagina = 15;
 
   const opcoesCategoria = [
     'Preencher .', 
@@ -170,7 +170,7 @@ export default function FormatacaoSAP() {
       }));
     });
 
-  // ✨ LÓGICA DE PAGINAÇÃO
+  // ✨ LÓGICA DE PAGINAÇÃO APLICADA
   const totalPaginas = Math.max(1, Math.ceil(itensConsolidados.length / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
   const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, itensConsolidados.length);
@@ -189,6 +189,7 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais(prev => ({ ...prev, [idLinha]: valor }));
   };
 
+  // ✨ A Origem não é copiada para o SAP, como pedido!
   const gerarLinhaTsv = (item) => {
     const categoria = categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .';
     return `${item.desenhoSAP}\t${item.quantidade}\t${item.valorUnitario}\t${item.wbs}\t${item.destino}\t${categoria}`;
@@ -379,6 +380,7 @@ export default function FormatacaoSAP() {
                     </tr>
                   </thead>
                   <tbody>
+                    {/* ✨ AGORA USANDO ITENS PAGINADOS PARA NÃO QUEBRAR O LAYOUT */}
                     {itensPaginados.map(item => (
                       <tr key={item.idLinha}>
                         <td className="texto-cinza">{item.origem}</td>
