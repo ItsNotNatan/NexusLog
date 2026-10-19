@@ -22,7 +22,7 @@ export default function VisaoGeralEstoque({ perfil }) {
   const [carregando, setCarregando] = useState(true);
   const [termoPesquisa, setTermoPesquisa] = useState('');
 
-  // ✨ ESTADOS PARA OS FILTROS AVANÇADOS
+  // ✨ ESTADOS PARA OS FILTROS AVANÇADOS (Agora com 'referencia' incluída!)
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     sap: '',
@@ -31,6 +31,7 @@ export default function VisaoGeralEstoque({ perfil }) {
     pedido: '',
     fabricante: '',
     fornecedor: '',
+    referencia: '', // ✨ ADICIONADO AQUI
     status_saldo: 'TODOS'
   });
 
@@ -229,7 +230,6 @@ export default function VisaoGeralEstoque({ perfil }) {
     );
   };
 
-  // ✨ FUNÇÃO AUXILIAR DOS FILTROS AVANÇADOS (Verifica se contém nas tags ou no range)
   const verificaFiltroAvancado = (valorItem, valorFiltro) => {
     if (!valorFiltro) return true;
     
@@ -266,6 +266,9 @@ export default function VisaoGeralEstoque({ perfil }) {
     if (!verificaFiltroAvancado(item.documento_compras, filtrosAvancados.pedido)) return false;
     if (!verificaFiltroAvancado(fab, filtrosAvancados.fabricante)) return false;
     if (!verificaFiltroAvancado(item.fornecedor, filtrosAvancados.fornecedor)) return false;
+    
+    // ✨ NOVO: Aplica a lógica matemática para o filtro da Referência
+    if (!verificaFiltroAvancado(item.referencia, filtrosAvancados.referencia)) return false;
 
     // Status do Saldo (Especial do Modal)
     if (filtrosAvancados.status_saldo !== 'TODOS') {
@@ -289,7 +292,9 @@ export default function VisaoGeralEstoque({ perfil }) {
       (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
       (item.fornecedor && item.fornecedor.toLowerCase().includes(termo)) ||
       (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termo)) ||
-      (item.nome_projeto && item.nome_projeto.toLowerCase().includes(termo))
+      (item.nome_projeto && item.nome_projeto.toLowerCase().includes(termo)) ||
+      // ✨ Permite pesquisar por referência na barra de pesquisa rápida também
+      (item.referencia && item.referencia.toLowerCase().includes(termo)) 
     );
   });
 
@@ -382,14 +387,14 @@ export default function VisaoGeralEstoque({ perfil }) {
     }
   };
 
-  // Funções para manipular o estado do Modal de Filtros
   const handleFiltroChange = (e) => {
     const { name, value } = e.target;
     setFiltrosAvancados(prev => ({ ...prev, [name]: value }));
   };
 
   const handleLimparFiltros = () => {
-    setFiltrosAvancados({ sap: '', wbs: '', nf: '', pedido: '', fabricante: '', fornecedor: '', status_saldo: 'TODOS' });
+    // ✨ Reseta todos os campos, incluindo a Referência
+    setFiltrosAvancados({ sap: '', wbs: '', nf: '', pedido: '', fabricante: '', fornecedor: '', referencia: '', status_saldo: 'TODOS' });
   };
 
   return (
@@ -456,7 +461,6 @@ export default function VisaoGeralEstoque({ perfil }) {
             />
           </div>
 
-          {/* ✨ BOTÃO DOS FILTROS AVANÇADOS (Igual à imagem) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button 
               onClick={() => setModalFiltroAberto(true)}
