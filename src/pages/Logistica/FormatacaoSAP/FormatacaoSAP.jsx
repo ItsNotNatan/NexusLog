@@ -1,11 +1,11 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Cópia silenciosa com feedback visual)
+// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Agora com Paginação)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
   FileSpreadsheet, Search, X, CheckCircle2, Circle, 
-  Layers, Copy, Lightbulb, AlertTriangle 
+  Layers, Copy, Lightbulb, AlertTriangle, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import './FormatacaoSAP.css';
 import { apiFetch } from '../../../services/api';
@@ -18,9 +18,11 @@ export default function FormatacaoSAP() {
   const [selecionados, setSelecionados] = useState([]); 
   const [categoriaGeral, setCategoriaGeral] = useState('');
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
-  
-  // Estado para controlar o feedback visual do botão de copiar
   const [copiadoSucesso, setCopiadoSucesso] = useState(false);
+
+  // ✨ NOVO: Estados para controlar a paginação da tabela
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 15; // Podes ajustar quantos itens aparecem por página
 
   const opcoesCategoria = [
     'Preencher .', 
@@ -141,6 +143,11 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais({});
   };
 
+  // ✨ Resetar a página para 1 sempre que a seleção de PLs mudar
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [selecionados]);
+
   const listaFiltrada = solicitacoes.filter(sol => {
     const termo = busca.toLowerCase();
     return sol.pl.toLowerCase().includes(termo) || 
@@ -163,6 +170,12 @@ export default function FormatacaoSAP() {
       }));
     });
 
+  // ✨ LÓGICA DE PAGINAÇÃO
+  const totalPaginas = Math.max(1, Math.ceil(itensConsolidados.length / itensPorPagina));
+  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
+  const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, itensConsolidados.length);
+  const itensPaginados = itensConsolidados.slice(indexPrimeiroItem, indexUltimoItem);
+
   const atualizarCategoriaGeral = (valor) => {
     setCategoriaGeral(valor);
     const novasCatIndividuais = {};
@@ -176,7 +189,6 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais(prev => ({ ...prev, [idLinha]: valor }));
   };
 
-  // ✨ CORREÇÃO: A Origem foi removida da linha formatada para o SAP
   const gerarLinhaTsv = (item) => {
     const categoria = categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .';
     return `${item.desenhoSAP}\t${item.quantidade}\t${item.valorUnitario}\t${item.wbs}\t${item.destino}\t${categoria}`;
@@ -212,13 +224,12 @@ export default function FormatacaoSAP() {
   const copiarTudo = () => {
     if (itensConsolidados.length === 0) return;
     
+    // O Copiar Tudo continua a ler "itensConsolidados" (todos os itens), ignorando a paginação visual.
     const textoCompleto = itensConsolidados.map(gerarLinhaTsv).join('\n');
     const copiado = forcarCopiaClipboard(textoCompleto);
     
-    // FEEDBACK VISUAL SILENCIOSO
     if (copiado) {
       setCopiadoSucesso(true);
-      // Remove o estado de "Copiado!" após 2 segundos
       setTimeout(() => {
         setCopiadoSucesso(false);
       }, 2000);
@@ -308,7 +319,7 @@ export default function FormatacaoSAP() {
               <p>Selecione itens na lista ao lado para começar a formatar.</p>
             </div>
           ) : (
-            <div className="sap-preview-conteudo">
+            <div className="sap-preview-conteudo" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <div className="sap-alerta-selecao">
                 <div className="sap-alerta-texto">
                   <AlertTriangle size={16} /> 
@@ -352,7 +363,8 @@ export default function FormatacaoSAP() {
                 </button>
               </div>
 
-              <div className="sap-tabela-container">
+              {/* ✨ A tabela agora usa itensPaginados e tem flex: 1 para empurrar o rodapé */}
+              <div className="sap-tabela-container" style={{ flex: 1 }}>
                 <table className="sap-tabela-preview">
                   <thead>
                     <tr>
@@ -367,7 +379,7 @@ export default function FormatacaoSAP() {
                     </tr>
                   </thead>
                   <tbody>
-                    {itensConsolidados.map(item => (
+                    {itensPaginados.map(item => (
                       <tr key={item.idLinha}>
                         <td className="texto-cinza">{item.origem}</td>
                         <td className="texto-negrito">{item.desenhoSAP}</td>
@@ -398,10 +410,34 @@ export default function FormatacaoSAP() {
                 </table>
               </div>
 
-              <div className="sap-footer-nota">
+              {/* ✨ NOVO: Barra de Paginação Integrada */}
+              {totalPaginas > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    Página <strong style={{ color: '#1e293b' }}>{paginaAtual}</strong> de <strong style={{ color: '#1e293b' }}>{totalPaginas}</strong> &middot; Exibindo {itensConsolidados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{indexUltimoItem}</strong> de <strong>{itensConsolidados.length}</strong> itens
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      onClick={() => setPaginaAtual(p => Math.max(p - 1, 1))} 
+                      disabled={paginaAtual === 1}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', background: paginaAtual === 1 ? '#f1f5f9' : '#fff', color: paginaAtual === 1 ? '#94a3b8' : '#334155', cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer', fontSize: '0.875rem', fontWeight: '500' }}
+                    >
+                      <ChevronLeft size={16} /> Anterior
+                    </button>
+                    <button 
+                      onClick={() => setPaginaAtual(p => Math.min(p + 1, totalPaginas))} 
+                      disabled={paginaAtual === totalPaginas}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', background: paginaAtual === totalPaginas ? '#f1f5f9' : '#fff', color: paginaAtual === totalPaginas ? '#94a3b8' : '#334155', cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer', fontSize: '0.875rem', fontWeight: '500' }}
+                    >
+                      Próxima <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="sap-footer-nota" style={{ marginTop: '0', borderRadius: totalPaginas > 1 ? '0' : '0 0 8px 8px' }}>
                 <Lightbulb size={16} color="#eab308" />
                 <span>
-                  {/* ✨ CORREÇÃO: Rodapé também atualizado */}
                   Ordem das colunas: <strong>Desenho SAP · Quantidade · Valor Unitário · WBS · Filial de Destino · Categoria</strong> — Use a <strong>Categoria Geral</strong> para preencher todos de uma vez, ou edite individualmente.
                 </span>
               </div>
