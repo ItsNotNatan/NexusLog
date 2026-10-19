@@ -19,7 +19,7 @@ export default function FormatacaoSAP() {
   const [categoriaGeral, setCategoriaGeral] = useState('');
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
   
-  // ✨ NOVO: Estado para controlar o feedback visual do botão de copiar
+  // Estado para controlar o feedback visual do botão de copiar
   const [copiadoSucesso, setCopiadoSucesso] = useState(false);
 
   const opcoesCategoria = [
@@ -176,9 +176,10 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais(prev => ({ ...prev, [idLinha]: valor }));
   };
 
+  // ✨ CORREÇÃO: Adicionada a Origem (item.origem) no início do TSV copiado
   const gerarLinhaTsv = (item) => {
     const categoria = categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .';
-    return `${item.desenhoSAP}\t${item.quantidade}\t${item.valorUnitario}\t${item.wbs}\t${item.destino}\t${categoria}`;
+    return `${item.origem}\t${item.desenhoSAP}\t${item.quantidade}\t${item.valorUnitario}\t${item.wbs}\t${item.destino}\t${categoria}`;
   };
 
   const forcarCopiaClipboard = (texto) => {
@@ -206,7 +207,7 @@ export default function FormatacaoSAP() {
   const copiarLinha = (item) => {
     const texto = gerarLinhaTsv(item);
     forcarCopiaClipboard(texto);
-    // ✨ Alert removido! Cópia silenciosa.
+    // Alert removido! Cópia silenciosa.
   };
 
   const copiarTudo = () => {
@@ -215,7 +216,7 @@ export default function FormatacaoSAP() {
     const textoCompleto = itensConsolidados.map(gerarLinhaTsv).join('\n');
     const copiado = forcarCopiaClipboard(textoCompleto);
     
-    // ✨ FEEDBACK VISUAL SILENCIOSO
+    // FEEDBACK VISUAL SILENCIOSO
     if (copiado) {
       setCopiadoSucesso(true);
       // Remove o estado de "Copiado!" após 2 segundos
@@ -342,7 +343,7 @@ export default function FormatacaoSAP() {
                   </select>
                 </div>
                 
-                {/* ✨ BOTÃO INTELIGENTE: Muda de cor e texto quando a cópia é bem sucedida */}
+                {/* BOTÃO INTELIGENTE: Muda de cor e texto quando a cópia é bem sucedida */}
                 <button 
                   className="sap-btn-copiar-tudo" 
                   onClick={copiarTudo}
@@ -402,7 +403,7 @@ export default function FormatacaoSAP() {
               <div className="sap-footer-nota">
                 <Lightbulb size={16} color="#eab308" />
                 <span>
-                  Ordem das colunas: <strong>Desenho SAP · Quantidade · Valor Unitário · WBS · Filial de Destino · Categoria</strong> — Use a <strong>Categoria Geral</strong> para preencher todos de uma vez, ou edite individualmente.
+                  Ordem das colunas: <strong>Origem · Desenho SAP · Quantidade · Valor Unitário · WBS · Filial de Destino · Categoria</strong> — Use a <strong>Categoria Geral</strong> para preencher todos de uma vez, ou edite individualmente.
                 </span>
               </div>
 
