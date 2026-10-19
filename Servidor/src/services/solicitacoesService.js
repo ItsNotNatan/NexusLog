@@ -21,7 +21,7 @@ const limparIdEstoque = (id) => {
   return idString;
 };
 
-// ✨ NOVO: Função Global para forçar o horário do Brasil (UTC-3)
+// Função Global para forçar o horário do Brasil (UTC-3)
 const formatarDataBrasil = (isoString) => {
   if (!isoString) return null;
   try {
@@ -203,7 +203,6 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
       pl: plFinal,
       filial: sol.filial_origem_id || '-',
       destino: sol.destino || 'Não informado',
-      // ✨ IMPLEMENTAÇÃO PRIORIDADE 01: Horário Formatado no Brasil!
       dataSolicitacao: formatarDataBrasil(sol.created_at) || "-",
       dataCriacaoISO: sol.created_at,
       dataAprovacaoPL: dataAprovacaoValida,
@@ -223,6 +222,16 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
   return { dados: dadosFormatados, total: resultado.totalItems || 0 };
 };
 
+const limparValor = (valorFront) => {
+  if (!valorFront) return 0;
+  let v = String(valorFront).replace(/[^\d.,-]/g, '');
+  if (v.includes('.') && v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
+  else if (v.includes(',')) v = v.replace(',', '.');
+  return parseFloat(v) || 0;
+};
+
+// ===================== CRIACAO POR TIPO DE PEDIDO =====================
+
 const criarMaterial = async (solicitante, itens, anexos) => {
   const dados = {
     tipo: 'Material',
@@ -238,16 +247,22 @@ const criarMaterial = async (solicitante, itens, anexos) => {
 
   const itensDB = itens.map((i) => ({
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
-    desenho_sap_manual: i.desenhoSAP || null,
-    part_number_manual: i.numPecaFabricante || null,
+    desenho_sap_manual: i.desenhoSAP || i.desenho_sap || null,
+    part_number_manual: i.numPecaFabricante || i.part_number || null,
     fabricante: i.fabricante || null, 
-    descricao_manual: limitarTexto(i.materialDescription || 'Sem descrição'),
-    quantidade_solicitada: Math.max(1, i.qtdSelecionada || 1),
-    unidade_medida_manual: i.unidadeMedida || 'Unid',
+    descricao_manual: limitarTexto(i.materialDescription || i.descricao || 'Sem descrição'),
+    quantidade_solicitada: Math.max(1, i.qtdSelecionada || i.quantidade || 1),
+    unidade_medida_manual: i.unidadeMedida || i.unidade_medida || 'Unid',
     fornecedor: i.fornecedor || null,
     referencia: i.referencia || null,
-    wbs_element: i.wbs || null,
+    wbs_element: i.wbs || i.wbs_element || null,
     alocacao: i.alocacao || null,
+    // ✨ RECUPERAMOS ESTES CAMPOS VITAIS AQUI PARA NUNCA MAIS SE PERDEREM NO PDF!
+    nf_entrada: i.nf_entrada || i.nfEntrada || i.nf || null,
+    valor_unitario_manual: limparValor(i.valor_unitario || i.poNetPrice || i.val),
+    centro: i.centro || null,
+    deposito: i.deposito || null,
+    documento_compras: i.documento_compras || i.docCompras || null,
   }));
 
   return salvarNoBanco(dados, itensDB, anexos);
@@ -273,21 +288,25 @@ const criarTransferencia = async (solicitante, itens, anexos) => {
 
   const itensDB = itens.map((i) => ({
     estoque_id: limparIdEstoque(i.estoque_id || i.id),
+    desenho_sap_manual: i.desenho_sap || i.desenhoSAP || null,
     part_number_manual: i.numPecaFabricante || i.pn || i.part_number_manual,
     fabricante: i.fabricante || null, 
     descricao_manual: limitarTexto(i.materialDescription || i.desc || i.descricao_manual),
     quantidade_solicitada: Math.max(1, i.qtd || i.qtdTransferencia || 1),
+    unidade_medida_manual: i.unidade_medida || i.unidadeMedida || 'Unid',
+    fornecedor: i.fornecedor || null,
+    referencia: i.referencia || null,
+    wbs_element: i.wbs || i.wbs_element || null,
+    alocacao: i.alocacao || null,
+    // ✨ RECUPERAMOS ESTES CAMPOS VITAIS AQUI PARA NUNCA MAIS SE PERDEREM NO PDF!
+    nf_entrada: i.nf_entrada || i.nfEntrada || i.nf || null,
+    valor_unitario_manual: limparValor(i.valor_unitario || i.poNetPrice || i.val),
+    centro: i.centro || null,
+    deposito: i.deposito || null,
+    documento_compras: i.documento_compras || i.docCompras || null,
   }));
 
   return salvarNoBanco(dados, itensDB, anexos);
-};
-
-const limparValor = (valorFront) => {
-  if (!valorFront) return 0;
-  let v = String(valorFront).replace(/[^\d.,-]/g, '');
-  if (v.includes('.') && v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
-  else if (v.includes(',')) v = v.replace(',', '.');
-  return parseFloat(v) || 0;
 };
 
 const criarEntrada = async (solicitante, itens, anexos) => {
@@ -1004,7 +1023,6 @@ const buscarHistoricoItem = async (estoqueId) => {
     const sol = porId[item.solicitacao_id];
     return {
       quantidade: item.quantidade_solicitada,
-      // ✨ FORMATADO PARA FUSO HORÁRIO BRASILEIRO
       dataSaida: formatarDataBrasil(sol?.created_at),
       solicitacao: sol?.id,
       solicitante: sol?.nome_solicitante,
@@ -1078,8 +1096,6 @@ const listarDemandasPorEstoque = async (estoqueId) => {
     }));
 
   const edicoesCruas = await db.listar('historico_edicoes', { filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }) });
-  
-  // ✨ FORMATADO PARA FUSO HORÁRIO BRASILEIRO
   const edicoes = edicoesCruas.map((e) => ({ ...e, created_at: formatarDataBrasil(e.created_at) }));
 
   return { demandas, edicoes };
