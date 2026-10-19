@@ -47,6 +47,18 @@ export default function FiltroSolicitacoesModal({
     return mapaOpcoes;
   }, [dadosTabela]);
 
+  // ✨ NOVO: Converte o texto separado por vírgulas de volta para as "Tags" visuais do Select
+  const getMultiValue = (str) => {
+    if (!str) return [];
+    return str.split(',').filter(Boolean).map(v => ({ value: v.trim(), label: v.trim() }));
+  };
+
+  // ✨ NOVO: Converte as "Tags" escolhidas num texto separado por vírgulas para o estado
+  const handleMultiSelectChange = (campoChave, selectedOptions) => {
+    const valores = selectedOptions ? selectedOptions.map(opt => opt.value).join(',') : '';
+    setFiltros({ ...filtros, [campoChave]: valores });
+  };
+
   const temFiltroAtivo = Object.values(filtros).some(valor => valor !== null && valor !== '');
 
   const selectStyles = {
@@ -60,10 +72,14 @@ export default function FiltroSolicitacoesModal({
       fontSize: '0.875rem',
       '&:hover': { borderColor: '#94a3b8' }
     }),
+    // ✨ NOVO: Estilos para as tags azuis de seleção múltipla
+    multiValue: (base) => ({ ...base, backgroundColor: '#dbeafe', borderRadius: '0.25rem' }),
+    multiValueLabel: (base) => ({ ...base, color: '#1e40af', fontWeight: 'bold' }),
+    multiValueRemove: (base) => ({ ...base, color: '#1e40af', ':hover': { backgroundColor: '#bfdbfe', color: '#1e3a8a' } }),
     option: (base, state) => ({
       ...base,
       fontSize: '0.875rem',
-      backgroundColor: state.isSelected ? '#2563eb' : state.isFocused ? '#eff6ff' : 'white',
+      backgroundColor: state.isFocused ? '#eff6ff' : 'white',
       color: state.isSelected ? 'white' : '#334155',
     })
   };
@@ -89,9 +105,10 @@ export default function FiltroSolicitacoesModal({
             <div key={campo.chave} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.80rem', fontWeight: '600', color: '#475569', textTransform: 'uppercase' }}>{campo.label}</label>
               <Select 
+                isMulti // ✨ NOVO: Ativa o modo de seleção múltipla
                 options={opcoesMapeadas[campo.chave] || []}
-                value={filtros[campo.chave] || null}
-                onChange={(opt) => setFiltros({ ...filtros, [campo.chave]: opt })}
+                value={getMultiValue(filtros[campo.chave])} // Lê com conversão
+                onChange={(opts) => handleMultiSelectChange(campo.chave, opts)} // Grava com conversão
                 placeholder={`Qualquer ${campo.label.toLowerCase()}...`}
                 isClearable
                 styles={selectStyles}
