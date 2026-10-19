@@ -19,24 +19,25 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
 
   if (!linha) return null;
 
-  // Função auxiliar para datas simples
+  // ✨ CORRIGIDO: Retirámos o { timeZone: 'UTC' } que estava a obrigar o PDF a usar o fuso horário global
   const formatarDataSimples = (data) => {
     if (!data) return '';
-    if (data.includes('/')) return data;
+    if (data.includes('/')) return data; // Se já vier formatado do backend, respeita
     try {
-      return new Date(data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+      return new Date(data).toLocaleString('pt-BR', { 
+          timeZone: 'America/Sao_Paulo',
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+      }).replace(',', ' às');
     } catch {
       return data;
     }
   };
 
-  // Lida com valores numéricos ou strings que já vêm formatadas como R$ de forma segura
   const formatarMoedaPdf = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || String(valor).trim() === 'NaN' || String(valor).trim() === '') return '-';
-    // Se o valor já vier formatado do frontend com "R$", não tentamos calcular, apenas exibimos
     if (typeof valor === 'string' && valor.includes('R$')) return valor;
     
-    // Se for um número limpo, formatamos
     const numero = parseFloat(String(valor).replace(',', '.'));
     if (!isNaN(numero)) return `R$ ${numero.toFixed(2).replace('.', ',')}`;
     
@@ -60,28 +61,20 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       if (isReintegracao) tituloPrincipal = 'BOLETIM DE ENTRADA - COMUNICAÇÃO INTERNA: REINTEGRAÇÃO DE MATERIAIS';
       if (isCancelamento) tituloPrincipal = 'BOLETIM DE CANCELAMENTO - COMUNICAÇÃO INTERNA: ESTORNO DE SOLICITAÇÃO';
 
-      // Tratamento de datas
-      const dataSolicitacao = linha.dataSolicitacao || '';
+      const dataSolicitacao = formatarDataSimples(linha.dataCriacaoISO || linha.created_at || linha.dataSolicitacao);
 
-      // ✨ LÓGICA ATUALIZADA: Tratamento Inteligente de Destino e Observações
-      // Destino: Prioriza a nova propriedade, se for 'Não informado', 'N/A' ou vazio, usa um placeholder mais limpo.
       let destinoMaterial = linha.destino || linha.deParaDestino || 'N/A';
       if (destinoMaterial === 'Não informado' || destinoMaterial.trim() === '') {
         destinoMaterial = 'N/A';
       }
 
-      // Observações: Puxa o campo real de observações da base de dados.
       let observacoesTexto = linha.observacoes || 'N/A';
       if (observacoesTexto.trim() === '') {
         observacoesTexto = 'N/A';
       }
 
-      // Tratamento do PL/BS
       const bsNumero = linha.pl ? linha.pl.replace(/PL #|BS/g, '').trim() : '';
 
-      // ==========================================
-      // DEFINIÇÃO DAS COLUNAS DA TABELA DE ITENS
-      // ==========================================
       const colWidths = [
         '3%',  // ITEM
         '10%', // DESENHO
@@ -122,7 +115,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             { text: it.unidade_medida_manual || 'Un', fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.descricao_manual || '-', fontSize: 7, margin: [0, 3] },
             { text: it.fornecedor || '-', fontSize: 7, margin: [0, 3] },
-            // Filtro visual para remover anotações técnicas do servidor na coluna Alocação
             { text: (it.alocacao || '').startsWith('CROSSDOCKING') ? 'CROSSDOCKING' : (it.alocacao || '-'), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: formatarMoedaPdf(it.valor_unitario_enriquecido ?? it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice), fontSize: 7, alignment: 'center', margin: [0, 3] },
@@ -131,7 +123,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         });
       }
 
-      // GARANTE EXATAMENTE 20 LINHAS DE ITENS (Total 21 com o cabeçalho)
       while (bodyRows.length <= 20) {
         bodyRows.push([
           { text: '', fontSize: 7, margin: [0, 3] }, { text: '', fontSize: 7 }, { text: '', fontSize: 7 },
@@ -141,15 +132,11 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         ]);
       }
 
-      // ==========================================
-      // DEFINIÇÃO GERAL DO PDF
-      // ==========================================
       const docDefinition = {
         pageSize: 'A4',
         pageOrientation: 'landscape',
         pageMargins: [15, 15, 15, 15], 
         content: [
-          // CABEÇALHO COM TÍTULO
           {
             table: {
               widths: ['100%'],
@@ -163,10 +150,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             margin: [0, 0, 0, 4] 
           },
 
-          // ÁREA DE INFORMAÇÕES SUPERIORES
           {
             columns: [
-              // Coluna Esquerda
               {
                 width: '42%',
                 table: {
@@ -193,7 +178,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                       {}
                     ],
                     [
-                      // ✨ AQUI ESTÁ A SUBSTITUIÇÃO DO NOME DA WBS PELAS OBSERVAÇÕES
                       { 
                         text: [
                           { text: 'OBSERVAÇÕES: ', fontSize: 6, bold: true },
@@ -207,7 +191,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                 }
               },
               
-              // Coluna Centro: Nome da Filial
               {
                 width: '16%', 
                 stack: [
@@ -222,7 +205,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                 ]
               },
 
-              // Coluna Direita: Bloco de Datas e Números
               {
                 width: '42%',
                 table: {
@@ -255,7 +237,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             margin: [0, 0, 0, 4] 
           },
 
-          // ÁREA DE ASSINATURAS E APROVAÇÕES
           {
             table: {
               widths: ['33.3%', '33.3%', '33.4%'],
@@ -301,7 +282,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             margin: [0, 0, 0, 4] 
           },
 
-          // TABELA PRINCIPAL DE ITENS
           {
             table: {
               widths: colWidths,
