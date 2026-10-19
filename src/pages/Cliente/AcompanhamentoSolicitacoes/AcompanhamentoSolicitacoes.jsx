@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
   Search, ChevronRight, ChevronLeft, GitBranch, FileText,
-  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin
+  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, Filter
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -17,6 +17,9 @@ import BotaoGerarPDF from "../../../components/BotaoGerarPDF/BotaoGerarPDF";
 import ScrollDuplo from "../../../components/ScrollDuplo/ScrollDuplo";
 import { apiFetch, urlDoServidor, enviarArquivos } from '../../../services/api';
 import { io } from 'socket.io-client';
+
+// ✨ NOVO COMPONENTE DE FILTRO IMPORTADO
+import FiltroSolicitacoesModal from "../../../components/FiltroSolicitacoesModal/FiltroSolicitacoesModal";
 
 const renderBadgeStatus = (status) => {
   switch (status) {
@@ -69,36 +72,6 @@ const converterParaInputDateTime = (dataString) => {
   return '';
 };
 
-// ✨ FUNÇÃO AUXILIAR SIMPLIFICADA PARA NÚMEROS
-const obterValorSeguroNumero = (valItem, valEstoque) => {
-  const processarNumero = (valor) => {
-    if (valor === undefined || valor === null || valor === '-' || valor === '') return 0;
-    
-    let limpo = String(valor).replace(/[^\d.,-]/g, '');
-    if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
-    else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
-    
-    const numeroFinal = parseFloat(limpo);
-    return isNaN(numeroFinal) ? 0 : numeroFinal;
-  };
-
-  const num1 = processarNumero(valItem);
-  if (num1 > 0) return num1;
-  
-  const num2 = processarNumero(valEstoque);
-  if (num2 > 0) return num2;
-
-  return 0;
-};
-
-// ✨ FUNÇÃO AUXILIAR SIMPLIFICADA PARA TEXTO
-const obterValorSeguroTexto = (valItem, valEstoque) => {
-  const validar = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== 'null';
-  if (validar(valItem)) return valItem;
-  if (validar(valEstoque)) return valEstoque;
-  return '-';
-};
-
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
@@ -130,6 +103,19 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [anexosNovos, setAnexosNovos] = useState([]);
   const [paginaAtual, setPaginaAtual] = useState(1);
 
+  // ✨ ESTADOS PARA O NOVO FILTRO AVANÇADO
+  const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
+  const [filtrosAvancados, setFiltrosAvancados] = useState({
+    tipo: '',
+    id: '',
+    solicitante: '',
+    wbs: '',
+    pl: '',
+    filial: '',
+    destino: '',
+    statusExibicao: ''
+  });
+
   const itensPorPagina = 10;
 
   let usuarioLogado = {};
@@ -140,7 +126,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   } catch (erro) { }
 
-  const token = localStorage.getItem('@NexusLog:token') || '';
   const isOperador = String(usuarioLogado.cargo || '').toLowerCase().trim().includes('operador');
   const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
 
@@ -152,7 +137,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         setCarregando(true);
         const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
 
-        const urlSolicitacoes = `/solicitacoes/listar?limit=1000&busca=${termoPesquisa}&tipo=${tipoMapeado !== 'Todos' ? tipoMapeado : ''}&filial=${estoqueAtual}`;
+        // Otimização: A API traz tudo, e o React trata dos filtros rápidos e avançados
+        const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual}`;
 
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
@@ -173,11 +159,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
           );
 
-          const estoqueReferencia = resultadoEst.sucesso ? resultadoEst.dados : [];
-
           const dadosFormatados = resultadoSol.dados.map((item) => {
-            let prefixo = "PS";
-            const idNumerico = item.id.replace(/\D/g, "");
             let acaoTipo = "select";
             let acaoValor = item.status;
             let statusDestinoAprovacao = item.tipo === "Entrada" ? "Concluído" : "Em Separação";
@@ -223,38 +205,26 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
-            const itensEnriquecidos = (item.itens || []).map(it => {
-              const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
-                ? estoqueReferencia.find(e => e.id === it.estoque_id)
-                : null;
-                
-              return {
-                ...it,
-                desenho_sap_manual: obterValorSeguroTexto(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
-                part_number_manual: obterValorSeguroTexto(it.part_number_manual || it.part_number, itemFisico?.part_number),
-                descricao_manual: obterValorSeguroTexto(it.descricao_manual || it.descricao, itemFisico?.descricao),
-                fabricante_enriquecido: obterValorSeguroTexto(it.fabricante || it.fabricante_manual, itemFisico?.fabricante),
-                valor_unitario_enriquecido: obterValorSeguroNumero(it.valor_unitario_manual || it.valor_unitario || it.poNetPrice, itemFisico?.valor_unitario),
-                referencia: obterValorSeguroTexto(it.referencia, itemFisico?.referencia),
-                fornecedor: obterValorSeguroTexto(it.fornecedor, itemFisico?.fornecedor),
-                nf_entrada: obterValorSeguroTexto(it.nf_entrada, itemFisico?.nf_entrada),
-                wbs_element: obterValorSeguroTexto(it.wbs_element || it.wbs, itemFisico?.wbs),
-                nome_projeto: obterValorSeguroTexto(it.nome_projeto, itemFisico?.nome_projeto),
-                emissao_nf: obterValorSeguroTexto(it.emissao_nf, itemFisico?.emissao_nf),
-                receb_nf: obterValorSeguroTexto(it.receb_nf, itemFisico?.receb_nf),
-                documento_compras: obterValorSeguroTexto(it.documento_compras, itemFisico?.documento_compras),
-                centro: obterValorSeguroTexto(it.centro, itemFisico?.centro),
-                deposito: obterValorSeguroTexto(it.deposito, itemFisico?.deposito),
-                alocacao: obterValorSeguroTexto(it.alocacao, itemFisico?.alocacao),
-                unidade_medida_manual: obterValorSeguroTexto(it.unidade_medida_manual, itemFisico?.unidade_medida)
-              };
-            });
+            let wbsExibicao = item.wbs || '';
+            if (item.tipo === 'Transferencia WBS' || item.tipo === 'Transfer. WBS') {
+               let origemLimpa = (item.wbs_origem && item.wbs_origem !== 'N/A' && item.wbs_origem !== 'null') ? item.wbs_origem : null;
+               let destinoLimpo = (item.wbs_destino && item.wbs_destino !== 'N/A' && item.wbs_destino !== 'null') ? item.wbs_destino : null;
+
+               if ((!origemLimpa || !destinoLimpo) && item.itens && item.itens.length > 0) {
+                   const primeiroItem = item.itens[0];
+                   if (!origemLimpa) origemLimpa = primeiroItem.wbsOrigem || primeiroItem.wbs_origem || 'Estoque';
+                   if (!destinoLimpo) destinoLimpo = primeiroItem.wbs_element || primeiroItem.wbs || '—';
+               }
+
+               origemLimpa = origemLimpa || 'Estoque';
+               destinoLimpo = destinoLimpo || '—';
+               wbsExibicao = `${origemLimpa} ➔ ${destinoLimpo}`;
+            }
 
             return {
               ...item,
               idOriginal: item.id,
               id: item.ps || item.id,
-              prefixo: prefixo,
               statusExibicao: statusFinalVisual,
               statusDestinoAprovacao: statusDestinoAprovacao,
               acaoTipo: acaoTipo,
@@ -262,10 +232,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataSolicitacao: item.dataSolicitacao || "-",
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
-              nfCrossdocking: item.nfCrossdocking || null,
-              wbs: item.wbs || '—', 
-              destino: item.destino || 'Não informado', // ✨ LÓGICA: Extraímos o destino para usar na nossa caixinha
-              itens: itensEnriquecidos 
+              wbs: wbsExibicao,
+              destino: item.destino || 'Não informado',
+              filial: item.filial_origem_id || item.filial || '-'
             };
           });
 
@@ -286,26 +255,55 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
     socket.on('solicitacoes_atualizadas', () => {
-      console.log('⚡ Status de solicitação alterado! Atualizando tabela...');
       buscarDados();
     });
 
     return () => socket.disconnect();
-  }, [filtroAtivo, termoPesquisa, estoqueAtual, showAlert, perfil]);
+  }, [estoqueAtual, showAlert, perfil]);
 
-  useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa]);
+  useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa, filtrosAvancados]);
 
+  // ✨ FILTRO GLOBAL: Combina Tabs, Pesquisa de Texto e Filtros Avançados
   const dadosFiltrados = dadosTabela.filter((item) => {
+    
+    // 1. Filtro do Cabeçalho Global (Filial)
     if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) {
       return false;
     }
 
+    // 2. Filtro dos KPIs Superiores (Status Rápido)
     if (filtroStatus !== 'Todos') {
       if (filtroStatus === 'Pendente' && item.status !== 'Pendente') return false;
       if (filtroStatus === 'Em Andamento' && (item.status !== 'Em Separação' && item.status !== 'Em Andamento')) return false;
       if (filtroStatus === 'Concluído' && (item.status !== 'Concluído' && item.statusExibicao !== 'Reintegrado')) return false;
       if (filtroStatus === 'Recusado' && item.status !== 'Recusado') return false;
       if (filtroStatus === 'Cancelado' && (item.status !== 'Cancelado' && item.statusExibicao !== 'Cancelado')) return false;
+    }
+
+    // 3. Filtro das Abas Superiores (Tipo Rápido)
+    const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
+    if (filtroAtivo !== "Todos" && item.tipo !== tipoMapeado && item.tipo !== filtroAtivo) return false;
+
+    // ✨ 4. Filtro Avançado (O Novo Modal)
+    if (filtrosAvancados.tipo && filtrosAvancados.tipo.value !== item.tipo) return false;
+    if (filtrosAvancados.id && filtrosAvancados.id.value !== item.id) return false;
+    if (filtrosAvancados.solicitante && filtrosAvancados.solicitante.value !== item.solicitante) return false;
+    if (filtrosAvancados.wbs && filtrosAvancados.wbs.value !== item.wbs) return false;
+    if (filtrosAvancados.pl && filtrosAvancados.pl.value !== item.pl) return false;
+    if (filtrosAvancados.filial && filtrosAvancados.filial.value !== item.filial) return false;
+    if (filtrosAvancados.destino && filtrosAvancados.destino.value !== item.destino) return false;
+    if (filtrosAvancados.statusExibicao && filtrosAvancados.statusExibicao.value !== item.statusExibicao) return false;
+
+    // 5. Pesquisa por Texto (Barra de Pesquisa)
+    if (termoPesquisa) {
+      const termo = termoPesquisa.toLowerCase();
+      const batePesquisa =
+        (item.id && String(item.id).toLowerCase().includes(termo)) ||
+        (item.solicitante && item.solicitante.toLowerCase().includes(termo)) ||
+        (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
+        (item.destino && item.destino.toLowerCase().includes(termo)) ||
+        ((item.pl || item.bs) && String(item.pl || item.bs).toLowerCase().includes(termo));
+      if (!batePesquisa) return false;
     }
 
     return true;
@@ -502,10 +500,33 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               <button key={filtro} className={`btn-aba ${filtroAtivo === filtro ? "ativo" : ""}`} onClick={() => setFiltroAtivo(filtro)}>{filtro}</button>
             ))}
           </div>
-          <div className="pesquisa-wrapper-direita">
-            <Search className="icone-pesquisa-dir" size={18} />
-            <input type="text" placeholder="Buscar por ID, solicitante, WBS..." value={termoPesquisa} onChange={(e) => setTermoPesquisa(e.target.value)} />
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="pesquisa-wrapper-direita">
+              <Search className="icone-pesquisa-dir" size={18} />
+              <input type="text" placeholder="Buscar por ID, solicitante, WBS..." value={termoPesquisa} onChange={(e) => setTermoPesquisa(e.target.value)} />
+            </div>
+
+            {/* ✨ NOVO: BOTÃO PARA ABRIR O MODAL DE FILTROS AVANÇADOS */}
+            <button 
+              onClick={() => setModalFiltroAberto(true)}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '10px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', 
+                backgroundColor: '#ffffff', color: '#334155', fontSize: '0.875rem', 
+                fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s', height: '100%' 
+              }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+            >
+              <Filter size={18} color="#475569" />
+              Filtros
+              {Object.values(filtrosAvancados).some(v => v !== '') && (
+                <span style={{ width: '8px', height: '8px', backgroundColor: '#3b82f6', borderRadius: '50%' }}></span>
+              )}
+            </button>
           </div>
+
         </div>
 
         <ScrollDuplo larguraConteudo="1100px">
@@ -516,7 +537,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <th>TIPO / ID (PS)</th>
                 <th>SOLICITANTE / WBS</th>
                 <th>Nº DA PL</th>
-                {/* ✨ NOVO CABEÇALHO COM A SETA */}
                 <th>DE ➔ PARA</th>
                 <th>DATA CRIAÇÃO</th>
                 <th>DATA ENTREGA</th>
@@ -593,10 +613,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           )}
                         </td>
 
-                        {/* ✨ CÉLULA: DE ➔ PARA COM CAIXINHAS EMPILHADAS */}
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                            {/* Caixa DE (Origem) */}
                             <span style={{ 
                               display: 'inline-block', 
                               backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc', 
@@ -611,7 +629,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               De: {obterNomeFilialDinamico(linha.filial || linha.estoque)}
                             </span>
 
-                            {/* Caixa PARA (Destino) */}
                             <span style={{ 
                               display: 'inline-block', 
                               backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#eff6ff', 
@@ -727,6 +744,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </div>
         </div>
       </div>
+
+      {/* ✨ RENDERIZAÇÃO DO NOVO MODAL DE FILTROS AVANÇADOS */}
+      <FiltroSolicitacoesModal
+        aberto={modalFiltroAberto}
+        onClose={() => setModalFiltroAberto(false)}
+        dadosTabela={dadosTabela}
+        filtros={filtrosAvancados}
+        setFiltros={setFiltrosAvancados}
+        onLimpar={() => setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', pl: '', filial: '', destino: '', statusExibicao: '' })}
+      />
+
     </div>
   );
 }
