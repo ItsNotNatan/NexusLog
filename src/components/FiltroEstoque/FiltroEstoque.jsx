@@ -1,5 +1,5 @@
 // =================================================================
-// ARQUIVO: src/components/FiltroEstoque/FiltroEstoque.jsx (ou na pasta que preferires)
+// ARQUIVO: src/components/FiltroEstoque/FiltroEstoque.jsx
 // =================================================================
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -17,6 +17,8 @@ export default function FiltroEstoque({ estoque, filtros, onFiltroChange, onLimp
   const [modoWbs, setModoWbs] = useState('especifico');
   const [modoNf, setModoNf] = useState('especifico');
   const [modoPedido, setModoPedido] = useState('especifico');
+  // ✨ NOVO: Estado para gerir o modo do filtro de Referência
+  const [modoRef, setModoRef] = useState('especifico');
 
   // Extração automática de opções únicas baseadas nos dados do estoque
   const opcoesFiltro = useMemo(() => {
@@ -26,6 +28,8 @@ export default function FiltroEstoque({ estoque, filtros, onFiltroChange, onLimp
     const pedidos = new Set();
     const fabricantes = new Set();
     const fornecedores = new Set();
+    // ✨ NOVO: Guardar as referências únicas
+    const referencias = new Set();
 
     estoque.forEach(item => {
       if (item.desenho_sap && item.desenho_sap !== '-') saps.add(item.desenho_sap);
@@ -37,6 +41,9 @@ export default function FiltroEstoque({ estoque, filtros, onFiltroChange, onLimp
       if (fab && fab !== '-') fabricantes.add(fab);
       
       if (item.fornecedor && item.fornecedor !== '-') fornecedores.add(item.fornecedor);
+      
+      // ✨ NOVO: Extrai a referência
+      if (item.referencia && item.referencia !== '-') referencias.add(item.referencia);
     });
 
     const formatarOpcoes = (set) => Array.from(set).filter(Boolean).sort().map(item => ({ value: item, label: item }));
@@ -48,6 +55,7 @@ export default function FiltroEstoque({ estoque, filtros, onFiltroChange, onLimp
       pedidos: formatarOpcoes(pedidos),
       fabricantes: formatarOpcoes(fabricantes),
       fornecedores: formatarOpcoes(fornecedores),
+      referencias: formatarOpcoes(referencias), // ✨ Expor as opções para o Select
       statusSaldo: [
         { value: 'TODOS', label: 'Todos os Itens' },
         { value: 'COM_SALDO', label: 'Apenas Itens com Saldo Livre' },
@@ -62,6 +70,8 @@ export default function FiltroEstoque({ estoque, filtros, onFiltroChange, onLimp
     if (campo === 'wbs') { setModoWbs(modo); onFiltroChange({ target: { name: 'wbs', value: '' } }); }
     if (campo === 'nf') { setModoNf(modo); onFiltroChange({ target: { name: 'nf', value: '' } }); }
     if (campo === 'pedido') { setModoPedido(modo); onFiltroChange({ target: { name: 'pedido', value: '' } }); }
+    // ✨ NOVO: Limpa o filtro quando o utilizador muda o modo da Referência
+    if (campo === 'referencia') { setModoRef(modo); onFiltroChange({ target: { name: 'referencia', value: '' } }); }
   };
 
   const handleMultiSelectChange = (name, selectedOptions) => {
@@ -103,6 +113,7 @@ export default function FiltroEstoque({ estoque, filtros, onFiltroChange, onLimp
   const rangeWbs = getRangeValues('wbs', modoWbs);
   const rangeNf = getRangeValues('nf', modoNf);
   const rangePedido = getRangeValues('pedido', modoPedido);
+  const rangeRef = getRangeValues('referencia', modoRef); // ✨ Busca o valor inicial da Referência
 
   const selectStyles = {
     control: (base) => ({ ...base, borderColor: '#d1d5db', boxShadow: 'none', '&:hover': { borderColor: '#9ca3af' }, borderRadius: '0.375rem', padding: '0.1rem' }),
@@ -156,6 +167,26 @@ export default function FiltroEstoque({ estoque, filtros, onFiltroChange, onLimp
                   <div style={{ flex: 1 }}><Select options={opcoesFiltro.saps} value={rangeSap.currentDe} onChange={(opt) => handleRangeChange('sap', 'de', opt)} placeholder="De" styles={selectStyles} isClearable /></div>
                   <span style={{ color: '#94a3b8' }}>até</span>
                   <div style={{ flex: 1 }}><Select options={opcoesFiltro.saps} value={rangeSap.currentAte} onChange={(opt) => handleRangeChange('sap', 'ate', opt)} placeholder="Até" styles={selectStyles} isClearable /></div>
+                </div>
+              )}
+            </div>
+
+            {/* ✨ NOVO BLOCO: REFERÊNCIA / PART NUMBER */}
+            <div className="filtro-card" style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <label style={{ fontWeight: '600', color: '#334155' }}>Referência / Part Number</label>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button onClick={() => alternarModo('referencia', 'especifico')} style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', background: modoRef === 'especifico' ? '#2563eb' : '#e2e8f0', color: modoRef === 'especifico' ? 'white' : '#64748b', cursor: 'pointer' }}>Tags</button>
+                  <button onClick={() => alternarModo('referencia', 'lote')} style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', background: modoRef === 'lote' ? '#2563eb' : '#e2e8f0', color: modoRef === 'lote' ? 'white' : '#64748b', cursor: 'pointer' }}>Intervalo</button>
+                </div>
+              </div>
+              {modoRef === 'especifico' ? (
+                <Select isMulti options={opcoesFiltro.referencias} value={getMultiValue(filtros.referencia)} onChange={(opts) => handleMultiSelectChange('referencia', opts)} placeholder="Selecionar Referência..." styles={selectStyles} />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ flex: 1 }}><Select options={opcoesFiltro.referencias} value={rangeRef.currentDe} onChange={(opt) => handleRangeChange('referencia', 'de', opt)} placeholder="De" styles={selectStyles} isClearable /></div>
+                  <span style={{ color: '#94a3b8' }}>até</span>
+                  <div style={{ flex: 1 }}><Select options={opcoesFiltro.referencias} value={rangeRef.currentAte} onChange={(opt) => handleRangeChange('referencia', 'ate', opt)} placeholder="Até" styles={selectStyles} isClearable /></div>
                 </div>
               )}
             </div>
