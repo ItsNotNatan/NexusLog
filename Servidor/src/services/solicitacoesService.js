@@ -1,22 +1,15 @@
 // =================================================================
 // ARQUIVO: src/services/solicitacoesService.js
-// DESCRICAO: Lógica de negócio (Cura Universal para TODAS as edições e Baixas)
+// DESCRICAO: Lógica de negócio (Fuso Horário Brasil UTC-3 + Curas Universais)
 // =================================================================
 const db = require('../db');
 
-// ✨ CONFIGURAÇÃO DE LIMITE: Atualizado para os 2000 caracteres configurados na BD
 const LIMITE_CARACTERES = 2000;
 
-// ✨ FUNÇÃO DE PROTEÇÃO COM INDICADOR DE ALERTA
 const limitarTexto = (texto) => {
   if (!texto) return '-';
   const str = String(texto).trim();
-  
-  if (str.length <= LIMITE_CARACTERES) {
-    return str;
-  }
-  
-  // Corta o texto reservando espaço para o alerta visual
+  if (str.length <= LIMITE_CARACTERES) return str;
   const textoCortado = str.substring(0, LIMITE_CARACTERES - 25);
   return `${textoCortado}... [LIMITE ATINGIDO]`;
 };
@@ -28,7 +21,20 @@ const limparIdEstoque = (id) => {
   return idString;
 };
 
-// Campos de data das solicitacoes que voltam para o front como ISO (ou null).
+// ✨ NOVO: Função Global para forçar o horário do Brasil (UTC-3)
+const formatarDataBrasil = (isoString) => {
+  if (!isoString) return null;
+  try {
+    return new Date(isoString).toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    }).replace(',', ' às');
+  } catch (e) {
+    return isoString;
+  }
+};
+
 const solicitacaoParaFront = (r) => ({
   ...r,
   data_necessidade: db.dt(r.data_necessidade),
@@ -39,10 +45,8 @@ const solicitacaoParaFront = (r) => ({
   updated_at: db.dt(r.updated_at),
 });
 
-// Gera um PS unico. O indice unico do banco e' a garantia final; se dois
-// pedidos sortearem o mesmo numero no mesmo segundo, tentamos de novo.
 const gerarPS = () => {
-  const dataAtual = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const dataAtual = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }).substring(0, 10).replace(/\//g, '');
   const numeroAleatorio = Math.floor(1000 + Math.random() * 9000);
   return `PS-${dataAtual}-${numeroAleatorio}`;
 };
@@ -57,8 +61,6 @@ const salvarNoBanco = async (dadosPrincipais, itensArray, anexosArray = [], nume
 
   for (let tentativa = 0; tentativa < 5 && !solicitacaoCriada; tentativa++) {
     psGerado = gerarPS();
-    console.log(`💾 Iniciando gravacao da solicitacao: ${psGerado}`);
-
     try {
       solicitacaoCriada = await db.criar('solicitacoes', {
         ps: psGerado,
@@ -75,10 +77,8 @@ const salvarNoBanco = async (dadosPrincipais, itensArray, anexosArray = [], nume
         status: dadosPrincipais.status || 'Pendente',
       });
     } catch (erro) {
-      // 400 aqui costuma ser o indice unico do PS; qualquer outro erro sobe.
       const ehPsRepetido = erro && erro.status === 400 && tentativa < 4;
       if (!ehPsRepetido) throw erro;
-      console.warn(`⚠️  PS ${psGerado} ja existia, sorteando outro...`);
     }
   }
 
@@ -203,29 +203,14 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
       pl: plFinal,
       filial: sol.filial_origem_id || '-',
       destino: sol.destino || 'Não informado',
-      dataSolicitacao:
-        new Date(sol.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-        ' ' +
-        new Date(sol.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      // ✨ IMPLEMENTAÇÃO PRIORIDADE 01: Horário Formatado no Brasil!
+      dataSolicitacao: formatarDataBrasil(sol.created_at) || "-",
       dataCriacaoISO: sol.created_at,
       dataAprovacaoPL: dataAprovacaoValida,
       prazoFinalizacao: sol.prazo_finalizacao_pl,
-      criacaoPl: dataAprovacaoValida
-        ? new Date(dataAprovacaoValida).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-          ' ' +
-          new Date(dataAprovacaoValida).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        : null,
+      criacaoPl: formatarDataBrasil(dataAprovacaoValida),
       dataFinalizacaoISO: sol.status === 'Concluído' && sol.updated_at ? sol.updated_at : null,
-
-      dataEntrega: sol.data_entrega
-        ? new Date(sol.data_entrega)
-            .toLocaleString('pt-BR', {
-              timeZone: 'America/Sao_Paulo',
-              day: '2-digit', month: '2-digit', year: 'numeric',
-              hour: '2-digit', minute: '2-digit',
-            })
-            .replace(',', ' às')
-        : sol.status === 'Concluído' ? 'Disponível' : null,
+      dataEntrega: sol.data_entrega ? formatarDataBrasil(sol.data_entrega) : sol.status === 'Concluído' ? 'Disponível' : null,
 
       status: sol.status,
       observacoes: db.txt(sol.observacoes),
@@ -237,8 +222,6 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
 
   return { dados: dadosFormatados, total: resultado.totalItems || 0 };
 };
-
-// ===================== CRIACAO POR TIPO DE PEDIDO =====================
 
 const criarMaterial = async (solicitante, itens, anexos) => {
   const dados = {
@@ -434,8 +417,6 @@ const cancelarPL = async (solicitante, anexos) => {
   return salvarNoBanco(dados, itensDB, anexos);
 };
 
-// ===================== APROVACAO / MUDANCA DE STATUS =====================
-
 const criarPackingList = async (solicitacaoId, status) =>
   db.emFila(async () => {
     const jaExiste = await db.um(
@@ -617,9 +598,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // ---------- 1. SAIDAS: baixa no estoque ----------
     if (tiposDeSaida.includes(solicitacao.tipo)) {
-      
       const itensPedidos = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
       });
@@ -631,9 +610,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           estoqueAtual = await db.porId('estoque', item.estoque_id);
         }
 
-        // ✨ CURA UNIVERSAL PARA TODAS AS SAÍDAS: Reconecta a prateleira se o ID se perder após uma edição no frontend
         if (!estoqueAtual) {
-          console.log(`[CURA UNIVERSAL] Restaurando ligação de estoque perdida para o item: ${item.desenho_sap_manual}`);
           const sapItem = String(item.desenho_sap_manual || '').trim().toUpperCase();
           const pnItem = String(item.part_number_manual || '').trim().toUpperCase();
 
@@ -652,10 +629,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           }
         }
 
-        if (!estoqueAtual) {
-          console.warn(`[FALHA NA BAIXA] Prateleira não encontrada para o item SAP: ${item.desenho_sap_manual}`);
-          continue;
-        }
+        if (!estoqueAtual) continue;
 
         const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
         const quantidadeRetirada = Number(item.quantidade_solicitada || 0); 
@@ -698,7 +672,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // ---------- 2. ENTRADAS: cria estoque e alimenta o crossdocking ----------
     else if (solicitacao.tipo === 'Entrada') {
       const itensEntrada = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
@@ -824,7 +797,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // ---------- 3. DEVOLUCOES: reintegracao e cancelamento ----------
     else if (
       solicitacao.tipo === 'Reintegracao' ||
       solicitacao.tipo === 'Reintegração' ||
@@ -1032,7 +1004,8 @@ const buscarHistoricoItem = async (estoqueId) => {
     const sol = porId[item.solicitacao_id];
     return {
       quantidade: item.quantidade_solicitada,
-      dataSaida: new Date(db.dt(item.created_at)).toLocaleDateString('pt-BR'),
+      // ✨ FORMATADO PARA FUSO HORÁRIO BRASILEIRO
+      dataSaida: formatarDataBrasil(sol?.created_at),
       solicitacao: sol?.id,
       solicitante: sol?.nome_solicitante,
       status: sol?.status,
@@ -1105,7 +1078,9 @@ const listarDemandasPorEstoque = async (estoqueId) => {
     }));
 
   const edicoesCruas = await db.listar('historico_edicoes', { filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }) });
-  const edicoes = edicoesCruas.map((e) => ({ ...e, created_at: db.dt(e.created_at) }));
+  
+  // ✨ FORMATADO PARA FUSO HORÁRIO BRASILEIRO
+  const edicoes = edicoesCruas.map((e) => ({ ...e, created_at: formatarDataBrasil(e.created_at) }));
 
   return { demandas, edicoes };
 };
