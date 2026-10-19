@@ -21,7 +21,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
 
   const formatarDataSimples = (data) => {
     if (!data) return '';
-    if (data.includes('/')) return data; // Se já vier formatado do backend, respeita
+    if (data.includes('/')) return data; 
     try {
       return new Date(data).toLocaleString('pt-BR', { 
           timeZone: 'America/Sao_Paulo',
@@ -106,19 +106,22 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       
       if (linha.itens && linha.itens.length > 0) {
         linha.itens.forEach((it, index) => {
+          // ✨ EXTRAÇÃO INTELIGENTE DA NF: Procura no item e, se não encontrar, procura na linha geral da solicitação
+          const notaFiscalFinal = it.nf_entrada || it.nfEntrada || it.nf || linha.nfCrossdocking || linha.nf_entrada || '-';
+
           bodyRows.push([
             { text: (index + 1).toString(), fontSize: 7, alignment: 'center', margin: [0, 3] },
-            { text: it.desenho_sap_manual || '-', fontSize: 7, margin: [0, 3] },
+            { text: it.desenho_sap_manual || it.desenho_sap || '-', fontSize: 7, margin: [0, 3] },
             { text: it.referencia || '-', fontSize: 7, bold: true, margin: [0, 3] },
-            { text: it.quantidade_solicitada || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
-            { text: it.unidade_medida_manual || 'Un', fontSize: 7, alignment: 'center', margin: [0, 3] },
-            { text: it.descricao_manual || '-', fontSize: 7, margin: [0, 3] },
+            { text: it.quantidade_solicitada || it.qtd || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
+            { text: it.unidade_medida_manual || it.unidade_medida || 'Un', fontSize: 7, alignment: 'center', margin: [0, 3] },
+            { text: it.descricao_manual || it.descricao || '-', fontSize: 7, margin: [0, 3] },
             { text: it.fornecedor || '-', fontSize: 7, margin: [0, 3] },
             { text: (it.alocacao || '').startsWith('CROSSDOCKING') ? 'CROSSDOCKING' : (it.alocacao || '-'), fontSize: 7, alignment: 'center', margin: [0, 3] },
-            // ✨ CORREÇÃO APLICADA: Verifica todas as chaves possíveis para a Nota Fiscal
-            { text: it.nf_entrada || it.nfEntrada || it.nf || linha.nfCrossdocking || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
+            // Inserção da Nota Fiscal com fallback garantido
+            { text: notaFiscalFinal, fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: formatarMoedaPdf(it.valor_unitario_enriquecido ?? it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice), fontSize: 7, alignment: 'center', margin: [0, 3] },
-            { text: it.wbs_element || '-', fontSize: 7, alignment: 'center', margin: [0, 3] }
+            { text: it.wbs_element || it.wbs || '-', fontSize: 7, alignment: 'center', margin: [0, 3] }
           ]);
         });
       }
