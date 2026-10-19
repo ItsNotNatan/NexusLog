@@ -131,6 +131,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [paginaAtual, setPaginaAtual] = useState(1);
 
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
+  
+  // ✨ ESTADOS PARA TODOS OS CAMPOS DO MODAL
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     tipo: '',
     id: '',
@@ -139,6 +141,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     pl: '',
     filial: '',
     destino: '',
+    dataCriacao: '',
+    dataEntrega: '',
     statusExibicao: ''
   });
 
@@ -286,10 +290,37 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa, filtrosAvancados]);
 
-  const dadosFiltrados = dadosTabela.filter((item) => {
-    if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) {
-      return false;
+  // ✨ FUNÇÃO INTELIGENTE DE FILTRAGEM: Separa as vírgulas e suporta o " - " para o Intervalo
+  const verificaFiltroAvancado = (valorItem, valorFiltro) => {
+    if (!valorFiltro) return true; // Se o utilizador não escreveu nada no filtro, passa logo
+    
+    if (valorFiltro.includes(' - ')) {
+      const [de, ate] = valorFiltro.split(' - ');
+      const val = String(valorItem).toUpperCase();
+      const limiteInf = de ? String(de).toUpperCase() : null;
+      const limiteSup = ate ? String(ate).toUpperCase() : null;
+
+      if (limiteInf && limiteSup) return val >= limiteInf && val <= limiteSup;
+      if (limiteInf) return val >= limiteInf;
+      if (limiteSup) return val <= limiteSup;
     }
+    
+    const tagsArray = valorFiltro.split(',');
+    return tagsArray.includes(String(valorItem));
+  };
+
+  const handleFiltroChange = (e) => {
+    const { name, value } = e.target;
+    setFiltrosAvancados(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleLimparFiltros = () => {
+    setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', pl: '', filial: '', destino: '', dataCriacao: '', dataEntrega: '', statusExibicao: '' });
+  };
+
+  const dadosFiltrados = dadosTabela.filter((item) => {
+    
+    if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) return false;
 
     if (filtroStatus !== 'Todos') {
       if (filtroStatus === 'Pendente' && item.status !== 'Pendente') return false;
@@ -302,14 +333,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
     if (filtroAtivo !== "Todos" && item.tipo !== tipoMapeado && item.tipo !== filtroAtivo) return false;
 
-    if (filtrosAvancados.tipo && filtrosAvancados.tipo.value !== item.tipo) return false;
-    if (filtrosAvancados.id && filtrosAvancados.id.value !== item.id) return false;
-    if (filtrosAvancados.solicitante && filtrosAvancados.solicitante.value !== item.solicitante) return false;
-    if (filtrosAvancados.wbs && filtrosAvancados.wbs.value !== item.wbs) return false;
-    if (filtrosAvancados.pl && filtrosAvancados.pl.value !== item.pl) return false;
-    if (filtrosAvancados.filial && filtrosAvancados.filial.value !== item.filial) return false;
-    if (filtrosAvancados.destino && filtrosAvancados.destino.value !== item.destino) return false;
-    if (filtrosAvancados.statusExibicao && filtrosAvancados.statusExibicao.value !== item.statusExibicao) return false;
+    // ✨ APLICA O MOTOR INTELIGENTE A TODOS OS CAMPOS DO MODAL
+    if (!verificaFiltroAvancado(item.tipo, filtrosAvancados.tipo)) return false;
+    if (!verificaFiltroAvancado(item.id, filtrosAvancados.id)) return false;
+    if (!verificaFiltroAvancado(item.solicitante, filtrosAvancados.solicitante)) return false;
+    if (!verificaFiltroAvancado(item.wbs, filtrosAvancados.wbs)) return false;
+    if (!verificaFiltroAvancado(item.pl, filtrosAvancados.pl)) return false;
+    if (!verificaFiltroAvancado(item.filial, filtrosAvancados.filial)) return false;
+    if (!verificaFiltroAvancado(item.destino, filtrosAvancados.destino)) return false;
+    if (!verificaFiltroAvancado(item.dataSolicitacao, filtrosAvancados.dataCriacao)) return false;
+    if (!verificaFiltroAvancado(item.dataEntrega, filtrosAvancados.dataEntrega)) return false;
+    if (!verificaFiltroAvancado(item.statusExibicao, filtrosAvancados.statusExibicao)) return false;
 
     if (termoPesquisa) {
       const termo = termoPesquisa.toLowerCase();
@@ -518,7 +552,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             ))}
           </div>
           
-          {/* ✨ CORREÇÃO DE ALINHAMENTO DO BOTÃO FILTROS AVANÇADOS */}
           <div style={{ display: 'flex', alignItems: 'stretch', gap: '12px', height: '42px' }}>
             <div className="pesquisa-wrapper-direita" style={{ height: '100%', width: '350px' }}>
               <Search className="icone-pesquisa-dir" size={18} />
@@ -768,13 +801,14 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         </div>
       </div>
 
+      {/* RENDERIZAÇÃO DO NOSSO NOVO MODAL DE FILTROS AVANÇADOS */}
       <FiltroSolicitacoesModal
         aberto={modalFiltroAberto}
         onClose={() => setModalFiltroAberto(false)}
         dadosTabela={dadosTabela}
         filtros={filtrosAvancados}
-        setFiltros={setFiltrosAvancados}
-        onLimpar={() => setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', pl: '', filial: '', destino: '', statusExibicao: '' })}
+        onFiltroChange={handleFiltroChange}
+        onLimpar={handleLimparFiltros}
       />
 
     </div>
