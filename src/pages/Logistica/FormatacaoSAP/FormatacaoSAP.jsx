@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Interface interativa com paginação DUPLA (Seletor Lateral e Tabela SAP)
+// DESCRIÇÃO: Formatação SAP filtrando exclusivamente Material e Crossdocking
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
@@ -20,13 +20,13 @@ export default function FormatacaoSAP() {
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
   const [copiadoSucesso, setCopiadoSucesso] = useState(false);
 
-  // ✨ PAGINAÇÃO DA DIREITA (Tabela de Itens para SAP)
+  // Paginação da tabela direita
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 15;
 
-  // ✨ NOVO: PAGINAÇÃO DA ESQUERDA (Seletor Lateral de PLs)
+  // Paginação do seletor lateral esquerdo
   const [paginaEsquerda, setPaginaEsquerda] = useState(1);
-  const plsPorPagina = 8; // Número de PLs exibidas no painel lateral por página
+  const plsPorPagina = 8;
 
   const opcoesCategoria = [
     'Preencher .', 
@@ -90,16 +90,15 @@ export default function FormatacaoSAP() {
         }
         
         if (resultadoSol && resultadoSol.sucesso && resultadoSol.dados) {
-          const transferencias = resultadoSol.dados.filter(
+          // ✨ ALTERAÇÃO: Filtra apenas 'Material' e 'Crossdocking'
+          const solicitacoesFiltradas = resultadoSol.dados.filter(
             s => (
               s.tipo === 'Material' || 
-              s.tipo === 'Transferencia WBS' || 
-              s.tipo === 'Transfer. WBS' || 
               s.tipo === 'Crossdocking'
             ) && (s.pl && s.pl !== '-' && s.pl !== '—')
           );
 
-          const solicitacoesEnriquecidas = transferencias.map(sol => {
+          const solicitacoesEnriquecidas = solicitacoesFiltradas.map(sol => {
             const itensEnriquecidos = (sol.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
@@ -147,12 +146,10 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais({});
   };
 
-  // Resetar a página da direita para 1 sempre que a seleção de PLs mudar
   useEffect(() => {
     setPaginaAtual(1);
   }, [selecionados]);
 
-  // ✨ Resetar a página da esquerda para 1 sempre que a busca mudar
   useEffect(() => {
     setPaginaEsquerda(1);
   }, [busca]);
@@ -164,7 +161,6 @@ export default function FormatacaoSAP() {
            sol.wbs?.toLowerCase().includes(termo);
   });
 
-  // ✨ LÓGICA DE PAGINAÇÃO DA ESQUERDA (PLs)
   const totalPaginasEsquerda = Math.max(1, Math.ceil(listaFiltrada.length / plsPorPagina));
   const indexPrimeiroPl = (paginaEsquerda - 1) * plsPorPagina;
   const plsPaginadas = listaFiltrada.slice(indexPrimeiroPl, indexPrimeiroPl + plsPorPagina);
@@ -184,7 +180,6 @@ export default function FormatacaoSAP() {
       }));
     });
 
-  // LÓGICA DE PAGINAÇÃO DA DIREITA (Tabela de Itens)
   const totalPaginas = Math.max(1, Math.ceil(itensConsolidados.length / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
   const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, itensConsolidados.length);
@@ -266,9 +261,7 @@ export default function FormatacaoSAP() {
 
       <div className="form-sap-grid">
         
-        {/* =========================================================
-            PAINEL LATERAL ESQUERDO (COM PAGINAÇÃO INTEGRADA)
-            ========================================================= */}
+        {/* PAINEL LATERAL ESQUERDO */}
         <div className="form-sap-coluna-esq" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="sap-pesquisa-caixa">
             <div className="sap-input-wrapper">
@@ -295,9 +288,8 @@ export default function FormatacaoSAP() {
             {carregando ? (
               <div className="sap-estado-vazio">A carregar Packing Lists...</div>
             ) : listaFiltrada.length === 0 ? (
-              <div className="sap-estado-vazio">Nenhuma PL concluída encontrada.</div>
+              <div className="sap-estado-vazio">Nenhuma PL de Material ou Crossdocking concluída encontrada.</div>
             ) : (
-              /* ✨ EXIBE APENAS AS PLs DA PÁGINA ATUAL DA ESQUERDA */
               plsPaginadas.map(sol => {
                 const isSelected = selecionados.includes(sol.id);
                 const dataFormatada = sol.criacaoPl && sol.criacaoPl !== '—' ? sol.criacaoPl.split(' ')[0] : 'N/D';
@@ -327,7 +319,6 @@ export default function FormatacaoSAP() {
             )}
           </div>
 
-          {/* ✨ NOVO: CONTROLES DE PAGINAÇÃO DA ESQUERDA */}
           {!carregando && totalPaginasEsquerda > 1 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
               <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -353,9 +344,7 @@ export default function FormatacaoSAP() {
           )}
         </div>
 
-        {/* =========================================================
-            PAINEL DIREITO (PREVIEW DA TABELA PARA O SAP)
-            ========================================================= */}
+        {/* PAINEL DIREITO */}
         <div className="form-sap-coluna-dir">
           {selecionados.length === 0 ? (
             <div className="sap-preview-vazio">
@@ -454,7 +443,6 @@ export default function FormatacaoSAP() {
                 </table>
               </div>
 
-              {/* BARRA DE PAGINAÇÃO DA DIREITA (Tabela de Itens) */}
               {totalPaginas > 1 && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
