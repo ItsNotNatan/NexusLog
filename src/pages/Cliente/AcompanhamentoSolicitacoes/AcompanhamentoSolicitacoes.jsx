@@ -231,23 +231,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
-            let wbsExibicao = item.wbs || '';
-            if (item.tipo === 'Transferencia WBS' || item.tipo === 'Transfer. WBS') {
-               let origemLimpa = (item.wbs_origem && item.wbs_origem !== 'N/A' && item.wbs_origem !== 'null') ? item.wbs_origem : null;
-               let destinoLimpo = (item.wbs_destino && item.wbs_destino !== 'N/A' && item.wbs_destino !== 'null') ? item.wbs_destino : null;
+            // ✨ CORREÇÃO: Retirámos o recálculo maluco do WBS. 
+            // Agora confiamos a 100% no que o backend enviou perfeitamente formatado!
 
-               if ((!origemLimpa || !destinoLimpo) && item.itens && item.itens.length > 0) {
-                   const primeiroItem = item.itens[0];
-                   if (!origemLimpa) origemLimpa = primeiroItem.wbsOrigem || primeiroItem.wbs_origem || 'Estoque';
-                   if (!destinoLimpo) destinoLimpo = primeiroItem.wbs_element || primeiroItem.wbs || '—';
-               }
-
-               origemLimpa = origemLimpa || 'Estoque';
-               destinoLimpo = destinoLimpo || '—';
-               wbsExibicao = `${origemLimpa} ➔ ${destinoLimpo}`;
-            }
-
-            // ✨ A RESTAURAÇÃO: Este é o bloco que cruza os itens do pedido com as prateleiras do estoque
             const itensEnriquecidos = (item.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
@@ -277,7 +263,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
             return {
               ...item,
-              idOriginal: item.id,
+              idOriginal: item.idOriginal || item.id,
               id: item.ps || item.id,
               statusExibicao: statusFinalVisual,
               statusDestinoAprovacao: statusDestinoAprovacao,
@@ -286,10 +272,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataSolicitacao: item.dataSolicitacao || "-",
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
-              wbs: wbsExibicao,
+              wbs: item.wbs || '—', // ✨ AQUI: Usamos diretamente o que o servidor enviou
               destino: item.destino || 'Não informado',
               filial: item.filial_origem_id || item.filial || '-',
-              itens: itensEnriquecidos // ✨ AQUI PASSAMOS OS ITENS COM TODA A INFORMAÇÃO COMPLETA
+              itens: itensEnriquecidos
             };
           });
 
@@ -820,7 +806,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         </div>
       </div>
 
-      {/* RENDERIZAÇÃO DO NOSSO NOVO MODAL DE FILTROS AVANÇADOS */}
       <FiltroSolicitacoesModal
         aberto={modalFiltroAberto}
         onClose={() => setModalFiltroAberto(false)}
