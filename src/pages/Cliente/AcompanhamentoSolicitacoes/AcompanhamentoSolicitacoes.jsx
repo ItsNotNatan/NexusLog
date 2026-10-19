@@ -18,7 +18,6 @@ import ScrollDuplo from "../../../components/ScrollDuplo/ScrollDuplo";
 import { apiFetch, urlDoServidor, enviarArquivos } from '../../../services/api';
 import { io } from 'socket.io-client';
 
-// ✨ NOVO COMPONENTE DE FILTRO IMPORTADO
 import FiltroSolicitacoesModal from "../../../components/FiltroSolicitacoesModal/FiltroSolicitacoesModal";
 
 const renderBadgeStatus = (status) => {
@@ -72,6 +71,34 @@ const converterParaInputDateTime = (dataString) => {
   return '';
 };
 
+const obterValorSeguroNumero = (valItem, valEstoque) => {
+  const processarNumero = (valor) => {
+    if (valor === undefined || valor === null || valor === '-' || valor === '') return 0;
+    
+    let limpo = String(valor).replace(/[^\d.,-]/g, '');
+    if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
+    else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
+    
+    const numeroFinal = parseFloat(limpo);
+    return isNaN(numeroFinal) ? 0 : numeroFinal;
+  };
+
+  const num1 = processarNumero(valItem);
+  if (num1 > 0) return num1;
+  
+  const num2 = processarNumero(valEstoque);
+  if (num2 > 0) return num2;
+
+  return 0;
+};
+
+const obterValorSeguroTexto = (valItem, valEstoque) => {
+  const validar = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== 'null';
+  if (validar(valItem)) return valItem;
+  if (validar(valEstoque)) return valEstoque;
+  return '-';
+};
+
 export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
@@ -103,7 +130,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [anexosNovos, setAnexosNovos] = useState([]);
   const [paginaAtual, setPaginaAtual] = useState(1);
 
-  // ✨ ESTADOS PARA O NOVO FILTRO AVANÇADO
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     tipo: '',
@@ -135,9 +161,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const buscarDados = async () => {
       try {
         setCarregando(true);
-        const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
-
-        // Otimização: A API traz tudo, e o React trata dos filtros rápidos e avançados
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual}`;
 
         const [resultadoSol, resultadoEst] = await Promise.all([
@@ -263,15 +286,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa, filtrosAvancados]);
 
-  // ✨ FILTRO GLOBAL: Combina Tabs, Pesquisa de Texto e Filtros Avançados
   const dadosFiltrados = dadosTabela.filter((item) => {
-    
-    // 1. Filtro do Cabeçalho Global (Filial)
     if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) {
       return false;
     }
 
-    // 2. Filtro dos KPIs Superiores (Status Rápido)
     if (filtroStatus !== 'Todos') {
       if (filtroStatus === 'Pendente' && item.status !== 'Pendente') return false;
       if (filtroStatus === 'Em Andamento' && (item.status !== 'Em Separação' && item.status !== 'Em Andamento')) return false;
@@ -280,11 +299,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (filtroStatus === 'Cancelado' && (item.status !== 'Cancelado' && item.statusExibicao !== 'Cancelado')) return false;
     }
 
-    // 3. Filtro das Abas Superiores (Tipo Rápido)
     const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
     if (filtroAtivo !== "Todos" && item.tipo !== tipoMapeado && item.tipo !== filtroAtivo) return false;
 
-    // ✨ 4. Filtro Avançado (O Novo Modal)
     if (filtrosAvancados.tipo && filtrosAvancados.tipo.value !== item.tipo) return false;
     if (filtrosAvancados.id && filtrosAvancados.id.value !== item.id) return false;
     if (filtrosAvancados.solicitante && filtrosAvancados.solicitante.value !== item.solicitante) return false;
@@ -294,7 +311,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (filtrosAvancados.destino && filtrosAvancados.destino.value !== item.destino) return false;
     if (filtrosAvancados.statusExibicao && filtrosAvancados.statusExibicao.value !== item.statusExibicao) return false;
 
-    // 5. Pesquisa por Texto (Barra de Pesquisa)
     if (termoPesquisa) {
       const termo = termoPesquisa.toLowerCase();
       const batePesquisa =
@@ -494,6 +510,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       </div>
 
       <div className="tabela-cartao-container">
+        
         <div className="tabela-controlos-topo">
           <div className="filtros-botoes">
             {listaFiltros.map((filtro) => (
@@ -501,20 +518,27 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             ))}
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="pesquisa-wrapper-direita">
+          {/* ✨ CORREÇÃO DE ALINHAMENTO DO BOTÃO FILTROS AVANÇADOS */}
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: '12px', height: '42px' }}>
+            <div className="pesquisa-wrapper-direita" style={{ height: '100%', width: '350px' }}>
               <Search className="icone-pesquisa-dir" size={18} />
-              <input type="text" placeholder="Buscar por ID, solicitante, WBS..." value={termoPesquisa} onChange={(e) => setTermoPesquisa(e.target.value)} />
+              <input 
+                type="text" 
+                placeholder="Buscar por ID, solicitante, WBS..." 
+                value={termoPesquisa} 
+                onChange={(e) => setTermoPesquisa(e.target.value)} 
+                style={{ height: '100%', boxSizing: 'border-box', margin: 0 }} 
+              />
             </div>
 
-            {/* ✨ NOVO: BOTÃO PARA ABRIR O MODAL DE FILTROS AVANÇADOS */}
             <button 
               onClick={() => setModalFiltroAberto(true)}
               style={{ 
                 display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '10px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', 
+                padding: '0 16px', borderRadius: '8px', border: '1px solid #cbd5e1', 
                 backgroundColor: '#ffffff', color: '#334155', fontSize: '0.875rem', 
-                fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s', height: '100%' 
+                fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s',
+                height: '100%', boxSizing: 'border-box'
               }}
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
@@ -526,7 +550,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               )}
             </button>
           </div>
-
         </div>
 
         <ScrollDuplo larguraConteudo="1100px">
@@ -745,7 +768,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         </div>
       </div>
 
-      {/* ✨ RENDERIZAÇÃO DO NOVO MODAL DE FILTROS AVANÇADOS */}
       <FiltroSolicitacoesModal
         aberto={modalFiltroAberto}
         onClose={() => setModalFiltroAberto(false)}
