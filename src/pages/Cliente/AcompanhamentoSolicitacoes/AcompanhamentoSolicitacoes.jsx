@@ -132,7 +132,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   
-  // ✨ ESTADOS PARA TODOS OS CAMPOS DO MODAL
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     tipo: '',
     id: '',
@@ -141,8 +140,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     pl: '',
     filial: '',
     destino: '',
-    dataCriacao: '',
-    dataEntrega: '',
     statusExibicao: ''
   });
 
@@ -185,6 +182,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           const cancelamentosAtivos = resultadoSol.dados.filter(sol =>
             sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
           );
+
+          const estoqueReferencia = resultadoEst.sucesso ? resultadoEst.dados : [];
 
           const dadosFormatados = resultadoSol.dados.map((item) => {
             let acaoTipo = "select";
@@ -248,6 +247,34 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                wbsExibicao = `${origemLimpa} ➔ ${destinoLimpo}`;
             }
 
+            // ✨ A RESTAURAÇÃO: Este é o bloco que cruza os itens do pedido com as prateleiras do estoque
+            const itensEnriquecidos = (item.itens || []).map(it => {
+              const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
+                ? estoqueReferencia.find(e => e.id === it.estoque_id)
+                : null;
+                
+              return {
+                ...it,
+                desenho_sap_manual: obterValorSeguroTexto(it.desenho_sap_manual || it.desenho_sap, itemFisico?.desenho_sap),
+                part_number_manual: obterValorSeguroTexto(it.part_number_manual || it.part_number, itemFisico?.part_number),
+                descricao_manual: obterValorSeguroTexto(it.descricao_manual || it.descricao, itemFisico?.descricao),
+                fabricante_enriquecido: obterValorSeguroTexto(it.fabricante || it.fabricante_manual, itemFisico?.fabricante),
+                valor_unitario_enriquecido: obterValorSeguroNumero(it.valor_unitario_manual || it.valor_unitario || it.poNetPrice, itemFisico?.valor_unitario),
+                referencia: obterValorSeguroTexto(it.referencia, itemFisico?.referencia),
+                fornecedor: obterValorSeguroTexto(it.fornecedor, itemFisico?.fornecedor),
+                nf_entrada: obterValorSeguroTexto(it.nf_entrada, itemFisico?.nf_entrada),
+                wbs_element: obterValorSeguroTexto(it.wbs_element || it.wbs, itemFisico?.wbs),
+                nome_projeto: obterValorSeguroTexto(it.nome_projeto, itemFisico?.nome_projeto),
+                emissao_nf: obterValorSeguroTexto(it.emissao_nf, itemFisico?.emissao_nf),
+                receb_nf: obterValorSeguroTexto(it.receb_nf, itemFisico?.receb_nf),
+                documento_compras: obterValorSeguroTexto(it.documento_compras, itemFisico?.documento_compras),
+                centro: obterValorSeguroTexto(it.centro, itemFisico?.centro),
+                deposito: obterValorSeguroTexto(it.deposito, itemFisico?.deposito),
+                alocacao: obterValorSeguroTexto(it.alocacao, itemFisico?.alocacao),
+                unidade_medida_manual: obterValorSeguroTexto(it.unidade_medida_manual, itemFisico?.unidade_medida)
+              };
+            });
+
             return {
               ...item,
               idOriginal: item.id,
@@ -261,7 +288,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               pl: numeroPL,
               wbs: wbsExibicao,
               destino: item.destino || 'Não informado',
-              filial: item.filial_origem_id || item.filial || '-'
+              filial: item.filial_origem_id || item.filial || '-',
+              itens: itensEnriquecidos // ✨ AQUI PASSAMOS OS ITENS COM TODA A INFORMAÇÃO COMPLETA
             };
           });
 
@@ -290,9 +318,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa, filtrosAvancados]);
 
-  // ✨ FUNÇÃO INTELIGENTE DE FILTRAGEM: Separa as vírgulas e suporta o " - " para o Intervalo
   const verificaFiltroAvancado = (valorItem, valorFiltro) => {
-    if (!valorFiltro) return true; // Se o utilizador não escreveu nada no filtro, passa logo
+    if (!valorFiltro) return true; 
     
     if (valorFiltro.includes(' - ')) {
       const [de, ate] = valorFiltro.split(' - ');
@@ -309,13 +336,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     return tagsArray.includes(String(valorItem));
   };
 
-  const handleFiltroChange = (e) => {
-    const { name, value } = e.target;
-    setFiltrosAvancados(prev => ({ ...prev, [name]: value }));
-  };
-
   const handleLimparFiltros = () => {
-    setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', pl: '', filial: '', destino: '', dataCriacao: '', dataEntrega: '', statusExibicao: '' });
+    setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', pl: '', filial: '', destino: '', statusExibicao: '' });
   };
 
   const dadosFiltrados = dadosTabela.filter((item) => {
@@ -333,7 +355,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
     if (filtroAtivo !== "Todos" && item.tipo !== tipoMapeado && item.tipo !== filtroAtivo) return false;
 
-    // ✨ APLICA O MOTOR INTELIGENTE A TODOS OS CAMPOS DO MODAL
     if (!verificaFiltroAvancado(item.tipo, filtrosAvancados.tipo)) return false;
     if (!verificaFiltroAvancado(item.id, filtrosAvancados.id)) return false;
     if (!verificaFiltroAvancado(item.solicitante, filtrosAvancados.solicitante)) return false;
@@ -341,8 +362,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (!verificaFiltroAvancado(item.pl, filtrosAvancados.pl)) return false;
     if (!verificaFiltroAvancado(item.filial, filtrosAvancados.filial)) return false;
     if (!verificaFiltroAvancado(item.destino, filtrosAvancados.destino)) return false;
-    if (!verificaFiltroAvancado(item.dataSolicitacao, filtrosAvancados.dataCriacao)) return false;
-    if (!verificaFiltroAvancado(item.dataEntrega, filtrosAvancados.dataEntrega)) return false;
     if (!verificaFiltroAvancado(item.statusExibicao, filtrosAvancados.statusExibicao)) return false;
 
     if (termoPesquisa) {
@@ -807,7 +826,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         onClose={() => setModalFiltroAberto(false)}
         dadosTabela={dadosTabela}
         filtros={filtrosAvancados}
-        onFiltroChange={handleFiltroChange}
+        setFiltros={setFiltrosAvancados} 
         onLimpar={handleLimparFiltros}
       />
 
