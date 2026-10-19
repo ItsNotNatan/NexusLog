@@ -132,15 +132,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   
+  // ✨ ATUALIZADO: Estado agora inclui sap e nf
   const [filtrosAvancados, setFiltrosAvancados] = useState({
-    tipo: '',
-    id: '',
-    solicitante: '',
-    wbs: '',
-    pl: '',
-    filial: '',
-    destino: '',
-    statusExibicao: ''
+    tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: ''
   });
 
   const itensPorPagina = 10;
@@ -231,9 +225,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
-            // ✨ CORREÇÃO: Retirámos o recálculo maluco do WBS. 
-            // Agora confiamos a 100% no que o backend enviou perfeitamente formatado!
-
             const itensEnriquecidos = (item.itens || []).map(it => {
               const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
                 ? estoqueReferencia.find(e => e.id === it.estoque_id)
@@ -272,10 +263,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataSolicitacao: item.dataSolicitacao || "-",
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
-              wbs: item.wbs || '—', // ✨ AQUI: Usamos diretamente o que o servidor enviou
+              wbs: item.wbs || '—', 
               destino: item.destino || 'Não informado',
               filial: item.filial_origem_id || item.filial || '-',
-              itens: itensEnriquecidos
+              itens: itensEnriquecidos 
             };
           });
 
@@ -306,24 +297,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const verificaFiltroAvancado = (valorItem, valorFiltro) => {
     if (!valorFiltro) return true; 
-    
-    if (valorFiltro.includes(' - ')) {
-      const [de, ate] = valorFiltro.split(' - ');
-      const val = String(valorItem).toUpperCase();
-      const limiteInf = de ? String(de).toUpperCase() : null;
-      const limiteSup = ate ? String(ate).toUpperCase() : null;
-
-      if (limiteInf && limiteSup) return val >= limiteInf && val <= limiteSup;
-      if (limiteInf) return val >= limiteInf;
-      if (limiteSup) return val <= limiteSup;
-    }
-    
-    const tagsArray = valorFiltro.split(',');
+    const tagsArray = String(valorFiltro).split(',');
     return tagsArray.includes(String(valorItem));
   };
 
   const handleLimparFiltros = () => {
-    setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', pl: '', filial: '', destino: '', statusExibicao: '' });
+    setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: '' });
   };
 
   const dadosFiltrados = dadosTabela.filter((item) => {
@@ -341,10 +320,30 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
     if (filtroAtivo !== "Todos" && item.tipo !== tipoMapeado && item.tipo !== filtroAtivo) return false;
 
+    // ✨ LÓGICA PROFUNDA: Verifica a WBS na "capa" e DENTRO dos itens
+    if (filtrosAvancados.wbs) {
+      const batePrincipal = verificaFiltroAvancado(item.wbs, filtrosAvancados.wbs);
+      const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.wbs_element || it.wbs, filtrosAvancados.wbs));
+      if (!batePrincipal && !bateItens) return false;
+    }
+
+    // ✨ LÓGICA PROFUNDA: Verifica Desenho SAP dentro dos itens
+    if (filtrosAvancados.sap) {
+      const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.desenho_sap_manual || it.desenho_sap, filtrosAvancados.sap));
+      if (!bateItens) return false;
+    }
+
+    // ✨ LÓGICA PROFUNDA: Verifica Nota Fiscal na "capa" e DENTRO dos itens
+    if (filtrosAvancados.nf) {
+      const batePrincipal = verificaFiltroAvancado(item.nfCrossdocking, filtrosAvancados.nf);
+      const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.nf_entrada || it.nfEntrada || it.nf, filtrosAvancados.nf));
+      if (!batePrincipal && !bateItens) return false;
+    }
+
+    // Resto dos filtros normais
     if (!verificaFiltroAvancado(item.tipo, filtrosAvancados.tipo)) return false;
     if (!verificaFiltroAvancado(item.id, filtrosAvancados.id)) return false;
     if (!verificaFiltroAvancado(item.solicitante, filtrosAvancados.solicitante)) return false;
-    if (!verificaFiltroAvancado(item.wbs, filtrosAvancados.wbs)) return false;
     if (!verificaFiltroAvancado(item.pl, filtrosAvancados.pl)) return false;
     if (!verificaFiltroAvancado(item.filial, filtrosAvancados.filial)) return false;
     if (!verificaFiltroAvancado(item.destino, filtrosAvancados.destino)) return false;
@@ -806,6 +805,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         </div>
       </div>
 
+      {/* RENDERIZAÇÃO DO NOSSO NOVO MODAL DE FILTROS AVANÇADOS */}
       <FiltroSolicitacoesModal
         aberto={modalFiltroAberto}
         onClose={() => setModalFiltroAberto(false)}
