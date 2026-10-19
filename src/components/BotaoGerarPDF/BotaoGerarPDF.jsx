@@ -19,7 +19,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
 
   if (!linha) return null;
 
-  // ✨ CORRIGIDO: Retirámos o { timeZone: 'UTC' } que estava a obrigar o PDF a usar o fuso horário global
   const formatarDataSimples = (data) => {
     if (!data) return '';
     if (data.includes('/')) return data; // Se já vier formatado do backend, respeita
@@ -116,7 +115,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             { text: it.descricao_manual || '-', fontSize: 7, margin: [0, 3] },
             { text: it.fornecedor || '-', fontSize: 7, margin: [0, 3] },
             { text: (it.alocacao || '').startsWith('CROSSDOCKING') ? 'CROSSDOCKING' : (it.alocacao || '-'), fontSize: 7, alignment: 'center', margin: [0, 3] },
-            { text: it.nf_entrada || linha.nfCrossdocking || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
+            // ✨ CORREÇÃO APLICADA: Verifica todas as chaves possíveis para a Nota Fiscal
+            { text: it.nf_entrada || it.nfEntrada || it.nf || linha.nfCrossdocking || '-', fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: formatarMoedaPdf(it.valor_unitario_enriquecido ?? it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.wbs_element || '-', fontSize: 7, alignment: 'center', margin: [0, 3] }
           ]);
