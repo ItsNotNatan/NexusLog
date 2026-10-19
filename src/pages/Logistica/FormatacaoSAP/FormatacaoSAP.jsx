@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Interface interativa para preparar e copiar dados para o SAP (Com Paginação e Cópia Limpa)
+// DESCRIÇÃO: Interface interativa com paginação DUPLA (Seletor Lateral e Tabela SAP)
 // =================================================================
 import React, { useState, useEffect } from 'react';
 import { 
@@ -20,9 +20,13 @@ export default function FormatacaoSAP() {
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
   const [copiadoSucesso, setCopiadoSucesso] = useState(false);
 
-  // ✨ ESTADOS PARA CONTROLAR A PAGINAÇÃO
+  // ✨ PAGINAÇÃO DA DIREITA (Tabela de Itens para SAP)
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 15;
+
+  // ✨ NOVO: PAGINAÇÃO DA ESQUERDA (Seletor Lateral de PLs)
+  const [paginaEsquerda, setPaginaEsquerda] = useState(1);
+  const plsPorPagina = 8; // Número de PLs exibidas no painel lateral por página
 
   const opcoesCategoria = [
     'Preencher .', 
@@ -143,10 +147,15 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais({});
   };
 
-  // ✨ Resetar a página para 1 sempre que a seleção de PLs mudar
+  // Resetar a página da direita para 1 sempre que a seleção de PLs mudar
   useEffect(() => {
     setPaginaAtual(1);
   }, [selecionados]);
+
+  // ✨ Resetar a página da esquerda para 1 sempre que a busca mudar
+  useEffect(() => {
+    setPaginaEsquerda(1);
+  }, [busca]);
 
   const listaFiltrada = solicitacoes.filter(sol => {
     const termo = busca.toLowerCase();
@@ -154,6 +163,11 @@ export default function FormatacaoSAP() {
            sol.solicitante?.toLowerCase().includes(termo) ||
            sol.wbs?.toLowerCase().includes(termo);
   });
+
+  // ✨ LÓGICA DE PAGINAÇÃO DA ESQUERDA (PLs)
+  const totalPaginasEsquerda = Math.max(1, Math.ceil(listaFiltrada.length / plsPorPagina));
+  const indexPrimeiroPl = (paginaEsquerda - 1) * plsPorPagina;
+  const plsPaginadas = listaFiltrada.slice(indexPrimeiroPl, indexPrimeiroPl + plsPorPagina);
 
   const itensConsolidados = solicitacoes
     .filter(sol => selecionados.includes(sol.id))
@@ -170,7 +184,7 @@ export default function FormatacaoSAP() {
       }));
     });
 
-  // ✨ LÓGICA DE PAGINAÇÃO APLICADA
+  // LÓGICA DE PAGINAÇÃO DA DIREITA (Tabela de Itens)
   const totalPaginas = Math.max(1, Math.ceil(itensConsolidados.length / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
   const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, itensConsolidados.length);
@@ -189,7 +203,6 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais(prev => ({ ...prev, [idLinha]: valor }));
   };
 
-  // ✨ A Origem não é copiada para o SAP, como pedido!
   const gerarLinhaTsv = (item) => {
     const categoria = categoriasIndividuais[item.idLinha] || categoriaGeral || 'Preencher .';
     return `${item.desenhoSAP}\t${item.quantidade}\t${item.valorUnitario}\t${item.wbs}\t${item.destino}\t${categoria}`;
@@ -225,7 +238,6 @@ export default function FormatacaoSAP() {
   const copiarTudo = () => {
     if (itensConsolidados.length === 0) return;
     
-    // O Copiar Tudo continua a ler "itensConsolidados" (todos os itens), ignorando a paginação visual.
     const textoCompleto = itensConsolidados.map(gerarLinhaTsv).join('\n');
     const copiado = forcarCopiaClipboard(textoCompleto);
     
@@ -254,7 +266,10 @@ export default function FormatacaoSAP() {
 
       <div className="form-sap-grid">
         
-        <div className="form-sap-coluna-esq">
+        {/* =========================================================
+            PAINEL LATERAL ESQUERDO (COM PAGINAÇÃO INTEGRADA)
+            ========================================================= */}
+        <div className="form-sap-coluna-esq" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="sap-pesquisa-caixa">
             <div className="sap-input-wrapper">
               <Search size={16} className="sap-icone-pesquisa" />
@@ -276,13 +291,14 @@ export default function FormatacaoSAP() {
             </div>
           </div>
 
-          <div className="sap-lista-scroll">
+          <div className="sap-lista-scroll" style={{ flex: 1, overflowY: 'auto' }}>
             {carregando ? (
               <div className="sap-estado-vazio">A carregar Packing Lists...</div>
             ) : listaFiltrada.length === 0 ? (
               <div className="sap-estado-vazio">Nenhuma PL concluída encontrada.</div>
             ) : (
-              listaFiltrada.map(sol => {
+              /* ✨ EXIBE APENAS AS PLs DA PÁGINA ATUAL DA ESQUERDA */
+              plsPaginadas.map(sol => {
                 const isSelected = selecionados.includes(sol.id);
                 const dataFormatada = sol.criacaoPl && sol.criacaoPl !== '—' ? sol.criacaoPl.split(' ')[0] : 'N/D';
                 const qtdItens = sol.itens ? sol.itens.length : 0;
@@ -310,8 +326,36 @@ export default function FormatacaoSAP() {
               })
             )}
           </div>
+
+          {/* ✨ NOVO: CONTROLES DE PAGINAÇÃO DA ESQUERDA */}
+          {!carregando && totalPaginasEsquerda > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                Pág. <strong>{paginaEsquerda}</strong> de <strong>{totalPaginasEsquerda}</strong>
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button 
+                  onClick={() => setPaginaEsquerda(p => Math.max(p - 1, 1))} 
+                  disabled={paginaEsquerda === 1}
+                  style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', border: '1px solid #cbd5e1', borderRadius: '6px', background: paginaEsquerda === 1 ? '#f1f5f9' : '#fff', color: paginaEsquerda === 1 ? '#94a3b8' : '#334155', cursor: paginaEsquerda === 1 ? 'not-allowed' : 'pointer', fontSize: '0.75rem' }}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button 
+                  onClick={() => setPaginaEsquerda(p => Math.min(p + 1, totalPaginasEsquerda))} 
+                  disabled={paginaEsquerda === totalPaginasEsquerda}
+                  style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', border: '1px solid #cbd5e1', borderRadius: '6px', background: paginaEsquerda === totalPaginasEsquerda ? '#f1f5f9' : '#fff', color: paginaEsquerda === totalPaginasEsquerda ? '#94a3b8' : '#334155', cursor: paginaEsquerda === totalPaginasEsquerda ? 'not-allowed' : 'pointer', fontSize: '0.75rem' }}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* =========================================================
+            PAINEL DIREITO (PREVIEW DA TABELA PARA O SAP)
+            ========================================================= */}
         <div className="form-sap-coluna-dir">
           {selecionados.length === 0 ? (
             <div className="sap-preview-vazio">
@@ -364,7 +408,6 @@ export default function FormatacaoSAP() {
                 </button>
               </div>
 
-              {/* ✨ A tabela agora usa itensPaginados e tem flex: 1 para empurrar o rodapé */}
               <div className="sap-tabela-container" style={{ flex: 1 }}>
                 <table className="sap-tabela-preview">
                   <thead>
@@ -380,7 +423,6 @@ export default function FormatacaoSAP() {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* ✨ AGORA USANDO ITENS PAGINADOS PARA NÃO QUEBRAR O LAYOUT */}
                     {itensPaginados.map(item => (
                       <tr key={item.idLinha}>
                         <td className="texto-cinza">{item.origem}</td>
@@ -412,9 +454,9 @@ export default function FormatacaoSAP() {
                 </table>
               </div>
 
-              {/* ✨ NOVO: Barra de Paginação Integrada */}
+              {/* BARRA DE PAGINAÇÃO DA DIREITA (Tabela de Itens) */}
               {totalPaginas > 1 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
                     Página <strong style={{ color: '#1e293b' }}>{paginaAtual}</strong> de <strong style={{ color: '#1e293b' }}>{totalPaginas}</strong> &middot; Exibindo {itensConsolidados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{indexUltimoItem}</strong> de <strong>{itensConsolidados.length}</strong> itens
                   </span>
