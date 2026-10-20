@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
   Search, ChevronRight, ChevronLeft, GitBranch, FileText,
-  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, Filter
+  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, Filter, Check, X
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -131,11 +131,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [paginaAtual, setPaginaAtual] = useState(1);
 
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
-  
-  // ✨ ATUALIZADO: Estado agora inclui sap e nf
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: ''
   });
+
+  // ✨ ESTADOS PARA A EDIÇÃO DA DATA COM CONFIRMAÇÃO (O "OK")
+  const [editandoDataId, setEditandoDataId] = useState(null);
+  const [dataTemporaria, setDataTemporaria] = useState("");
 
   const itensPorPagina = 10;
 
@@ -320,27 +322,23 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
     if (filtroAtivo !== "Todos" && item.tipo !== tipoMapeado && item.tipo !== filtroAtivo) return false;
 
-    // ✨ LÓGICA PROFUNDA: Verifica a WBS na "capa" e DENTRO dos itens
     if (filtrosAvancados.wbs) {
       const batePrincipal = verificaFiltroAvancado(item.wbs, filtrosAvancados.wbs);
       const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.wbs_element || it.wbs, filtrosAvancados.wbs));
       if (!batePrincipal && !bateItens) return false;
     }
 
-    // ✨ LÓGICA PROFUNDA: Verifica Desenho SAP dentro dos itens
     if (filtrosAvancados.sap) {
       const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.desenho_sap_manual || it.desenho_sap, filtrosAvancados.sap));
       if (!bateItens) return false;
     }
 
-    // ✨ LÓGICA PROFUNDA: Verifica Nota Fiscal na "capa" e DENTRO dos itens
     if (filtrosAvancados.nf) {
       const batePrincipal = verificaFiltroAvancado(item.nfCrossdocking, filtrosAvancados.nf);
       const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.nf_entrada || it.nfEntrada || it.nf, filtrosAvancados.nf));
       if (!batePrincipal && !bateItens) return false;
     }
 
-    // Resto dos filtros normais
     if (!verificaFiltroAvancado(item.tipo, filtrosAvancados.tipo)) return false;
     if (!verificaFiltroAvancado(item.id, filtrosAvancados.id)) return false;
     if (!verificaFiltroAvancado(item.solicitante, filtrosAvancados.solicitante)) return false;
@@ -707,26 +705,75 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
 
+                        {/* ✨ A NOVA LÓGICA DO CAMPO DE DATA COM CONFIRMAÇÃO ESTÁ AQUI */}
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
-                            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                              <input
-                                type="datetime-local"
-                                value={converterParaInputDateTime(linha.dataEntrega)}
-                                onChange={(e) => lidarComMudancaDataEntrega(linha.idOriginal, e.target.value)}
-                                style={{
-                                  padding: '4px 8px',
-                                  fontSize: '0.75rem',
-                                  borderRadius: '6px',
-                                  border: '1px solid #cbd5e1',
-                                  backgroundColor: '#ffffff',
-                                  color: '#059669',
-                                  fontWeight: '600',
-                                  outline: 'none',
-                                  cursor: 'pointer'
-                                }}
-                                title="Altere a data e hora de entrega"
-                              />
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              {editandoDataId === linha.idOriginal ? (
+                                <>
+                                  <input
+                                    type="datetime-local"
+                                    value={dataTemporaria}
+                                    onChange={(e) => setDataTemporaria(e.target.value)}
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '0.75rem',
+                                      borderRadius: '6px',
+                                      border: '1px solid #3b82f6',
+                                      backgroundColor: '#ffffff',
+                                      color: '#059669',
+                                      fontWeight: '600',
+                                      outline: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      lidarComMudancaDataEntrega(linha.idOriginal, dataTemporaria);
+                                      setEditandoDataId(null);
+                                    }}
+                                    title="Confirmar alteração"
+                                    style={{
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      padding: '4px', backgroundColor: '#10b981', color: 'white',
+                                      border: 'none', borderRadius: '4px', cursor: 'pointer'
+                                    }}
+                                  >
+                                    <Check size={14} strokeWidth={3} />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditandoDataId(null)}
+                                    title="Cancelar"
+                                    style={{
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      padding: '4px', backgroundColor: '#ef4444', color: 'white',
+                                      border: 'none', borderRadius: '4px', cursor: 'pointer'
+                                    }}
+                                  >
+                                    <X size={14} strokeWidth={3} />
+                                  </button>
+                                </>
+                              ) : (
+                                <div
+                                  onClick={() => {
+                                    setEditandoDataId(linha.idOriginal);
+                                    setDataTemporaria(converterParaInputDateTime(linha.dataEntrega));
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    fontSize: '0.75rem',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    backgroundColor: '#ffffff',
+                                    color: linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? '#059669' : '#64748b',
+                                    fontWeight: '600',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Clique para alterar a data e hora de entrega"
+                                >
+                                  {linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? linha.dataEntrega : "Definir Data"}
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span style={{ color: linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? (isRecusadoOuCancelado ? "#dc2626" : "#10b981") : corTextoFraco }}>
@@ -805,7 +852,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         </div>
       </div>
 
-      {/* RENDERIZAÇÃO DO NOSSO NOVO MODAL DE FILTROS AVANÇADOS */}
       <FiltroSolicitacoesModal
         aberto={modalFiltroAberto}
         onClose={() => setModalFiltroAberto(false)}
