@@ -135,7 +135,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: ''
   });
 
-  // ✨ ESTADOS PARA A EDIÇÃO DA DATA COM CONFIRMAÇÃO (O "OK")
+  // ✨ ESTADOS PARA A EDIÇÃO SILENCIOSA (MANTÉM O INPUT ORIGINAL)
   const [editandoDataId, setEditandoDataId] = useState(null);
   const [dataTemporaria, setDataTemporaria] = useState("");
 
@@ -705,28 +705,34 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
 
-                        {/* ✨ A NOVA LÓGICA DO CAMPO DE DATA COM CONFIRMAÇÃO ESTÁ AQUI */}
+                        {/* ✨ RESTAURADO: O INPUT DE DATA COM LÓGICA DE OK/CANCELAR */}
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              {editandoDataId === linha.idOriginal ? (
+                            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <input
+                                type="datetime-local"
+                                value={editandoDataId === linha.idOriginal ? dataTemporaria : converterParaInputDateTime(linha.dataEntrega)}
+                                onChange={(e) => {
+                                  if (editandoDataId !== linha.idOriginal) {
+                                    setEditandoDataId(linha.idOriginal);
+                                  }
+                                  setDataTemporaria(e.target.value);
+                                }}
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '0.75rem',
+                                  borderRadius: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  backgroundColor: '#ffffff',
+                                  color: '#059669',
+                                  fontWeight: '600',
+                                  outline: 'none',
+                                  cursor: 'pointer'
+                                }}
+                                title="Altere a data e hora de entrega"
+                              />
+                              {editandoDataId === linha.idOriginal && (
                                 <>
-                                  <input
-                                    type="datetime-local"
-                                    value={dataTemporaria}
-                                    onChange={(e) => setDataTemporaria(e.target.value)}
-                                    style={{
-                                      padding: '4px 8px',
-                                      fontSize: '0.75rem',
-                                      borderRadius: '6px',
-                                      border: '1px solid #3b82f6',
-                                      backgroundColor: '#ffffff',
-                                      color: '#059669',
-                                      fontWeight: '600',
-                                      outline: 'none',
-                                      cursor: 'pointer'
-                                    }}
-                                  />
                                   <button
                                     onClick={() => {
                                       lidarComMudancaDataEntrega(linha.idOriginal, dataTemporaria);
@@ -753,26 +759,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                     <X size={14} strokeWidth={3} />
                                   </button>
                                 </>
-                              ) : (
-                                <div
-                                  onClick={() => {
-                                    setEditandoDataId(linha.idOriginal);
-                                    setDataTemporaria(converterParaInputDateTime(linha.dataEntrega));
-                                  }}
-                                  style={{
-                                    padding: '4px 8px',
-                                    fontSize: '0.75rem',
-                                    borderRadius: '6px',
-                                    border: '1px solid #cbd5e1',
-                                    backgroundColor: '#ffffff',
-                                    color: linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? '#059669' : '#64748b',
-                                    fontWeight: '600',
-                                    cursor: 'pointer'
-                                  }}
-                                  title="Clique para alterar a data e hora de entrega"
-                                >
-                                  {linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? linha.dataEntrega : "Definir Data"}
-                                </div>
                               )}
                             </div>
                           ) : (
