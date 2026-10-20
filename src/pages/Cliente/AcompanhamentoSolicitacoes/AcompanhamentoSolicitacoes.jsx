@@ -54,12 +54,18 @@ const obterClasseBadgeTipo = (tipo) => {
 
 const converterParaInputDateTime = (dataString) => {
   if (!dataString || dataString === '-' || dataString === '—' || dataString === 'Disponível') return '';
+  
   const partes = dataString.split(' ');
   if (partes[0].includes('/')) {
     const [dia, mes, ano] = partes[0].split('/');
     let hora = '00:00';
-    if (partes.length >= 3 && partes[2].includes(':')) hora = partes[2]; 
-    else if (partes.length === 2 && partes[1].includes(':')) hora = partes[1]; 
+    
+    if (partes.length >= 3 && partes[2].includes(':')) {
+       hora = partes[2]; 
+    } else if (partes.length === 2 && partes[1].includes(':')) {
+       hora = partes[1]; 
+    }
+    
     return `${ano}-${mes}-${dia}T${hora}`;
   }
   return '';
@@ -68,16 +74,21 @@ const converterParaInputDateTime = (dataString) => {
 const obterValorSeguroNumero = (valItem, valEstoque) => {
   const processarNumero = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || valor === '') return 0;
+    
     let limpo = String(valor).replace(/[^\d.,-]/g, '');
     if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
     else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
+    
     const numeroFinal = parseFloat(limpo);
     return isNaN(numeroFinal) ? 0 : numeroFinal;
   };
+
   const num1 = processarNumero(valItem);
   if (num1 > 0) return num1;
+  
   const num2 = processarNumero(valEstoque);
   if (num2 > 0) return num2;
+
   return 0;
 };
 
@@ -112,12 +123,22 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
-  const [termoPesquisa, setTermoPesquisa] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
   const [paginaAtual, setPaginaAtual] = useState(1);
+
+  // ✨ OTIMIZAÇÃO 1: Separamos a digitação da pesquisa real (DEBOUNCE)
+  const [termoPesquisaInput, setTermoPesquisaInput] = useState("");
+  const [termoPesquisaFiltro, setTermoPesquisaFiltro] = useState("");
+
+  useEffect(() => {
+    const atraso = setTimeout(() => {
+      setTermoPesquisaFiltro(termoPesquisaInput);
+    }, 350); // Só pesquisa 350 milissegundos depois de parares de escrever
+    return () => clearTimeout(atraso);
+  }, [termoPesquisaInput]);
 
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
@@ -140,7 +161,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const isOperador = String(usuarioLogado.cargo || '').toLowerCase().trim().includes('operador');
   const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
 
-  // ✨ CRIAÇÃO DO DICIONÁRIO DE ESTOQUE PARA ALTA PERFORMANCE
   const mapEstoque = useMemo(() => {
     const map = {};
     estoque.forEach(e => { map[e.id] = e; });
@@ -165,14 +185,40 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         }
 
         if (resultadoSol.sucesso) {
+          const dicionarioEstoque = {};
+          if (resultadoEst.sucesso && resultadoEst.dados) {
+            resultadoEst.dados.forEach(itemFisico => {
+              dicionarioEstoque[itemFisico.id] = itemFisico;
+            });
+          }
+
           const reints = resultadoSol.dados.filter(sol =>
             (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
             (sol.status === 'Em Separação' || sol.status === 'Concluído')
           );
+          
+          const qtdJaDevolvidaGlobal = {};
+          reints.forEach(reint => {
+            if (reint.observacoes) {
+               const match = reint.observacoes.match(/PL #(\d+)/);
+               if (match) {
+                 const plKey = `PL #${match[1]}`;
+                 if (!qtdJaDevolvidaGlobal[plKey]) qtdJaDevolvidaGlobal[plKey] = {};
+                 
+                 (reint.itens || []).forEach(it => {
+                   qtdJaDevolvidaGlobal[plKey][it.estoque_id] = (qtdJaDevolvidaGlobal[plKey][it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
+                 });
+               }
+            }
+          });
 
-          const cancelamentosAtivos = resultadoSol.dados.filter(sol =>
-            sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
-          );
+          const idsCanceladosSet = new Set();
+          resultadoSol.dados.forEach(sol => {
+            if (sol.tipo === 'Cancelado' && sol.status !== 'Recusado' && sol.observacoes) {
+              const matches = sol.observacoes.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
+              if (matches) idsCanceladosSet.add(matches[0]);
+            }
+          });
 
           const dadosFormatados = resultadoSol.dados.map((item) => {
             let acaoTipo = "select";
@@ -193,25 +239,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
             let statusFinalVisual = item.status;
 
-            const temPedidoDeCancelamento = cancelamentosAtivos.find(canc =>
-              canc.observacoes && canc.observacoes.includes(item.idOriginal)
-            );
-
-            if (item.tipo !== 'Cancelado' && temPedidoDeCancelamento) {
+            if (item.tipo !== 'Cancelado' && idsCanceladosSet.has(item.id)) {
               statusFinalVisual = 'Cancelado';
             }
             else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
-              const qtdJaDevolvida = {};
-              reints.forEach(reint => {
-                if (reint.observacoes && reint.observacoes.includes(numeroPL)) {
-                  (reint.itens || []).forEach(it => {
-                    qtdJaDevolvida[it.estoque_id] = (qtdJaDevolvida[it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
-                  });
-                }
-              });
-
+              const devolucoesDestaPL = qtdJaDevolvidaGlobal[numeroPL] || {};
               const itensRestantes = (item.itens || []).filter(origItem => {
-                const devolvido = qtdJaDevolvida[origItem.estoque_id] || 0;
+                const devolvido = devolucoesDestaPL[origItem.estoque_id] || 0;
                 return (Number(origItem.quantidade_solicitada) - devolvido) > 0;
               });
 
@@ -220,10 +254,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
+            // ✨ OTIMIZAÇÃO 2: Pré-Indexação da Pesquisa. Junta tudo numa string limpa para procura à velocidade da luz.
+            const wbsProcura = item.wbs || '—';
+            const destinoProcura = item.destino || 'Não informado';
+            const idProcura = item.ps || item.id;
+            const solicitanteProcura = item.solicitante || '';
+            const textoBuscavel = `${idProcura} ${solicitanteProcura} ${wbsProcura} ${destinoProcura} ${numeroPL}`.toLowerCase();
+
             return {
               ...item,
               idOriginal: item.idOriginal || item.id,
-              id: item.ps || item.id,
+              id: idProcura,
               statusExibicao: statusFinalVisual,
               statusDestinoAprovacao: statusDestinoAprovacao,
               acaoTipo: acaoTipo,
@@ -231,10 +272,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               dataSolicitacao: item.dataSolicitacao || "-",
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
-              wbs: item.wbs || '—', 
-              destino: item.destino || 'Não informado',
+              wbs: wbsProcura, 
+              destino: destinoProcura,
               filial: item.filial_origem_id || item.filial || '-',
-              // ✨ LAZY PROCESSING APLICADO: Guardamos os itens puros. Não fazemos contas nenhumas agora!
+              textoBuscavel: textoBuscavel, // <--- A Nossa Etiqueta Secreta!
               itensRaw: item.itens || []
             };
           });
@@ -258,9 +299,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     return () => socket.disconnect();
   }, [estoqueAtual, showAlert, perfil]);
 
-  useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisa, filtrosAvancados]);
+  useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisaFiltro, filtrosAvancados]);
 
-  // ✨ A FUNÇÃO QUE ACORDA OS ITENS SOB DEMANDA: Só é chamada quando expandes a linha ou clicas no PDF!
   const getItensEnriquecidos = (linha) => {
     if (!linha.itensRaw) return [];
     return linha.itensRaw.map(it => {
@@ -298,7 +338,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: '' });
   };
 
-  // ✨ MEMORIZAÇÃO: Filtros só são reprocessados se os dados mudarem. Melhora drástica na barra de pesquisa!
   const dadosFiltrados = useMemo(() => {
     return dadosTabela.filter((item) => {
       if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) return false;
@@ -314,7 +353,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
       if (filtroAtivo !== "Todos" && item.tipo !== tipoMapeado && item.tipo !== filtroAtivo) return false;
 
-      // O filtro usa a array rápida (itensRaw)
       if (filtrosAvancados.wbs) {
         const batePrincipal = verificaFiltroAvancado(item.wbs, filtrosAvancados.wbs);
         const bateItens = item.itensRaw?.some(it => verificaFiltroAvancado(it.wbs_element || it.wbs, filtrosAvancados.wbs));
@@ -340,21 +378,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (!verificaFiltroAvancado(item.destino, filtrosAvancados.destino)) return false;
       if (!verificaFiltroAvancado(item.statusExibicao, filtrosAvancados.statusExibicao)) return false;
 
-      if (termoPesquisa) {
-        const termo = termoPesquisa.toLowerCase();
-        const batePesquisa =
-          (item.id && String(item.id).toLowerCase().includes(termo)) ||
-          (item.solicitante && item.solicitante.toLowerCase().includes(termo)) ||
-          (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
-          (item.destino && item.destino.toLowerCase().includes(termo)) ||
-          ((item.pl || item.bs) && String(item.pl || item.bs).toLowerCase().includes(termo));
-        if (!batePesquisa) return false;
+      // ✨ OTIMIZAÇÃO 2 APLICADA: Pesquisa muito mais leve (1 campo em vez de 5)
+      if (termoPesquisaFiltro) {
+        const termo = termoPesquisaFiltro.toLowerCase();
+        if (!item.textoBuscavel.includes(termo)) return false;
       }
       return true;
     });
-  }, [dadosTabela, estoqueAtual, filtroStatus, filtroAtivo, filtrosAvancados, termoPesquisa]);
+  }, [dadosTabela, estoqueAtual, filtroStatus, filtroAtivo, filtrosAvancados, termoPesquisaFiltro]);
 
-  // ✨ MEMORIZAÇÃO DOS KPIs: Não conta milhares de itens ao mudar de página!
   const kpis = useMemo(() => {
     return {
       total: dadosFiltrados.length,
@@ -366,7 +398,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     };
   }, [dadosFiltrados]);
 
-  // ✨ MEMORIZAÇÃO DA PAGINAÇÃO: O ecrã não refaz fatiamentos desnecessários
   const { dadosPaginados, totalPaginas, totalRegistrosFiltrados, indexPrimeiroItem, indexUltimoItem } = useMemo(() => {
     const totalRegistros = dadosFiltrados.length;
     const paginas = Math.max(1, Math.ceil(totalRegistros / itensPorPagina));
@@ -379,7 +410,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       indexPrimeiroItem: start,
       indexUltimoItem: end
     };
-  }, [dadosFiltrados, paginaAtual]);
+  }, [dadosFiltrados, paginaAtual, itensPorPagina]);
 
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
     const confirmar = await showConfirm("Alterar Status", `Tem certeza que deseja mudar o status para "${novoStatus}"?`, "warning", "Sim, Mudar");
@@ -414,7 +445,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               ...sol,
               status: novoStatus, statusExibicao: novoStatus, acaoValor: novoStatus,
               pl: (novoStatus === 'Pendente' || novoStatus === 'Recusado' || novoStatus === 'Cancelado') ? '-' : novoPl,
-              acaoTipo: novoStatus === 'Pendente' ? 'botao' : 'select'
+              acaoTipo: novoStatus === 'Pendente' ? 'botao' : 'select',
+              textoBuscavel: `${sol.id} ${sol.solicitante} ${sol.wbs} ${sol.destino} ${novoPl}`.toLowerCase()
             };
           }
           return sol;
@@ -560,8 +592,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               <input 
                 type="text" 
                 placeholder="Buscar por ID, solicitante, WBS..." 
-                value={termoPesquisa} 
-                onChange={(e) => setTermoPesquisa(e.target.value)} 
+                value={termoPesquisaInput} 
+                onChange={(e) => setTermoPesquisaInput(e.target.value)} 
                 style={{ height: '100%', boxSizing: 'border-box', margin: 0 }} 
               />
             </div>
@@ -603,7 +635,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             </thead>
             <tbody>
               {carregando ? (
-                <tr><td colSpan="8" style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>Carregando solicitações e processando o estoque...</td></tr>
+                <tr><td colSpan="8" style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>Carregando solicitações e a processar o estoque de segurança...</td></tr>
               ) : dadosPaginados.length === 0 ? (
                 <tr><td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
@@ -660,7 +692,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         <td>
                           {!esconderPL && linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
                             <BotaoGerarPDF
-                              /* ✨ PROCESSAMENTO SOB DEMANDA NO PDF: Só faz a matemática se clicares aqui! */
                               linha={{ ...linha, itens: getItensEnriquecidos(linha) }}
                               nomeFilial={obterNomeFilialDinamico(linha.filial || linha.estoque)}
                               showAlert={showAlert}
@@ -763,7 +794,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                       {isExpandida && (
                         <tr>
                           <td colSpan="8" className="td-expandida">
-                            {/* ✨ PROCESSAMENTO SOB DEMANDA NA TABELA: Só faz as contas se a linha for aberta! */}
                             <DetalhesSolicitacao item={{ ...linha, itens: getItensEnriquecidos(linha) }} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
 
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
