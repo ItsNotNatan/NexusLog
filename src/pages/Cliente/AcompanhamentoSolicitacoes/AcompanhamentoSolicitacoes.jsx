@@ -1,7 +1,7 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
 // =================================================================
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
@@ -135,7 +135,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: ''
   });
 
-  // ✨ ESTADOS PARA A EDIÇÃO SILENCIOSA (MANTÉM O INPUT ORIGINAL)
   const [editandoDataId, setEditandoDataId] = useState(null);
   const [dataTemporaria, setDataTemporaria] = useState("");
 
@@ -160,6 +159,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         setCarregando(true);
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual}`;
 
+        // Carrega as 1000 solicitações e o estoque ao mesmo tempo
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
           apiFetch("/estoque/listar?rastreabilidade=true")
@@ -170,17 +170,45 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         }
 
         if (resultadoSol.sucesso) {
+          // ✨ OPTIMIZAÇÃO 1: Criar um dicionário (Hash Map) gigante e ultra-rápido para o estoque
+          const dicionarioEstoque = {};
+          if (resultadoEst.sucesso && resultadoEst.dados) {
+            resultadoEst.dados.forEach(itemFisico => {
+              dicionarioEstoque[itemFisico.id] = itemFisico;
+            });
+          }
+
+          // Filtra reintegrações e junta todas as observações num texto único para procura rápida
           const reints = resultadoSol.dados.filter(sol =>
             (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
             (sol.status === 'Em Separação' || sol.status === 'Concluído')
           );
+          
+          const qtdJaDevolvidaGlobal = {};
+          reints.forEach(reint => {
+            if (reint.observacoes) {
+               const match = reint.observacoes.match(/PL #(\d+)/);
+               if (match) {
+                 const plKey = `PL #${match[1]}`;
+                 if (!qtdJaDevolvidaGlobal[plKey]) qtdJaDevolvidaGlobal[plKey] = {};
+                 
+                 (reint.itens || []).forEach(it => {
+                   qtdJaDevolvidaGlobal[plKey][it.estoque_id] = (qtdJaDevolvidaGlobal[plKey][it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
+                 });
+               }
+            }
+          });
 
-          const cancelamentosAtivos = resultadoSol.dados.filter(sol =>
-            sol.tipo === 'Cancelado' && sol.status !== 'Recusado'
-          );
+          // ✨ OPTIMIZAÇÃO 2: Compila todos os IDs cancelados num Set para consulta instantânea O(1)
+          const idsCanceladosSet = new Set();
+          resultadoSol.dados.forEach(sol => {
+            if (sol.tipo === 'Cancelado' && sol.status !== 'Recusado' && sol.observacoes) {
+              const matches = sol.observacoes.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
+              if (matches) idsCanceladosSet.add(matches[0]);
+            }
+          });
 
-          const estoqueReferencia = resultadoEst.sucesso ? resultadoEst.dados : [];
-
+          // Inicia o processamento dos 1000 itens (agora sem loops escondidos pesados)
           const dadosFormatados = resultadoSol.dados.map((item) => {
             let acaoTipo = "select";
             let acaoValor = item.status;
@@ -200,25 +228,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
             let statusFinalVisual = item.status;
 
-            const temPedidoDeCancelamento = cancelamentosAtivos.find(canc =>
-              canc.observacoes && canc.observacoes.includes(item.idOriginal)
-            );
-
-            if (item.tipo !== 'Cancelado' && temPedidoDeCancelamento) {
+            // Busca instantânea no Set de cancelamentos
+            if (item.tipo !== 'Cancelado' && idsCanceladosSet.has(item.id)) {
               statusFinalVisual = 'Cancelado';
             }
             else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
-              const qtdJaDevolvida = {};
-              reints.forEach(reint => {
-                if (reint.observacoes && reint.observacoes.includes(numeroPL)) {
-                  (reint.itens || []).forEach(it => {
-                    qtdJaDevolvida[it.estoque_id] = (qtdJaDevolvida[it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
-                  });
-                }
-              });
-
+              
+              // O(1) Lookup nas devoluções pre-calculadas
+              const devolucoesDestaPL = qtdJaDevolvidaGlobal[numeroPL] || {};
+              
               const itensRestantes = (item.itens || []).filter(origItem => {
-                const devolvido = qtdJaDevolvida[origItem.estoque_id] || 0;
+                const devolvido = devolucoesDestaPL[origItem.estoque_id] || 0;
                 return (Number(origItem.quantidade_solicitada) - devolvido) > 0;
               });
 
@@ -227,10 +247,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
+            // ✨ OPTIMIZAÇÃO 3: O enriquecimento de itens usa o dicionário! 
+            // Já não usa o .find(), a velocidade aumenta brutalmente.
             const itensEnriquecidos = (item.itens || []).map(it => {
-              const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
-                ? estoqueReferencia.find(e => e.id === it.estoque_id)
-                : null;
+              const itemFisico = it.estoque_id ? dicionarioEstoque[it.estoque_id] : null;
                 
               return {
                 ...it,
@@ -307,72 +327,87 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: '' });
   };
 
-  const dadosFiltrados = dadosTabela.filter((item) => {
+  const dadosFiltrados = useMemo(() => {
+    return dadosTabela.filter((item) => {
+      
+      if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) return false;
+
+      if (filtroStatus !== 'Todos') {
+        if (filtroStatus === 'Pendente' && item.status !== 'Pendente') return false;
+        if (filtroStatus === 'Em Andamento' && (item.status !== 'Em Separação' && item.status !== 'Em Andamento')) return false;
+        if (filtroStatus === 'Concluído' && (item.status !== 'Concluído' && item.statusExibicao !== 'Reintegrado')) return false;
+        if (filtroStatus === 'Recusado' && item.status !== 'Recusado') return false;
+        if (filtroStatus === 'Cancelado' && (item.status !== 'Cancelado' && item.statusExibicao !== 'Cancelado')) return false;
+      }
+
+      const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
+      if (filtroAtivo !== "Todos" && item.tipo !== tipoMapeado && item.tipo !== filtroAtivo) return false;
+
+      if (filtrosAvancados.wbs) {
+        const batePrincipal = verificaFiltroAvancado(item.wbs, filtrosAvancados.wbs);
+        const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.wbs_element || it.wbs, filtrosAvancados.wbs));
+        if (!batePrincipal && !bateItens) return false;
+      }
+
+      if (filtrosAvancados.sap) {
+        const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.desenho_sap_manual || it.desenho_sap, filtrosAvancados.sap));
+        if (!bateItens) return false;
+      }
+
+      if (filtrosAvancados.nf) {
+        const batePrincipal = verificaFiltroAvancado(item.nfCrossdocking, filtrosAvancados.nf);
+        const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.nf_entrada || it.nfEntrada || it.nf, filtrosAvancados.nf));
+        if (!batePrincipal && !bateItens) return false;
+      }
+
+      if (!verificaFiltroAvancado(item.tipo, filtrosAvancados.tipo)) return false;
+      if (!verificaFiltroAvancado(item.id, filtrosAvancados.id)) return false;
+      if (!verificaFiltroAvancado(item.solicitante, filtrosAvancados.solicitante)) return false;
+      if (!verificaFiltroAvancado(item.pl, filtrosAvancados.pl)) return false;
+      if (!verificaFiltroAvancado(item.filial, filtrosAvancados.filial)) return false;
+      if (!verificaFiltroAvancado(item.destino, filtrosAvancados.destino)) return false;
+      if (!verificaFiltroAvancado(item.statusExibicao, filtrosAvancados.statusExibicao)) return false;
+
+      if (termoPesquisa) {
+        const termo = termoPesquisa.toLowerCase();
+        const batePesquisa =
+          (item.id && String(item.id).toLowerCase().includes(termo)) ||
+          (item.solicitante && item.solicitante.toLowerCase().includes(termo)) ||
+          (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
+          (item.destino && item.destino.toLowerCase().includes(termo)) ||
+          ((item.pl || item.bs) && String(item.pl || item.bs).toLowerCase().includes(termo));
+        if (!batePesquisa) return false;
+      }
+
+      return true;
+    });
+  }, [dadosTabela, estoqueAtual, filtroStatus, filtroAtivo, filtrosAvancados, termoPesquisa]);
+
+  const kpis = useMemo(() => {
+    return {
+      total: dadosFiltrados.length,
+      pendentes: dadosFiltrados.filter((item) => item.status === "Pendente").length,
+      andamento: dadosFiltrados.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length,
+      concluidos: dadosFiltrados.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length,
+      recusados: dadosFiltrados.filter((item) => item.status === "Recusado").length,
+      cancelados: dadosFiltrados.filter((item) => item.status === "Cancelado" || item.statusExibicao === "Cancelado").length,
+    };
+  }, [dadosFiltrados]);
+
+  const { dadosPaginados, totalPaginas, totalRegistrosFiltrados, indexPrimeiroItem, indexUltimoItem } = useMemo(() => {
+    const totalRegistros = dadosFiltrados.length;
+    const paginas = Math.max(1, Math.ceil(totalRegistros / itensPorPagina));
+    const start = (paginaAtual - 1) * itensPorPagina;
+    const end = paginaAtual * itensPorPagina;
     
-    if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) return false;
-
-    if (filtroStatus !== 'Todos') {
-      if (filtroStatus === 'Pendente' && item.status !== 'Pendente') return false;
-      if (filtroStatus === 'Em Andamento' && (item.status !== 'Em Separação' && item.status !== 'Em Andamento')) return false;
-      if (filtroStatus === 'Concluído' && (item.status !== 'Concluído' && item.statusExibicao !== 'Reintegrado')) return false;
-      if (filtroStatus === 'Recusado' && item.status !== 'Recusado') return false;
-      if (filtroStatus === 'Cancelado' && (item.status !== 'Cancelado' && item.statusExibicao !== 'Cancelado')) return false;
-    }
-
-    const tipoMapeado = filtroAtivo === "Transfer. WBS" ? "Transferencia WBS" : filtroAtivo === "Reintegração" ? "Reintegracao" : filtroAtivo;
-    if (filtroAtivo !== "Todos" && item.tipo !== tipoMapeado && item.tipo !== filtroAtivo) return false;
-
-    if (filtrosAvancados.wbs) {
-      const batePrincipal = verificaFiltroAvancado(item.wbs, filtrosAvancados.wbs);
-      const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.wbs_element || it.wbs, filtrosAvancados.wbs));
-      if (!batePrincipal && !bateItens) return false;
-    }
-
-    if (filtrosAvancados.sap) {
-      const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.desenho_sap_manual || it.desenho_sap, filtrosAvancados.sap));
-      if (!bateItens) return false;
-    }
-
-    if (filtrosAvancados.nf) {
-      const batePrincipal = verificaFiltroAvancado(item.nfCrossdocking, filtrosAvancados.nf);
-      const bateItens = item.itens?.some(it => verificaFiltroAvancado(it.nf_entrada || it.nfEntrada || it.nf, filtrosAvancados.nf));
-      if (!batePrincipal && !bateItens) return false;
-    }
-
-    if (!verificaFiltroAvancado(item.tipo, filtrosAvancados.tipo)) return false;
-    if (!verificaFiltroAvancado(item.id, filtrosAvancados.id)) return false;
-    if (!verificaFiltroAvancado(item.solicitante, filtrosAvancados.solicitante)) return false;
-    if (!verificaFiltroAvancado(item.pl, filtrosAvancados.pl)) return false;
-    if (!verificaFiltroAvancado(item.filial, filtrosAvancados.filial)) return false;
-    if (!verificaFiltroAvancado(item.destino, filtrosAvancados.destino)) return false;
-    if (!verificaFiltroAvancado(item.statusExibicao, filtrosAvancados.statusExibicao)) return false;
-
-    if (termoPesquisa) {
-      const termo = termoPesquisa.toLowerCase();
-      const batePesquisa =
-        (item.id && String(item.id).toLowerCase().includes(termo)) ||
-        (item.solicitante && item.solicitante.toLowerCase().includes(termo)) ||
-        (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
-        (item.destino && item.destino.toLowerCase().includes(termo)) ||
-        ((item.pl || item.bs) && String(item.pl || item.bs).toLowerCase().includes(termo));
-      if (!batePesquisa) return false;
-    }
-
-    return true;
-  });
-
-  const kpiTotal = dadosFiltrados.length;
-  const kpiPendentes = dadosFiltrados.filter((item) => item.status === "Pendente").length;
-  const kpiAndamento = dadosFiltrados.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length;
-  const kpiConcluidos = dadosFiltrados.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length;
-  const kpiRecusados = dadosFiltrados.filter((item) => item.status === "Recusado").length;
-  const kpiCancelados = dadosFiltrados.filter((item) => item.status === "Cancelado" || item.statusExibicao === "Cancelado").length;
-
-  const totalRegistrosFiltrados = dadosFiltrados.length;
-  const totalPaginas = Math.max(1, Math.ceil(totalRegistrosFiltrados / itensPorPagina));
-  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
-  const indexUltimoItem = paginaAtual * itensPorPagina;
-  const dadosPaginados = dadosFiltrados.slice(indexPrimeiroItem, indexUltimoItem);
+    return {
+      dadosPaginados: dadosFiltrados.slice(start, end),
+      totalPaginas: paginas,
+      totalRegistrosFiltrados: totalRegistros,
+      indexPrimeiroItem: start,
+      indexUltimoItem: end
+    };
+  }, [dadosFiltrados, paginaAtual, itensPorPagina]);
 
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
     const confirmar = await showConfirm("Alterar Status", `Tem certeza que deseja mudar o status para "${novoStatus}"?`, "warning", "Sim, Mudar");
@@ -526,22 +561,22 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
       <div className="kpis-linha">
         <div className={`kpi-card-resumo kpi-total ${filtroStatus === "Todos" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Todos")}>
-          <span>Total</span><strong>{kpiTotal}</strong>
+          <span>Total</span><strong>{kpis.total}</strong>
         </div>
         <div className={`kpi-card-resumo kpi-pendentes ${filtroStatus === "Pendente" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Pendente")}>
-          <span>Pendentes</span><strong>{kpiPendentes}</strong>
+          <span>Pendentes</span><strong>{kpis.pendentes}</strong>
         </div>
         <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Andamento" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Em Andamento")}>
-          <span>Em Separação</span><strong>{kpiAndamento}</strong>
+          <span>Em Separação</span><strong>{kpis.andamento}</strong>
         </div>
         <div className={`kpi-card-resumo kpi-concluidos ${filtroStatus === "Concluído" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Concluído")}>
-          <span>Concluídos</span><strong>{kpiConcluidos}</strong>
+          <span>Concluídos</span><strong>{kpis.concluidos}</strong>
         </div>
         <div className={`kpi-card-resumo kpi-recusados ${filtroStatus === "Recusado" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Recusado")}>
-          <span>Recusados</span><strong>{kpiRecusados}</strong>
+          <span>Recusados</span><strong>{kpis.recusados}</strong>
         </div>
         <div className={`kpi-card-resumo kpi-cancelados ${filtroStatus === "Cancelado" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Cancelado")}>
-          <span>Cancelados</span><strong>{kpiCancelados}</strong>
+          <span>Cancelados</span><strong>{kpis.cancelados}</strong>
         </div>
       </div>
 
@@ -603,7 +638,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             </thead>
             <tbody>
               {carregando ? (
-                <tr><td colSpan="8" style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>Carregando solicitações...</td></tr>
+                <tr><td colSpan="8" style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>Carregando solicitações e a processar o estoque de segurança...</td></tr>
               ) : dadosPaginados.length === 0 ? (
                 <tr><td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
@@ -705,7 +740,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
 
-                        {/* ✨ RESTAURADO: O INPUT DE DATA COM LÓGICA DE OK/CANCELAR */}
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
