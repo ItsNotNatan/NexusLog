@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, Archive, Calendar, User, Box, ArrowRight, RotateCcw, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText, X } from 'lucide-react';
+// ✨ ADICIONADO: ChevronLeft e ChevronRight para os botões da paginação
+import { Search, Loader2, Archive, Calendar, User, Box, ArrowRight, RotateCcw, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
@@ -15,13 +16,20 @@ export default function Traceabilly({ perfil }) {
   
   const [recarregar, setRecarregar] = useState(0);
 
-  // ✨ NOVOS ESTADOS PARA O MODAL DE REVERSÃO
   const [modalReverter, setModalReverter] = useState(false);
   const [itemReverter, setItemReverter] = useState(null);
   const [qtdReverter, setQtdReverter] = useState(1);
 
-  // VERIFICAÇÃO DE PERMISSÃO: Apenas ADM e LÍDER no perfil logística podem reverter
+  // ✨ ESTADO DE PAGINAÇÃO QUE JÁ TINHAS
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 10;
+
   const isAdminOuLider = perfil !== 'cliente' && (usuario?.cargo === 'ADM' || usuario?.cargo === 'LIDER');
+
+  // ✨ LÓGICA NOVA: Volta para a página 1 sempre que pesquisares algo
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [termoPesquisa]);
 
   const formatarData = (dataISO) => {
     if (!dataISO) return '-';
@@ -133,14 +141,12 @@ export default function Traceabilly({ perfil }) {
     }
   }, [estoqueAtual, showAlert, recarregar]);
 
-  // ✨ ABRE O MODAL DE REVERSÃO COM OS DADOS DO ITEM
   const abrirModalReverter = (item) => {
     setItemReverter(item);
-    setQtdReverter(item.qtdMovimentada); // Define o valor máximo como padrão
+    setQtdReverter(item.qtdMovimentada); 
     setModalReverter(true);
   };
 
-  // ✨ LÓGICA DE CONFIRMAR A REVERSÃO PARA A API
   const confirmarReversao = async () => {
     const qtdNum = Number(qtdReverter);
     if (!qtdNum || qtdNum <= 0 || qtdNum > itemReverter.qtdMovimentada) {
@@ -154,14 +160,14 @@ export default function Traceabilly({ perfil }) {
         method: 'POST',
         body: JSON.stringify({ 
           id_item: itemReverter.idItem,
-          quantidade: qtdNum // ✨ ENVIAMOS A QUANTIDADE AGORA!
+          quantidade: qtdNum 
         })
       });
 
       if (resposta.sucesso) {
         showAlert("Sucesso", "A quantidade foi revertida para o estoque com sucesso!", "success");
         setModalReverter(false);
-        setRecarregar(prev => prev + 1); // Dispara a recarga da tabela
+        setRecarregar(prev => prev + 1); 
       } else {
         showAlert("Erro de Servidor", resposta.erro, "error");
       }
@@ -181,15 +187,22 @@ export default function Traceabilly({ perfil }) {
     (item.solicitacao && item.solicitacao.toLowerCase().includes(termoPesquisa.toLowerCase()))
   );
 
+  // ✨ LÓGICA DE PAGINAÇÃO IMPLEMENTADA AQUI
+  const totalRegistrosFiltrados = historicoFiltrado.length;
+  const totalPaginas = Math.max(1, Math.ceil(totalRegistrosFiltrados / itensPorPagina));
+  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
+  const indexUltimoItem = paginaAtual * itensPorPagina;
+  const dadosPaginados = historicoFiltrado.slice(indexPrimeiroItem, indexUltimoItem);
+
   return (
     <div className="traceabilly-wrapper">
-      <div className="traceabilly-card">
+      <div className="traceabilly-card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         
         <div className="traceabilly-header">
           <div className="header-esquerda">
             <Archive size={20} className="icone-azul" />
             <h2>Itens Arquivados</h2>
-            <span className="badge-contador">{historicoFiltrado.length}</span>
+            <span className="badge-contador">{totalRegistrosFiltrados}</span>
           </div>
           <div className="header-direita">
             <Search size={16} className="icone-pesquisa" />
@@ -215,10 +228,10 @@ export default function Traceabilly({ perfil }) {
           </div>
         </div>
 
-        <div className="tabela-container">
+        <div className="tabela-container" style={{ flex: 1, overflowY: 'auto' }}>
           {carregando ? (
             <div className="estado-vazio"><Loader2 className="animate-spin" size={32} /> A analisar o ciclo de vida dos materiais...</div>
-          ) : historicoFiltrado.length === 0 ? (
+          ) : dadosPaginados.length === 0 ? (
             <div className="estado-vazio"><Archive size={48} className="icone-vazio" /> Nenhum fluxo encontrado para materiais zerados.</div>
           ) : (
             <table className="tabela-rastreabilidade">
@@ -238,7 +251,8 @@ export default function Traceabilly({ perfil }) {
                 </tr>
               </thead>
               <tbody>
-                {historicoFiltrado.map(item => (
+                {/* ✨ TABELA AGORA MAPEA APENAS OS DADOS DA PÁGINA ATUAL */}
+                {dadosPaginados.map(item => (
                   <tr key={item.idUnico}>
                     <td className="texto-azul">{item.desenhoSAP}</td>
                     <td className="texto-negrito">{item.partNumber}</td>
@@ -288,7 +302,6 @@ export default function Traceabilly({ perfil }) {
                     
                     <td>{item.dataSaida}</td>
                     
-                    {/* ✨ O BOTÃO AGORA ABRE A CAIXA (MODAL) */}
                     {isAdminOuLider && (
                       <td style={{ textAlign: 'center' }}>
                         {['Material', 'Transferencia WBS', 'Crossdocking'].includes(item.tipoOriginal) ? (
@@ -310,11 +323,37 @@ export default function Traceabilly({ perfil }) {
             </table>
           )}
         </div>
+
+        {/* ✨ BARRA DE PAGINAÇÃO ADICIONADA */}
+        {!carregando && totalRegistrosFiltrados > 0 && (
+          <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9', borderRadius: '0 0 12px 12px' }}>
+            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> itens
+            </div>
+            <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button onClick={() => setPaginaAtual(p => Math.max(p - 1, 1))} disabled={paginaAtual === 1} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', background: paginaAtual === 1 ? '#f8fafc' : '#fff', color: paginaAtual === 1 ? '#94a3b8' : '#334155', cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer', fontSize: '0.875rem', fontWeight: '500' }}>
+                <ChevronLeft size={16} /> Anterior
+              </button>
+              
+              {Array.from({ length: totalPaginas }, (_, i) => {
+                const numeroPagina = i + 1;
+                const ehAtiva = paginaAtual === numeroPagina;
+                return (
+                  <button key={numeroPagina} onClick={() => setPaginaAtual(numeroPagina)} style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: 'pointer', transition: 'all 0.15s ease' }}>
+                    {numeroPagina}
+                  </button>
+                );
+              })}
+
+              <button onClick={() => setPaginaAtual(p => Math.min(p + 1, totalPaginas))} disabled={paginaAtual === totalPaginas} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', background: paginaAtual === totalPaginas ? '#f8fafc' : '#fff', color: paginaAtual === totalPaginas ? '#94a3b8' : '#334155', cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer', fontSize: '0.875rem', fontWeight: '500' }}>
+                Próxima <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {/* ==============================================
-          ✨ MODAL DE REVERSÃO COM CAMPO DE QUANTIDADE
-          ============================================== */}
       {modalReverter && itemReverter && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, animation: 'fadeIn 0.2s ease-out' }}>
           <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '450px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
