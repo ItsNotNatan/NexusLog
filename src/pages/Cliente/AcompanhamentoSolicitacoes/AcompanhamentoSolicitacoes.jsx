@@ -1,7 +1,7 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
 // =================================================================
-import React, { useState, useEffect, useContext, useMemo } from "react";
+import React, { useState, useEffect, useContext, useMemo, useRef } from "react"; // ✨ useRef adicionado
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
@@ -54,18 +54,12 @@ const obterClasseBadgeTipo = (tipo) => {
 
 const converterParaInputDateTime = (dataString) => {
   if (!dataString || dataString === '-' || dataString === '—' || dataString === 'Disponível') return '';
-  
   const partes = dataString.split(' ');
   if (partes[0].includes('/')) {
     const [dia, mes, ano] = partes[0].split('/');
     let hora = '00:00';
-    
-    if (partes.length >= 3 && partes[2].includes(':')) {
-       hora = partes[2]; 
-    } else if (partes.length === 2 && partes[1].includes(':')) {
-       hora = partes[1]; 
-    }
-    
+    if (partes.length >= 3 && partes[2].includes(':')) hora = partes[2]; 
+    else if (partes.length === 2 && partes[1].includes(':')) hora = partes[1]; 
     return `${ano}-${mes}-${dia}T${hora}`;
   }
   return '';
@@ -74,21 +68,16 @@ const converterParaInputDateTime = (dataString) => {
 const obterValorSeguroNumero = (valItem, valEstoque) => {
   const processarNumero = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || valor === '') return 0;
-    
     let limpo = String(valor).replace(/[^\d.,-]/g, '');
     if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
     else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
-    
     const numeroFinal = parseFloat(limpo);
     return isNaN(numeroFinal) ? 0 : numeroFinal;
   };
-
   const num1 = processarNumero(valItem);
   if (num1 > 0) return num1;
-  
   const num2 = processarNumero(valEstoque);
   if (num2 > 0) return num2;
-
   return 0;
 };
 
@@ -127,16 +116,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
-  const [paginaAtual, setPaginaAtual] = useState(1);
 
-  // ✨ OTIMIZAÇÃO 1: Separamos a digitação da pesquisa real (DEBOUNCE)
+  // ✨ Estados para o Debounce da Pesquisa
   const [termoPesquisaInput, setTermoPesquisaInput] = useState("");
   const [termoPesquisaFiltro, setTermoPesquisaFiltro] = useState("");
 
   useEffect(() => {
     const atraso = setTimeout(() => {
       setTermoPesquisaFiltro(termoPesquisaInput);
-    }, 350); // Só pesquisa 350 milissegundos depois de parares de escrever
+    }, 350);
     return () => clearTimeout(atraso);
   }, [termoPesquisaInput]);
 
@@ -147,8 +135,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [editandoDataId, setEditandoDataId] = useState(null);
   const [dataTemporaria, setDataTemporaria] = useState("");
-
-  const itensPorPagina = 10;
 
   let usuarioLogado = {};
   try {
@@ -254,7 +240,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
-            // ✨ OTIMIZAÇÃO 2: Pré-Indexação da Pesquisa. Junta tudo numa string limpa para procura à velocidade da luz.
             const wbsProcura = item.wbs || '—';
             const destinoProcura = item.destino || 'Não informado';
             const idProcura = item.ps || item.id;
@@ -275,7 +260,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               wbs: wbsProcura, 
               destino: destinoProcura,
               filial: item.filial_origem_id || item.filial || '-',
-              textoBuscavel: textoBuscavel, // <--- A Nossa Etiqueta Secreta!
+              textoBuscavel: textoBuscavel,
               itensRaw: item.itens || []
             };
           });
@@ -299,7 +284,44 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     return () => socket.disconnect();
   }, [estoqueAtual, showAlert, perfil]);
 
-  useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisaFiltro, filtrosAvancados]);
+  // =================================================================
+  // ✨ LÓGICA MESTRA: SCROLL INFINITO & RENDERIZAÇÃO INCREMENTAL
+  // =================================================================
+  
+  // Controla quantas linhas desenhar na memória de cada vez
+  const [limiteExibicao, setLimiteExibicao] = useState(15);
+  // Esta referência vai para a última linha invisível da tabela
+  const observerTarget = useRef(null);
+
+  // Sempre que os filtros mudam, resetamos o limite para 15 (para ser super rápido)
+  useEffect(() => {
+    setLimiteExibicao(15);
+  }, [filtroAtivo, filtroStatus, termoPesquisaFiltro, filtrosAvancados]);
+
+  // O Detetive que sabe quando o utilizador chegou ao fundo da tabela
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entradas) => {
+        // Se a linha invisível aparecer no ecrã...
+        if (entradas[0].isIntersecting) {
+          // ... aumenta o número de itens desenhados em mais 15!
+          setLimiteExibicao((limiteAtual) => limiteAtual + 15);
+        }
+      },
+      { threshold: 0.1 } // Deteta logo que 10% da linha invisível aparece
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [dadosTabela]); // Atualiza o detetive se os dados mudarem
+
 
   const getItensEnriquecidos = (linha) => {
     if (!linha.itensRaw) return [];
@@ -378,7 +400,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (!verificaFiltroAvancado(item.destino, filtrosAvancados.destino)) return false;
       if (!verificaFiltroAvancado(item.statusExibicao, filtrosAvancados.statusExibicao)) return false;
 
-      // ✨ OTIMIZAÇÃO 2 APLICADA: Pesquisa muito mais leve (1 campo em vez de 5)
       if (termoPesquisaFiltro) {
         const termo = termoPesquisaFiltro.toLowerCase();
         if (!item.textoBuscavel.includes(termo)) return false;
@@ -398,19 +419,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     };
   }, [dadosFiltrados]);
 
-  const { dadosPaginados, totalPaginas, totalRegistrosFiltrados, indexPrimeiroItem, indexUltimoItem } = useMemo(() => {
-    const totalRegistros = dadosFiltrados.length;
-    const paginas = Math.max(1, Math.ceil(totalRegistros / itensPorPagina));
-    const start = (paginaAtual - 1) * itensPorPagina;
-    const end = paginaAtual * itensPorPagina;
-    return {
-      dadosPaginados: dadosFiltrados.slice(start, end),
-      totalPaginas: paginas,
-      totalRegistrosFiltrados: totalRegistros,
-      indexPrimeiroItem: start,
-      indexUltimoItem: end
-    };
-  }, [dadosFiltrados, paginaAtual, itensPorPagina]);
+  // ✨ FATIAMENTO INTELIGENTE: Pega apenas do item 0 até ao limite visível
+  const dadosParaExibir = useMemo(() => {
+    return dadosFiltrados.slice(0, limiteExibicao);
+  }, [dadosFiltrados, limiteExibicao]);
 
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
     const confirmar = await showConfirm("Alterar Status", `Tem certeza que deseja mudar o status para "${novoStatus}"?`, "warning", "Sim, Mudar");
@@ -636,10 +648,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             <tbody>
               {carregando ? (
                 <tr><td colSpan="8" style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>Carregando solicitações e a processar o estoque de segurança...</td></tr>
-              ) : dadosPaginados.length === 0 ? (
+              ) : dadosParaExibir.length === 0 ? (
                 <tr><td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
-                dadosPaginados.map((linha, index) => {
+                dadosParaExibir.map((linha, index) => {
                   const idUnico = `${linha.idOriginal}-${index}`;
                   const isExpandida = linhaExpandida === idUnico;
                   const isCrossdocking = linha.tipo === 'Crossdocking';
@@ -814,23 +826,23 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   );
                 })
               )}
+
+              {/* ✨ O DETETIVE INVISÍVEL: A linha que dispara o carregamento contínuo */}
+              {!carregando && limiteExibicao < dadosFiltrados.length && (
+                <tr ref={observerTarget}>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: '#64748b', fontWeight: '500' }}>
+                    <RefreshCw size={20} className="animate-spin" style={{ margin: '0 auto', display: 'block', marginBottom: '8px' }} />
+                    A carregar mais solicitações...
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </ScrollDuplo>
 
-        <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-          <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-            Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
-          </div>
-          <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}><ChevronLeft size={16} /> Anterior</button>
-            {Array.from({ length: totalPaginas }, (_, index) => {
-              const numeroPagina = index + 1;
-              const ehAtiva = paginaAtual === numeroPagina;
-              return (<button key={numeroPagina} onClick={() => setPaginaAtual(numeroPagina)} disabled={carregando} style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: carregando ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease' }}>{numeroPagina}</button>);
-            })}
-            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 0.6 : 1 }}>Próxima <ChevronRight size={16} /></button>
-          </div>
+        {/* Rodapé informativo substitui os antigos botões de página */}
+        <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 24px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.875rem' }}>
+          <span>Exibindo <strong>{Math.min(limiteExibicao, dadosFiltrados.length)}</strong> de <strong>{dadosFiltrados.length}</strong> resultados listados.</span>
         </div>
       </div>
 
