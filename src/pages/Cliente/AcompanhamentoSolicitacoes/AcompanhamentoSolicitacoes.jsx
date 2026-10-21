@@ -129,7 +129,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
   
-  // ✨ NOVO: Estado para a Ordenação (Sorting)
   const [ordenacao, setOrdenacao] = useState({ coluna: 'dataCriacaoISO', direcao: 'desc' });
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(10);
@@ -271,7 +270,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               acaoTipo: acaoTipo,
               acaoValor: acaoValor,
               dataSolicitacao: item.dataSolicitacao || "-",
-              dataCriacaoISO: item.created_at || item.dataCriacaoISO || item.dataSolicitacao, // ✨ ISO para Sorting perfeito
+              dataCriacaoISO: item.created_at || item.dataCriacaoISO || item.dataSolicitacao, 
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
               wbs: wbsProcura, 
@@ -340,7 +339,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: '' });
   };
 
-  // 1. FILTRA OS DADOS PRIMEIRO
   const dadosFiltrados = useMemo(() => {
     return dadosTabela.filter((item) => {
       if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) return false;
@@ -389,7 +387,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     });
   }, [dadosTabela, estoqueAtual, filtroStatus, filtroAtivo, filtrosAvancados, termoPesquisaFiltro]);
 
-  // ✨ 2. ORDENA OS DADOS DEPOIS DE FILTRAR (NOVO)
   const dadosOrdenados = useMemo(() => {
     const { coluna, direcao } = ordenacao;
     if (!coluna) return dadosFiltrados;
@@ -399,7 +396,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       let valA = a[coluna] || '';
       let valB = b[coluna] || '';
 
-      // Tratamento especial para Datas
       if (coluna === 'dataCriacaoISO' || coluna === 'dataEntrega') {
         valA = new Date(valA).getTime() || 0;
         valB = new Date(valB).getTime() || 0;
@@ -427,7 +423,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     };
   }, [dadosOrdenados]);
 
-  // ✨ 3. PAGINA OS DADOS ORDENADOS
   const { dadosPaginados, totalPaginas, totalRegistrosFiltrados, indexPrimeiroItem, indexUltimoItem } = useMemo(() => {
     const totalRegistros = dadosOrdenados.length;
     const paginas = Math.max(1, Math.ceil(totalRegistros / itensPorPagina));
@@ -577,7 +572,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  // ✨ COMPONENTE HEADER ORDENÁVEL (Interno)
   const HeaderOrdenavel = ({ coluna, label, estiloAdicional = {} }) => {
     const isAtiva = ordenacao.coluna === coluna;
     
@@ -598,7 +592,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             {isAtiva ? (
               ordenacao.direcao === 'asc' ? <ChevronUp size={14} strokeWidth={3} /> : <ChevronDown size={14} strokeWidth={3} />
             ) : (
-              <ChevronDown size={14} /> // Ícone inativo discreto
+              <ChevronDown size={14} />
             )}
           </div>
         </div>
@@ -683,7 +677,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             <thead>
               <tr>
                 <th className="col-chevron"></th>
-                {/* ✨ OS CABEÇALHOS AGORA SÃO ORDENÁVEIS */}
                 <HeaderOrdenavel coluna="tipo" label="TIPO / ID (PS)" />
                 <HeaderOrdenavel coluna="solicitante" label="SOLICITANTE / WBS" />
                 <HeaderOrdenavel coluna="pl" label="Nº DA PL" />
@@ -695,7 +688,28 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             </thead>
             <tbody>
               {carregando ? (
-                <tr><td colSpan="8" style={{ padding: "60px", textAlign: "center", color: "#64748b", fontWeight: "500" }}>Carregando solicitações e a processar o estoque de segurança...</td></tr>
+                // ✨ SKELETON LOADING
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={`skeleton-${i}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '20px', height: '20px', borderRadius: '50%' }}></div></td>
+                    <td style={{ padding: '16px' }}>
+                      <div className="skeleton-box" style={{ width: '80px', marginBottom: '8px', height: '16px' }}></div>
+                      <div className="skeleton-box" style={{ width: '120px', height: '14px' }}></div>
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      <div className="skeleton-box" style={{ width: '100px', marginBottom: '8px', height: '14px' }}></div>
+                      <div className="skeleton-box" style={{ width: '60px', height: '14px' }}></div>
+                    </td>
+                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '70px', height: '20px' }}></div></td>
+                    <td style={{ padding: '16px' }}>
+                      <div className="skeleton-box" style={{ width: '90px', marginBottom: '8px', height: '20px' }}></div>
+                      <div className="skeleton-box" style={{ width: '90px', height: '20px' }}></div>
+                    </td>
+                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
+                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
+                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '100px', height: '28px', borderRadius: '999px' }}></div></td>
+                  </tr>
+                ))
               ) : dadosPaginados.length === 0 ? (
                 <tr><td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
@@ -878,8 +892,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </table>
         </ScrollDuplo>
 
+        {/* 
+          A lógica da paginação encontra-se extraída abaixo para clareza, mas faz parte
+          integral deste mesmo componente 
+        */}
         <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-          
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
               Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
@@ -909,7 +926,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </div>
 
           <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            
             <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}>
               <ChevronLeft size={16} /> Anterior
             </button>
