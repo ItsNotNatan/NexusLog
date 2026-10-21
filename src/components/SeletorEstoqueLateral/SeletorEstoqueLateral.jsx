@@ -6,10 +6,10 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check, Box, X } from 'lucide-react';
 import { AuthContext } from '../../contexts/AuthContext';
 
-// ✨ NOVO: Função auxiliar para formatar o Valor Unitário como moeda (R$)
+// Função auxiliar para formatar o Valor Unitário como moeda (R$)
 const formatarMoeda = (valor) => {
   if (valor === undefined || valor === null || valor === '-' || valor === '') return '-';
-  if (typeof valor === 'string' && valor.includes('R$')) return valor; // Se já vier formatado
+  if (typeof valor === 'string' && valor.includes('R$')) return valor;
 
   let limpo = String(valor).replace(/[^\d.,-]/g, '');
   if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
@@ -64,7 +64,7 @@ export default function SeletorEstoqueLateral({
       (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
       (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
       (item.materialDescription && item.materialDescription.toLowerCase().includes(termo)) ||
-      (item.referencia && item.referencia.toLowerCase().includes(termo)) // ✨ Adicionado busca por referência
+      (item.referencia && item.referencia.toLowerCase().includes(termo))
     );
   }) || [];
 
@@ -303,22 +303,15 @@ export default function SeletorEstoqueLateral({
               <p style={{ margin: 0, fontSize: '0.9rem' }}>Clique nos itens do estoque à esquerda para adicioná-los.</p>
             </div>
           ) : (
-            // ✨ O minWidth passou para 1300px para acomodar as 2 novas colunas
             <table style={{ width: "100%", minWidth: "1300px", borderCollapse: "collapse", textAlign: "left" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#2563eb", fontWeight: "700", textTransform: "uppercase" }}>DESENHO SAP</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>Nº PEDIDO DE COMPRA / CPV</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>DESCRIÇÃO</th>
-                  
-                  {/* ✨ NOVO: Coluna Referência */}
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>REFERÊNCIA</th>
-                  
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>NF ENTRADA</th>
-                  
-                  {/* ✨ NOVO: Coluna Valor Unitário */}
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>VALOR UNITÁRIO</th>
-                  
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>ALOCAÇÃO</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>WBS ITEM</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#10b981", fontWeight: "700", textTransform: "uppercase" }}>SALDO</th>
@@ -328,52 +321,70 @@ export default function SeletorEstoqueLateral({
                 </tr>
               </thead>
               <tbody>
-                {itensSelecionados.map((item) => {
-                  const qtdDesejada = item.qtdSelecionada !== undefined ? item.qtdSelecionada : (item.qtdTransferencia !== undefined ? item.qtdTransferencia : 1);
-                  const unidade = item.unidade_medida || item.unidadeMedida || 'Unid';
+                {itensSelecionados.map((itemOriginal) => {
                   
-                  const saldo = item.quantidade_disponivel ?? item.qtdFornecida ?? 0;
-                  const reservado = item.quantidade_reservada ?? item.qtdReservada ?? 0;
+                  // ✨ LÓGICA DE ENRIQUECIMENTO: Puxa o item da "prateleira" para preencher os espaços em branco
+                  const idEstoqueRef = itemOriginal.estoque_id || itemOriginal.idBD || itemOriginal.id;
+                  const itemFisico = estoque?.find(e => e.id === idEstoqueRef) || {};
+
+                  // Puxamos os dados da prateleira se eles não existirem no itemOriginal
+                  const docCompras = itemOriginal.documento_compras || itemOriginal.docCompras || itemFisico.documento_compras || "-";
+                  const referencia = itemOriginal.referencia || itemFisico.referencia || "-";
+                  const valorUnitario = itemOriginal.valor_unitario_enriquecido ?? itemOriginal.valor_unitario ?? itemOriginal.valor_unitario_manual ?? itemOriginal.poNetPrice ?? itemOriginal.val ?? itemFisico.valor_unitario;
+                  const nfEntrada = itemOriginal.nf_entrada || itemOriginal.nfEntrada || itemOriginal.nf || itemFisico.nf_entrada || "-";
+                  const alocacao = itemOriginal.alocacao || itemFisico.alocacao || "CROSSDOCKING";
+                  const wbs = itemOriginal.wbs_element || itemOriginal.wbs || itemFisico.wbs || "-";
+                  
+                  // Dados de controlo de quantidade
+                  const qtdDesejada = itemOriginal.qtdSelecionada !== undefined ? itemOriginal.qtdSelecionada : (itemOriginal.qtdTransferencia !== undefined ? itemOriginal.qtdTransferencia : 1);
+                  const unidade = itemOriginal.unidade_medida || itemOriginal.unidadeMedida || itemFisico.unidade_medida || 'Unid';
+                  
+                  const saldo = itemFisico.quantidade_disponivel ?? itemOriginal.quantidade_disponivel ?? itemOriginal.qtdFornecida ?? 0;
+                  const reservado = itemFisico.quantidade_reservada ?? itemOriginal.quantidade_reservada ?? itemOriginal.qtdReservada ?? 0;
                   const saldoLivreReal = Math.max(1, saldo - reservado);
 
                   return (
-                    <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <tr key={itemOriginal.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
                       <td style={{ padding: "16px", backgroundColor: "#f8fafc", color: "#2563eb", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {item.desenho_sap || item.desenhoSAP || "-"}
-                      </td>
-                      <td style={{ padding: "16px", fontWeight: "700", color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
-                        {item.documento_compras || "-"}
-                      </td>
-                      <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", minWidth: "200px" }}>
-                        {item.descricao || item.materialDescription || "-"}
+                        {itemOriginal.desenho_sap || itemOriginal.desenhoSAP || "-"}
                       </td>
                       
-                      {/* ✨ NOVO: Célula Referência */}
+                      <td style={{ padding: "16px", fontWeight: "700", color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
+                        {docCompras}
+                      </td>
+                      
+                      <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", minWidth: "200px" }}>
+                        {itemOriginal.descricao || itemOriginal.materialDescription || "-"}
+                      </td>
+                      
                       <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {item.referencia || "-"}
+                        {referencia}
                       </td>
 
                       <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {item.nf_entrada || item.nf || "-"}
+                        {nfEntrada}
                       </td>
 
-                      {/* ✨ NOVO: Célula Valor Unitário (Usando a função formatarMoeda) */}
                       <td style={{ padding: "16px", color: "#059669", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {formatarMoeda(item.valor_unitario ?? item.valor_unitario_manual ?? item.poNetPrice ?? item.val)}
+                        {formatarMoeda(valorUnitario)}
                       </td>
 
                       <td style={{ padding: "16px", color: "#2563eb", fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                        {item.alocacao || "CROSSDOCKING"}
+                        {alocacao}
                       </td>
+                      
                       <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {item.wbs_element || item.wbs || "-"}
+                        {wbs}
                       </td>
+                      
                       <td style={{ padding: "16px", color: "#10b981", fontWeight: "600", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {saldo} <span style={{ fontSize: "0.75rem", fontWeight: "normal" }}>{unidade}</span>
                       </td>
+                      
                       <td style={{ padding: "16px", color: "#f59e0b", fontWeight: "600", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {reservado} <span style={{ fontSize: "0.75rem", fontWeight: "normal" }}>{unidade}</span>
                       </td>
+                      
                       <td style={{ padding: "16px", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <input
@@ -381,7 +392,7 @@ export default function SeletorEstoqueLateral({
                             min="1"
                             max={saldoLivreReal}
                             value={qtdDesejada}
-                            onChange={(e) => onAtualizarQuantidade && onAtualizarQuantidade(item.id, e.target.value)}
+                            onChange={(e) => onAtualizarQuantidade && onAtualizarQuantidade(itemOriginal.id, e.target.value)}
                             style={{
                               width: "70px", border: "1px solid #e2e8f0", borderRadius: "8px",
                               padding: "6px 12px", outline: "none", color: "#0f172a", textAlign: "center",
@@ -391,9 +402,10 @@ export default function SeletorEstoqueLateral({
                           <span style={{ fontSize: "0.85rem", color: "#64748b" }}>{unidade}</span>
                         </div>
                       </td>
+                      
                       <td style={{ textAlign: "center", padding: "16px" }}>
                         <button
-                          onClick={() => onRemoverItem && onRemoverItem(item.id)}
+                          onClick={() => onRemoverItem && onRemoverItem(itemOriginal.id)}
                           style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", transition: "color 0.2s" }}
                           onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
                           onMouseOut={(e) => e.currentTarget.style.color = '#64748b'}
