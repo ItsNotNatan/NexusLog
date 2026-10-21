@@ -6,7 +6,8 @@ import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
   Search, ChevronRight, ChevronLeft, GitBranch, FileText,
-  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, Filter, Check, X
+  RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, 
+  Filter, Check, X, ChevronUp, ChevronDown
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -127,9 +128,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
-  const [paginaAtual, setPaginaAtual] = useState(1);
   
-  // ✨ NOVO: Estado para gerir a quantidade de itens por página
+  // ✨ NOVO: Estado para a Ordenação (Sorting)
+  const [ordenacao, setOrdenacao] = useState({ coluna: 'dataCriacaoISO', direcao: 'desc' });
+  const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(10);
 
   const [termoPesquisaInput, setTermoPesquisaInput] = useState("");
@@ -269,6 +271,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               acaoTipo: acaoTipo,
               acaoValor: acaoValor,
               dataSolicitacao: item.dataSolicitacao || "-",
+              dataCriacaoISO: item.created_at || item.dataCriacaoISO || item.dataSolicitacao, // ✨ ISO para Sorting perfeito
               dataEntrega: item.dataEntrega || "-",
               pl: numeroPL,
               wbs: wbsProcura, 
@@ -298,7 +301,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     return () => socket.disconnect();
   }, [estoqueAtual, showAlert, perfil]);
 
-  useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisaFiltro, filtrosAvancados]);
+  useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisaFiltro, filtrosAvancados, ordenacao]);
 
   const getItensEnriquecidos = (linha) => {
     if (!linha.itensRaw) return [];
@@ -337,6 +340,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     setFiltrosAvancados({ tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: '' });
   };
 
+  // 1. FILTRA OS DADOS PRIMEIRO
   const dadosFiltrados = useMemo(() => {
     return dadosTabela.filter((item) => {
       if (estoqueAtual && estoqueAtual !== 'TODOS' && item.filial !== estoqueAtual) return false;
@@ -385,31 +389,58 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     });
   }, [dadosTabela, estoqueAtual, filtroStatus, filtroAtivo, filtrosAvancados, termoPesquisaFiltro]);
 
+  // ✨ 2. ORDENA OS DADOS DEPOIS DE FILTRAR (NOVO)
+  const dadosOrdenados = useMemo(() => {
+    const { coluna, direcao } = ordenacao;
+    if (!coluna) return dadosFiltrados;
+
+    const copia = [...dadosFiltrados];
+    copia.sort((a, b) => {
+      let valA = a[coluna] || '';
+      let valB = b[coluna] || '';
+
+      // Tratamento especial para Datas
+      if (coluna === 'dataCriacaoISO' || coluna === 'dataEntrega') {
+        valA = new Date(valA).getTime() || 0;
+        valB = new Date(valB).getTime() || 0;
+      } else if (typeof valA === 'string') {
+        valA = valA.toLowerCase();
+        valB = String(valB).toLowerCase();
+      }
+
+      if (valA < valB) return direcao === 'asc' ? -1 : 1;
+      if (valA > valB) return direcao === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return copia;
+  }, [dadosFiltrados, ordenacao]);
+
   const kpis = useMemo(() => {
     return {
-      total: dadosFiltrados.length,
-      pendentes: dadosFiltrados.filter((item) => item.status === "Pendente").length,
-      andamento: dadosFiltrados.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length,
-      concluidos: dadosFiltrados.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length,
-      recusados: dadosFiltrados.filter((item) => item.status === "Recusado").length,
-      cancelados: dadosFiltrados.filter((item) => item.status === "Cancelado" || item.statusExibicao === "Cancelado").length,
+      total: dadosOrdenados.length,
+      pendentes: dadosOrdenados.filter((item) => item.status === "Pendente").length,
+      andamento: dadosOrdenados.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length,
+      concluidos: dadosOrdenados.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length,
+      recusados: dadosOrdenados.filter((item) => item.status === "Recusado").length,
+      cancelados: dadosOrdenados.filter((item) => item.status === "Cancelado" || item.statusExibicao === "Cancelado").length,
     };
-  }, [dadosFiltrados]);
+  }, [dadosOrdenados]);
 
-  // ✨ OTIMIZAÇÃO: Usa o novo estado "itensPorPagina" para os cálculos
+  // ✨ 3. PAGINA OS DADOS ORDENADOS
   const { dadosPaginados, totalPaginas, totalRegistrosFiltrados, indexPrimeiroItem, indexUltimoItem } = useMemo(() => {
-    const totalRegistros = dadosFiltrados.length;
+    const totalRegistros = dadosOrdenados.length;
     const paginas = Math.max(1, Math.ceil(totalRegistros / itensPorPagina));
     const start = (paginaAtual - 1) * itensPorPagina;
     const end = paginaAtual * itensPorPagina;
     return {
-      dadosPaginados: dadosFiltrados.slice(start, end),
+      dadosPaginados: dadosOrdenados.slice(start, end),
       totalPaginas: paginas,
       totalRegistrosFiltrados: totalRegistros,
       indexPrimeiroItem: start,
       indexUltimoItem: end
     };
-  }, [dadosFiltrados, paginaAtual, itensPorPagina]);
+  }, [dadosOrdenados, paginaAtual, itensPorPagina]);
 
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
     const confirmar = await showConfirm("Alterar Status", `Tem certeza que deseja mudar o status para "${novoStatus}"?`, "warning", "Sim, Mudar");
@@ -546,6 +577,35 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
+  // ✨ COMPONENTE HEADER ORDENÁVEL (Interno)
+  const HeaderOrdenavel = ({ coluna, label, estiloAdicional = {} }) => {
+    const isAtiva = ordenacao.coluna === coluna;
+    
+    const handleOrdenar = () => {
+      setOrdenacao(prev => ({
+        coluna,
+        direcao: prev.coluna === coluna && prev.direcao === 'asc' ? 'desc' : 'asc'
+      }));
+    };
+
+    return (
+      <th onClick={handleOrdenar} style={{ cursor: 'pointer', userSelect: 'none', transition: 'background-color 0.2s', ...estiloAdicional }} 
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {label}
+          <div style={{ display: 'flex', flexDirection: 'column', color: isAtiva ? '#2563eb' : '#cbd5e1' }}>
+            {isAtiva ? (
+              ordenacao.direcao === 'asc' ? <ChevronUp size={14} strokeWidth={3} /> : <ChevronDown size={14} strokeWidth={3} />
+            ) : (
+              <ChevronDown size={14} /> // Ícone inativo discreto
+            )}
+          </div>
+        </div>
+      </th>
+    );
+  };
+
   if (carregandoInicial || (perfil === 'cliente' && estoqueAtual === 'TODOS')) return null;
 
   return (
@@ -623,13 +683,14 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             <thead>
               <tr>
                 <th className="col-chevron"></th>
-                <th>TIPO / ID (PS)</th>
-                <th>SOLICITANTE / WBS</th>
-                <th>Nº DA PL</th>
-                <th>DE ➔ PARA</th>
-                <th>DATA CRIAÇÃO</th>
-                <th>DATA ENTREGA</th>
-                <th>STATUS {perfil === "logistica" && "/ AÇÃO"}</th>
+                {/* ✨ OS CABEÇALHOS AGORA SÃO ORDENÁVEIS */}
+                <HeaderOrdenavel coluna="tipo" label="TIPO / ID (PS)" />
+                <HeaderOrdenavel coluna="solicitante" label="SOLICITANTE / WBS" />
+                <HeaderOrdenavel coluna="pl" label="Nº DA PL" />
+                <HeaderOrdenavel coluna="destino" label="DE ➔ PARA" />
+                <HeaderOrdenavel coluna="dataCriacaoISO" label="DATA CRIAÇÃO" />
+                <HeaderOrdenavel coluna="dataEntrega" label="DATA ENTREGA" />
+                <HeaderOrdenavel coluna="statusExibicao" label={`STATUS ${perfil === "logistica" ? "/ AÇÃO" : ""}`} />
               </tr>
             </thead>
             <tbody>
@@ -817,23 +878,20 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </table>
         </ScrollDuplo>
 
-        {/* ✨ RODAPÉ DA TABELA: PAGINAÇÃO E SELETOR DE ITENS POR PÁGINA */}
         <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
           
-          {/* SECÇÃO ESQUERDA: Exibindo X a Y e Seletor */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
               Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
             </div>
 
-            {/* SELETOR DE ITENS POR PÁGINA */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Itens por página:</span>
               <select 
                 value={itensPorPagina} 
                 onChange={(e) => {
                   setItensPorPagina(Number(e.target.value));
-                  setPaginaAtual(1); // Reinicia sempre a paginação para não crashar
+                  setPaginaAtual(1); 
                 }}
                 disabled={carregando}
                 style={{
@@ -850,7 +908,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             </div>
           </div>
 
-          {/* SECÇÃO DIREITA: Botões de Navegação Elíptica */}
           <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             
             <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}>
