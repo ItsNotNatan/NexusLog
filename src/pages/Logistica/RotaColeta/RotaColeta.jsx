@@ -178,9 +178,9 @@ export default function RotaColeta() {
             <thead>
               <tr>
                 <th style="width: 15%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">NF</th>
-                <th style="width: 25%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: left;">Desenho SAP</th>
+                <th style="width: 20%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: left;">Desenho SAP</th>
                 <th style="width: 15%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">WBS</th>
-                <th style="width: 30%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: left;">Descrição</th>
+                <th style="width: 25%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: left;">Descrição</th>
                 <th style="width: 5%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">Qtd</th>
                 <th style="width: 5%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">Un</th>
                 <th style="width: 10%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">PL</th>
@@ -251,7 +251,7 @@ export default function RotaColeta() {
       filename:     `Boletim_Coleta_${Date.now()}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true }, 
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } // MUDEI PARA 'landscape'
     };
 
     html2pdf().set(opcoesPDF).from(containerParaPdf).output('bloburl').then((pdfBlobUrl) => {
