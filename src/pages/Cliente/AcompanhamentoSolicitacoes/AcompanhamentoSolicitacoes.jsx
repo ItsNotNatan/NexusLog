@@ -5,7 +5,7 @@ import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
-  Search, ChevronRight, ChevronLeft, GitBranch, FileText,
+  Search, ChevronRight, GitBranch, FileText,
   RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, 
   Filter, Check, X, ChevronUp, ChevronDown
 } from "lucide-react";
@@ -16,6 +16,8 @@ import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import BotaoGerarPDF from "../../../components/BotaoGerarPDF/BotaoGerarPDF";
 import ScrollDuplo from "../../../components/ScrollDuplo/ScrollDuplo";
+// ✨ IMPORTA O NOVO COMPONENTE DE PAGINAÇÃO
+import PaginacaoTabela from "../../../components/PaginacaoTabela/PaginacaoTabela";
 import { apiFetch, urlDoServidor, enviarArquivos } from '../../../services/api';
 import { io } from 'socket.io-client';
 
@@ -688,7 +690,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             </thead>
             <tbody>
               {carregando ? (
-                // ✨ SKELETON LOADING
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={`skeleton-${i}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '20px', height: '20px', borderRadius: '50%' }}></div></td>
@@ -892,93 +893,20 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </table>
         </ScrollDuplo>
 
-        {/* 
-          A lógica da paginação encontra-se extraída abaixo para clareza, mas faz parte
-          integral deste mesmo componente 
-        */}
-        <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
-            </div>
+        {/* ✨ UTILIZAR O NOVO COMPONENTE DE PAGINAÇÃO AQUI */}
+        <PaginacaoTabela 
+          paginaAtual={paginaAtual}
+          totalPaginas={totalPaginas}
+          totalRegistrosFiltrados={totalRegistrosFiltrados}
+          indexPrimeiroItem={indexPrimeiroItem}
+          indexUltimoItem={indexUltimoItem}
+          dadosPaginadosLength={dadosPaginados.length}
+          itensPorPagina={itensPorPagina}
+          setItensPorPagina={setItensPorPagina}
+          setPaginaAtual={setPaginaAtual}
+          carregando={carregando}
+        />
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Itens por página:</span>
-              <select 
-                value={itensPorPagina} 
-                onChange={(e) => {
-                  setItensPorPagina(Number(e.target.value));
-                  setPaginaAtual(1); 
-                }}
-                disabled={carregando}
-                style={{
-                  padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', 
-                  fontSize: '0.875rem', color: '#334155', backgroundColor: '#ffffff', 
-                  cursor: carregando ? 'not-allowed' : 'pointer', outline: 'none'
-                }}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}>
-              <ChevronLeft size={16} /> Anterior
-            </button>
-            
-            {(() => {
-              const maxPaginasVisiveis = 5;
-              let paginas = [];
-
-              if (totalPaginas <= maxPaginasVisiveis) {
-                for (let i = 1; i <= totalPaginas; i++) paginas.push(i);
-              } else {
-                if (paginaAtual <= 3) {
-                  paginas = [1, 2, 3, 4, '...', totalPaginas];
-                } else if (paginaAtual >= totalPaginas - 2) {
-                  paginas = [1, '...', totalPaginas - 3, totalPaginas - 2, totalPaginas - 1, totalPaginas];
-                } else {
-                  paginas = [1, '...', paginaAtual - 1, paginaAtual, paginaAtual + 1, '...', totalPaginas];
-                }
-              }
-
-              return paginas.map((pagina, index) => {
-                if (pagina === '...') {
-                  return <span key={`ellipsis-${index}`} style={{ color: '#94a3b8', padding: '0 4px', fontWeight: 'bold' }}>...</span>;
-                }
-                const ehAtiva = paginaAtual === pagina;
-                return (
-                  <button 
-                    key={`page-${pagina}`} 
-                    onClick={() => setPaginaAtual(pagina)} 
-                    disabled={carregando} 
-                    style={{ 
-                      padding: '6px 12px', 
-                      backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', 
-                      color: ehAtiva ? '#ffffff' : '#334155', 
-                      border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, 
-                      borderRadius: '6px', 
-                      fontSize: '0.875rem', 
-                      fontWeight: ehAtiva ? '600' : '500', 
-                      cursor: carregando ? 'not-allowed' : 'pointer', 
-                      transition: 'all 0.15s ease' 
-                    }}
-                  >
-                    {pagina}
-                  </button>
-                );
-              });
-            })()}
-
-            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 0.6 : 1 }}>
-              Próxima <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
       </div>
 
       <FiltroSolicitacoesModal
