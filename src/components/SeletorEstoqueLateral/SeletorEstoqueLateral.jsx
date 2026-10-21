@@ -6,6 +6,21 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check, Box, X } from 'lucide-react';
 import { AuthContext } from '../../contexts/AuthContext';
 
+// ✨ NOVO: Função auxiliar para formatar o Valor Unitário como moeda (R$)
+const formatarMoeda = (valor) => {
+  if (valor === undefined || valor === null || valor === '-' || valor === '') return '-';
+  if (typeof valor === 'string' && valor.includes('R$')) return valor; // Se já vier formatado
+
+  let limpo = String(valor).replace(/[^\d.,-]/g, '');
+  if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
+  else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
+  
+  const numero = parseFloat(limpo);
+  if (isNaN(numero)) return String(valor);
+  
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numero);
+};
+
 export default function SeletorEstoqueLateral({ 
   estoque, 
   carregando, 
@@ -43,13 +58,13 @@ export default function SeletorEstoqueLateral({
     return (
       (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
       (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
-      // ✨ Adicionada a busca por Documento de Compras (Pedido/CPV)
       (item.documento_compras && item.documento_compras.toLowerCase().includes(termo)) ||
       (item.fabricante && item.fabricante.toLowerCase().includes(termo)) ||
       (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
       (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
       (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
-      (item.materialDescription && item.materialDescription.toLowerCase().includes(termo))
+      (item.materialDescription && item.materialDescription.toLowerCase().includes(termo)) ||
+      (item.referencia && item.referencia.toLowerCase().includes(termo)) // ✨ Adicionado busca por referência
     );
   }) || [];
 
@@ -192,7 +207,6 @@ export default function SeletorEstoqueLateral({
                     </button>
                   </div>
 
-                  {/* ✨ AQUI: SUBSTITUIÇÃO PARA O PEDIDO DE COMPRA / CPV NO CARD */}
                   <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <div style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: '700', fontFamily: 'monospace' }}>
                       WBS: {item.wbs || item.wbs_element || "-"}
@@ -289,14 +303,22 @@ export default function SeletorEstoqueLateral({
               <p style={{ margin: 0, fontSize: '0.9rem' }}>Clique nos itens do estoque à esquerda para adicioná-los.</p>
             </div>
           ) : (
-            <table style={{ width: "100%", minWidth: "1100px", borderCollapse: "collapse", textAlign: "left" }}>
+            // ✨ O minWidth passou para 1300px para acomodar as 2 novas colunas
+            <table style={{ width: "100%", minWidth: "1300px", borderCollapse: "collapse", textAlign: "left" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#2563eb", fontWeight: "700", textTransform: "uppercase" }}>DESENHO SAP</th>
-                  {/* ✨ AQUI: SUBSTITUIÇÃO PARA O PEDIDO DE COMPRA / CPV NO CABEÇALHO DA TABELA */}
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>Nº PEDIDO DE COMPRA / CPV</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>DESCRIÇÃO</th>
+                  
+                  {/* ✨ NOVO: Coluna Referência */}
+                  <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>REFERÊNCIA</th>
+                  
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>NF ENTRADA</th>
+                  
+                  {/* ✨ NOVO: Coluna Valor Unitário */}
+                  <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>VALOR UNITÁRIO</th>
+                  
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>ALOCAÇÃO</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>WBS ITEM</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#10b981", fontWeight: "700", textTransform: "uppercase" }}>SALDO</th>
@@ -319,16 +341,27 @@ export default function SeletorEstoqueLateral({
                       <td style={{ padding: "16px", backgroundColor: "#f8fafc", color: "#2563eb", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {item.desenho_sap || item.desenhoSAP || "-"}
                       </td>
-                      {/* ✨ AQUI: SUBSTITUIÇÃO PARA O PEDIDO DE COMPRA / CPV NA CÉLULA */}
                       <td style={{ padding: "16px", fontWeight: "700", color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
                         {item.documento_compras || "-"}
                       </td>
                       <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", minWidth: "200px" }}>
                         {item.descricao || item.materialDescription || "-"}
                       </td>
+                      
+                      {/* ✨ NOVO: Célula Referência */}
+                      <td style={{ padding: "16px", color: "#475569", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+                        {item.referencia || "-"}
+                      </td>
+
                       <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {item.nf_entrada || item.nf || "-"}
                       </td>
+
+                      {/* ✨ NOVO: Célula Valor Unitário (Usando a função formatarMoeda) */}
+                      <td style={{ padding: "16px", color: "#059669", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+                        {formatarMoeda(item.valor_unitario ?? item.valor_unitario_manual ?? item.poNetPrice ?? item.val)}
+                      </td>
+
                       <td style={{ padding: "16px", color: "#2563eb", fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", whiteSpace: "nowrap" }}>
                         {item.alocacao || "CROSSDOCKING"}
                       </td>
