@@ -32,7 +32,6 @@ export default function RotaColeta() {
         const resultado = await apiFetch(`/solicitacoes/listar?status=Em%20Separa%C3%A7%C3%A3o&filial=${estoqueAtual || ''}&limit=100`);
 
         if (resultado.sucesso && resultado.dados) {
-          // ✨ FILTRO ESTRITO: Apenas os 3 tipos E OBRIGATÓRIAMENTE COM PL GERADA
           const dadosPermitidos = resultado.dados.filter(item => 
             (item.tipo === 'Material' || 
              item.tipo === 'Transferencia WBS' || 
@@ -141,15 +140,16 @@ export default function RotaColeta() {
     containerParaPdf.style.width = '1000px'; 
     containerParaPdf.style.padding = '20px';
     containerParaPdf.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-    containerParaPdf.style.color = '#1e293b';
+    containerParaPdf.style.color = '#000000'; // Cor base preta
     containerParaPdf.style.backgroundColor = '#ffffff';
 
+    // ✨ TUDO AGORA USA BORDAS E TEXTOS #000000 PARA IMPRESSÃO EM PRETO E BRANCO
     let htmlString = `
-      <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 2px solid #1e293b;">
-        <h3 style="margin: 0; font-size: 1.4rem; color: #1e293b; text-transform: uppercase; font-weight: 800;">ROTA DE COLETA — SEPARAÇÃO OTIMIZADA</h3>
-        <span style="font-size: 0.9rem; color: #475569;">${dataHoraAtual}</span>
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 2px solid #000000;">
+        <h3 style="margin: 0; font-size: 1.4rem; color: #000000; text-transform: uppercase; font-weight: 800;">ROTA DE COLETA — SEPARAÇÃO OTIMIZADA</h3>
+        <span style="font-size: 0.9rem; color: #000000;">${dataHoraAtual}</span>
       </div>
-      <div style="font-size: 0.95rem; color: #1e293b; font-weight: 700; margin-bottom: 24px;">
+      <div style="font-size: 0.95rem; color: #000000; font-weight: 700; margin-bottom: 24px;">
         PLs incluídos: ${selecionados.map(id => `PL #${id}`).join(', ')} &nbsp;|&nbsp; Paradas: ${totalParadas} &nbsp;|&nbsp; Itens consolidados: ${totalQtdGeral}
       </div>
     `;
@@ -165,26 +165,26 @@ export default function RotaColeta() {
       });
 
       htmlString += `
-        <div style="margin-bottom: 24px; border: 2px solid #2563eb; border-radius: 4px; overflow: hidden; page-break-inside: avoid;">
-          <div style="background-color: #ffffff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2563eb;">
+        <div style="margin-bottom: 24px; border: 2px solid #000000; border-radius: 4px; overflow: hidden; page-break-inside: avoid;">
+          <div style="background-color: #ffffff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #000000;">
             <div>
-              <span style="font-weight: 800; font-size: 1.2rem; margin-right: 12px; text-transform: uppercase; color: #94a3b8;">PARADA ${String(pIdx + 1).padStart(2, '0')}</span>
-              <span style="color: #b45309; font-weight: 800; font-size: 1.2rem;">${localizacao}</span>
+              <span style="font-weight: 800; font-size: 1.2rem; margin-right: 12px; text-transform: uppercase; color: #000000;">PARADA ${String(pIdx + 1).padStart(2, '0')}</span>
+              <span style="color: #000000; font-weight: 800; font-size: 1.2rem;">${localizacao}</span>
             </div>
-            <span style="font-weight: 700; font-size: 1rem; color: #94a3b8;">Total Geral: ${totalDaParada}</span>
+            <span style="font-weight: 700; font-size: 1rem; color: #000000;">Total Geral: ${totalDaParada}</span>
           </div>
 
           <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; table-layout: fixed; word-wrap: break-word;">
             <thead>
               <tr>
-                <th style="width: 15%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">NF</th>
-                <th style="width: 20%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: left;">Desenho SAP</th>
-                <th style="width: 15%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">WBS</th>
-                <th style="width: 25%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: left;">Descrição</th>
-                <th style="width: 5%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">Qtd</th>
-                <th style="width: 5%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">Un</th>
-                <th style="width: 10%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">PL</th>
-                <th style="width: 5%; background-color: #ffffff; color: #cbd5e1; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; text-transform: uppercase; font-size: 0.75rem; text-align: center;">✓</th>
+                <th style="width: 15%; background-color: #ffffff; color: #000000; font-weight: 800; padding: 8px; border-bottom: 1px solid #000000; text-transform: uppercase; font-size: 0.75rem; text-align: center;">NF</th>
+                <th style="width: 20%; background-color: #ffffff; color: #000000; font-weight: 800; padding: 8px; border-bottom: 1px solid #000000; text-transform: uppercase; font-size: 0.75rem; text-align: left;">Desenho SAP</th>
+                <th style="width: 15%; background-color: #ffffff; color: #000000; font-weight: 800; padding: 8px; border-bottom: 1px solid #000000; text-transform: uppercase; font-size: 0.75rem; text-align: center;">WBS</th>
+                <th style="width: 25%; background-color: #ffffff; color: #000000; font-weight: 800; padding: 8px; border-bottom: 1px solid #000000; text-transform: uppercase; font-size: 0.75rem; text-align: left;">Descrição</th>
+                <th style="width: 5%; background-color: #ffffff; color: #000000; font-weight: 800; padding: 8px; border-bottom: 1px solid #000000; text-transform: uppercase; font-size: 0.75rem; text-align: center;">Qtd</th>
+                <th style="width: 5%; background-color: #ffffff; color: #000000; font-weight: 800; padding: 8px; border-bottom: 1px solid #000000; text-transform: uppercase; font-size: 0.75rem; text-align: center;">Un</th>
+                <th style="width: 10%; background-color: #ffffff; color: #000000; font-weight: 800; padding: 8px; border-bottom: 1px solid #000000; text-transform: uppercase; font-size: 0.75rem; text-align: center;">PL</th>
+                <th style="width: 5%; background-color: #ffffff; color: #000000; font-weight: 800; padding: 8px; border-bottom: 1px solid #000000; text-transform: uppercase; font-size: 0.75rem; text-align: center;">✓</th>
               </tr>
             </thead>
             <tbody>
@@ -197,40 +197,40 @@ export default function RotaColeta() {
         itensDaNF.forEach((item, iIdx) => {
           htmlString += `<tr>`;
           if (iIdx === 0) {
-            htmlString += `<td rowspan="${itensDaNF.length}" style="font-weight: 800; font-size: 1rem; text-align: center; background-color: #ffffff; word-break: break-all; padding: 8px; border-bottom: 1px solid #2563eb; border-right: 1px solid #2563eb; vertical-align: middle;">${numNF}</td>`;
+            htmlString += `<td rowspan="${itensDaNF.length}" style="font-weight: 800; font-size: 1rem; color: #000000; text-align: center; background-color: #ffffff; word-break: break-all; padding: 8px; border-bottom: 1px solid #000000; border-right: 1px solid #000000; vertical-align: middle;">${numNF}</td>`;
           }
           
           htmlString += `
-              <td style="padding: 8px; border-bottom: 1px solid #2563eb; border-right: 1px solid #2563eb; vertical-align: middle;">
-                <strong style="font-size: 1rem; font-weight: 800;">${item.desenho_sap_manual || item.desenhoSAP || '-'}</strong><br/>
-                <span style="font-size: 0.75rem; color: #94a3b8; display: block; margin-top: 2px;">PN: ${item.part_number_manual || item.numPecaFabricante || '-'}</span>
+              <td style="padding: 8px; border-bottom: 1px solid #000000; border-right: 1px solid #000000; vertical-align: middle;">
+                <strong style="font-size: 1rem; font-weight: 800; color: #000000;">${item.desenho_sap_manual || item.desenhoSAP || '-'}</strong><br/>
+                <span style="font-size: 0.75rem; color: #000000; display: block; margin-top: 2px;">PN: ${item.part_number_manual || item.numPecaFabricante || '-'}</span>
               </td>
-              <td style="font-family: monospace, sans-serif; font-weight: 700; font-size: 0.85rem; text-align: center; word-break: break-all; padding: 8px; border-bottom: 1px solid #2563eb; border-right: 1px solid #2563eb; vertical-align: middle;">${item.wbs}</td>
-              <td style="font-size: 0.85rem; padding: 8px; border-bottom: 1px solid #2563eb; border-right: 1px solid #2563eb; vertical-align: middle;">${item.descricao_manual || item.materialDescription || 'Sem descrição'}</td>
-              <td style="text-align: center; font-weight: bold; font-size: 0.95rem; padding: 8px; border-bottom: 1px solid #2563eb; border-right: 1px solid #2563eb; vertical-align: middle;">
+              <td style="font-family: monospace, sans-serif; color: #000000; font-weight: 700; font-size: 0.85rem; text-align: center; word-break: break-all; padding: 8px; border-bottom: 1px solid #000000; border-right: 1px solid #000000; vertical-align: middle;">${item.wbs}</td>
+              <td style="font-size: 0.85rem; padding: 8px; color: #000000; border-bottom: 1px solid #000000; border-right: 1px solid #000000; vertical-align: middle;">${item.descricao_manual || item.materialDescription || 'Sem descrição'}</td>
+              <td style="text-align: center; color: #000000; font-weight: bold; font-size: 0.95rem; padding: 8px; border-bottom: 1px solid #000000; border-right: 1px solid #000000; vertical-align: middle;">
                 ${item.quantidade_solicitada || item.qtdFornecida || item.quantidade || 1}
               </td>
-              <td style="text-align: center; font-size: 0.85rem; padding: 8px; border-bottom: 1px solid #2563eb; border-right: 1px solid #2563eb; vertical-align: middle;">${item.unidade_medida_manual || 'Unid'}</td>
-              <td style="text-align: center; font-size: 0.75rem; font-weight: 600; padding: 8px; border-bottom: 1px solid #2563eb; border-right: 1px solid #2563eb; vertical-align: middle;">${item.plOrigem?.replace('PL #', '')}</td>
-              <td style="padding: 8px; border-bottom: 1px solid #2563eb; vertical-align: middle;"></td>
+              <td style="text-align: center; color: #000000; font-size: 0.85rem; padding: 8px; border-bottom: 1px solid #000000; border-right: 1px solid #000000; vertical-align: middle;">${item.unidade_medida_manual || 'Unid'}</td>
+              <td style="text-align: center; color: #000000; font-size: 0.75rem; font-weight: 600; padding: 8px; border-bottom: 1px solid #000000; border-right: 1px solid #000000; vertical-align: middle;">${item.plOrigem?.replace('PL #', '')}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #000000; vertical-align: middle;"></td>
             </tr>
           `;
         });
 
         htmlString += `
           <tr>
-            <td colspan="4" style="text-align: right; background-color: #ffffff; border-top: 1px solid #2563eb; font-weight: 600; font-size: 0.9rem; padding: 8px; border-bottom: 1px solid #2563eb; border-right: 1px solid #2563eb;">Subtotal NF ${numNF}:</td>
-            <td style="text-align: center; background-color: #ffffff; border-top: 1px solid #2563eb; font-weight: 700; font-size: 0.95rem; padding: 8px; border-bottom: 1px solid #2563eb; border-right: 1px solid #2563eb;">${totalDaNF}</td>
-            <td colspan="3" style="background-color: #ffffff; border-top: 1px solid #2563eb; padding: 8px; border-bottom: 1px solid #2563eb;"></td>
+            <td colspan="4" style="text-align: right; background-color: #ffffff; border-top: 1px solid #000000; font-weight: 600; font-size: 0.9rem; padding: 8px; border-bottom: 1px solid #000000; border-right: 1px solid #000000; color: #000000;">Subtotal NF ${numNF}:</td>
+            <td style="text-align: center; background-color: #ffffff; border-top: 1px solid #000000; font-weight: 700; font-size: 0.95rem; padding: 8px; border-bottom: 1px solid #000000; border-right: 1px solid #000000; color: #000000;">${totalDaNF}</td>
+            <td colspan="3" style="background-color: #ffffff; border-top: 1px solid #000000; padding: 8px; border-bottom: 1px solid #000000;"></td>
           </tr>
         `;
       });
 
       htmlString += `
             <tr>
-              <td colspan="4" style="text-align: right; background-color: #ffffff; border-top: 2px solid #2563eb; color: #000000; font-weight: 800; font-size: 0.95rem; padding: 10px 8px; border-right: 1px solid #2563eb;">TOTAL GERAL DA PARADA:</td>
-              <td style="text-align: center; background-color: #ffffff; border-top: 2px solid #2563eb; color: #000000; font-weight: 800; font-size: 1.1rem; padding: 10px 8px; border-right: 1px solid #2563eb;">${totalDaParada}</td>
-              <td colspan="3" style="background-color: #ffffff; border-top: 2px solid #2563eb; padding: 8px;"></td>
+              <td colspan="4" style="text-align: right; background-color: #ffffff; border-top: 2px solid #000000; color: #000000; font-weight: 800; font-size: 0.95rem; padding: 10px 8px; border-right: 1px solid #000000;">TOTAL GERAL DA PARADA:</td>
+              <td style="text-align: center; background-color: #ffffff; border-top: 2px solid #000000; color: #000000; font-weight: 800; font-size: 1.1rem; padding: 10px 8px; border-right: 1px solid #000000;">${totalDaParada}</td>
+              <td colspan="3" style="background-color: #ffffff; border-top: 2px solid #000000; padding: 8px;"></td>
             </tr>
           </tbody>
         </table>
@@ -238,9 +238,9 @@ export default function RotaColeta() {
     });
 
     htmlString += `
-      <div style="display: flex; justify-content: space-between; margin-top: 40px; font-size: 0.95rem; font-weight: 700; color: #1e293b; page-break-inside: avoid;">
-        <div style="width: 45%; display: flex; align-items: flex-end;">Operador (Empilhadeira): <div style="flex: 1; border-bottom: 1px solid #1e293b; margin-left: 8px;"></div></div>
-        <div style="width: 45%; display: flex; align-items: flex-end;">Assinatura: <div style="flex: 1; border-bottom: 1px solid #1e293b; margin-left: 8px;"></div></div>
+      <div style="display: flex; justify-content: space-between; margin-top: 40px; font-size: 0.95rem; font-weight: 700; color: #000000; page-break-inside: avoid;">
+        <div style="width: 45%; display: flex; align-items: flex-end;">Operador (Empilhadeira): <div style="flex: 1; border-bottom: 1px solid #000000; margin-left: 8px;"></div></div>
+        <div style="width: 45%; display: flex; align-items: flex-end;">Assinatura: <div style="flex: 1; border-bottom: 1px solid #000000; margin-left: 8px;"></div></div>
       </div>
     `;
 
@@ -251,7 +251,7 @@ export default function RotaColeta() {
       filename:     `Boletim_Coleta_${Date.now()}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true }, 
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } // MUDEI PARA 'landscape'
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
     };
 
     html2pdf().set(opcoesPDF).from(containerParaPdf).output('bloburl').then((pdfBlobUrl) => {
