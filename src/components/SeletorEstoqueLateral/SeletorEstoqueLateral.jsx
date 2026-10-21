@@ -42,13 +42,12 @@ export default function SeletorEstoqueLateral({
   const [hoverId, setHoverId] = useState(null);
   const [copiadoId, setCopiadoId] = useState(null);
 
-  // ✨ ESTADOS DO NOVO FILTRO PRÓPRIO
+  // ✨ ESTADOS DO NOVO FILTRO PRÓPRIO (Sem Alocação)
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosEspecificos, setFiltrosEspecificos] = useState({
     wbs: null,
     docCompras: null,
-    nf: null,
-    alocacao: null
+    nf: null
   });
 
   // MOTOR DE FILTRAGEM (LADO ESQUERDO) COM O FILTRO ESPECÍFICO
@@ -77,10 +76,6 @@ export default function SeletorEstoqueLateral({
       const nfItem = item.nf_entrada || item.nf || "";
       if (String(nfItem) !== String(filtrosEspecificos.nf.value)) return false;
     }
-    if (filtrosEspecificos.alocacao && filtrosEspecificos.alocacao.value) {
-      const alocItem = item.alocacao || "";
-      if (String(alocItem) !== String(filtrosEspecificos.alocacao.value)) return false;
-    }
 
     // Busca por Texto na Barra
     const termo = busca.toLowerCase();
@@ -96,8 +91,7 @@ export default function SeletorEstoqueLateral({
         (item.materialDescription && item.materialDescription.toLowerCase().includes(termo)) ||
         (item.referencia && item.referencia.toLowerCase().includes(termo)) ||
         (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termo)) ||
-        (item.nf && item.nf.toLowerCase().includes(termo)) ||
-        (item.alocacao && item.alocacao.toLowerCase().includes(termo))
+        (item.nf && item.nf.toLowerCase().includes(termo))
       );
     }
 
@@ -126,7 +120,7 @@ export default function SeletorEstoqueLateral({
   };
 
   const handleLimparFiltros = () => {
-    setFiltrosEspecificos({ wbs: null, docCompras: null, nf: null, alocacao: null });
+    setFiltrosEspecificos({ wbs: null, docCompras: null, nf: null });
   };
 
   const temFiltroAtivo = Object.values(filtrosEspecificos).some(v => v !== null && v !== undefined);
@@ -303,10 +297,6 @@ export default function SeletorEstoqueLateral({
                         Reservado: {reservado}
                       </span>
                     )}
-
-                    {item.alocacao && item.alocacao !== "-" && (
-                      <span style={{ color: '#2563eb' }}>{item.alocacao}</span>
-                    )}
                   </div>
                 </div>
               );
@@ -368,7 +358,7 @@ export default function SeletorEstoqueLateral({
               <p style={{ margin: 0, fontSize: '0.9rem' }}>Clique nos itens do estoque à esquerda para adicioná-los.</p>
             </div>
           ) : (
-            <table style={{ width: "100%", minWidth: "1300px", borderCollapse: "collapse", textAlign: "left" }}>
+            <table style={{ width: "100%", minWidth: "1200px", borderCollapse: "collapse", textAlign: "left" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#2563eb", fontWeight: "700", textTransform: "uppercase" }}>DESENHO SAP</th>
@@ -377,7 +367,6 @@ export default function SeletorEstoqueLateral({
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>REFERÊNCIA</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>NF ENTRADA</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>VALOR UNITÁRIO</th>
-                  <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>ALOCAÇÃO</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#64748b", fontWeight: "600", textTransform: "uppercase" }}>WBS ITEM</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#10b981", fontWeight: "700", textTransform: "uppercase" }}>SALDO</th>
                   <th style={{ padding: "16px", fontSize: "0.75rem", color: "#f59e0b", fontWeight: "700", textTransform: "uppercase" }}>RESERVADO</th>
@@ -395,7 +384,6 @@ export default function SeletorEstoqueLateral({
                   const referencia = itemOriginal.referencia || itemFisico.referencia || "-";
                   const valorUnitario = itemOriginal.valor_unitario_enriquecido ?? itemOriginal.valor_unitario ?? itemOriginal.valor_unitario_manual ?? itemOriginal.poNetPrice ?? itemOriginal.val ?? itemFisico.valor_unitario;
                   const nfEntrada = itemOriginal.nf_entrada || itemOriginal.nfEntrada || itemOriginal.nf || itemFisico.nf_entrada || "-";
-                  const alocacao = itemOriginal.alocacao || itemFisico.alocacao || "CROSSDOCKING";
                   const wbs = itemOriginal.wbs_element || itemOriginal.wbs || itemFisico.wbs || "-";
                   
                   const qtdDesejada = itemOriginal.qtdSelecionada !== undefined ? itemOriginal.qtdSelecionada : (itemOriginal.qtdTransferencia !== undefined ? itemOriginal.qtdTransferencia : 1);
@@ -429,10 +417,6 @@ export default function SeletorEstoqueLateral({
 
                       <td style={{ padding: "16px", color: "#059669", fontWeight: "600", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                         {formatarMoeda(valorUnitario)}
-                      </td>
-
-                      <td style={{ padding: "16px", color: "#2563eb", fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                        {alocacao}
                       </td>
                       
                       <td style={{ padding: "16px", color: "#64748b", fontFamily: "monospace", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
@@ -500,13 +484,11 @@ export default function SeletorEstoqueLateral({
 
 // =================================================================
 // COMPONENTE EXCLUSIVO DO FILTRO: ModalFiltroSeletor
-// (Construído à prova de falhas com estilos diretos e limpos)
 // =================================================================
 function ModalFiltroSeletor({ aberto, onClose, dadosEstoque, filtros, setFiltros, onLimpar }) {
   
-  // Extrai inteligentemente os dados da prateleira para não mostrar opções vazias
   const opcoesMapeadas = useMemo(() => {
-    const mapas = { wbs: new Set(), docCompras: new Set(), nf: new Set(), alocacao: new Set() };
+    const mapas = { wbs: new Set(), docCompras: new Set(), nf: new Set() };
     
     dadosEstoque.forEach(item => {
       const wbs = item.wbs || item.wbs_element;
@@ -517,9 +499,6 @@ function ModalFiltroSeletor({ aberto, onClose, dadosEstoque, filtros, setFiltros
 
       const nf = item.nf_entrada || item.nf;
       if (nf && nf !== '-' && nf !== '—') mapas.nf.add(nf);
-
-      const aloc = item.alocacao;
-      if (aloc && aloc !== '-' && aloc !== '—') mapas.alocacao.add(aloc);
     });
 
     const formatarLista = (set) => Array.from(set).sort().map(val => ({ value: val, label: String(val) }));
@@ -527,8 +506,7 @@ function ModalFiltroSeletor({ aberto, onClose, dadosEstoque, filtros, setFiltros
     return {
       wbs: formatarLista(mapas.wbs),
       docCompras: formatarLista(mapas.docCompras),
-      nf: formatarLista(mapas.nf),
-      alocacao: formatarLista(mapas.alocacao)
+      nf: formatarLista(mapas.nf)
     };
   }, [dadosEstoque]);
 
@@ -579,11 +557,6 @@ function ModalFiltroSeletor({ aberto, onClose, dadosEstoque, filtros, setFiltros
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>Nota Fiscal (NF)</label>
             <Select options={opcoesMapeadas.nf} value={filtros.nf} onChange={(opt) => setFiltros({ ...filtros, nf: opt })} placeholder="Qualquer NF..." isClearable styles={selectStyles} noOptionsMessage={() => "Sem dados"} />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>Alocação</label>
-            <Select options={opcoesMapeadas.alocacao} value={filtros.alocacao} onChange={(opt) => setFiltros({ ...filtros, alocacao: opt })} placeholder="Qualquer Alocação..." isClearable styles={selectStyles} noOptionsMessage={() => "Sem dados"} />
           </div>
         </div>
 
