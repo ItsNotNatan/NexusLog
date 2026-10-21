@@ -3,8 +3,12 @@
 // DESCRIÇÃO: Componente completo: Seletor lateral de estoque + Tabela de Itens Selecionados
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check, Box, X } from 'lucide-react';
+// ✨ ADICIONADO: O ícone 'Filter'
+import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check, Box, X, Filter } from 'lucide-react';
 import { AuthContext } from '../../contexts/AuthContext';
+
+// ✨ ADICIONADO: Importação do teu componente de modal (Ajusta o caminho se necessário)
+import FiltroEstoqueModal from '../FiltroEstoqueModal/FiltroEstoqueModal';
 
 // Função auxiliar para formatar o Valor Unitário como moeda (R$)
 const formatarMoeda = (valor) => {
@@ -40,41 +44,62 @@ export default function SeletorEstoqueLateral({
   const [hoverId, setHoverId] = useState(null);
   const [copiadoId, setCopiadoId] = useState(null);
 
-  // MOTOR DE FILTRAGEM (LADO ESQUERDO)
+  // ✨ NOVOS ESTADOS PARA O MODAL DE FILTRO
+  const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
+  const [filtrosAvancados, setFiltrosAvancados] = useState({});
+
+  // MOTOR DE FILTRAGEM (LADO ESQUERDO) - AGORA COM SUPORTE AOS FILTROS AVANÇADOS
   const estoqueFiltrado = estoque?.filter(item => {
+    // 1. Filtro de Filial
     const filialItem = item.filial_id || item.filial || item.filial_origem_id;
     if (estoqueAtual && estoqueAtual !== 'TODOS' && filialItem && filialItem !== estoqueAtual) {
       return false;
     }
 
+    // 2. Remove o que já foi selecionado para o lado direito
     const idDoItem = item.idBD || item.id;
     const jaEstaSelecionado = itensSelecionados.some(selecionado =>
       selecionado.estoque_id === idDoItem || selecionado.id === idDoItem || selecionado.idBD === idDoItem
     );
-    
     if (jaEstaSelecionado) return false;
 
+    // ✨ 3. NOVO: Validação do Filtro Avançado (Modal)
+    for (const chave in filtrosAvancados) {
+      const opcaoSelecionada = filtrosAvancados[chave];
+      if (opcaoSelecionada && opcaoSelecionada.value) {
+        // Compara como string para evitar bugs entre números e texto
+        if (String(item[chave]) !== String(opcaoSelecionada.value)) {
+          return false; // Esconde o item se ele não cumprir um dos filtros
+        }
+      }
+    }
+
+    // 4. Busca por Texto (A barra de pesquisa)
     const termo = busca.toLowerCase();
-    return (
-      (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
-      (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
-      (item.documento_compras && item.documento_compras.toLowerCase().includes(termo)) ||
-      (item.fabricante && item.fabricante.toLowerCase().includes(termo)) ||
-      (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
-      (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
-      (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
-      (item.materialDescription && item.materialDescription.toLowerCase().includes(termo)) ||
-      (item.referencia && item.referencia.toLowerCase().includes(termo)) ||
-      // ✨ NOVOS FILTROS ADICIONADOS AQUI PARA TORNAR A BUSCA MAIS PODEROSA E ESPECÍFICA:
-      (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termo)) ||
-      (item.nf && item.nf.toLowerCase().includes(termo)) ||
-      (item.alocacao && item.alocacao.toLowerCase().includes(termo))
-    );
+    if (termo) {
+      return (
+        (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
+        (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
+        (item.documento_compras && item.documento_compras.toLowerCase().includes(termo)) ||
+        (item.fabricante && item.fabricante.toLowerCase().includes(termo)) ||
+        (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
+        (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
+        (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
+        (item.materialDescription && item.materialDescription.toLowerCase().includes(termo)) ||
+        (item.referencia && item.referencia.toLowerCase().includes(termo)) ||
+        (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termo)) ||
+        (item.nf && item.nf.toLowerCase().includes(termo)) ||
+        (item.alocacao && item.alocacao.toLowerCase().includes(termo))
+      );
+    }
+    
+    return true; // Se não houver texto na busca, mostra o item
   }) || [];
 
+  // Volta à página 1 se alterares a busca, a filial ou aplicares um filtro novo
   useEffect(() => { 
     setPaginaAtual(1); 
-  }, [busca, estoqueAtual]);
+  }, [busca, estoqueAtual, filtrosAvancados]);
 
   const totalPaginas = Math.ceil(estoqueFiltrado.length / itensPorPagina) || 1;
 
@@ -93,6 +118,13 @@ export default function SeletorEstoqueLateral({
     setTimeout(() => { setCopiadoId(null); }, 2000);
   };
 
+  const handleLimparFiltros = () => {
+    setFiltrosAvancados({});
+  };
+
+  // Verifica se há pelo menos um filtro ativo no modal para mostrar a bolinha azul
+  const temFiltroAtivo = Object.values(filtrosAvancados).some(v => v !== null && v !== undefined);
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "350px minmax(0, 1fr)", gap: "24px", alignItems: "start", width: "100%" }}>
       
@@ -110,20 +142,42 @@ export default function SeletorEstoqueLateral({
             </span>
           </div>
           
-          <div style={{ position: 'relative' }}>
-            <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            {/* ✨ PLACEHOLDER ATUALIZADO PARA INFORMAR O UTILIZADOR DOS NOVOS FILTROS */}
-            <input
-              type="text"
-              placeholder="Buscar por SAP, Pedido, NF, Alocação..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              style={{
-                width: '100%', padding: '8px 12px 8px 36px', borderRadius: '8px',
-                backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', outline: 'none',
-                fontSize: '0.85rem', boxSizing: 'border-box'
+          {/* ✨ ÁREA DA PESQUISA COM O NOVO BOTÃO DE FILTRO */}
+          <div style={{ display: 'flex', gap: '8px', height: '36px' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="text"
+                placeholder="Buscar por SAP, Pedido..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                style={{
+                  width: '100%', height: '100%', padding: '0 12px 0 36px', borderRadius: '8px',
+                  backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', outline: 'none',
+                  fontSize: '0.85rem', boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            
+            <button 
+              onClick={() => setModalFiltroAberto(true)}
+              title="Filtros Avançados"
+              style={{ 
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '40px', borderRadius: '8px', border: '1px solid #cbd5e1', 
+                backgroundColor: temFiltroAtivo ? '#eff6ff' : '#ffffff', 
+                color: temFiltroAtivo ? '#2563eb' : '#475569', 
+                cursor: 'pointer', transition: 'background 0.2s',
+                height: '100%', boxSizing: 'border-box', position: 'relative'
               }}
-            />
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = temFiltroAtivo ? '#dbeafe' : '#f1f5f9'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = temFiltroAtivo ? '#eff6ff' : '#ffffff'}
+            >
+              <Filter size={18} />
+              {temFiltroAtivo && (
+                <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '10px', height: '10px', backgroundColor: '#ef4444', border: '2px solid #ffffff', borderRadius: '50%' }}></span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -138,7 +192,7 @@ export default function SeletorEstoqueLateral({
             <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px' }}>
               <AlertCircle size={36} style={{ opacity: 0.4, margin: '0 auto 12px auto' }} />
               <p style={{ fontSize: '0.85rem', margin: 0, padding: '0 16px' }}>
-                {estoque?.length > 0 ? `Nenhum material encontrado para a filial selecionada.` : "Nenhum material encontrado."}
+                {estoque?.length > 0 ? `Nenhum material encontrado para os filtros selecionados.` : "Nenhum material encontrado."}
               </p>
             </div>
           ) : (
@@ -423,6 +477,17 @@ export default function SeletorEstoqueLateral({
           )}
         </div>
       </div>
+
+      {/* ✨ RENDERIZAÇÃO DO MODAL DE FILTRO (Fica invisível até clicares no botão) */}
+      <FiltroEstoqueModal
+        aberto={modalFiltroAberto}
+        onClose={() => setModalFiltroAberto(false)}
+        dadosEstoque={estoque || []}
+        filtros={filtrosAvancados}
+        setFiltros={setFiltrosAvancados}
+        onLimpar={handleLimparFiltros}
+      />
+
     </div>
   );
 }
