@@ -823,13 +823,60 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
             Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
           </div>
           <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}><ChevronLeft size={16} /> Anterior</button>
-            {Array.from({ length: totalPaginas }, (_, index) => {
-              const numeroPagina = index + 1;
-              const ehAtiva = paginaAtual === numeroPagina;
-              return (<button key={numeroPagina} onClick={() => setPaginaAtual(numeroPagina)} disabled={carregando} style={{ padding: '6px 12px', backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', color: ehAtiva ? '#ffffff' : '#334155', border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: ehAtiva ? '600' : '500', cursor: carregando ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease' }}>{numeroPagina}</button>);
-            })}
-            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 0.6 : 1 }}>Próxima <ChevronRight size={16} /></button>
+            
+            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}>
+              <ChevronLeft size={16} /> Anterior
+            </button>
+            
+            {/* ✨ NOVA LÓGICA DE PAGINAÇÃO ELÍPTICA */}
+            {(() => {
+              const maxPaginasVisiveis = 5;
+              let paginas = [];
+
+              if (totalPaginas <= maxPaginasVisiveis) {
+                // Se houver poucas páginas, mostra todas
+                for (let i = 1; i <= totalPaginas; i++) paginas.push(i);
+              } else {
+                if (paginaAtual <= 3) {
+                  paginas = [1, 2, 3, 4, '...', totalPaginas];
+                } else if (paginaAtual >= totalPaginas - 2) {
+                  paginas = [1, '...', totalPaginas - 3, totalPaginas - 2, totalPaginas - 1, totalPaginas];
+                } else {
+                  paginas = [1, '...', paginaAtual - 1, paginaAtual, paginaAtual + 1, '...', totalPaginas];
+                }
+              }
+
+              return paginas.map((pagina, index) => {
+                if (pagina === '...') {
+                  return <span key={`ellipsis-${index}`} style={{ color: '#94a3b8', padding: '0 4px', fontWeight: 'bold' }}>...</span>;
+                }
+                const ehAtiva = paginaAtual === pagina;
+                return (
+                  <button 
+                    key={`page-${pagina}`} 
+                    onClick={() => setPaginaAtual(pagina)} 
+                    disabled={carregando} 
+                    style={{ 
+                      padding: '6px 12px', 
+                      backgroundColor: ehAtiva ? '#ea580c' : '#ffffff', 
+                      color: ehAtiva ? '#ffffff' : '#334155', 
+                      border: `1px solid ${ehAtiva ? '#ea580c' : '#e2e8f0'}`, 
+                      borderRadius: '6px', 
+                      fontSize: '0.875rem', 
+                      fontWeight: ehAtiva ? '600' : '500', 
+                      cursor: carregando ? 'not-allowed' : 'pointer', 
+                      transition: 'all 0.15s ease' 
+                    }}
+                  >
+                    {pagina}
+                  </button>
+                );
+              });
+            })()}
+
+            <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || carregando || totalRegistrosFiltrados === 0) ? 0.6 : 1 }}>
+              Próxima <ChevronRight size={16} />
+            </button>
           </div>
         </div>
       </div>
