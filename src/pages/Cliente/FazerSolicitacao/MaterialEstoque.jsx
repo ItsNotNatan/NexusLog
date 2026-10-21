@@ -66,7 +66,11 @@ export default function MaterialEstoque() {
               unidadeMedida: item.unidade_medida_manual || item.unidade_medida || "Unid",
               wbs: item.wbs_element || item.wbs || "-",
               alocacao: item.alocacao || "-",
-              isTransferencia: item.is_transferencia || false
+              isTransferencia: item.is_transferencia || false,
+              // ✨ O SEGREDO 1: Puxar os dados da base de dados logo na primeira leitura!
+              referencia: item.referencia || "-",
+              documento_compras: item.documento_compras || "-",
+              valor_unitario: item.valor_unitario || 0
             }));
 
           setEstoqueDisponivel(itensComSaldo);
@@ -130,7 +134,6 @@ export default function MaterialEstoque() {
   };
 
   const adicionarItemDoEstoque = (item, index) => {
-    // ✨ LIMITE REDUZIDO PARA 20!
     if (itensSelecionados.length >= 20) { showAlert("Limite Atingido", "Limite máximo de 20 itens.", "warning"); return; }
     if (itensSelecionados.some(i => i.estoque_id === item.idBD)) { showAlert("Item Duplicado", "Material já adicionado.", "info"); return; }
     
@@ -138,7 +141,21 @@ export default function MaterialEstoque() {
     if (saldoLivre <= 0) {
       showAlert("Estoque Reservado", "A quantidade deste item já se encontra 100% reservada.", "warning"); return;
     }
-    setItensSelecionados((prev) => [...prev, { id: `manual-${Date.now()}-${index}`, estoque_id: item.idBD || null, ...item, qtdSelecionada: 1 }]);
+
+    // ✨ O SEGREDO 2: Garantir que todos os campos vão para o "carrinho"
+    setItensSelecionados((prev) => [
+      ...prev, 
+      { 
+        ...item, 
+        id: `manual-${Date.now()}-${index}`, 
+        estoque_id: item.idBD || null, 
+        qtdSelecionada: 1,
+        referencia: item.referencia, 
+        documento_compras: item.documento_compras,
+        valor_unitario: item.valor_unitario,
+        nf_entrada: item.nf || item.nf_entrada || "-"
+      }
+    ]);
   };
 
   const handleEnviar = async () => {
@@ -164,10 +181,7 @@ export default function MaterialEstoque() {
         }
 
         enviados.forEach((anexo, i) => {
-          // O primeiro anexo é a autorização quando a WBS diverge.
-          const nomeFicheiro =
-            temWbsDivergente && i === 0 ? `[AUTORIZAÇÃO WBS] ${anexo.nome_arquivo}` : anexo.nome_arquivo;
-
+          const nomeFicheiro = temWbsDivergente && i === 0 ? `[AUTORIZAÇÃO WBS] ${anexo.nome_arquivo}` : anexo.nome_arquivo;
           anexosProcessados.push({ nome_arquivo: nomeFicheiro, url_arquivo: anexo.url_arquivo });
         });
       }
@@ -295,7 +309,7 @@ export default function MaterialEstoque() {
           estoque={estoqueDisponivel}
           carregando={carregandoEstoque}
           itensSelecionados={listaSegura} 
-          limiteMaximo={20} // ✨ INJETADO O NOVO LIMITE NO SELETOR!
+          limiteMaximo={20}
           onAdicionarItem={adicionarItemDoEstoque}
           onRemoverItem={removerItem}
           onAtualizarQuantidade={atualizarCampo}
