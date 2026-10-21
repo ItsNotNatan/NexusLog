@@ -3,11 +3,10 @@
 // DESCRIÇÃO: Componente completo: Seletor lateral de estoque + Tabela de Itens Selecionados
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
-// ✨ ADICIONADO: O ícone 'Filter'
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check, Box, X, Filter } from 'lucide-react';
 import { AuthContext } from '../../contexts/AuthContext';
 
-// ✨ ADICIONADO: Importação do teu componente de modal (Ajusta o caminho se necessário)
+// Importação do Modal baseada na tua estrutura de ficheiros exata
 import FiltroEstoqueModal from '../FiltroEstoqueModal/FiltroEstoqueModal';
 
 // Função auxiliar para formatar o Valor Unitário como moeda (R$)
@@ -44,37 +43,35 @@ export default function SeletorEstoqueLateral({
   const [hoverId, setHoverId] = useState(null);
   const [copiadoId, setCopiadoId] = useState(null);
 
-  // ✨ NOVOS ESTADOS PARA O MODAL DE FILTRO
+  // Estados do Modal
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({});
 
-  // MOTOR DE FILTRAGEM (LADO ESQUERDO) - AGORA COM SUPORTE AOS FILTROS AVANÇADOS
+  // MOTOR DE FILTRAGEM (LADO ESQUERDO)
   const estoqueFiltrado = estoque?.filter(item => {
-    // 1. Filtro de Filial
     const filialItem = item.filial_id || item.filial || item.filial_origem_id;
     if (estoqueAtual && estoqueAtual !== 'TODOS' && filialItem && filialItem !== estoqueAtual) {
       return false;
     }
 
-    // 2. Remove o que já foi selecionado para o lado direito
     const idDoItem = item.idBD || item.id;
     const jaEstaSelecionado = itensSelecionados.some(selecionado =>
       selecionado.estoque_id === idDoItem || selecionado.id === idDoItem || selecionado.idBD === idDoItem
     );
+    
     if (jaEstaSelecionado) return false;
 
-    // ✨ 3. NOVO: Validação do Filtro Avançado (Modal)
+    // Filtros do Modal
     for (const chave in filtrosAvancados) {
       const opcaoSelecionada = filtrosAvancados[chave];
       if (opcaoSelecionada && opcaoSelecionada.value) {
-        // Compara como string para evitar bugs entre números e texto
         if (String(item[chave]) !== String(opcaoSelecionada.value)) {
-          return false; // Esconde o item se ele não cumprir um dos filtros
+          return false; 
         }
       }
     }
 
-    // 4. Busca por Texto (A barra de pesquisa)
+    // Busca por Texto
     const termo = busca.toLowerCase();
     if (termo) {
       return (
@@ -93,10 +90,9 @@ export default function SeletorEstoqueLateral({
       );
     }
     
-    return true; // Se não houver texto na busca, mostra o item
+    return true;
   }) || [];
 
-  // Volta à página 1 se alterares a busca, a filial ou aplicares um filtro novo
   useEffect(() => { 
     setPaginaAtual(1); 
   }, [busca, estoqueAtual, filtrosAvancados]);
@@ -122,7 +118,6 @@ export default function SeletorEstoqueLateral({
     setFiltrosAvancados({});
   };
 
-  // Verifica se há pelo menos um filtro ativo no modal para mostrar a bolinha azul
   const temFiltroAtivo = Object.values(filtrosAvancados).some(v => v !== null && v !== undefined);
 
   return (
@@ -142,7 +137,6 @@ export default function SeletorEstoqueLateral({
             </span>
           </div>
           
-          {/* ✨ ÁREA DA PESQUISA COM O NOVO BOTÃO DE FILTRO */}
           <div style={{ display: 'flex', gap: '8px', height: '36px' }}>
             <div style={{ position: 'relative', flex: 1 }}>
               <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
@@ -478,7 +472,6 @@ export default function SeletorEstoqueLateral({
         </div>
       </div>
 
-      {/* ✨ RENDERIZAÇÃO DO MODAL DE FILTRO (Fica invisível até clicares no botão) */}
       <FiltroEstoqueModal
         aberto={modalFiltroAberto}
         onClose={() => setModalFiltroAberto(false)}
