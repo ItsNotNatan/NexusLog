@@ -128,15 +128,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
   const [paginaAtual, setPaginaAtual] = useState(1);
+  
+  // ✨ NOVO: Estado para gerir a quantidade de itens por página
+  const [itensPorPagina, setItensPorPagina] = useState(10);
 
-  // ✨ OTIMIZAÇÃO 1: Separamos a digitação da pesquisa real (DEBOUNCE)
   const [termoPesquisaInput, setTermoPesquisaInput] = useState("");
   const [termoPesquisaFiltro, setTermoPesquisaFiltro] = useState("");
 
   useEffect(() => {
     const atraso = setTimeout(() => {
       setTermoPesquisaFiltro(termoPesquisaInput);
-    }, 350); // Só pesquisa 350 milissegundos depois de parares de escrever
+    }, 350);
     return () => clearTimeout(atraso);
   }, [termoPesquisaInput]);
 
@@ -147,8 +149,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [editandoDataId, setEditandoDataId] = useState(null);
   const [dataTemporaria, setDataTemporaria] = useState("");
-
-  const itensPorPagina = 10;
 
   let usuarioLogado = {};
   try {
@@ -254,7 +254,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               }
             }
 
-            // ✨ OTIMIZAÇÃO 2: Pré-Indexação da Pesquisa. Junta tudo numa string limpa para procura à velocidade da luz.
             const wbsProcura = item.wbs || '—';
             const destinoProcura = item.destino || 'Não informado';
             const idProcura = item.ps || item.id;
@@ -275,7 +274,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               wbs: wbsProcura, 
               destino: destinoProcura,
               filial: item.filial_origem_id || item.filial || '-',
-              textoBuscavel: textoBuscavel, // <--- A Nossa Etiqueta Secreta!
+              textoBuscavel: textoBuscavel,
               itensRaw: item.itens || []
             };
           });
@@ -378,7 +377,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (!verificaFiltroAvancado(item.destino, filtrosAvancados.destino)) return false;
       if (!verificaFiltroAvancado(item.statusExibicao, filtrosAvancados.statusExibicao)) return false;
 
-      // ✨ OTIMIZAÇÃO 2 APLICADA: Pesquisa muito mais leve (1 campo em vez de 5)
       if (termoPesquisaFiltro) {
         const termo = termoPesquisaFiltro.toLowerCase();
         if (!item.textoBuscavel.includes(termo)) return false;
@@ -398,6 +396,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     };
   }, [dadosFiltrados]);
 
+  // ✨ OTIMIZAÇÃO: Usa o novo estado "itensPorPagina" para os cálculos
   const { dadosPaginados, totalPaginas, totalRegistrosFiltrados, indexPrimeiroItem, indexUltimoItem } = useMemo(() => {
     const totalRegistros = dadosFiltrados.length;
     const paginas = Math.max(1, Math.ceil(totalRegistros / itensPorPagina));
@@ -818,23 +817,51 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </table>
         </ScrollDuplo>
 
+        {/* ✨ RODAPÉ DA TABELA: PAGINAÇÃO E SELETOR DE ITENS POR PÁGINA */}
         <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-          <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-            Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
+          
+          {/* SECÇÃO ESQUERDA: Exibindo X a Y e Seletor */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {dadosPaginados.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, totalRegistrosFiltrados)}</strong> de <strong>{totalRegistrosFiltrados}</strong> resultados
+            </div>
+
+            {/* SELETOR DE ITENS POR PÁGINA */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Itens por página:</span>
+              <select 
+                value={itensPorPagina} 
+                onChange={(e) => {
+                  setItensPorPagina(Number(e.target.value));
+                  setPaginaAtual(1); // Reinicia sempre a paginação para não crashar
+                }}
+                disabled={carregando}
+                style={{
+                  padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', 
+                  fontSize: '0.875rem', color: '#334155', backgroundColor: '#ffffff', 
+                  cursor: carregando ? 'not-allowed' : 'pointer', outline: 'none'
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
           </div>
+
+          {/* SECÇÃO DIREITA: Botões de Navegação Elíptica */}
           <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             
             <button className="btn-paginacao" onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || carregando} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || carregando) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || carregando) ? 0.6 : 1 }}>
               <ChevronLeft size={16} /> Anterior
             </button>
             
-            {/* ✨ NOVA LÓGICA DE PAGINAÇÃO ELÍPTICA */}
             {(() => {
               const maxPaginasVisiveis = 5;
               let paginas = [];
 
               if (totalPaginas <= maxPaginasVisiveis) {
-                // Se houver poucas páginas, mostra todas
                 for (let i = 1; i <= totalPaginas; i++) paginas.push(i);
               } else {
                 if (paginaAtual <= 3) {
