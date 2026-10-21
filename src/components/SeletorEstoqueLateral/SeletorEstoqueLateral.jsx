@@ -64,7 +64,11 @@ export default function SeletorEstoqueLateral({
       (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
       (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
       (item.materialDescription && item.materialDescription.toLowerCase().includes(termo)) ||
-      (item.referencia && item.referencia.toLowerCase().includes(termo))
+      (item.referencia && item.referencia.toLowerCase().includes(termo)) ||
+      // ✨ NOVOS FILTROS ADICIONADOS AQUI PARA TORNAR A BUSCA MAIS PODEROSA E ESPECÍFICA:
+      (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termo)) ||
+      (item.nf && item.nf.toLowerCase().includes(termo)) ||
+      (item.alocacao && item.alocacao.toLowerCase().includes(termo))
     );
   }) || [];
 
@@ -108,9 +112,10 @@ export default function SeletorEstoqueLateral({
           
           <div style={{ position: 'relative' }}>
             <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            {/* ✨ PLACEHOLDER ATUALIZADO PARA INFORMAR O UTILIZADOR DOS NOVOS FILTROS */}
             <input
               type="text"
-              placeholder="Buscar por SAP, Pedido CPV, Descrição..."
+              placeholder="Buscar por SAP, Pedido, NF, Alocação..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               style={{
@@ -323,11 +328,9 @@ export default function SeletorEstoqueLateral({
               <tbody>
                 {itensSelecionados.map((itemOriginal) => {
                   
-                  // ✨ LÓGICA DE ENRIQUECIMENTO: Puxa o item da "prateleira" para preencher os espaços em branco
                   const idEstoqueRef = itemOriginal.estoque_id || itemOriginal.idBD || itemOriginal.id;
                   const itemFisico = estoque?.find(e => e.id === idEstoqueRef) || {};
 
-                  // Puxamos os dados da prateleira se eles não existirem no itemOriginal
                   const docCompras = itemOriginal.documento_compras || itemOriginal.docCompras || itemFisico.documento_compras || "-";
                   const referencia = itemOriginal.referencia || itemFisico.referencia || "-";
                   const valorUnitario = itemOriginal.valor_unitario_enriquecido ?? itemOriginal.valor_unitario ?? itemOriginal.valor_unitario_manual ?? itemOriginal.poNetPrice ?? itemOriginal.val ?? itemFisico.valor_unitario;
@@ -335,7 +338,6 @@ export default function SeletorEstoqueLateral({
                   const alocacao = itemOriginal.alocacao || itemFisico.alocacao || "CROSSDOCKING";
                   const wbs = itemOriginal.wbs_element || itemOriginal.wbs || itemFisico.wbs || "-";
                   
-                  // Dados de controlo de quantidade
                   const qtdDesejada = itemOriginal.qtdSelecionada !== undefined ? itemOriginal.qtdSelecionada : (itemOriginal.qtdTransferencia !== undefined ? itemOriginal.qtdTransferencia : 1);
                   const unidade = itemOriginal.unidade_medida || itemOriginal.unidadeMedida || itemFisico.unidade_medida || 'Unid';
                   
