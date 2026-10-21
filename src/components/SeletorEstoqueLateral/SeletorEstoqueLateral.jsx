@@ -1,13 +1,13 @@
 // =================================================================
 // ARQUIVO: src/components/SeletorEstoqueLateral/SeletorEstoqueLateral.jsx
-// DESCRIÇÃO: Componente completo: Seletor lateral de estoque + Tabela de Itens Selecionados
+// DESCRIÇÃO: Componente principal do seletor, usando o Modal separado.
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check, Box, X, Filter } from 'lucide-react';
 import { AuthContext } from '../../contexts/AuthContext';
 
-// Importação do Modal baseada na tua estrutura de ficheiros exata
-import FiltroEstoqueModal from '../FiltroEstoqueModal/FiltroEstoqueModal';
+// ✨ IMPORTAÇÃO SIMPLES E DIRETA DO NOVO COMPONENTE NA MESMA PASTA
+import ModalFiltroSeletor from './ModalFiltroSeletor';
 
 // Função auxiliar para formatar o Valor Unitário como moeda (R$)
 const formatarMoeda = (valor) => {
@@ -43,11 +43,16 @@ export default function SeletorEstoqueLateral({
   const [hoverId, setHoverId] = useState(null);
   const [copiadoId, setCopiadoId] = useState(null);
 
-  // Estados do Modal
+  // ✨ ESTADOS DO NOVO FILTRO
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
-  const [filtrosAvancados, setFiltrosAvancados] = useState({});
+  const [filtrosEspecificos, setFiltrosEspecificos] = useState({
+    wbs: null,
+    docCompras: null,
+    nf: null,
+    alocacao: null
+  });
 
-  // MOTOR DE FILTRAGEM (LADO ESQUERDO)
+  // MOTOR DE FILTRAGEM (LADO ESQUERDO) COM O FILTRO ESPECÍFICO
   const estoqueFiltrado = estoque?.filter(item => {
     const filialItem = item.filial_id || item.filial || item.filial_origem_id;
     if (estoqueAtual && estoqueAtual !== 'TODOS' && filialItem && filialItem !== estoqueAtual) {
@@ -58,20 +63,27 @@ export default function SeletorEstoqueLateral({
     const jaEstaSelecionado = itensSelecionados.some(selecionado =>
       selecionado.estoque_id === idDoItem || selecionado.id === idDoItem || selecionado.idBD === idDoItem
     );
-    
     if (jaEstaSelecionado) return false;
 
-    // Filtros do Modal
-    for (const chave in filtrosAvancados) {
-      const opcaoSelecionada = filtrosAvancados[chave];
-      if (opcaoSelecionada && opcaoSelecionada.value) {
-        if (String(item[chave]) !== String(opcaoSelecionada.value)) {
-          return false; 
-        }
-      }
+    // ✨ APLICA O FILTRO ESPECÍFICO AQUI ANTES DA PESQUISA DE TEXTO
+    if (filtrosEspecificos.wbs && filtrosEspecificos.wbs.value) {
+      const wbsItem = item.wbs || item.wbs_element || "";
+      if (String(wbsItem) !== String(filtrosEspecificos.wbs.value)) return false;
+    }
+    if (filtrosEspecificos.docCompras && filtrosEspecificos.docCompras.value) {
+      const docItem = item.documento_compras || "";
+      if (String(docItem) !== String(filtrosEspecificos.docCompras.value)) return false;
+    }
+    if (filtrosEspecificos.nf && filtrosEspecificos.nf.value) {
+      const nfItem = item.nf_entrada || item.nf || "";
+      if (String(nfItem) !== String(filtrosEspecificos.nf.value)) return false;
+    }
+    if (filtrosEspecificos.alocacao && filtrosEspecificos.alocacao.value) {
+      const alocItem = item.alocacao || "";
+      if (String(alocItem) !== String(filtrosEspecificos.alocacao.value)) return false;
     }
 
-    // Busca por Texto
+    // Busca por Texto na Barra
     const termo = busca.toLowerCase();
     if (termo) {
       return (
@@ -89,13 +101,13 @@ export default function SeletorEstoqueLateral({
         (item.alocacao && item.alocacao.toLowerCase().includes(termo))
       );
     }
-    
+
     return true;
   }) || [];
 
   useEffect(() => { 
     setPaginaAtual(1); 
-  }, [busca, estoqueAtual, filtrosAvancados]);
+  }, [busca, estoqueAtual, filtrosEspecificos]);
 
   const totalPaginas = Math.ceil(estoqueFiltrado.length / itensPorPagina) || 1;
 
@@ -115,10 +127,10 @@ export default function SeletorEstoqueLateral({
   };
 
   const handleLimparFiltros = () => {
-    setFiltrosAvancados({});
+    setFiltrosEspecificos({ wbs: null, docCompras: null, nf: null, alocacao: null });
   };
 
-  const temFiltroAtivo = Object.values(filtrosAvancados).some(v => v !== null && v !== undefined);
+  const temFiltroAtivo = Object.values(filtrosEspecificos).some(v => v !== null && v !== undefined);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "350px minmax(0, 1fr)", gap: "24px", alignItems: "start", width: "100%" }}>
@@ -142,7 +154,7 @@ export default function SeletorEstoqueLateral({
               <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
-                placeholder="Buscar por SAP, Pedido..."
+                placeholder="Buscar (SAP, WBS, Descrição)..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 style={{
@@ -153,9 +165,10 @@ export default function SeletorEstoqueLateral({
               />
             </div>
             
+            {/* BOTÃO DO FILTRO PRÓPRIO */}
             <button 
               onClick={() => setModalFiltroAberto(true)}
-              title="Filtros Avançados"
+              title="Filtros Específicos"
               style={{ 
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: '40px', borderRadius: '8px', border: '1px solid #cbd5e1', 
@@ -186,7 +199,7 @@ export default function SeletorEstoqueLateral({
             <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px' }}>
               <AlertCircle size={36} style={{ opacity: 0.4, margin: '0 auto 12px auto' }} />
               <p style={{ fontSize: '0.85rem', margin: 0, padding: '0 16px' }}>
-                {estoque?.length > 0 ? `Nenhum material encontrado para os filtros selecionados.` : "Nenhum material encontrado."}
+                Nenhum material cumpre os critérios.
               </p>
             </div>
           ) : (
@@ -472,12 +485,13 @@ export default function SeletorEstoqueLateral({
         </div>
       </div>
 
-      <FiltroEstoqueModal
+      {/* ✨ RENDERIZAÇÃO DO MODAL EXCLUSIVO */}
+      <ModalFiltroSeletor
         aberto={modalFiltroAberto}
         onClose={() => setModalFiltroAberto(false)}
         dadosEstoque={estoque || []}
-        filtros={filtrosAvancados}
-        setFiltros={setFiltrosAvancados}
+        filtros={filtrosEspecificos}
+        setFiltros={setFiltrosEspecificos}
         onLimpar={handleLimparFiltros}
       />
 
