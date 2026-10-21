@@ -485,3 +485,18 @@
   cursor: not-allowed;
   opacity: 0.7;
 }
+
+/* =================================================================
+   SKELETON LOADING (Efeito Fantasma)
+   ================================================================= */
+@keyframes pulse-skeleton {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.skeleton-box {
+  height: 20px;
+  background-color: #e2e8f0; /* Cor cinza clara do Tailwind (slate-200) */
+  border-radius: 6px;
+  animation: pulse-skeleton 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
