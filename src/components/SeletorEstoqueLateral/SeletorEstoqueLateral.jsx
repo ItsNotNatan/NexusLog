@@ -1,13 +1,12 @@
 // =================================================================
 // ARQUIVO: src/components/SeletorEstoqueLateral/SeletorEstoqueLateral.jsx
-// DESCRIÇÃO: Componente completo: Seletor lateral de estoque + Tabela de Itens Selecionados
+// DESCRIÇÃO: Componente completo: Seletor lateral de estoque + Filtro Específico + Tabela
 // =================================================================
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import Select from 'react-select';
 import { Search, Plus, AlertCircle, Loader2, ChevronLeft, ChevronRight, Copy, Check, Box, X, Filter } from 'lucide-react';
 import { AuthContext } from '../../contexts/AuthContext';
-
-// Importação do Modal baseada na tua estrutura de ficheiros exata
-import FiltroEstoqueModal from '../FiltroEstoqueModal/FiltroEstoqueModal';
 
 // Função auxiliar para formatar o Valor Unitário como moeda (R$)
 const formatarMoeda = (valor) => {
@@ -43,11 +42,16 @@ export default function SeletorEstoqueLateral({
   const [hoverId, setHoverId] = useState(null);
   const [copiadoId, setCopiadoId] = useState(null);
 
-  // Estados do Modal
+  // ✨ ESTADOS DO FILTRO ESPECÍFICO
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
-  const [filtrosAvancados, setFiltrosAvancados] = useState({});
+  const [filtrosEspecificos, setFiltrosEspecificos] = useState({
+    wbs: null,
+    docCompras: null,
+    nf: null,
+    alocacao: null
+  });
 
-  // MOTOR DE FILTRAGEM (LADO ESQUERDO)
+  // MOTOR DE FILTRAGEM
   const estoqueFiltrado = estoque?.filter(item => {
     const filialItem = item.filial_id || item.filial || item.filial_origem_id;
     if (estoqueAtual && estoqueAtual !== 'TODOS' && filialItem && filialItem !== estoqueAtual) {
@@ -58,34 +62,39 @@ export default function SeletorEstoqueLateral({
     const jaEstaSelecionado = itensSelecionados.some(selecionado =>
       selecionado.estoque_id === idDoItem || selecionado.id === idDoItem || selecionado.idBD === idDoItem
     );
-    
     if (jaEstaSelecionado) return false;
 
-    // Filtros do Modal
-    for (const chave in filtrosAvancados) {
-      const opcaoSelecionada = filtrosAvancados[chave];
-      if (opcaoSelecionada && opcaoSelecionada.value) {
-        if (String(item[chave]) !== String(opcaoSelecionada.value)) {
-          return false; 
-        }
-      }
+    // ✨ APLICAÇÃO DOS FILTROS ESPECÍFICOS
+    if (filtrosEspecificos.wbs && filtrosEspecificos.wbs.value) {
+      const wbsItem = item.wbs || item.wbs_element || "";
+      if (String(wbsItem) !== String(filtrosEspecificos.wbs.value)) return false;
+    }
+    if (filtrosEspecificos.docCompras && filtrosEspecificos.docCompras.value) {
+      const docItem = item.documento_compras || "";
+      if (String(docItem) !== String(filtrosEspecificos.docCompras.value)) return false;
+    }
+    if (filtrosEspecificos.nf && filtrosEspecificos.nf.value) {
+      const nfItem = item.nf_entrada || item.nf || "";
+      if (String(nfItem) !== String(filtrosEspecificos.nf.value)) return false;
+    }
+    if (filtrosEspecificos.alocacao && filtrosEspecificos.alocacao.value) {
+      const alocItem = item.alocacao || "";
+      if (String(alocItem) !== String(filtrosEspecificos.alocacao.value)) return false;
     }
 
-    // Busca por Texto
+    // Busca por Texto Geral
     const termo = busca.toLowerCase();
     if (termo) {
       return (
         (item.desenhoSAP && item.desenhoSAP.toLowerCase().includes(termo)) ||
         (item.desenho_sap && item.desenho_sap.toLowerCase().includes(termo)) ||
         (item.documento_compras && item.documento_compras.toLowerCase().includes(termo)) ||
-        (item.fabricante && item.fabricante.toLowerCase().includes(termo)) ||
         (item.wbs && item.wbs.toLowerCase().includes(termo)) ||
         (item.wbs_element && item.wbs_element.toLowerCase().includes(termo)) ||
         (item.descricao && item.descricao.toLowerCase().includes(termo)) ||
         (item.materialDescription && item.materialDescription.toLowerCase().includes(termo)) ||
         (item.referencia && item.referencia.toLowerCase().includes(termo)) ||
         (item.nf_entrada && item.nf_entrada.toLowerCase().includes(termo)) ||
-        (item.nf && item.nf.toLowerCase().includes(termo)) ||
         (item.alocacao && item.alocacao.toLowerCase().includes(termo))
       );
     }
@@ -95,7 +104,7 @@ export default function SeletorEstoqueLateral({
 
   useEffect(() => { 
     setPaginaAtual(1); 
-  }, [busca, estoqueAtual, filtrosAvancados]);
+  }, [busca, estoqueAtual, filtrosEspecificos]);
 
   const totalPaginas = Math.ceil(estoqueFiltrado.length / itensPorPagina) || 1;
 
@@ -114,11 +123,7 @@ export default function SeletorEstoqueLateral({
     setTimeout(() => { setCopiadoId(null); }, 2000);
   };
 
-  const handleLimparFiltros = () => {
-    setFiltrosAvancados({});
-  };
-
-  const temFiltroAtivo = Object.values(filtrosAvancados).some(v => v !== null && v !== undefined);
+  const temFiltroAtivo = Object.values(filtrosEspecificos).some(v => v !== null && v !== undefined);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "350px minmax(0, 1fr)", gap: "24px", alignItems: "start", width: "100%" }}>
@@ -142,7 +147,7 @@ export default function SeletorEstoqueLateral({
               <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
-                placeholder="Buscar por SAP, Pedido..."
+                placeholder="Buscar (SAP, WBS, Descrição)..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 style={{
@@ -155,7 +160,7 @@ export default function SeletorEstoqueLateral({
             
             <button 
               onClick={() => setModalFiltroAberto(true)}
-              title="Filtros Avançados"
+              title="Filtros Específicos"
               style={{ 
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: '40px', borderRadius: '8px', border: '1px solid #cbd5e1', 
@@ -186,7 +191,7 @@ export default function SeletorEstoqueLateral({
             <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px' }}>
               <AlertCircle size={36} style={{ opacity: 0.4, margin: '0 auto 12px auto' }} />
               <p style={{ fontSize: '0.85rem', margin: 0, padding: '0 16px' }}>
-                {estoque?.length > 0 ? `Nenhum material encontrado para os filtros selecionados.` : "Nenhum material encontrado."}
+                Nenhum material cumpre os critérios.
               </p>
             </div>
           ) : (
@@ -472,15 +477,123 @@ export default function SeletorEstoqueLateral({
         </div>
       </div>
 
-      <FiltroEstoqueModal
+      {/* ✨ RENDERIZAÇÃO DO MODAL DE FILTRO ESPECÍFICO (Diretamente dentro do componente) */}
+      <ModalFiltroEspecifico
         aberto={modalFiltroAberto}
         onClose={() => setModalFiltroAberto(false)}
         dadosEstoque={estoque || []}
-        filtros={filtrosAvancados}
-        setFiltros={setFiltrosAvancados}
+        filtros={filtrosEspecificos}
+        setFiltros={setFiltrosEspecificos}
         onLimpar={handleLimparFiltros}
       />
 
     </div>
+  );
+}
+
+// =================================================================
+// COMPONENTE: ModalFiltroEspecifico (Fica no mesmo ficheiro por conveniência)
+// =================================================================
+function ModalFiltroEspecifico({ aberto, onClose, dadosEstoque, filtros, setFiltros, onLimpar }) {
+  
+  // Extrai as opções de WBS, NF, Pedido e Alocação dos dados físicos
+  const opcoesMapeadas = useMemo(() => {
+    const mapas = { wbs: new Set(), docCompras: new Set(), nf: new Set(), alocacao: new Set() };
+    
+    dadosEstoque.forEach(item => {
+      const wbs = item.wbs || item.wbs_element;
+      if (wbs && wbs !== '-' && wbs !== '—') mapas.wbs.add(wbs);
+
+      const doc = item.documento_compras;
+      if (doc && doc !== '-' && doc !== '—') mapas.docCompras.add(doc);
+
+      const nf = item.nf_entrada || item.nf;
+      if (nf && nf !== '-' && nf !== '—') mapas.nf.add(nf);
+
+      const aloc = item.alocacao;
+      if (aloc && aloc !== '-' && aloc !== '—') mapas.alocacao.add(aloc);
+    });
+
+    const formatarLista = (set) => Array.from(set).sort().map(val => ({ value: val, label: String(val) }));
+
+    return {
+      wbs: formatarLista(mapas.wbs),
+      docCompras: formatarLista(mapas.docCompras),
+      nf: formatarLista(mapas.nf),
+      alocacao: formatarLista(mapas.alocacao)
+    };
+  }, [dadosEstoque]);
+
+  const temFiltroAtivo = Object.values(filtros).some(valor => valor !== null && valor !== undefined);
+
+  const selectStyles = {
+    control: (base, state) => ({
+      ...base,
+      borderColor: state.isFocused ? '#3b82f6' : '#cbd5e1',
+      boxShadow: state.isFocused ? '0 0 0 1px #3b82f6' : 'none',
+      borderRadius: '8px', padding: '0px', minHeight: '36px', fontSize: '0.875rem',
+      '&:hover': { borderColor: '#94a3b8' }
+    }),
+    option: (base, state) => ({
+      ...base, fontSize: '0.875rem',
+      backgroundColor: state.isSelected ? '#2563eb' : state.isFocused ? '#eff6ff' : 'white',
+      color: state.isSelected ? 'white' : '#334155',
+    })
+  };
+
+  if (!aberto) return null;
+
+  return createPortal(
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ backgroundColor: '#ffffff', width: '450px', maxWidth: '90%', borderRadius: '12px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+          <div>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.05em' }}>Seletor Lateral</span>
+            <h2 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', color: '#0f172a', fontWeight: '700' }}>Filtro Específico</h2>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>WBS do Item</label>
+            <Select options={opcoesMapeadas.wbs} value={filtros.wbs} onChange={(opt) => setFiltros({ ...filtros, wbs: opt })} placeholder="Qualquer WBS..." isClearable styles={selectStyles} noOptionsMessage={() => "Sem dados"} />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>Pedido de Compra / CPV</label>
+            <Select options={opcoesMapeadas.docCompras} value={filtros.docCompras} onChange={(opt) => setFiltros({ ...filtros, docCompras: opt })} placeholder="Qualquer Pedido..." isClearable styles={selectStyles} noOptionsMessage={() => "Sem dados"} />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>Nota Fiscal (NF)</label>
+            <Select options={opcoesMapeadas.nf} value={filtros.nf} onChange={(opt) => setFiltros({ ...filtros, nf: opt })} placeholder="Qualquer NF..." isClearable styles={selectStyles} noOptionsMessage={() => "Sem dados"} />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>Alocação</label>
+            <Select options={opcoesMapeadas.alocacao} value={filtros.alocacao} onChange={(opt) => setFiltros({ ...filtros, alocacao: opt })} placeholder="Qualquer Alocação..." isClearable styles={selectStyles} noOptionsMessage={() => "Sem dados"} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+          <div>
+            {temFiltroAtivo && (
+              <button onClick={onLimpar} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: '#ef4444', fontWeight: '600', fontSize: '0.875rem', cursor: 'pointer' }}>
+                Limpar
+              </button>
+            )}
+          </div>
+          <button onClick={onClose} style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', fontSize: '0.875rem', border: 'none', cursor: 'pointer' }}>
+            Aplicar
+          </button>
+        </div>
+
+      </div>
+    </div>,
+    document.body
   );
 }
