@@ -81,6 +81,8 @@ export default function ExportarDados() {
 
           const dadosFormatados = resultado.dados.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
+            
+            // ✨ PUXANDO A DATA DE ENTREGA
             const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
             const dataFinalConclusao = dataEntregaFisica || parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
             const dataPrazoExpira = parseDataBackend(item.prazoFinalizacao); 
@@ -89,7 +91,6 @@ export default function ExportarDados() {
             let dentroTarget = null;
             const targetDias = 3;
 
-            // ✨ BLOQUEIO DE TIPOS PARA O CÁLCULO DO SLA
             const tiposIgnorados = ['Crossdocking', 'Nota Fiscal', 'Reintegracao', 'Reintegração', 'Cancelado'];
             const tipoLimpo = item.tipo || '';
             const deveComputarSLA = !tiposIgnorados.includes(tipoLimpo);
@@ -133,6 +134,7 @@ export default function ExportarDados() {
               status: item.status || 'Pendente',
               pl: plApresentacao,
               criacaoPsFormatada: formatarDataHora(item.dataCriacaoISO || item.created_at || item.dataSolicitacao),
+              dataEntregaFormatada: dataEntregaFisica ? formatarDataHora(dataEntregaFisica) : '-', // ✨ Exposto na tabela
               finalizacaoPlFormatada: textoFinalizacaoPL,
               itemExpirado: expirado,
               leadTime: leadTimeDias,
@@ -185,13 +187,14 @@ export default function ExportarDados() {
       return;
     }
 
-    const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;EXPIRACAO_FINALIZACAO_PL;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
+    // ✨ Adicionada a DATA_ENTREGA ao CSV
+    const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;DATA_ENTREGA;EXPIRACAO_FINALIZACAO_PL;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
     const linhas = listaFiltrada.map(row => {
       const leadTimeExport = row.leadTime !== null ? row.leadTime.toFixed(2) : '';
       const targetExport = row.dentroTarget === true ? 'Dentro' : (row.dentroTarget === false ? 'Fora' : '');
       const valorExport = row.valorTotal > 0 ? row.valorTotal.toFixed(2) : '';
       
-      return `"${row.id}";"${row.solicitante}";"${row.wbs}";"${row.tipo}";"${row.status}";"${row.pl}";"${row.criacaoPsFormatada}";"${row.finalizacaoPlFormatada}";"${leadTimeExport}";"${targetExport}";"${row.itensCount}";"${valorExport}"`;
+      return `"${row.id}";"${row.solicitante}";"${row.wbs}";"${row.tipo}";"${row.status}";"${row.pl}";"${row.criacaoPsFormatada}";"${row.dataEntregaFormatada}";"${row.finalizacaoPlFormatada}";"${leadTimeExport}";"${targetExport}";"${row.itensCount}";"${valorExport}"`;
     }).join("\n");
 
     const blob = new Blob(['\ufeff' + cabecalho + linhas], { type: 'text/csv;charset=utf-8;' }); 
@@ -268,7 +271,7 @@ export default function ExportarDados() {
 
         <div className="tabela-info-exportar">
           <span>{listaFiltrada.length} registros</span>
-          <span>Target: 3 dia(s) — Lead Time = Criação PS &rarr; Expiração/Finalização PL</span>
+          <span>Target: 3 dia(s) — Lead Time = Criação PS &rarr; Data de Entrega</span>
         </div>
 
         {carregando ? (
@@ -288,6 +291,8 @@ export default function ExportarDados() {
                   <th>STATUS PS</th>
                   <th>PL</th>
                   <th>CRIAÇÃO PS</th>
+                  {/* ✨ Coluna adicionada visualmente */}
+                  <th>DATA ENTREGA</th>
                   <th>FINALIZAÇÃO PL (EXPIRAÇÃO)</th>
                   <th>LEAD TIME</th>
                   <th>TARGET</th>
@@ -298,7 +303,7 @@ export default function ExportarDados() {
               <tbody>
                 {listaFiltrada.length === 0 ? (
                   <tr>
-                    <td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                    <td colSpan="13" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                       Nenhum registo encontrado com os filtros atuais.
                     </td>
                   </tr>
@@ -316,6 +321,8 @@ export default function ExportarDados() {
                       <td><span className="badge-status-simples">{linha.status}</span></td>
                       <td>{linha.pl !== '-' ? <span className="link-azul">{linha.pl}</span> : <span className="texto-cinza">-</span>}</td>
                       <td className="texto-cinza">{linha.criacaoPsFormatada}</td>
+                      {/* ✨ Mostra a Data de Entrega na Tabela */}
+                      <td className="texto-cinza fonte-negrito">{linha.dataEntregaFormatada}</td>
                       <td className={linha.finalizacaoPlFormatada === 'não definido' ? 'texto-amarelo' : (linha.itemExpirado ? 'texto-vermelho fonte-negrito' : 'texto-verde')}>{linha.finalizacaoPlFormatada}</td>
                       <td>{linha.leadTime !== null ? <span className="fonte-negrito">{linha.leadTime.toFixed(2)}d</span> : <span className="texto-cinza">—</span>}</td>
                       <td>
