@@ -2,12 +2,12 @@
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
 // =================================================================
 import React, { useState, useEffect, useContext, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom"; // ✨ IMPORTADO useSearchParams
+import { useNavigate } from "react-router-dom";
 import "./AcompanhamentoSolicitacoes.css";
 import {
   Search, ChevronRight, GitBranch, FileText,
   RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, 
-  Filter, Check, X, ChevronUp, ChevronDown, ListChecks
+  Filter, ChevronUp, ChevronDown
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -54,19 +54,6 @@ const obterClasseBadgeTipo = (tipo) => {
   }
 };
 
-const converterParaInputDateTime = (dataString) => {
-  if (!dataString || dataString === '-' || dataString === '—' || dataString === 'Disponível') return '';
-  const partes = dataString.split(' ');
-  if (partes[0].includes('/')) {
-    const [dia, mes, ano] = partes[0].split('/');
-    let hora = '00:00';
-    if (partes.length >= 3 && partes[2].includes(':')) hora = partes[2]; 
-    else if (partes.length === 2 && partes[1].includes(':')) hora = partes[1]; 
-    return `${ano}-${mes}-${dia}T${hora}`;
-  }
-  return '';
-};
-
 const obterValorSeguroNumero = (valItem, valEstoque) => {
   const processarNumero = (valor) => {
     if (valor === undefined || valor === null || valor === '-' || valor === '') return 0;
@@ -95,7 +82,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
   const { showAlert, showConfirm, showLoading, closeAlert } = useAlert();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams(); // ✨ RECUPERA OS PARÂMETROS DA URL
 
   const obterNomeFilialDinamico = (codigo) => {
     if (!codigo) return 'N/D';
@@ -113,50 +99,28 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]);
+  const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [carregando, setCarregando] = useState(true);
+  const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
-  const [linhasSelecionadas, setLinhasSelecionadas] = useState(new Set());
+  
+  const [ordenacao, setOrdenacao] = useState({ coluna: 'dataCriacaoISO', direcao: 'desc' });
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(10);
 
-  // ✨ INICIALIZA OS ESTADOS COM BASE NO QUE ESTÁ NA URL (Deep Linking)
-  const [filtroAtivo, setFiltroAtivo] = useState(searchParams.get('tipo') || "Todos");
-  const [filtroStatus, setFiltroStatus] = useState(searchParams.get('status') || "Todos");
-  const [paginaAtual, setPaginaAtual] = useState(Number(searchParams.get('pagina')) || 1);
-  const [termoPesquisaInput, setTermoPesquisaInput] = useState(searchParams.get('busca') || "");
-  const [itensPorPagina, setItensPorPagina] = useState(Number(searchParams.get('limite')) || 10);
-  const [ordenacao, setOrdenacao] = useState({ 
-    coluna: searchParams.get('ordem') || 'dataCriacaoISO', 
-    direcao: searchParams.get('dir') || 'desc' 
-  });
-
-  const [termoPesquisaFiltro, setTermoPesquisaFiltro] = useState(termoPesquisaInput);
+  const [termoPesquisaInput, setTermoPesquisaInput] = useState("");
+  const [termoPesquisaFiltro, setTermoPesquisaFiltro] = useState("");
 
   useEffect(() => {
     const atraso = setTimeout(() => setTermoPesquisaFiltro(termoPesquisaInput), 350);
     return () => clearTimeout(atraso);
   }, [termoPesquisaInput]);
 
-  // ✨ ATUALIZA A URL SILENCIOSAMENTE SEMPRE QUE UM FILTRO MUDA
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (filtroAtivo !== "Todos") params.set("tipo", filtroAtivo);
-    if (filtroStatus !== "Todos") params.set("status", filtroStatus);
-    if (paginaAtual > 1) params.set("pagina", paginaAtual);
-    if (termoPesquisaInput) params.set("busca", termoPesquisaInput);
-    if (itensPorPagina !== 10) params.set("limite", itensPorPagina);
-    if (ordenacao.coluna !== 'dataCriacaoISO') params.set("ordem", ordenacao.coluna);
-    if (ordenacao.direcao !== 'desc') params.set("dir", ordenacao.direcao);
-    
-    setSearchParams(params, { replace: true });
-  }, [filtroAtivo, filtroStatus, paginaAtual, termoPesquisaInput, itensPorPagina, ordenacao, setSearchParams]);
-
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     tipo: '', id: '', solicitante: '', wbs: '', sap: '', nf: '', pl: '', filial: '', destino: '', statusExibicao: ''
   });
-
-  const [editandoDataId, setEditandoDataId] = useState(null);
-  const [dataTemporaria, setDataTemporaria] = useState("");
 
   let usuarioLogado = {};
   try {
@@ -165,7 +129,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   } catch (erro) { }
 
   const isOperador = String(usuarioLogado.cargo || '').toLowerCase().trim().includes('operador');
-  const isLogisticaMaster = perfil === "logistica" && !isOperador;
   const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
 
   const mapEstoque = useMemo(() => {
@@ -253,7 +216,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         });
 
         setDadosTabela(dadosFormatados);
-        setLinhasSelecionadas(new Set());
       } else {
         showAlert("Erro Operacional", resultadoSol.erro || 'Falha ao buscar dados.', "error");
       }
@@ -272,15 +234,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     return () => socket.disconnect();
   }, [estoqueAtual, perfil]);
 
-  // Remover a reinicialização automática de página caso não seja necessária em carregamento inicial
-  useEffect(() => { 
-    // Só reseta a página se a alteração for provocada por uma pesquisa ativa do utilizador, não na montagem
-  }, [filtroAtivo, filtroStatus, termoPesquisaFiltro, filtrosAvancados]);
-
-  const handleMudancaFiltroComResetPagina = (acao) => {
-    acao();
-    setPaginaAtual(1);
-  };
+  useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisaFiltro, filtrosAvancados, ordenacao]);
 
   const getItensEnriquecidos = (linha) => {
     if (!linha.itensRaw) return [];
@@ -393,11 +347,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const { dadosPaginados, totalPaginas, totalRegistrosFiltrados, indexPrimeiroItem, indexUltimoItem } = useMemo(() => {
     const paginas = Math.max(1, Math.ceil(dadosOrdenados.length / itensPorPagina));
-    // Correção: Se a página pela URL for maior que as disponíveis, ajusta.
-    const paginaSegura = paginaAtual > paginas ? paginas : Math.max(1, paginaAtual);
-    
-    const start = (paginaSegura - 1) * itensPorPagina;
-    const end = paginaSegura * itensPorPagina;
+    const start = (paginaAtual - 1) * itensPorPagina;
+    const end = paginaAtual * itensPorPagina;
     return {
       dadosPaginados: dadosOrdenados.slice(start, end),
       totalPaginas: paginas,
@@ -406,68 +357,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       indexUltimoItem: end
     };
   }, [dadosOrdenados, paginaAtual, itensPorPagina]);
-
-  const toggleSelecionarTodas = () => {
-    if (linhasSelecionadas.size === dadosPaginados.length && dadosPaginados.length > 0) {
-      setLinhasSelecionadas(new Set());
-    } else {
-      const novosSelecionados = new Set(dadosPaginados.map(item => item.idOriginal));
-      setLinhasSelecionadas(novosSelecionados);
-    }
-  };
-
-  const toggleSelecionarLinha = (idOriginal) => {
-    const novosSelecionados = new Set(linhasSelecionadas);
-    if (novosSelecionados.has(idOriginal)) novosSelecionados.delete(idOriginal);
-    else novosSelecionados.add(idOriginal);
-    setLinhasSelecionadas(novosSelecionados);
-  };
-
-  const executarAcaoEmMassa = async (acao) => {
-    if (linhasSelecionadas.size === 0) return;
-
-    let novoStatus = "";
-    let motivo = null;
-
-    if (acao === "aprovar") novoStatus = "Em Separação";
-    else if (acao === "cancelar") novoStatus = "Cancelado";
-    else if (acao === "concluir") novoStatus = "Concluído";
-
-    if (novoStatus === 'Cancelado') {
-      motivo = window.prompt("Atenção! Vai cancelar múltiplas solicitações. Informe o motivo:");
-      if (!motivo) return;
-    } else {
-      const confirmar = await showConfirm(`Ação em Massa`, `Tem certeza que deseja ${acao} as ${linhasSelecionadas.size} solicitações selecionadas?`, "warning", "Sim, Confirmar");
-      if (!confirmar) return;
-    }
-
-    showLoading("A Processar", `A aplicar ação em massa a ${linhasSelecionadas.size} itens...`);
-
-    try {
-      const promessas = Array.from(linhasSelecionadas).map(async (idOriginal) => {
-        const itemNaTabela = dadosTabela.find(i => i.idOriginal === idOriginal);
-        let statusParaEnviar = novoStatus;
-        
-        if (acao === "aprovar" && itemNaTabela) {
-          statusParaEnviar = itemNaTabela.statusDestinoAprovacao;
-        }
-
-        return apiFetch(`/solicitacoes/${idOriginal}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: statusParaEnviar, motivo_recusa: motivo })
-        });
-      });
-
-      await Promise.all(promessas);
-      closeAlert();
-      showAlert("Sucesso!", `As ${linhasSelecionadas.size} solicitações foram atualizadas.`, "success");
-      setLinhasSelecionadas(new Set());
-      buscarDados(); 
-    } catch (error) {
-      closeAlert();
-      showAlert("Erro", "Ocorreu uma falha ao processar a ação em massa.", "error");
-    }
-  };
 
   const lidarComMudancaStatus = async (idSolicitacao, novoStatus) => {
     const confirmar = await showConfirm("Alterar Status", `Tem certeza que deseja mudar o status para "${novoStatus}"?`, "warning", "Sim, Mudar");
@@ -492,17 +381,58 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  const lidarComMudancaDataEntrega = async (idSolicitacao, novaData) => {
+  const toggleLinha = (idUnico) => {
+    setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
+    setAnexosNovos([]);
+  };
+
+  const handleDeletarAnexo = async (idSolicitacao, anexo) => {
+    const confirmar = await showConfirm("Excluir Anexo", `Tem a certeza que deseja apagar o ficheiro "${anexo.nome_arquivo}"?`, "error", "Sim, Apagar");
+    if (!confirmar) return;
+
     try {
-      const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/local`, { method: 'PATCH', body: JSON.stringify({ data_entrega: novaData ? new Date(novaData).toISOString() : null }) });
+      const dados = await apiFetch(`/solicitacoes/anexo/${anexo.id}`, { method: "DELETE" });
       if (dados.sucesso) {
-        buscarDados();
-        showAlert("Data Atualizada", "A data e hora de entrega foram atualizadas com sucesso!", "success");
+        setDadosTabela((prev) => prev.map((sol) => {
+          if (sol.idOriginal === idSolicitacao) return { ...sol, anexos: sol.anexos.filter((a) => a.id !== anexo.id) };
+          return sol;
+        }));
       } else {
-        showAlert("Erro", dados.erro || "Falha ao salvar a data de entrega.", "error");
+        showAlert("Erro", "Não foi possível apagar o anexo.", "error");
       }
     } catch (error) {
-      showAlert("Erro de Conexão", "Não foi possível conectar ao servidor.", "error");
+      showAlert("Erro de Conexão", "Falha ao comunicar com o servidor.", "error");
+    }
+  };
+
+  const handleEnviarAnexosExtras = async (idSolicitacao) => {
+    if (anexosNovos.length === 0) return;
+
+    try {
+      setCarregando(true);
+      let anexosProcessados = [];
+      try {
+        anexosProcessados = await enviarArquivos(anexosNovos);
+      } catch (erroUpload) {
+        showAlert("Erro no Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+        setCarregando(false);
+        return;
+      }
+
+      const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/anexos`, { method: "POST", body: JSON.stringify({ anexos: anexosProcessados }) });
+
+      if (dados.sucesso) {
+        showAlert("Sucesso!", "Novos anexos integrados na base de dados com sucesso.", "success");
+        setAnexosNovos([]);
+        setLinhaExpandida(null);
+        window.location.reload();
+      } else {
+        showAlert("Erro do Servidor", dados.erro, "error");
+      }
+    } catch (error) {
+      showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -527,9 +457,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   if (carregandoInicial || (perfil === 'cliente' && estoqueAtual === 'TODOS')) return null;
 
-  const checkboxGeralMarcado = dadosPaginados.length > 0 && linhasSelecionadas.size === dadosPaginados.length;
-  const existemLinhasSelecionadas = linhasSelecionadas.size > 0;
-
   return (
     <div className="acompanhamento-wrapper">
       <header className="acompanhamento-cabecalho">
@@ -538,22 +465,22 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       </header>
 
       <div className="kpis-linha">
-        <div className={`kpi-card-resumo kpi-total ${filtroStatus === "Todos" ? "ativo" : ""}`} onClick={() => handleMudancaFiltroComResetPagina(() => setFiltroStatus("Todos"))}>
+        <div className={`kpi-card-resumo kpi-total ${filtroStatus === "Todos" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Todos")}>
           <span>Total</span><strong>{kpis.total}</strong>
         </div>
-        <div className={`kpi-card-resumo kpi-pendentes ${filtroStatus === "Pendente" ? "ativo" : ""}`} onClick={() => handleMudancaFiltroComResetPagina(() => setFiltroStatus("Pendente"))}>
+        <div className={`kpi-card-resumo kpi-pendentes ${filtroStatus === "Pendente" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Pendente")}>
           <span>Pendentes</span><strong>{kpis.pendentes}</strong>
         </div>
-        <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Andamento" ? "ativo" : ""}`} onClick={() => handleMudancaFiltroComResetPagina(() => setFiltroStatus("Em Andamento"))}>
+        <div className={`kpi-card-resumo kpi-andamento ${filtroStatus === "Em Andamento" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Em Andamento")}>
           <span>Em Separação</span><strong>{kpis.andamento}</strong>
         </div>
-        <div className={`kpi-card-resumo kpi-concluidos ${filtroStatus === "Concluído" ? "ativo" : ""}`} onClick={() => handleMudancaFiltroComResetPagina(() => setFiltroStatus("Concluído"))}>
+        <div className={`kpi-card-resumo kpi-concluidos ${filtroStatus === "Concluído" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Concluído")}>
           <span>Concluídos</span><strong>{kpis.concluidos}</strong>
         </div>
-        <div className={`kpi-card-resumo kpi-recusados ${filtroStatus === "Recusado" ? "ativo" : ""}`} onClick={() => handleMudancaFiltroComResetPagina(() => setFiltroStatus("Recusado"))}>
+        <div className={`kpi-card-resumo kpi-recusados ${filtroStatus === "Recusado" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Recusado")}>
           <span>Recusados</span><strong>{kpis.recusados}</strong>
         </div>
-        <div className={`kpi-card-resumo kpi-cancelados ${filtroStatus === "Cancelado" ? "ativo" : ""}`} onClick={() => handleMudancaFiltroComResetPagina(() => setFiltroStatus("Cancelado"))}>
+        <div className={`kpi-card-resumo kpi-cancelados ${filtroStatus === "Cancelado" ? "ativo" : ""}`} onClick={() => setFiltroStatus("Cancelado")}>
           <span>Cancelados</span><strong>{kpis.cancelados}</strong>
         </div>
       </div>
@@ -561,25 +488,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       <div className="tabela-cartao-container">
         
         <div className="tabela-controlos-topo" style={{ position: 'relative' }}>
-          
-          {existemLinhasSelecionadas && isLogisticaMaster && (
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#eff6ff', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: '1px solid #bfdbfe' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <ListChecks size={20} color="#2563eb" />
-                <span style={{ fontWeight: '700', color: '#1e3a8a' }}>{linhasSelecionadas.size} solicitações selecionadas</span>
-                <button onClick={() => setLinhasSelecionadas(new Set())} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.85rem', textDecoration: 'underline', cursor: 'pointer' }}>Desmarcar tudo</button>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => executarAcaoEmMassa('cancelar')} style={{ padding: '6px 16px', backgroundColor: '#ffffff', border: '1px solid #fecaca', color: '#ef4444', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer' }}>Cancelar Selecionados</button>
-                <button onClick={() => executarAcaoEmMassa('concluir')} style={{ padding: '6px 16px', backgroundColor: '#10b981', border: 'none', color: '#ffffff', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer' }}>Concluir Selecionados</button>
-                <button onClick={() => executarAcaoEmMassa('aprovar')} style={{ padding: '6px 16px', backgroundColor: '#ea580c', border: 'none', color: '#ffffff', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer' }}>Aprovar Selecionados</button>
-              </div>
-            </div>
-          )}
-
           <div className="filtros-botoes">
             {listaFiltros.map((filtro) => (
-              <button key={filtro} className={`btn-aba ${filtroAtivo === filtro ? "ativo" : ""}`} onClick={() => handleMudancaFiltroComResetPagina(() => setFiltroAtivo(filtro))}>{filtro}</button>
+              <button key={filtro} className={`btn-aba ${filtroAtivo === filtro ? "ativo" : ""}`} onClick={() => setFiltroAtivo(filtro)}>{filtro}</button>
             ))}
           </div>
           
@@ -601,16 +512,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           <table className="tabela-solicitacoes" style={{ width: '100%', minWidth: '1150px' }}>
             <thead>
               <tr>
-                {isLogisticaMaster && (
-                  <th style={{ width: '40px', textAlign: 'center', padding: '16px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={checkboxGeralMarcado} 
-                      onChange={toggleSelecionarTodas}
-                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#2563eb' }}
-                    />
-                  </th>
-                )}
                 <th className="col-chevron"></th>
                 <HeaderOrdenavel coluna="tipo" label="TIPO / ID (PS)" />
                 <HeaderOrdenavel coluna="solicitante" label="SOLICITANTE / WBS" />
@@ -625,7 +526,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
               {carregando ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={`skeleton-${i}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    {isLogisticaMaster && <td style={{ padding: '16px' }}></td>}
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '20px', height: '20px', borderRadius: '50%' }}></div></td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', marginBottom: '8px', height: '16px' }}></div><div className="skeleton-box" style={{ width: '120px', height: '14px' }}></div></td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '100px', marginBottom: '8px', height: '14px' }}></div><div className="skeleton-box" style={{ width: '60px', height: '14px' }}></div></td>
@@ -637,12 +537,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                   </tr>
                 ))
               ) : dadosPaginados.length === 0 ? (
-                <tr><td colSpan={isLogisticaMaster ? "9" : "8"} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
+                <tr><td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
                 dadosPaginados.map((linha, index) => {
                   const idUnico = `${linha.idOriginal}-${index}`;
                   const isExpandida = linhaExpandida === idUnico;
-                  const isSelecionada = linhasSelecionadas.has(linha.idOriginal);
 
                   const isCrossdocking = linha.tipo === 'Crossdocking';
                   let nfNoEstoque = true;
@@ -663,22 +562,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                       <tr
                         className={isExpandida ? "tr-expandida" : ""}
                         style={{
-                          backgroundColor: isSelecionada ? '#eff6ff' : (isRecusadoOuCancelado ? '#fef2f2' : ''),
+                          backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '',
                           borderBottom: isRecusadoOuCancelado ? '1px solid #fecaca' : '1px solid #f1f5f9',
                           transition: 'background-color 0.2s'
                         }}
                       >
-                        {isLogisticaMaster && (
-                          <td style={{ textAlign: 'center', padding: '16px' }}>
-                            <input 
-                              type="checkbox" 
-                              checked={isSelecionada}
-                              onChange={() => toggleSelecionarLinha(linha.idOriginal)}
-                              style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#2563eb' }}
-                            />
-                          </td>
-                        )}
-
                         <td className="col-chevron" onClick={() => toggleLinha(idUnico)}>
                           <ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: corTextoFraco }} />
                         </td>
@@ -719,22 +607,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
 
+                        {/* ✨ COLUNA DATA ENTREGA CORRIGIDA PARA APENAS TEXTO */}
                         <td>
-                          {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
-                            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <input type="datetime-local" value={editandoDataId === linha.idOriginal ? dataTemporaria : converterParaInputDateTime(linha.dataEntrega)} onChange={(e) => { if (editandoDataId !== linha.idOriginal) setEditandoDataId(linha.idOriginal); setDataTemporaria(e.target.value); }} style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#059669', fontWeight: '600', outline: 'none', cursor: 'pointer' }} />
-                              {editandoDataId === linha.idOriginal && (
-                                <>
-                                  <button onClick={() => { lidarComMudancaDataEntrega(linha.idOriginal, dataTemporaria); setEditandoDataId(null); }} style={{ display: 'flex', padding: '4px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}><Check size={14} strokeWidth={3} /></button>
-                                  <button onClick={() => setEditandoDataId(null)} style={{ display: 'flex', padding: '4px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}><X size={14} strokeWidth={3} /></button>
-                                </>
-                              )}
-                            </div>
-                          ) : (
-                            <span style={{ color: linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? (isRecusadoOuCancelado ? "#dc2626" : "#10b981") : corTextoFraco }}>
-                              {linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? linha.dataEntrega : "—"}
-                            </span>
-                          )}
+                          <span style={{ color: linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? (isRecusadoOuCancelado ? "#dc2626" : "#10b981") : corTextoFraco }}>
+                            {linha.dataEntrega && linha.dataEntrega !== "-" && linha.dataEntrega !== "—" ? linha.dataEntrega : "—"}
+                          </span>
                         </td>
 
                         <td>
@@ -764,7 +641,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                       {isExpandida && (
                         <tr>
-                          <td colSpan={isLogisticaMaster ? "9" : "8"} className="td-expandida">
+                          <td colSpan="8" className="td-expandida">
                             <DetalhesSolicitacao item={{ ...linha, itens: getItensEnriquecidos(linha) }} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
                           </td>
                         </tr>
