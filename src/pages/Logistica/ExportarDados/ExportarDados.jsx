@@ -61,8 +61,12 @@ export default function ExportarDados() {
           const agora = new Date();
 
           const dadosFormatados = resultado.dados.map((item) => {
-            const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at);
-            const dataFinalConclusao = parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
+            const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
+            
+            // ✨ CORREÇÃO APLICADA: Prioriza a data_entrega física. Se não existir, usa a data de sistema.
+            const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
+            const dataFinalConclusao = dataEntregaFisica || parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
+            
             const dataPrazoExpira = parseDataBackend(item.prazoFinalizacao); 
             
             let leadTimeDias = null;
@@ -92,18 +96,21 @@ export default function ExportarDados() {
               if (agora > dataPrazoExpira && item.status !== 'Concluído') {
                 expirado = true;
               }
-            } else if (item.status === 'Concluído' && dataFinalConclusao) {
-              textoFinalizacaoPL = formatarDataHora(item.dataFinalizacaoISO || item.updated_at);
+            } 
+            
+            // Se o pedido está concluído, mostra exatamente a data que foi usada na matemática
+            if (item.status === 'Concluído' && dataFinalConclusao) {
+              textoFinalizacaoPL = formatarDataHora(dataFinalConclusao);
             }
 
             return {
               id: item.ps || `PS:${item.id.replace(/\D/g, '') || item.id}`,
               solicitante: item.solicitante || 'Não informado',
               wbs: item.wbs || '-',
-              tipo: item.tipo || '-', // ✨ Extraímos o TIPO aqui
+              tipo: item.tipo || '-', 
               status: item.status || 'Pendente',
               pl: plApresentacao,
-              criacaoPsFormatada: formatarDataHora(item.dataCriacaoISO || item.created_at),
+              criacaoPsFormatada: formatarDataHora(item.dataCriacaoISO || item.created_at || item.dataSolicitacao),
               finalizacaoPlFormatada: textoFinalizacaoPL,
               itemExpirado: expirado,
               leadTime: leadTimeDias,
@@ -132,7 +139,7 @@ export default function ExportarDados() {
       item.solicitante.toLowerCase().includes(termo) ||
       item.wbs.toLowerCase().includes(termo) ||
       item.pl.toLowerCase().includes(termo) ||
-      item.tipo.toLowerCase().includes(termo); // ✨ Também permitimos pesquisar pelo tipo
+      item.tipo.toLowerCase().includes(termo);
 
     const bateStatus = filtroStatus === 'Todos os Status' || item.status === filtroStatus;
     return batePesquisa && bateStatus;
@@ -156,18 +163,16 @@ export default function ExportarDados() {
       return;
     }
 
-    // ✨ Adicionada a coluna TIPO no cabeçalho
     const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;EXPIRACAO_FINALIZACAO_PL;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
     const linhas = listaFiltrada.map(row => {
       const leadTimeExport = row.leadTime !== null ? row.leadTime.toFixed(2) : '';
       const targetExport = row.dentroTarget === true ? 'Dentro' : (row.dentroTarget === false ? 'Fora' : '');
       const valorExport = row.valorTotal > 0 ? row.valorTotal.toFixed(2) : '';
       
-      // ✨ Adicionada a propriedade row.tipo
       return `"${row.id}";"${row.solicitante}";"${row.wbs}";"${row.tipo}";"${row.status}";"${row.pl}";"${row.criacaoPsFormatada}";"${row.finalizacaoPlFormatada}";"${leadTimeExport}";"${targetExport}";"${row.itensCount}";"${valorExport}"`;
     }).join("\n");
 
-    const blob = new Blob([cabecalho + linhas], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\ufeff' + cabecalho + linhas], { type: 'text/csv;charset=utf-8;' }); // Adicionado BOM \ufeff para forçar o Excel a ler os acentos corretamente
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
@@ -257,7 +262,6 @@ export default function ExportarDados() {
                   <th>PS ID</th>
                   <th>SOLICITANTE</th>
                   <th>WBS</th>
-                  {/* ✨ Adicionada coluna TIPO */}
                   <th>TIPO</th>
                   <th>STATUS PS</th>
                   <th>PL</th>
@@ -272,7 +276,6 @@ export default function ExportarDados() {
               <tbody>
                 {listaFiltrada.length === 0 ? (
                   <tr>
-                    {/* ✨ colSpan alterado de 11 para 12 devido à nova coluna */}
                     <td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                       Nenhum registo encontrado com os filtros atuais.
                     </td>
@@ -283,7 +286,6 @@ export default function ExportarDados() {
                       <td className="fonte-negrito">{linha.id}</td>
                       <td>{linha.solicitante}</td>
                       <td><span className="link-azul">{linha.wbs}</span></td>
-                      {/* ✨ Mostra o Tipo de Solicitação na tabela */}
                       <td>
                         <span style={{ fontWeight: '500', color: '#475569' }}>
                           {linha.tipo}
