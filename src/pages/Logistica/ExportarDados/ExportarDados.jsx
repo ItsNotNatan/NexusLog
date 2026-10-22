@@ -31,10 +31,35 @@ export default function ExportarDados() {
     { id: 'status', label: 'Status dos PL', icone: <CheckCircle2 size={16} /> },
   ];
 
+  // ✨ CORREÇÃO: Lê corretamente datas no formato "DD/MM/YYYY às HH:MM" e ISO
   const parseDataBackend = (dataStr) => {
-    if (!dataStr || dataStr === '-' || dataStr === '—' || dataStr === 'não definido') return null;
-    let data = new Date(dataStr);
-    if (!isNaN(data.getTime())) return data;
+    if (!dataStr || typeof dataStr !== 'string') return null;
+    
+    // Limpa palavras como "às" ou "as" que possam vir coladas à data
+    const strLimpa = dataStr.replace(/às/gi, '').replace(/as/gi, '').replace(/\s+/g, ' ').trim();
+    if (!strLimpa || strLimpa === '-' || strLimpa === '—' || strLimpa === 'não definido') return null;
+
+    if (strLimpa.includes('/')) {
+      try {
+        const [dataParte, horaParte] = strLimpa.split(' ');
+        const partesData = dataParte.split('/');
+        
+        if (partesData.length === 3) {
+          const dia = parseInt(partesData[0], 10);
+          const mes = parseInt(partesData[1], 10) - 1;
+          const ano = parseInt(partesData[2], 10);
+          const horaMin = horaParte ? horaParte.split(':') : [0, 0];
+          const hora = parseInt(horaMin[0] || 0, 10);
+          const minuto = parseInt(horaMin[1] || 0, 10);
+          
+          const dataBr = new Date(ano, mes, dia, hora, minuto, 0);
+          if (!isNaN(dataBr.getTime())) return dataBr;
+        }
+      } catch (e) { }
+    }
+
+    let dataIso = new Date(strLimpa);
+    if (!isNaN(dataIso.getTime())) return dataIso;
     return null;
   };
 
@@ -63,7 +88,7 @@ export default function ExportarDados() {
           const dadosFormatados = resultado.dados.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
             
-            // ✨ CORREÇÃO APLICADA: Prioriza a data_entrega física. Se não existir, usa a data de sistema.
+            // ✨ CALCULO COM A DATA DE ENTREGA (PRIORIDADE ABSOLUTA)
             const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
             const dataFinalConclusao = dataEntregaFisica || parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
             
@@ -98,7 +123,6 @@ export default function ExportarDados() {
               }
             } 
             
-            // Se o pedido está concluído, mostra exatamente a data que foi usada na matemática
             if (item.status === 'Concluído' && dataFinalConclusao) {
               textoFinalizacaoPL = formatarDataHora(dataFinalConclusao);
             }
@@ -172,7 +196,7 @@ export default function ExportarDados() {
       return `"${row.id}";"${row.solicitante}";"${row.wbs}";"${row.tipo}";"${row.status}";"${row.pl}";"${row.criacaoPsFormatada}";"${row.finalizacaoPlFormatada}";"${leadTimeExport}";"${targetExport}";"${row.itensCount}";"${valorExport}"`;
     }).join("\n");
 
-    const blob = new Blob(['\ufeff' + cabecalho + linhas], { type: 'text/csv;charset=utf-8;' }); // Adicionado BOM \ufeff para forçar o Excel a ler os acentos corretamente
+    const blob = new Blob(['\ufeff' + cabecalho + linhas], { type: 'text/csv;charset=utf-8;' }); 
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
