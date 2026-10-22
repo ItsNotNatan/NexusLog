@@ -28,7 +28,10 @@ export default function ExportarDados() {
     periodo: 'Todo Período',
     status: 'Todos os Status',
     tipo: 'Todos',
-    target: 'Todos'
+    target: 'Todos',
+    solicitante: '',
+    wbs: '',
+    pl: ''
   });
 
   const abasNav = [
@@ -87,7 +90,6 @@ export default function ExportarDados() {
         if (resultado.sucesso) {
           const agora = new Date();
 
-          // ✨ EXCLUSÃO COMPLETA DOS TIPOS INDESEJADOS
           const tiposIgnorados = ['Crossdocking', 'Nota Fiscal', 'Reintegracao', 'Reintegração', 'Cancelado'];
           
           const dadosValidos = resultado.dados.filter(item => {
@@ -184,6 +186,15 @@ export default function ExportarDados() {
     if (filtrosAvancados.target === 'Dentro') bateTarget = item.dentroTarget === true;
     if (filtrosAvancados.target === 'Fora') bateTarget = item.dentroTarget === false;
 
+    let bateSolicitante = true;
+    if (filtrosAvancados.solicitante) bateSolicitante = item.solicitante.toLowerCase().includes(filtrosAvancados.solicitante.toLowerCase());
+
+    let bateWbs = true;
+    if (filtrosAvancados.wbs) bateWbs = item.wbs.toLowerCase().includes(filtrosAvancados.wbs.toLowerCase());
+
+    let batePl = true;
+    if (filtrosAvancados.pl) batePl = item.pl.toLowerCase().includes(filtrosAvancados.pl.toLowerCase());
+
     let bateData = true;
     if (filtrosAvancados.periodo !== 'Todo Período' && item.criacaoPsRaw) {
       const hoje = new Date();
@@ -200,7 +211,7 @@ export default function ExportarDados() {
       }
     }
 
-    return batePesquisa && bateStatus && bateTipo && bateTarget && bateData;
+    return batePesquisa && bateStatus && bateTipo && bateTarget && bateData && bateSolicitante && bateWbs && batePl;
   });
 
   const listaStatusUnicos = ['Todos os Status', ...new Set(dadosTabela.map(i => i.status))];
@@ -220,7 +231,10 @@ export default function ExportarDados() {
       periodo: 'Todo Período',
       status: 'Todos os Status',
       tipo: 'Todos',
-      target: 'Todos'
+      target: 'Todos',
+      solicitante: '',
+      wbs: '',
+      pl: ''
     });
     setBusca('');
   };
@@ -228,7 +242,10 @@ export default function ExportarDados() {
   const temFiltroAtivo = filtrosAvancados.periodo !== 'Todo Período' || 
                          filtrosAvancados.status !== 'Todos os Status' || 
                          filtrosAvancados.tipo !== 'Todos' || 
-                         filtrosAvancados.target !== 'Todos';
+                         filtrosAvancados.target !== 'Todos' ||
+                         filtrosAvancados.solicitante !== '' ||
+                         filtrosAvancados.wbs !== '' ||
+                         filtrosAvancados.pl !== '';
 
   const exportarCSV = () => {
     if (listaFiltrada.length === 0) {
