@@ -12,7 +12,6 @@ import {
 import { apiFetch } from '../../../services/api';
 import { AuthContext } from '../../../contexts/AuthContext'; 
 
-// ✨ IMPORTA O NOVO COMPONENTE
 import FiltroExportacaoModal from '../../../components/FiltroExportacaoModal/FiltroExportacaoModal';
 
 export default function ExportarDados() {
@@ -24,7 +23,6 @@ export default function ExportarDados() {
 
   const [busca, setBusca] = useState('');
   
-  // ✨ NOVO ESTADO DE FILTROS AVANÇADOS
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     periodo: 'Todo Período',
@@ -89,7 +87,18 @@ export default function ExportarDados() {
         if (resultado.sucesso) {
           const agora = new Date();
 
-          const dadosFormatados = resultado.dados.map((item) => {
+          // ✨ EXCLUSÃO COMPLETA DOS TIPOS INDESEJADOS
+          const tiposIgnorados = ['Crossdocking', 'Nota Fiscal', 'Reintegracao', 'Reintegração', 'Cancelado'];
+          
+          const dadosValidos = resultado.dados.filter(item => {
+            const tipo = item.tipo || '';
+            const status = item.status || '';
+            if (status === 'Cancelado' || tipo === 'Cancelado') return false;
+            if (tiposIgnorados.includes(tipo)) return false;
+            return true;
+          });
+
+          const dadosFormatados = dadosValidos.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
             const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
             const dataFinalConclusao = dataEntregaFisica || parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
@@ -99,18 +108,12 @@ export default function ExportarDados() {
             let dentroTarget = null;
             const targetDias = 3;
 
-            const tiposIgnorados = ['Crossdocking', 'Nota Fiscal', 'Reintegracao', 'Reintegração', 'Cancelado'];
-            const tipoLimpo = item.tipo || '';
-            const deveComputarSLA = !tiposIgnorados.includes(tipoLimpo);
-
-            if (deveComputarSLA) {
-              if (item.status === 'Concluído' && dataCriacao && dataFinalConclusao) {
-                const diferencaMs = dataFinalConclusao.getTime() - dataCriacao.getTime();
-                leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
-                dentroTarget = leadTimeDias <= targetDias;
-              } else if (item.status === 'Em Separação' && dataPrazoExpira) {
-                dentroTarget = agora <= dataPrazoExpira;
-              }
+            if (item.status === 'Concluído' && dataCriacao && dataFinalConclusao) {
+              const diferencaMs = dataFinalConclusao.getTime() - dataCriacao.getTime();
+              leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
+              dentroTarget = leadTimeDias <= targetDias;
+            } else if (item.status === 'Em Separação' && dataPrazoExpira) {
+              dentroTarget = agora <= dataPrazoExpira;
             }
 
             const valorTotal = (item.itens || []).reduce((acc, it) => {
@@ -165,9 +168,7 @@ export default function ExportarDados() {
     carregarDadosExportacao();
   }, [estoqueAtual]); 
 
-  // ✨ LÓGICA DE FILTRAGEM ATUALIZADA
   const listaFiltrada = dadosTabela.filter((item) => {
-    // Busca Rápida
     const termo = busca.toLowerCase();
     const batePesquisa = 
       item.id.toLowerCase().includes(termo) ||
@@ -176,15 +177,13 @@ export default function ExportarDados() {
       item.pl.toLowerCase().includes(termo) ||
       item.tipo.toLowerCase().includes(termo);
 
-    // Filtros Avançados
     const bateStatus = filtrosAvancados.status === 'Todos os Status' || item.status === filtrosAvancados.status;
-    const bateTipo = filtrosAvancados.tipo === 'Todos' || item.tipo === filtrosAvancados.tipo || (filtrosAvancados.tipo === 'Reintegracao' && item.tipo === 'Reintegração');
+    const bateTipo = filtrosAvancados.tipo === 'Todos' || item.tipo === filtrosAvancados.tipo;
     
     let bateTarget = true;
     if (filtrosAvancados.target === 'Dentro') bateTarget = item.dentroTarget === true;
     if (filtrosAvancados.target === 'Fora') bateTarget = item.dentroTarget === false;
 
-    // Filtro de Data
     let bateData = true;
     if (filtrosAvancados.periodo !== 'Todo Período' && item.criacaoPsRaw) {
       const hoje = new Date();
@@ -306,7 +305,6 @@ export default function ExportarDados() {
             <input type="text" placeholder="Buscar PS, PL, WBS, Tipo..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
 
-          {/* ✨ BOTÃO PARA ABRIR O NOVO MODAL */}
           <button 
             onClick={() => setModalFiltroAberto(true)} 
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontWeight: '600', cursor: 'pointer', height: '40px' }}
@@ -387,7 +385,6 @@ export default function ExportarDados() {
         )}
       </div>
 
-      {/* ✨ RENDERIZAÇÃO DO COMPONENTE MODAL */}
       <FiltroExportacaoModal 
         aberto={modalFiltroAberto}
         onClose={() => setModalFiltroAberto(false)}
