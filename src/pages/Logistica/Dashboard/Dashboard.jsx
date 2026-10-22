@@ -82,7 +82,19 @@ export default function Dashboard() {
         const resultado = await apiFetch(`/solicitacoes/listar?limit=1000${filtroFilial}`);
 
         if (resultado?.sucesso && Array.isArray(resultado.dados)) {
-          const dadosFormatados = resultado.dados.map((item) => {
+          
+          // ✨ EXCLUSÃO COMPLETA DOS TIPOS INDESEJADOS
+          const tiposIgnorados = ['Crossdocking', 'Nota Fiscal', 'Reintegracao', 'Reintegração', 'Cancelado'];
+          
+          const dadosValidos = resultado.dados.filter(item => {
+            const tipo = item.tipo || '';
+            const status = item.status || '';
+            if (status === 'Cancelado' || tipo === 'Cancelado') return false;
+            if (tiposIgnorados.includes(tipo)) return false;
+            return true;
+          });
+
+          const dadosFormatados = dadosValidos.map((item) => {
             let prefixo = "PS"; 
             if (item.tipo === "Crossdocking") prefixo = "CD";
             else if (item.tipo === "Nota Fiscal") prefixo = "NF";
@@ -111,7 +123,7 @@ export default function Dashboard() {
               criacaoPlRaw: dataCriacaoPL,
               prazoFinalizacao: item.prazoFinalizacao || null,
               dataSolicitacao: item.dataSolicitacao || item.created_at,
-              dataEntrega: item.dataEntrega || 'não definido',
+              dataEntrega: item.dataEntrega || item.data_entrega || 'não definido',
               dataFinalizacaoISO: item.dataFinalizacaoISO || item.updated_at
             };
           });
@@ -149,7 +161,7 @@ export default function Dashboard() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // 3. ✨ A MATEMÁTICA DAS CORES DO SLA (Agora Prioriza dataEntrega)
+  // 3. ✨ A MATEMÁTICA DAS CORES DO SLA
   // ---------------------------------------------------------------------------
   const calcularTempoRestante = (item, agora) => {
     const { criacaoPlRaw, prazoFinalizacao, status, tipo, dataSolicitacao, dataFinalizacaoISO, dataEntrega } = item;
@@ -184,7 +196,6 @@ export default function Dashboard() {
       return { texto: '—', cor: 'neutro', dentroTarget: null };
     }
 
-    // ✨ CORREÇÃO: Priorizar data_entrega (dataEntrega) tal como na exportação
     let dataReferenciaFim = agora;
     if (status === 'Concluído') {
        dataReferenciaFim = parseDataBackend(dataEntrega) || parseDataBackend(dataFinalizacaoISO) || agora;
