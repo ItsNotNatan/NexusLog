@@ -13,7 +13,7 @@ import {
 import TabelaDemandas from '../../../components/TabelaDemandas/TabelaDemandas';
 import { apiFetch, urlDoServidor } from '../../../services/api';
 import { AuthContext } from '../../../contexts/AuthContext';
-import { io } from 'socket.io-client'; // ✨ IMPORTAÇÃO DO SOCKET NO TOPO
+import { io } from 'socket.io-client';
 
 const parseDataBackend = (dataStr) => {
   if (!dataStr || typeof dataStr !== 'string') return null;
@@ -127,7 +127,6 @@ export default function Dashboard() {
 
     buscarDados();
 
-    // ✨ SOCKET.IO: Atualiza gráficos e tabela em tempo real (Silenciosamente)
     const SOCKET_URL = urlDoServidor();
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
@@ -150,7 +149,7 @@ export default function Dashboard() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // 3. ✨ A MATEMÁTICA DAS CORES DO SLA (50%, 20% e Expirado)
+  // 3. ✨ A MATEMÁTICA DAS CORES DO SLA (Agora Prioriza dataEntrega)
   // ---------------------------------------------------------------------------
   const calcularTempoRestante = (item, agora) => {
     const { criacaoPlRaw, prazoFinalizacao, status, tipo, dataSolicitacao, dataFinalizacaoISO, dataEntrega } = item;
@@ -172,7 +171,7 @@ export default function Dashboard() {
     }
 
     let dataLimite = parseDataBackend(prazoFinalizacao);
-    const prazoTargetMs = 3 * 24 * 60 * 60 * 1000; // SLA de 3 dias em milissegundos
+    const prazoTargetMs = 3 * 24 * 60 * 60 * 1000; 
     
     if (!dataLimite) {
       const dataAprovacaoPL = parseDataBackend(criacaoPlRaw) || parseDataBackend(dataSolicitacao);
@@ -185,13 +184,15 @@ export default function Dashboard() {
       return { texto: '—', cor: 'neutro', dentroTarget: null };
     }
 
+    // ✨ CORREÇÃO: Priorizar data_entrega (dataEntrega) tal como na exportação
+    let dataReferenciaFim = agora;
     if (status === 'Concluído') {
-      const dataConclusao = parseDataBackend(dataFinalizacaoISO) || parseDataBackend(dataEntrega) || agora;
-      const cumpriuTarget = dataConclusao.getTime() <= dataLimite.getTime();
-      return { texto: 'Entregue', cor: 'neutro', dentroTarget: cumpriuTarget };
+       dataReferenciaFim = parseDataBackend(dataEntrega) || parseDataBackend(dataFinalizacaoISO) || agora;
+       const cumpriuTarget = dataReferenciaFim.getTime() <= dataLimite.getTime();
+       return { texto: 'Entregue', cor: 'neutro', dentroTarget: cumpriuTarget };
     }
 
-    const diferencaMs = dataLimite.getTime() - agora.getTime();
+    const diferencaMs = dataLimite.getTime() - dataReferenciaFim.getTime();
     const pad = (num) => String(num).padStart(2, '0');
 
     const atrasoAbsoluto = Math.abs(diferencaMs);
@@ -202,21 +203,19 @@ export default function Dashboard() {
 
     const relogioFormatado = `${dias}d ${pad(horas)}:${pad(minutos)}:${pad(segundos)}`;
 
-    // ✨ REGRAS DE COR EXATAS (50% e 20%)
     if (diferencaMs < 0) {
-      // Já passou do prazo (Expirado)
       return { 
         texto: `-${relogioFormatado}`, 
-        cor: 'expirado', // Vai ativar o fundo vermelho
+        cor: 'expirado',
         dentroTarget: false 
       };
     } else {
-      let corStatus = 'verde'; // O Padrão é Verde (Mais de 50% do tempo)
+      let corStatus = 'verde'; 
       
       if (diferencaMs <= (prazoTargetMs * 0.20)) {
-        corStatus = 'vermelho'; // Falta 20% ou menos do tempo
+        corStatus = 'vermelho';
       } else if (diferencaMs <= (prazoTargetMs * 0.50)) {
-        corStatus = 'amarelo'; // Falta entre 20% e 50% do tempo
+        corStatus = 'amarelo'; 
       }
 
       return { 
@@ -243,7 +242,7 @@ export default function Dashboard() {
       return {
         ...item,
         contagem: contagemAoVivo.texto,
-        contagemStatus: contagemAoVivo.cor, // Passa a cor "verde", "amarelo", "vermelho" ou "expirado"
+        contagemStatus: contagemAoVivo.cor,
         dentroTarget: contagemAoVivo.dentroTarget
       };
     });
