@@ -31,40 +31,35 @@ export default function ExportarDados() {
     { id: 'status', label: 'Status dos PL', icone: <CheckCircle2 size={16} /> },
   ];
 
-  // ✨ CORREÇÃO: Lê corretamente datas no formato "DD/MM/YYYY às HH:MM" e ISO
   const parseDataBackend = (dataStr) => {
-    if (!dataStr || typeof dataStr !== 'string') return null;
+    if (!dataStr) return null;
+    if (dataStr instanceof Date) return dataStr;
+    if (typeof dataStr !== 'string') return null;
     
-    // Limpa palavras como "às" ou "as" que possam vir coladas à data
     const strLimpa = dataStr.replace(/às/gi, '').replace(/as/gi, '').replace(/\s+/g, ' ').trim();
     if (!strLimpa || strLimpa === '-' || strLimpa === '—' || strLimpa === 'não definido') return null;
 
-    if (strLimpa.includes('/')) {
-      try {
-        const [dataParte, horaParte] = strLimpa.split(' ');
-        const partesData = dataParte.split('/');
-        
-        if (partesData.length === 3) {
-          const dia = parseInt(partesData[0], 10);
-          const mes = parseInt(partesData[1], 10) - 1;
-          const ano = parseInt(partesData[2], 10);
-          const horaMin = horaParte ? horaParte.split(':') : [0, 0];
-          const hora = parseInt(horaMin[0] || 0, 10);
-          const minuto = parseInt(horaMin[1] || 0, 10);
-          
-          const dataBr = new Date(ano, mes, dia, hora, minuto, 0);
-          if (!isNaN(dataBr.getTime())) return dataBr;
-        }
-      } catch (e) { }
+    const brRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?: (\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/;
+    const matchBr = strLimpa.match(brRegex);
+    if (matchBr) {
+       const dia = parseInt(matchBr[1], 10);
+       const mes = parseInt(matchBr[2], 10) - 1;
+       const ano = parseInt(matchBr[3], 10);
+       const hora = matchBr[4] ? parseInt(matchBr[4], 10) : 0;
+       const min = matchBr[5] ? parseInt(matchBr[5], 10) : 0;
+       const sec = matchBr[6] ? parseInt(matchBr[6], 10) : 0;
+       const dataBr = new Date(ano, mes, dia, hora, min, sec);
+       if (!isNaN(dataBr.getTime())) return dataBr;
     }
 
-    let dataIso = new Date(strLimpa);
+    const dataIso = new Date(strLimpa);
     if (!isNaN(dataIso.getTime())) return dataIso;
+    
     return null;
   };
 
-  const formatarDataHora = (dataString) => {
-    const data = parseDataBackend(dataString);
+  const formatarDataHora = (dataInput) => {
+    const data = parseDataBackend(dataInput);
     if (!data) return 'não definido';
     const dia = String(data.getDate()).padStart(2, '0');
     const mes = String(data.getMonth() + 1).padStart(2, '0');
@@ -74,7 +69,6 @@ export default function ExportarDados() {
     return `${dia}/${mes}/${ano} ${hora}:${min}`;
   };
 
-  // 🔄 CARREGAMENTO DOS DADOS
   useEffect(() => {
     const carregarDadosExportacao = async () => {
       try {
@@ -88,7 +82,6 @@ export default function ExportarDados() {
           const dadosFormatados = resultado.dados.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
             
-            // ✨ CALCULO COM A DATA DE ENTREGA (PRIORIDADE ABSOLUTA)
             const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
             const dataFinalConclusao = dataEntregaFisica || parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
             
