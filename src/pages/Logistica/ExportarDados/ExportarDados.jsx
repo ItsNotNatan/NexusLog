@@ -6,11 +6,14 @@ import React, { useState, useEffect, useContext } from 'react';
 import './ExportarDados.css';
 import { 
   Download, FileText, Activity, BarChart3, 
-  CheckCircle2, Loader2, TrendingUp, Search
+  CheckCircle2, Loader2, TrendingUp, Search, Filter
 } from 'lucide-react';
 
 import { apiFetch } from '../../../services/api';
 import { AuthContext } from '../../../contexts/AuthContext'; 
+
+// ✨ IMPORTA O NOVO COMPONENTE
+import FiltroExportacaoModal from '../../../components/FiltroExportacaoModal/FiltroExportacaoModal';
 
 export default function ExportarDados() {
   const { estoqueAtual } = useContext(AuthContext);
@@ -20,8 +23,15 @@ export default function ExportarDados() {
   const [abaAtiva, setAbaAtiva] = useState('ps-pl');
 
   const [busca, setBusca] = useState('');
-  const [filtroPeriodo, setFiltroPeriodo] = useState('Todo Período');
-  const [filtroStatus, setFiltroStatus] = useState('Todos os Status');
+  
+  // ✨ NOVO ESTADO DE FILTROS AVANÇADOS
+  const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
+  const [filtrosAvancados, setFiltrosAvancados] = useState({
+    periodo: 'Todo Período',
+    status: 'Todos os Status',
+    tipo: 'Todos',
+    target: 'Todos'
+  });
 
   const abasNav = [
     { id: 'ps-pl', label: 'PS + PL (Solicitações)', icone: <FileText size={16} /> },
@@ -81,8 +91,6 @@ export default function ExportarDados() {
 
           const dadosFormatados = resultado.dados.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
-            
-            // ✨ PUXANDO A DATA DE ENTREGA
             const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
             const dataFinalConclusao = dataEntregaFisica || parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
             const dataPrazoExpira = parseDataBackend(item.prazoFinalizacao); 
@@ -133,8 +141,9 @@ export default function ExportarDados() {
               tipo: item.tipo || '-', 
               status: item.status || 'Pendente',
               pl: plApresentacao,
-              criacaoPsFormatada: formatarDataHora(item.dataCriacaoISO || item.created_at || item.dataSolicitacao),
-              dataEntregaFormatada: dataEntregaFisica ? formatarDataHora(dataEntregaFisica) : '-', // ✨ Exposto na tabela
+              criacaoPsRaw: dataCriacao,
+              criacaoPsFormatada: formatarDataHora(dataCriacao),
+              dataEntregaFormatada: dataEntregaFisica ? formatarDataHora(dataEntregaFisica) : '-',
               finalizacaoPlFormatada: textoFinalizacaoPL,
               itemExpirado: expirado,
               leadTime: leadTimeDias,
@@ -156,7 +165,9 @@ export default function ExportarDados() {
     carregarDadosExportacao();
   }, [estoqueAtual]); 
 
+  // ✨ LÓGICA DE FILTRAGEM ATUALIZADA
   const listaFiltrada = dadosTabela.filter((item) => {
+    // Busca Rápida
     const termo = busca.toLowerCase();
     const batePesquisa = 
       item.id.toLowerCase().includes(termo) ||
@@ -165,8 +176,32 @@ export default function ExportarDados() {
       item.pl.toLowerCase().includes(termo) ||
       item.tipo.toLowerCase().includes(termo);
 
-    const bateStatus = filtroStatus === 'Todos os Status' || item.status === filtroStatus;
-    return batePesquisa && bateStatus;
+    // Filtros Avançados
+    const bateStatus = filtrosAvancados.status === 'Todos os Status' || item.status === filtrosAvancados.status;
+    const bateTipo = filtrosAvancados.tipo === 'Todos' || item.tipo === filtrosAvancados.tipo || (filtrosAvancados.tipo === 'Reintegracao' && item.tipo === 'Reintegração');
+    
+    let bateTarget = true;
+    if (filtrosAvancados.target === 'Dentro') bateTarget = item.dentroTarget === true;
+    if (filtrosAvancados.target === 'Fora') bateTarget = item.dentroTarget === false;
+
+    // Filtro de Data
+    let bateData = true;
+    if (filtrosAvancados.periodo !== 'Todo Período' && item.criacaoPsRaw) {
+      const hoje = new Date();
+      const dataItem = new Date(item.criacaoPsRaw);
+      
+      if (filtrosAvancados.periodo === 'Hoje') {
+        bateData = dataItem.toDateString() === hoje.toDateString();
+      } else if (filtrosAvancados.periodo === 'Este Mês') {
+        bateData = dataItem.getMonth() === hoje.getMonth() && dataItem.getFullYear() === hoje.getFullYear();
+      } else if (filtrosAvancados.periodo === 'Semana Passada') {
+        const semanaPassada = new Date();
+        semanaPassada.setDate(hoje.getDate() - 7);
+        bateData = dataItem >= semanaPassada;
+      }
+    }
+
+    return batePesquisa && bateStatus && bateTipo && bateTarget && bateData;
   });
 
   const listaStatusUnicos = ['Todos os Status', ...new Set(dadosTabela.map(i => i.status))];
@@ -181,13 +216,27 @@ export default function ExportarDados() {
     eficiencia = Math.round((qtdDentro / avaliadosTarget.length) * 100);
   }
 
+  const handleLimparFiltros = () => {
+    setFiltrosAvancados({
+      periodo: 'Todo Período',
+      status: 'Todos os Status',
+      tipo: 'Todos',
+      target: 'Todos'
+    });
+    setBusca('');
+  };
+
+  const temFiltroAtivo = filtrosAvancados.periodo !== 'Todo Período' || 
+                         filtrosAvancados.status !== 'Todos os Status' || 
+                         filtrosAvancados.tipo !== 'Todos' || 
+                         filtrosAvancados.target !== 'Todos';
+
   const exportarCSV = () => {
     if (listaFiltrada.length === 0) {
       alert("Não existem dados disponíveis para exportação.");
       return;
     }
 
-    // ✨ Adicionada a DATA_ENTREGA ao CSV
     const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;DATA_ENTREGA;EXPIRACAO_FINALIZACAO_PL;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
     const linhas = listaFiltrada.map(row => {
       const leadTimeExport = row.leadTime !== null ? row.leadTime.toFixed(2) : '';
@@ -250,27 +299,26 @@ export default function ExportarDados() {
       </div>
 
       <div className="tabela-exportar-container">
-        <div className="tabela-controles-exportar">
-          <div className="controles-dropdowns">
-            <select className="select-filtro-exportar" value={filtroPeriodo} onChange={(e) => setFiltroPeriodo(e.target.value)}>
-              <option>Todo Período</option>
-              <option>Este Mês</option>
-              <option>Semana Passada</option>
-            </select>
-            <select className="select-filtro-exportar" value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}>
-              {listaStatusUnicos.map((status, idx) => (
-                <option key={idx} value={status}>{status}</option>
-              ))}
-            </select>
-          </div>
-          <div className="pesquisa-exportar-wrapper">
+        <div className="tabela-controles-exportar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          
+          <div className="pesquisa-exportar-wrapper" style={{ flex: 1, maxWidth: '400px' }}>
             <Search className="icone-pesquisa-exportar" size={16} />
             <input type="text" placeholder="Buscar PS, PL, WBS, Tipo..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
+
+          {/* ✨ BOTÃO PARA ABRIR O NOVO MODAL */}
+          <button 
+            onClick={() => setModalFiltroAberto(true)} 
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontWeight: '600', cursor: 'pointer', height: '40px' }}
+          >
+            <Filter size={18} color="#475569" />
+            Filtros Avançados
+            {temFiltroAtivo && <span style={{ width: '8px', height: '8px', backgroundColor: '#3b82f6', borderRadius: '50%' }}></span>}
+          </button>
         </div>
 
         <div className="tabela-info-exportar">
-          <span>{listaFiltrada.length} registros</span>
+          <span>{listaFiltrada.length} registros exibidos</span>
           <span>Target: 3 dia(s) — Lead Time = Criação PS &rarr; Data de Entrega</span>
         </div>
 
@@ -291,7 +339,6 @@ export default function ExportarDados() {
                   <th>STATUS PS</th>
                   <th>PL</th>
                   <th>CRIAÇÃO PS</th>
-                  {/* ✨ Coluna adicionada visualmente */}
                   <th>DATA ENTREGA</th>
                   <th>FINALIZAÇÃO PL (EXPIRAÇÃO)</th>
                   <th>LEAD TIME</th>
@@ -321,7 +368,6 @@ export default function ExportarDados() {
                       <td><span className="badge-status-simples">{linha.status}</span></td>
                       <td>{linha.pl !== '-' ? <span className="link-azul">{linha.pl}</span> : <span className="texto-cinza">-</span>}</td>
                       <td className="texto-cinza">{linha.criacaoPsFormatada}</td>
-                      {/* ✨ Mostra a Data de Entrega na Tabela */}
                       <td className="texto-cinza fonte-negrito">{linha.dataEntregaFormatada}</td>
                       <td className={linha.finalizacaoPlFormatada === 'não definido' ? 'texto-amarelo' : (linha.itemExpirado ? 'texto-vermelho fonte-negrito' : 'texto-verde')}>{linha.finalizacaoPlFormatada}</td>
                       <td>{linha.leadTime !== null ? <span className="fonte-negrito">{linha.leadTime.toFixed(2)}d</span> : <span className="texto-cinza">—</span>}</td>
@@ -340,6 +386,16 @@ export default function ExportarDados() {
           </div>
         )}
       </div>
+
+      {/* ✨ RENDERIZAÇÃO DO COMPONENTE MODAL */}
+      <FiltroExportacaoModal 
+        aberto={modalFiltroAberto}
+        onClose={() => setModalFiltroAberto(false)}
+        filtros={filtrosAvancados}
+        setFiltros={setFiltrosAvancados}
+        onLimpar={handleLimparFiltros}
+        opcoesStatus={listaStatusUnicos}
+      />
     </div>
   );
 }
