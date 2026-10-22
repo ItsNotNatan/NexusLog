@@ -81,22 +81,27 @@ export default function ExportarDados() {
 
           const dadosFormatados = resultado.dados.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
-            
             const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
             const dataFinalConclusao = dataEntregaFisica || parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
-            
             const dataPrazoExpira = parseDataBackend(item.prazoFinalizacao); 
             
             let leadTimeDias = null;
             let dentroTarget = null;
             const targetDias = 3;
 
-            if (item.status === 'Concluído' && dataCriacao && dataFinalConclusao) {
-              const diferencaMs = dataFinalConclusao.getTime() - dataCriacao.getTime();
-              leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
-              dentroTarget = leadTimeDias <= targetDias;
-            } else if (item.status === 'Em Separação' && dataPrazoExpira) {
-              dentroTarget = agora <= dataPrazoExpira;
+            // ✨ BLOQUEIO DE TIPOS PARA O CÁLCULO DO SLA
+            const tiposIgnorados = ['Crossdocking', 'Nota Fiscal', 'Reintegracao', 'Reintegração', 'Cancelado'];
+            const tipoLimpo = item.tipo || '';
+            const deveComputarSLA = !tiposIgnorados.includes(tipoLimpo);
+
+            if (deveComputarSLA) {
+              if (item.status === 'Concluído' && dataCriacao && dataFinalConclusao) {
+                const diferencaMs = dataFinalConclusao.getTime() - dataCriacao.getTime();
+                leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
+                dentroTarget = leadTimeDias <= targetDias;
+              } else if (item.status === 'Em Separação' && dataPrazoExpira) {
+                dentroTarget = agora <= dataPrazoExpira;
+              }
             }
 
             const valorTotal = (item.itens || []).reduce((acc, it) => {
