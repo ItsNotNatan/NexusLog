@@ -13,7 +13,6 @@ import { apiFetch } from '../../../services/api';
 import { AuthContext } from '../../../contexts/AuthContext'; 
 
 import FiltroExportacaoModal from '../../../components/FiltroExportacaoModal/FiltroExportacaoModal';
-// ✨ IMPORTADO O COMPONENTE DE PAGINAÇÃO
 import PaginacaoTabela from '../../../components/PaginacaoTabela/PaginacaoTabela';
 
 export default function ExportarDados() {
@@ -36,11 +35,9 @@ export default function ExportarDados() {
     pl: ''
   });
 
-  // ✨ ESTADOS PARA PAGINAÇÃO
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(20);
 
-  // ✨ VOLTA À PÁGINA 1 SEMPRE QUE UM FILTRO É ALTERADO
   useEffect(() => {
     setPaginaAtual(1);
   }, [busca, filtrosAvancados]);
@@ -104,7 +101,6 @@ export default function ExportarDados() {
           const dadosFormatados = resultado.dados.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
             const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
-            const dataFinalConclusao = dataEntregaFisica || parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
             const dataPrazoExpira = parseDataBackend(item.prazoFinalizacao); 
             
             let leadTimeDias = null;
@@ -117,10 +113,13 @@ export default function ExportarDados() {
             const deveComputarSLA = !tiposIgnoradosSLA.includes(tipoLimpo) && statusLimpo !== 'Cancelado';
 
             if (deveComputarSLA) {
-              if (item.status === 'Concluído' && dataCriacao && dataFinalConclusao) {
-                const diferencaMs = dataFinalConclusao.getTime() - dataCriacao.getTime();
-                leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
-                dentroTarget = leadTimeDias <= targetDias;
+              if (item.status === 'Concluído') {
+                // ✨ EXIGE A DATA DE ENTREGA FÍSICA PARA CALCULAR O SLA
+                if (dataCriacao && dataEntregaFisica) {
+                  const diferencaMs = dataEntregaFisica.getTime() - dataCriacao.getTime();
+                  leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
+                  dentroTarget = leadTimeDias <= targetDias;
+                }
               } else if (item.status === 'Em Separação' && dataPrazoExpira) {
                 dentroTarget = agora <= dataPrazoExpira;
               }
@@ -143,8 +142,9 @@ export default function ExportarDados() {
               }
             } 
             
-            if (item.status === 'Concluído' && dataFinalConclusao) {
-              textoFinalizacaoPL = formatarDataHora(dataFinalConclusao);
+            if (item.status === 'Concluído') {
+              const dataSist = parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
+              textoFinalizacaoPL = dataEntregaFisica ? formatarDataHora(dataEntregaFisica) : (dataSist ? formatarDataHora(dataSist) : 'não definido');
             }
 
             return {
@@ -222,7 +222,6 @@ export default function ExportarDados() {
     return batePesquisa && bateStatus && bateTipo && bateTarget && bateData && bateSolicitante && bateWbs && batePl;
   });
 
-  // ✨ LÓGICA DE FATIAMENTO DA PAGINAÇÃO
   const totalRegistrosFiltrados = listaFiltrada.length;
   const totalPaginas = Math.max(1, Math.ceil(totalRegistrosFiltrados / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
@@ -267,7 +266,6 @@ export default function ExportarDados() {
       return;
     }
 
-    // ✨ O Excel continua a exportar a lista inteira (listaFiltrada) e não apenas a página atual
     const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;DATA_ENTREGA;EXPIRACAO_FINALIZACAO_PL;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
     const linhas = listaFiltrada.map(row => {
       const leadTimeExport = row.leadTime !== null ? row.leadTime.toFixed(2) : '';
@@ -416,7 +414,6 @@ export default function ExportarDados() {
               </table>
             </div>
 
-            {/* ✨ CONTROLES DA PAGINAÇÃO RENDERIZADOS AQUI */}
             {totalRegistrosFiltrados > 0 && (
               <PaginacaoTabela 
                 paginaAtual={paginaAtual}
