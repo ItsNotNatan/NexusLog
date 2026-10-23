@@ -118,6 +118,12 @@ export default function ExportarDados() {
                 if (dataCriacao && dataEntregaFisica) {
                   const diferencaMs = dataEntregaFisica.getTime() - dataCriacao.getTime();
                   leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
+                  
+                  // ✨ CORREÇÃO: Previne o display de "-0.00"
+                  if (leadTimeDias < 0 && leadTimeDias > -0.005) {
+                    leadTimeDias = 0;
+                  }
+                  
                   dentroTarget = leadTimeDias <= targetDias;
                 }
               } else if (item.status === 'Em Separação' && dataPrazoExpira) {
