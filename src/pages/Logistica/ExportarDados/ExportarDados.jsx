@@ -119,7 +119,6 @@ export default function ExportarDados() {
                   const diferencaMs = dataEntregaFisica.getTime() - dataCriacao.getTime();
                   leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
                   
-                  // ✨ CORREÇÃO: Previne o display de "-0.00"
                   if (leadTimeDias < 0 && leadTimeDias > -0.005) {
                     leadTimeDias = 0;
                   }
@@ -138,20 +137,6 @@ export default function ExportarDados() {
             }, 0);
 
             let plApresentacao = item.pl || '-';
-            let textoFinalizacaoPL = 'não definido';
-            let expirado = false;
-
-            if (dataPrazoExpira) {
-              textoFinalizacaoPL = formatarDataHora(item.prazoFinalizacao);
-              if (agora > dataPrazoExpira && item.status !== 'Concluído') {
-                expirado = true;
-              }
-            } 
-            
-            if (item.status === 'Concluído') {
-              const dataSist = parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
-              textoFinalizacaoPL = dataEntregaFisica ? formatarDataHora(dataEntregaFisica) : (dataSist ? formatarDataHora(dataSist) : 'não definido');
-            }
 
             return {
               id: item.ps || `PS:${item.id.replace(/\D/g, '') || item.id}`,
@@ -163,8 +148,6 @@ export default function ExportarDados() {
               criacaoPsRaw: dataCriacao,
               criacaoPsFormatada: formatarDataHora(dataCriacao),
               dataEntregaFormatada: dataEntregaFisica ? formatarDataHora(dataEntregaFisica) : '-',
-              finalizacaoPlFormatada: textoFinalizacaoPL,
-              itemExpirado: expirado,
               leadTime: leadTimeDias,
               dentroTarget: dentroTarget,
               itensCount: item.itens ? item.itens.length : 0,
@@ -272,13 +255,13 @@ export default function ExportarDados() {
       return;
     }
 
-    const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;DATA_ENTREGA;EXPIRACAO_FINALIZACAO_PL;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
+    const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;DATA_ENTREGA;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
     const linhas = listaFiltrada.map(row => {
       const leadTimeExport = row.leadTime !== null ? row.leadTime.toFixed(2) : '';
       const targetExport = row.dentroTarget === true ? 'Dentro' : (row.dentroTarget === false ? 'Fora' : '');
       const valorExport = row.valorTotal > 0 ? row.valorTotal.toFixed(2) : '';
       
-      return `"${row.id}";"${row.solicitante}";"${row.wbs}";"${row.tipo}";"${row.status}";"${row.pl}";"${row.criacaoPsFormatada}";"${row.dataEntregaFormatada}";"${row.finalizacaoPlFormatada}";"${leadTimeExport}";"${targetExport}";"${row.itensCount}";"${valorExport}"`;
+      return `"${row.id}";"${row.solicitante}";"${row.wbs}";"${row.tipo}";"${row.status}";"${row.pl}";"${row.criacaoPsFormatada}";"${row.dataEntregaFormatada}";"${leadTimeExport}";"${targetExport}";"${row.itensCount}";"${valorExport}"`;
     }).join("\n");
 
     const blob = new Blob(['\ufeff' + cabecalho + linhas], { type: 'text/csv;charset=utf-8;' }); 
@@ -376,7 +359,6 @@ export default function ExportarDados() {
                       <th>PL</th>
                       <th>CRIAÇÃO PS</th>
                       <th>DATA ENTREGA</th>
-                      <th>FINALIZAÇÃO PL (EXPIRAÇÃO)</th>
                       <th>LEAD TIME</th>
                       <th>TARGET</th>
                       <th style={{ textAlign: 'center' }}>ITENS</th>
@@ -386,7 +368,7 @@ export default function ExportarDados() {
                   <tbody>
                     {dadosPaginados.length === 0 ? (
                       <tr>
-                        <td colSpan="13" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                        <td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                           Nenhum registo encontrado com os filtros atuais.
                         </td>
                       </tr>
@@ -405,7 +387,6 @@ export default function ExportarDados() {
                           <td>{linha.pl !== '-' ? <span className="link-azul">{linha.pl}</span> : <span className="texto-cinza">-</span>}</td>
                           <td className="texto-cinza">{linha.criacaoPsFormatada}</td>
                           <td className="texto-cinza fonte-negrito">{linha.dataEntregaFormatada}</td>
-                          <td className={linha.finalizacaoPlFormatada === 'não definido' ? 'texto-amarelo' : (linha.itemExpirado ? 'texto-vermelho fonte-negrito' : 'texto-verde')}>{linha.finalizacaoPlFormatada}</td>
                           <td>{linha.leadTime !== null ? <span className="fonte-negrito">{linha.leadTime.toFixed(2)}d</span> : <span className="texto-cinza">—</span>}</td>
                           <td>
                             {linha.dentroTarget === true && <span className="badge-target badge-dentro">Dentro</span>}
