@@ -3,21 +3,44 @@
 // DESCRIÇÃO: Componente que adiciona uma barra de scroll em cima e em baixo sincronizadas.
 // =================================================================
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 
-export default function ScrollDuplo({ children, larguraConteudo = '2000px' }) {
-  // 1. Criamos "referências" para podermos controlar os dois scrolls diretamente
+export default function ScrollDuplo({ children }) {
   const topScrollRef = useRef(null);
   const bottomScrollRef = useRef(null);
+  
+  const [larguraReal, setLarguraReal] = useState('100%');
 
-  // 2. Quando o utilizador mexe na barra de CIMA, copiamos a posição para a barra de BAIXO
+  useEffect(() => {
+    const atualizarLargura = () => {
+      if (bottomScrollRef.current) {
+        setLarguraReal(`${bottomScrollRef.current.scrollWidth}px`);
+      }
+    };
+
+    atualizarLargura();
+
+    // O ResizeObserver monitoriza as mudanças de tamanho da tabela em tempo real
+    const observer = new ResizeObserver(() => {
+      atualizarLargura();
+    });
+
+    if (bottomScrollRef.current) {
+      observer.observe(bottomScrollRef.current);
+      if (bottomScrollRef.current.firstElementChild) {
+        observer.observe(bottomScrollRef.current.firstElementChild);
+      }
+    }
+
+    return () => observer.disconnect();
+  }, [children]);
+
   const handleTopScroll = () => {
     if (bottomScrollRef.current && topScrollRef.current) {
       bottomScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
     }
   };
 
-  // 3. Quando o utilizador mexe na barra de BAIXO, copiamos a posição para a barra de CIMA
   const handleBottomScroll = () => {
     if (topScrollRef.current && bottomScrollRef.current) {
       topScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
@@ -33,9 +56,7 @@ export default function ScrollDuplo({ children, larguraConteudo = '2000px' }) {
         onScroll={handleTopScroll}
         style={{ width: '100%', overflowX: 'auto', marginBottom: '8px' }}
       >
-        {/* Esta div é invisível (1px de altura) mas tem a largura exata da tabela real */}
-        {/* Isto obriga o navegador a desenhar a barra de scroll horizontal aqui em cima */}
-        <div style={{ width: larguraConteudo, height: '1px' }}></div>
+        <div style={{ width: larguraReal, height: '1px' }}></div>
       </div>
 
       {/* --- BARRA INFERIOR (Onde vai ficar a tua tabela real) --- */}
@@ -44,7 +65,6 @@ export default function ScrollDuplo({ children, larguraConteudo = '2000px' }) {
         onScroll={handleBottomScroll}
         style={{ width: '100%', overflowX: 'auto' }}
       >
-        {/* O 'children' é o conteúdo (a tabela) que tu colocares dentro deste componente */}
         {children}
       </div>
 
