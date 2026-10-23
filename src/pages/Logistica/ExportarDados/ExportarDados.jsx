@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/ExportarDados/ExportarDados.jsx
-// DESCRIÇÃO: Página de exportação de dados com indicadores de Target.
+// DESCRIÇÃO: Página de exportação de dados com indicadores de Target e Paginação.
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './ExportarDados.css';
@@ -13,6 +13,8 @@ import { apiFetch } from '../../../services/api';
 import { AuthContext } from '../../../contexts/AuthContext'; 
 
 import FiltroExportacaoModal from '../../../components/FiltroExportacaoModal/FiltroExportacaoModal';
+// ✨ IMPORTADO O COMPONENTE DE PAGINAÇÃO
+import PaginacaoTabela from '../../../components/PaginacaoTabela/PaginacaoTabela';
 
 export default function ExportarDados() {
   const { estoqueAtual } = useContext(AuthContext);
@@ -33,6 +35,15 @@ export default function ExportarDados() {
     wbs: '',
     pl: ''
   });
+
+  // ✨ ESTADOS PARA PAGINAÇÃO
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(20);
+
+  // ✨ VOLTA À PÁGINA 1 SEMPRE QUE UM FILTRO É ALTERADO
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [busca, filtrosAvancados]);
 
   const abasNav = [
     { id: 'ps-pl', label: 'PS + PL (Solicitações)', icone: <FileText size={16} /> },
@@ -100,7 +111,6 @@ export default function ExportarDados() {
             let dentroTarget = null;
             const targetDias = 3;
 
-            // ✨ Apenas bloqueia o cálculo do SLA, mas não exclui os itens da tabela
             const tiposIgnoradosSLA = ['Crossdocking', 'Nota Fiscal', 'Reintegracao', 'Reintegração', 'Cancelado'];
             const tipoLimpo = item.tipo || '';
             const statusLimpo = item.status || '';
@@ -212,9 +222,15 @@ export default function ExportarDados() {
     return batePesquisa && bateStatus && bateTipo && bateTarget && bateData && bateSolicitante && bateWbs && batePl;
   });
 
+  // ✨ LÓGICA DE FATIAMENTO DA PAGINAÇÃO
+  const totalRegistrosFiltrados = listaFiltrada.length;
+  const totalPaginas = Math.max(1, Math.ceil(totalRegistrosFiltrados / itensPorPagina));
+  const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
+  const indexUltimoItem = paginaAtual * itensPorPagina;
+  const dadosPaginados = listaFiltrada.slice(indexPrimeiroItem, indexUltimoItem);
+
   const listaStatusUnicos = ['Todos os Status', ...new Set(dadosTabela.map(i => i.status))];
 
-  const totalPs = listaFiltrada.length;
   const avaliadosTarget = listaFiltrada.filter(i => i.dentroTarget !== null);
   const qtdDentro = avaliadosTarget.filter(i => i.dentroTarget === true).length;
   const qtdFora = avaliadosTarget.filter(i => i.dentroTarget === false).length;
@@ -251,6 +267,7 @@ export default function ExportarDados() {
       return;
     }
 
+    // ✨ O Excel continua a exportar a lista inteira (listaFiltrada) e não apenas a página atual
     const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;DATA_ENTREGA;EXPIRACAO_FINALIZACAO_PL;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
     const linhas = listaFiltrada.map(row => {
       const leadTimeExport = row.leadTime !== null ? row.leadTime.toFixed(2) : '';
@@ -294,7 +311,7 @@ export default function ExportarDados() {
       <div className="kpis-grid-export">
         <div className="kpi-card-export">
           <span className="kpi-titulo-export">Total de PS</span>
-          <strong className="kpi-valor-export kpi-preto">{carregando ? '-' : totalPs}</strong>
+          <strong className="kpi-valor-export kpi-preto">{carregando ? '-' : totalRegistrosFiltrados}</strong>
         </div>
         <div className="kpi-card-export">
           <span className="kpi-titulo-export">Dentro do Target</span>
@@ -331,7 +348,7 @@ export default function ExportarDados() {
         </div>
 
         <div className="tabela-info-exportar">
-          <span>{listaFiltrada.length} registros exibidos</span>
+          <span>{totalRegistrosFiltrados} registros no total</span>
           <span>Target: 3 dia(s) — Lead Time = Criação PS &rarr; Data de Entrega</span>
         </div>
 
@@ -341,62 +358,80 @@ export default function ExportarDados() {
             <span>A carregar relatórios do servidor...</span>
           </div>
         ) : (
-          <div className="tabela-scroll-exportar">
-            <table className="dados-table-exportar">
-              <thead>
-                <tr>
-                  <th>PS ID</th>
-                  <th>SOLICITANTE</th>
-                  <th>WBS</th>
-                  <th>TIPO</th>
-                  <th>STATUS PS</th>
-                  <th>PL</th>
-                  <th>CRIAÇÃO PS</th>
-                  <th>DATA ENTREGA</th>
-                  <th>FINALIZAÇÃO PL (EXPIRAÇÃO)</th>
-                  <th>LEAD TIME</th>
-                  <th>TARGET</th>
-                  <th style={{ textAlign: 'center' }}>ITENS</th>
-                  <th>VALOR TOTAL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {listaFiltrada.length === 0 ? (
+          <>
+            <div className="tabela-scroll-exportar">
+              <table className="dados-table-exportar">
+                <thead>
                   <tr>
-                    <td colSpan="13" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                      Nenhum registo encontrado com os filtros atuais.
-                    </td>
+                    <th>PS ID</th>
+                    <th>SOLICITANTE</th>
+                    <th>WBS</th>
+                    <th>TIPO</th>
+                    <th>STATUS PS</th>
+                    <th>PL</th>
+                    <th>CRIAÇÃO PS</th>
+                    <th>DATA ENTREGA</th>
+                    <th>FINALIZAÇÃO PL (EXPIRAÇÃO)</th>
+                    <th>LEAD TIME</th>
+                    <th>TARGET</th>
+                    <th style={{ textAlign: 'center' }}>ITENS</th>
+                    <th>VALOR TOTAL</th>
                   </tr>
-                ) : (
-                  listaFiltrada.map((linha, index) => (
-                    <tr key={index}>
-                      <td className="fonte-negrito">{linha.id}</td>
-                      <td>{linha.solicitante}</td>
-                      <td><span className="link-azul">{linha.wbs}</span></td>
-                      <td>
-                        <span style={{ fontWeight: '500', color: '#475569' }}>
-                          {linha.tipo}
-                        </span>
+                </thead>
+                <tbody>
+                  {dadosPaginados.length === 0 ? (
+                    <tr>
+                      <td colSpan="13" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                        Nenhum registo encontrado com os filtros atuais.
                       </td>
-                      <td><span className="badge-status-simples">{linha.status}</span></td>
-                      <td>{linha.pl !== '-' ? <span className="link-azul">{linha.pl}</span> : <span className="texto-cinza">-</span>}</td>
-                      <td className="texto-cinza">{linha.criacaoPsFormatada}</td>
-                      <td className="texto-cinza fonte-negrito">{linha.dataEntregaFormatada}</td>
-                      <td className={linha.finalizacaoPlFormatada === 'não definido' ? 'texto-amarelo' : (linha.itemExpirado ? 'texto-vermelho fonte-negrito' : 'texto-verde')}>{linha.finalizacaoPlFormatada}</td>
-                      <td>{linha.leadTime !== null ? <span className="fonte-negrito">{linha.leadTime.toFixed(2)}d</span> : <span className="texto-cinza">—</span>}</td>
-                      <td>
-                        {linha.dentroTarget === true && <span className="badge-target badge-dentro">Dentro</span>}
-                        {linha.dentroTarget === false && <span className="badge-target badge-fora">Fora</span>}
-                        {linha.dentroTarget === null && <span className="texto-cinza">—</span>}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>{linha.itensCount}</td>
-                      <td>{linha.valorTotal > 0 ? <span className="fonte-negrito">R$ {linha.valorTotal.toFixed(2)}</span> : <span className="texto-cinza">—</span>}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    dadosPaginados.map((linha, index) => (
+                      <tr key={index}>
+                        <td className="fonte-negrito">{linha.id}</td>
+                        <td>{linha.solicitante}</td>
+                        <td><span className="link-azul">{linha.wbs}</span></td>
+                        <td>
+                          <span style={{ fontWeight: '500', color: '#475569' }}>
+                            {linha.tipo}
+                          </span>
+                        </td>
+                        <td><span className="badge-status-simples">{linha.status}</span></td>
+                        <td>{linha.pl !== '-' ? <span className="link-azul">{linha.pl}</span> : <span className="texto-cinza">-</span>}</td>
+                        <td className="texto-cinza">{linha.criacaoPsFormatada}</td>
+                        <td className="texto-cinza fonte-negrito">{linha.dataEntregaFormatada}</td>
+                        <td className={linha.finalizacaoPlFormatada === 'não definido' ? 'texto-amarelo' : (linha.itemExpirado ? 'texto-vermelho fonte-negrito' : 'texto-verde')}>{linha.finalizacaoPlFormatada}</td>
+                        <td>{linha.leadTime !== null ? <span className="fonte-negrito">{linha.leadTime.toFixed(2)}d</span> : <span className="texto-cinza">—</span>}</td>
+                        <td>
+                          {linha.dentroTarget === true && <span className="badge-target badge-dentro">Dentro</span>}
+                          {linha.dentroTarget === false && <span className="badge-target badge-fora">Fora</span>}
+                          {linha.dentroTarget === null && <span className="texto-cinza">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>{linha.itensCount}</td>
+                        <td>{linha.valorTotal > 0 ? <span className="fonte-negrito">R$ {linha.valorTotal.toFixed(2)}</span> : <span className="texto-cinza">—</span>}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ✨ CONTROLES DA PAGINAÇÃO RENDERIZADOS AQUI */}
+            {totalRegistrosFiltrados > 0 && (
+              <PaginacaoTabela 
+                paginaAtual={paginaAtual}
+                totalPaginas={totalPaginas}
+                totalRegistrosFiltrados={totalRegistrosFiltrados}
+                indexPrimeiroItem={indexPrimeiroItem}
+                indexUltimoItem={indexUltimoItem}
+                dadosPaginadosLength={dadosPaginados.length}
+                itensPorPagina={itensPorPagina}
+                setItensPorPagina={setItensPorPagina}
+                setPaginaAtual={setPaginaAtual}
+                carregando={carregando}
+              />
+            )}
+          </>
         )}
       </div>
 
