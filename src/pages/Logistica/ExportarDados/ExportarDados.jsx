@@ -97,12 +97,9 @@ export default function ExportarDados() {
         const resultado = await apiFetch(`/solicitacoes/listar?limit=1000${filtroFilial}`);
 
         if (resultado.sucesso) {
-          const agora = new Date();
-
           const dadosFormatados = resultado.dados.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
             const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
-            const dataPrazoExpira = parseDataBackend(item.prazoFinalizacao); 
             
             let leadTimeDias = null;
             let dentroTarget = null;
@@ -113,20 +110,17 @@ export default function ExportarDados() {
             const statusLimpo = item.status || '';
             const deveComputarSLA = !tiposIgnoradosSLA.includes(tipoLimpo) && statusLimpo !== 'Cancelado';
 
+            // ✨ Lógica corrigida: Só calcula se estiver Concluído E tiver Data de Entrega
             if (deveComputarSLA) {
-              if (item.status === 'Concluído') {
-                if (dataCriacao && dataEntregaFisica) {
-                  const diferencaMs = dataEntregaFisica.getTime() - dataCriacao.getTime();
-                  leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
-                  
-                  if (leadTimeDias < 0 && leadTimeDias > -0.005) {
-                    leadTimeDias = 0;
-                  }
-                  
-                  dentroTarget = leadTimeDias <= targetDias;
+              if (item.status === 'Concluído' && dataCriacao && dataEntregaFisica) {
+                const diferencaMs = dataEntregaFisica.getTime() - dataCriacao.getTime();
+                leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
+                
+                if (leadTimeDias < 0 && leadTimeDias > -0.005) {
+                  leadTimeDias = 0;
                 }
-              } else if (item.status === 'Em Separação' && dataPrazoExpira) {
-                dentroTarget = agora <= dataPrazoExpira;
+                
+                dentroTarget = leadTimeDias <= targetDias;
               }
             }
 
