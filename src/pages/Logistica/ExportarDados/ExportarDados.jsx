@@ -90,17 +90,7 @@ export default function ExportarDados() {
         if (resultado.sucesso) {
           const agora = new Date();
 
-          const tiposIgnorados = ['Crossdocking', 'Nota Fiscal', 'Reintegracao', 'Reintegração', 'Cancelado'];
-          
-          const dadosValidos = resultado.dados.filter(item => {
-            const tipo = item.tipo || '';
-            const status = item.status || '';
-            if (status === 'Cancelado' || tipo === 'Cancelado') return false;
-            if (tiposIgnorados.includes(tipo)) return false;
-            return true;
-          });
-
-          const dadosFormatados = dadosValidos.map((item) => {
+          const dadosFormatados = resultado.dados.map((item) => {
             const dataCriacao = parseDataBackend(item.dataCriacaoISO || item.created_at || item.dataSolicitacao);
             const dataEntregaFisica = parseDataBackend(item.dataEntrega || item.data_entrega);
             const dataFinalConclusao = dataEntregaFisica || parseDataBackend(item.dataFinalizacaoISO || item.updated_at);
@@ -110,12 +100,20 @@ export default function ExportarDados() {
             let dentroTarget = null;
             const targetDias = 3;
 
-            if (item.status === 'Concluído' && dataCriacao && dataFinalConclusao) {
-              const diferencaMs = dataFinalConclusao.getTime() - dataCriacao.getTime();
-              leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
-              dentroTarget = leadTimeDias <= targetDias;
-            } else if (item.status === 'Em Separação' && dataPrazoExpira) {
-              dentroTarget = agora <= dataPrazoExpira;
+            // ✨ Apenas bloqueia o cálculo do SLA, mas não exclui os itens da tabela
+            const tiposIgnoradosSLA = ['Crossdocking', 'Nota Fiscal', 'Reintegracao', 'Reintegração', 'Cancelado'];
+            const tipoLimpo = item.tipo || '';
+            const statusLimpo = item.status || '';
+            const deveComputarSLA = !tiposIgnoradosSLA.includes(tipoLimpo) && statusLimpo !== 'Cancelado';
+
+            if (deveComputarSLA) {
+              if (item.status === 'Concluído' && dataCriacao && dataFinalConclusao) {
+                const diferencaMs = dataFinalConclusao.getTime() - dataCriacao.getTime();
+                leadTimeDias = diferencaMs / (1000 * 60 * 60 * 24);
+                dentroTarget = leadTimeDias <= targetDias;
+              } else if (item.status === 'Em Separação' && dataPrazoExpira) {
+                dentroTarget = agora <= dataPrazoExpira;
+              }
             }
 
             const valorTotal = (item.itens || []).reduce((acc, it) => {
