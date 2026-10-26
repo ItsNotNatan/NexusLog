@@ -27,13 +27,10 @@ export default function FazerSolicitacao() {
   const [tipoAtivo, setTipoAtivo] = useState('material');
   const navigate = useNavigate();
 
-  // ✨ 1. PUXAR A FILIAL E O ESTADO DE CARREGAMENTO
   const { estoqueAtual, carregandoInicial } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
-  // ✨ 2. O OBSERVADOR MÁGICO (AGORA BLINDADO)
   useEffect(() => {
-    // Só toma decisões DEPOIS que a aplicação estiver com os dados lidos
     if (!carregandoInicial) {
       if (estoqueAtual === 'TODOS') {
         showAlert(
@@ -56,8 +53,6 @@ export default function FazerSolicitacao() {
     { id: 'cancelar', titulo: 'Cancelar PL', desc: 'Cancelar Packing List emitido', icone: <XCircle size={20} />, cor: 'vermelho' }
   ];
 
-  // ✨ 3. PROTEÇÃO DE RENDERIZAÇÃO
-  // Esconde o ecrã enquanto carrega os dados ou enquanto está a viajar para outra página
   if (carregandoInicial || estoqueAtual === 'TODOS') {
     return null; 
   }
@@ -96,13 +91,14 @@ export default function FazerSolicitacao() {
       </div>
 
       <div className="conteudo-dinamico">
-        {tipoAtivo === 'material' && <MaterialEstoque />}
-        {tipoAtivo === 'transferencia' && <TransferenciaWBS />}
-        {tipoAtivo === 'nf' && <SolicitarNotaFiscal />}
-        {tipoAtivo === 'entrada' && <EntradaMaterial />}
-        {tipoAtivo === 'crossdocking' && <Crossdocking />}
-        {tipoAtivo === 'reintegracao' && <ReintegracaoItens />}
-        {tipoAtivo === 'cancelar' && <CancelarPL />}
+        {/* A propriedade key={estoqueAtual} obriga o React a resetar o estado interno (carrinho) do componente sempre que a filial muda */}
+        {tipoAtivo === 'material' && <MaterialEstoque key={`mat-${estoqueAtual}`} />}
+        {tipoAtivo === 'transferencia' && <TransferenciaWBS key={`trans-${estoqueAtual}`} />}
+        {tipoAtivo === 'nf' && <SolicitarNotaFiscal key={`nf-${estoqueAtual}`} />}
+        {tipoAtivo === 'entrada' && <EntradaMaterial key={`ent-${estoqueAtual}`} />}
+        {tipoAtivo === 'crossdocking' && <Crossdocking key={`cross-${estoqueAtual}`} />}
+        {tipoAtivo === 'reintegracao' && <ReintegracaoItens key={`reint-${estoqueAtual}`} />}
+        {tipoAtivo === 'cancelar' && <CancelarPL key={`canc-${estoqueAtual}`} />}
       </div>
     </div>
   );
