@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react'; 
+import React, { useState, useEffect, useContext } from 'react'; 
 import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText, MapPin } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
@@ -15,12 +15,18 @@ export default function Crossdocking() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
-  // ✨ Adicionado o campo "destino" ao estado inicial
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
-  
   const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
   const [anexos, setAnexos] = useState([]);
+
+  // ✨ TRAVA DE SEGURANÇA: Limpa todo o estado do formulário se o utilizador trocar de filial a meio da operação
+  useEffect(() => {
+    setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
+    setTipoSaida(null);
+    setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]);
+    setAnexos([]);
+  }, [estoqueAtual]);
 
   const adicionarItemParcial = () => setItensParciais([...itensParciais, { id: Date.now(), desenhoSAP: '', quantidade: 1 }]);
   
@@ -53,7 +59,7 @@ export default function Crossdocking() {
       showAlert("Atenção", "Por favor, selecione uma filial no topo da página antes de prosseguir.", "warning");
       return;
     }
-    // ✨ Validação atualizada para exigir o Destino
+    
     if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.nf || !tipoSaida) {
       showAlert("Campos Obrigatórios", "Por favor, preencha o Nome, WBS, Destino, Número da NF e selecione o Tipo de Saída.", "warning");
       return;
@@ -154,7 +160,6 @@ export default function Crossdocking() {
               <span className="badge-fixo">Fixo</span>
             </div>
           </div>
-          {/* ✨ CAIXA DESTINO (Ocupa as duas colunas inteiras) */}
           <div className="input-grupo" style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> DESTINO *</label>
             <textarea 
@@ -214,7 +219,6 @@ export default function Crossdocking() {
                         <td style={{ color: '#64748b', fontSize: '0.875rem', fontWeight: '500', padding: '8px' }}>{index + 1}</td>
                         <td><input type="text" className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff', fontFamily: 'monospace', fontWeight: '600' }} placeholder="Ex: 12345-A" value={item.desenhoSAP} onChange={(e) => atualizarItemParcial(item.id, 'desenhoSAP', e.target.value)} /></td>
                         
-                        {/* ✨ INPUT DE QUANTIDADE BLOQUEADO PARA INTEIROS */}
                         <td>
                           <input 
                             type="number" 
