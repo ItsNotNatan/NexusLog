@@ -76,6 +76,15 @@ export async function enviarArquivos(arquivos) {
     }
   }
 
+  // ✨ INTERCEPTADOR DE SESSÃO PARA UPLOADS (Proteção extra)
+  if (resposta.status === 401 || resposta.status === 403) {
+    localStorage.removeItem('@NexusLog:token');
+    localStorage.removeItem('@NexusLog:usuario');
+    window.alert('A sua sessão expirou. Por favor, faça login novamente.');
+    window.location.href = '/login';
+    throw new Error('Sessão expirada.');
+  }
+
   if (!resposta.ok || !dados.sucesso) {
     throw new Error(dados.erro || 'Falha ao guardar o anexo no servidor.');
   }
@@ -105,13 +114,12 @@ export async function apiFetch(endpoint, options = {}) {
     // 4. Executa o pedido ao servidor
     const resposta = await fetch(urlCompleta, { ...options, headers });
 
-    // 5. Lemos primeiro como texto bruto: assim um erro em HTML nao vira
-    // "Unexpected end of JSON input" e a mensagem real aparece no console.
+    // 5. Lemos primeiro como texto bruto
     const textoBruto = await resposta.text();
 
     let dados = {};
 
-    // 6. Se o servidor enviou algum texto, tentamos transforma-lo em JSON
+    // 6. Tenta transformar a resposta em JSON
     if (textoBruto) {
       try {
         dados = JSON.parse(textoBruto);
@@ -124,8 +132,26 @@ export async function apiFetch(endpoint, options = {}) {
       }
     }
 
-    // 7. Avalia se o Backend devolveu uma resposta de sucesso (200 a 299)
+    // 7. Avalia se o Backend devolveu um erro (Sessão Expirada ou outros)
     if (!resposta.ok) {
+      // ✨ INTERCEPTADOR GLOBAL DE SESSÃO EXPIRADA
+      if (resposta.status === 401 || resposta.status === 403) {
+        console.warn('⚠️ Sessão expirada detetada pelo apiFetch. Redirecionando...');
+        
+        localStorage.removeItem('@NexusLog:token');
+        localStorage.removeItem('@NexusLog:usuario');
+        
+        // Emite o alerta nativo (bloqueia o ecrã para evitar que o utilizador continue a preencher)
+        window.alert('A sua sessão expirou por inatividade ou acesso inválido. Por favor, faça login novamente para continuar.');
+        
+        // Força a navegação para a tela de login limpando o histórico atual
+        window.location.href = '/login';
+        
+        // Interrompe a execução atual
+        throw new Error('Sessão expirada. Redirecionando para login...');
+      }
+
+      // Se for outro erro qualquer (ex: 400 Bad Request, 500 Server Error)
       throw new Error(dados.erro || dados.mensagem || `Erro reportado pelo servidor (Status ${resposta.status})`);
     }
 
