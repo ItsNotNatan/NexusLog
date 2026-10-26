@@ -73,7 +73,28 @@ app.use((req, res, next) => {
           endpoint.includes('/material')
         ) {
           console.log('\n📡 [SOCKET.IO] Nova Solicitação ou Status alterado!');
-          io.emit('solicitacoes_atualizadas');
+          
+          // Tenta extrair dados úteis do body para direcionar a emissão (Opcional, não bloqueante)
+          const b = req.body || {};
+          let idItem = req.params?.id || null;
+          let filialEnvolvida = null;
+          
+          // Se for criacao (req.body.solicitante.filial_origem)
+          if (b.solicitante) {
+            filialEnvolvida = b.solicitante.filial_origem || b.solicitante.filial_id;
+          } 
+          // Se for atualizacao de local (req.body.filial)
+          else if (b.filial) {
+            filialEnvolvida = b.filial;
+          }
+
+          // Envia o payload com a filial (se descoberta). O frontend vai filtrar baseado nisto.
+          io.emit('solicitacoes_atualizadas', { 
+            id: idItem, 
+            filialOrigem: filialEnvolvida,
+            timestamp: Date.now()
+          });
+          
         } else if (endpoint.includes('/filiais')) {
           console.log('\n📡 [SOCKET.IO] Filial adicionada/removida!');
           io.emit('filiais_atualizadas');
