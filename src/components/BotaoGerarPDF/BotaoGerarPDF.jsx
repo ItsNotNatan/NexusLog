@@ -74,6 +74,19 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
 
       const bsNumero = linha.pl ? linha.pl.replace(/PL #|BS/g, '').trim() : '';
 
+      // ✨ Criação Dinâmica do Nome do Arquivo ('PS 214512-2000 - PL 540')
+      let psNome = String(linha.ps || linha.id || '');
+      if (!psNome.toUpperCase().startsWith('PS')) {
+        psNome = `PS ${psNome}`;
+      }
+      
+      let plNome = '';
+      if (linha.pl && linha.pl !== '-' && linha.pl !== '—') {
+        plNome = String(linha.pl).replace('#', '').trim(); // Remove o '#' se existir
+      }
+      
+      const tituloDocumento = plNome ? `${psNome} - ${plNome}` : psNome;
+
       const colWidths = [
         '3%',  // ITEM
         '10%', // DESENHO
@@ -106,7 +119,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       
       if (linha.itens && linha.itens.length > 0) {
         linha.itens.forEach((it, index) => {
-          // ✨ EXTRAÇÃO INTELIGENTE DA NF: Procura no item e, se não encontrar, procura na linha geral da solicitação
           const notaFiscalFinal = it.nf_entrada || it.nfEntrada || it.nf || linha.nfCrossdocking || linha.nf_entrada || '-';
 
           bodyRows.push([
@@ -118,7 +130,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             { text: it.descricao_manual || it.descricao || '-', fontSize: 7, margin: [0, 3] },
             { text: it.fornecedor || '-', fontSize: 7, margin: [0, 3] },
             { text: (it.alocacao || '').startsWith('CROSSDOCKING') ? 'CROSSDOCKING' : (it.alocacao || '-'), fontSize: 7, alignment: 'center', margin: [0, 3] },
-            // Inserção da Nota Fiscal com fallback garantido
             { text: notaFiscalFinal, fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: formatarMoedaPdf(it.valor_unitario_enriquecido ?? it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice), fontSize: 7, alignment: 'center', margin: [0, 3] },
             { text: it.wbs_element || it.wbs || '-', fontSize: 7, alignment: 'center', margin: [0, 3] }
@@ -136,6 +147,10 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       }
 
       const docDefinition = {
+        // ✨ Aplicação do nome dinâmico ao separador e documento gerado
+        info: {
+          title: tituloDocumento
+        },
         pageSize: 'A4',
         pageOrientation: 'landscape',
         pageMargins: [15, 15, 15, 15], 
@@ -305,6 +320,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         }
       };
 
+      // Abre o PDF numa nova aba. Se o utilizador clicar em transferir (download) nessa aba,
+      // o browser assumirá o nome configurado em info.title automaticamente.
       pdfMake.createPdf(docDefinition).open();
 
     } catch (error) {
