@@ -1,4 +1,3 @@
-
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
 // =================================================================
@@ -17,7 +16,6 @@ import DetalhesSolicitacao from "./Detalhes/DetalhesSolicitacao";
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import BotaoGerarPDF from "../../../components/BotaoGerarPDF/BotaoGerarPDF";
 import ScrollDuplo from "../../../components/ScrollDuplo/ScrollDuplo";
-// ✨ IMPORTA O NOVO COMPONENTE DE PAGINAÇÃO
 import PaginacaoTabela from "../../../components/PaginacaoTabela/PaginacaoTabela";
 import { apiFetch, urlDoServidor, enviarArquivos } from '../../../services/api';
 import { io } from 'socket.io-client';
@@ -174,7 +172,99 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   useEffect(() => {
     if (perfil === 'cliente' && estoqueAtual === 'TODOS') return;
 
-    const buscarDados = async () => {
+    const processarESetarSolicitacoes = (novasSolicitacoes, estoqueAtualizado) => {
+      const reints = novasSolicitacoes.filter(sol =>
+        (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
+        (sol.status === 'Em Separação' || sol.status === 'Concluído')
+      );
+      
+      const qtdJaDevolvidaGlobal = {};
+      reints.forEach(reint => {
+        if (reint.observacoes) {
+           const match = reint.observacoes.match(/PL #(\d+)/);
+           if (match) {
+             const plKey = `PL #${match[1]}`;
+             if (!qtdJaDevolvidaGlobal[plKey]) qtdJaDevolvidaGlobal[plKey] = {};
+             
+             (reint.itens || []).forEach(it => {
+               qtdJaDevolvidaGlobal[plKey][it.estoque_id] = (qtdJaDevolvidaGlobal[plKey][it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
+             });
+           }
+        }
+      });
+
+      const idsCanceladosSet = new Set();
+      novasSolicitacoes.forEach(sol => {
+        if (sol.tipo === 'Cancelado' && sol.status !== 'Recusado' && sol.observacoes) {
+          const matches = sol.observacoes.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
+          if (matches) idsCanceladosSet.add(matches[0]);
+        }
+      });
+
+      const dadosFormatados = novasSolicitacoes.map((item) => {
+        let acaoTipo = "select";
+        let acaoValor = item.status;
+        let statusDestinoAprovacao = item.tipo === "Entrada" ? "Concluído" : "Em Separação";
+
+        if (item.status === "Pendente") {
+          acaoTipo = "botao";
+          acaoValor = "Aprovar";
+        } else if (item.status === "Em Separação" || item.status === "Em Andamento") {
+          acaoValor = "Em Separação";
+        }
+
+        let numeroPL = "-";
+        if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
+          numeroPL = item.pl || item.bs || "-";
+        }
+
+        let statusFinalVisual = item.status;
+
+        if (item.tipo !== 'Cancelado' && idsCanceladosSet.has(item.id)) {
+          statusFinalVisual = 'Cancelado';
+        }
+        else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
+          const devolucoesDestaPL = qtdJaDevolvidaGlobal[numeroPL] || {};
+          const itensRestantes = (item.itens || []).filter(origItem => {
+            const devolvido = devolucoesDestaPL[origItem.estoque_id] || 0;
+            return (Number(origItem.quantidade_solicitada) - devolvido) > 0;
+          });
+
+          if (itensRestantes.length === 0 && (item.itens || []).length > 0) {
+            statusFinalVisual = 'Reintegrado';
+          }
+        }
+
+        const wbsProcura = item.wbs || '—';
+        const destinoProcura = item.destino || 'Não informado';
+        const idProcura = item.ps || item.id;
+        const solicitanteProcura = item.solicitante || '';
+        const textoBuscavel = `${idProcura} ${solicitanteProcura} ${wbsProcura} ${destinoProcura} ${numeroPL}`.toLowerCase();
+
+        return {
+          ...item,
+          idOriginal: item.idOriginal || item.id,
+          id: idProcura,
+          statusExibicao: statusFinalVisual,
+          statusDestinoAprovacao: statusDestinoAprovacao,
+          acaoTipo: acaoTipo,
+          acaoValor: acaoValor,
+          dataSolicitacao: item.dataSolicitacao || "-",
+          dataCriacaoISO: item.created_at || item.dataCriacaoISO || item.dataSolicitacao, 
+          dataEntrega: item.dataEntrega || "-",
+          pl: numeroPL,
+          wbs: wbsProcura, 
+          destino: destinoProcura,
+          filial: item.filial_origem_id || item.filial || '-',
+          textoBuscavel: textoBuscavel,
+          itensRaw: item.itens || []
+        };
+      });
+
+      setDadosTabela(dadosFormatados);
+    };
+
+    const buscarDadosIniciais = async () => {
       try {
         setCarregando(true);
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual}`;
@@ -189,102 +279,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         }
 
         if (resultadoSol.sucesso) {
-          const dicionarioEstoque = {};
-          if (resultadoEst.sucesso && resultadoEst.dados) {
-            resultadoEst.dados.forEach(itemFisico => {
-              dicionarioEstoque[itemFisico.id] = itemFisico;
-            });
-          }
-
-          const reints = resultadoSol.dados.filter(sol =>
-            (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
-            (sol.status === 'Em Separação' || sol.status === 'Concluído')
-          );
-          
-          const qtdJaDevolvidaGlobal = {};
-          reints.forEach(reint => {
-            if (reint.observacoes) {
-               const match = reint.observacoes.match(/PL #(\d+)/);
-               if (match) {
-                 const plKey = `PL #${match[1]}`;
-                 if (!qtdJaDevolvidaGlobal[plKey]) qtdJaDevolvidaGlobal[plKey] = {};
-                 
-                 (reint.itens || []).forEach(it => {
-                   qtdJaDevolvidaGlobal[plKey][it.estoque_id] = (qtdJaDevolvidaGlobal[plKey][it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
-                 });
-               }
-            }
-          });
-
-          const idsCanceladosSet = new Set();
-          resultadoSol.dados.forEach(sol => {
-            if (sol.tipo === 'Cancelado' && sol.status !== 'Recusado' && sol.observacoes) {
-              const matches = sol.observacoes.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
-              if (matches) idsCanceladosSet.add(matches[0]);
-            }
-          });
-
-          const dadosFormatados = resultadoSol.dados.map((item) => {
-            let acaoTipo = "select";
-            let acaoValor = item.status;
-            let statusDestinoAprovacao = item.tipo === "Entrada" ? "Concluído" : "Em Separação";
-
-            if (item.status === "Pendente") {
-              acaoTipo = "botao";
-              acaoValor = "Aprovar";
-            } else if (item.status === "Em Separação" || item.status === "Em Andamento") {
-              acaoValor = "Em Separação";
-            }
-
-            let numeroPL = "-";
-            if (item.status !== "Pendente" && item.status !== "Cancelado" && item.status !== "Recusado") {
-              numeroPL = item.pl || item.bs || "-";
-            }
-
-            let statusFinalVisual = item.status;
-
-            if (item.tipo !== 'Cancelado' && idsCanceladosSet.has(item.id)) {
-              statusFinalVisual = 'Cancelado';
-            }
-            else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
-              const devolucoesDestaPL = qtdJaDevolvidaGlobal[numeroPL] || {};
-              const itensRestantes = (item.itens || []).filter(origItem => {
-                const devolvido = devolucoesDestaPL[origItem.estoque_id] || 0;
-                return (Number(origItem.quantidade_solicitada) - devolvido) > 0;
-              });
-
-              if (itensRestantes.length === 0 && (item.itens || []).length > 0) {
-                statusFinalVisual = 'Reintegrado';
-              }
-            }
-
-            const wbsProcura = item.wbs || '—';
-            const destinoProcura = item.destino || 'Não informado';
-            const idProcura = item.ps || item.id;
-            const solicitanteProcura = item.solicitante || '';
-            const textoBuscavel = `${idProcura} ${solicitanteProcura} ${wbsProcura} ${destinoProcura} ${numeroPL}`.toLowerCase();
-
-            return {
-              ...item,
-              idOriginal: item.idOriginal || item.id,
-              id: idProcura,
-              statusExibicao: statusFinalVisual,
-              statusDestinoAprovacao: statusDestinoAprovacao,
-              acaoTipo: acaoTipo,
-              acaoValor: acaoValor,
-              dataSolicitacao: item.dataSolicitacao || "-",
-              dataCriacaoISO: item.created_at || item.dataCriacaoISO || item.dataSolicitacao, 
-              dataEntrega: item.dataEntrega || "-",
-              pl: numeroPL,
-              wbs: wbsProcura, 
-              destino: destinoProcura,
-              filial: item.filial_origem_id || item.filial || '-',
-              textoBuscavel: textoBuscavel,
-              itensRaw: item.itens || []
-            };
-          });
-
-          setDadosTabela(dadosFormatados);
+          processarESetarSolicitacoes(resultadoSol.dados, resultadoEst.dados || estoque);
         } else {
           showAlert("Erro Operacional", resultadoSol.erro || 'Falha ao buscar dados.', "error");
         }
@@ -295,13 +290,37 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       }
     };
 
-    buscarDados();
+    buscarDadosIniciais();
 
     const SOCKET_URL = urlDoServidor();
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-    socket.on('solicitacoes_atualizadas', () => buscarDados());
+    
+    socket.on('solicitacoes_atualizadas', async (payload) => {
+      // Bloqueio de filial! Se a mensagem tiver filial e NÃO for a minha, ignora completamente.
+      if (payload && payload.filialOrigem && payload.filialOrigem !== estoqueAtual && estoqueAtual !== 'TODOS') {
+         return; 
+      }
+
+      try {
+        const [resultadoSol, resultadoEst] = await Promise.all([
+          apiFetch(`/solicitacoes/listar?limit=1000&filial=${estoqueAtual}`),
+          apiFetch("/estoque/listar?rastreabilidade=true")
+        ]);
+
+        if (resultadoEst.sucesso) {
+          setEstoque(resultadoEst.dados);
+        }
+
+        if (resultadoSol.sucesso) {
+          processarESetarSolicitacoes(resultadoSol.dados, resultadoEst.dados);
+        }
+      } catch (e) {
+        console.warn("Falha na atualização silenciosa dupla via socket.", e);
+      }
+    });
+
     return () => socket.disconnect();
-  }, [estoqueAtual, showAlert, perfil]);
+  }, [estoqueAtual, perfil, showAlert]);
 
   useEffect(() => { setPaginaAtual(1); }, [filtroAtivo, filtroStatus, termoPesquisaFiltro, filtrosAvancados, ordenacao]);
 
@@ -894,7 +913,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </table>
         </ScrollDuplo>
 
-        {/* ✨ UTILIZAR O NOVO COMPONENTE DE PAGINAÇÃO AQUI */}
         <PaginacaoTabela 
           paginaAtual={paginaAtual}
           totalPaginas={totalPaginas}
