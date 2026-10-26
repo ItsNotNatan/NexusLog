@@ -322,7 +322,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
 
       // Abre o PDF numa nova aba. Se o utilizador clicar em transferir (download) nessa aba,
       // o browser assumirá o nome configurado em info.title automaticamente.
-      pdfMake.createPdf(docDefinition).open();
+      // Força o download direto com o nome correto em vez de abrir um separador temporário
+      pdfMake.createPdf(docDefinition).download(`${tituloDocumento}.pdf`);
 
     } catch (error) {
       console.error("Erro ao gerar PDF:", error);
