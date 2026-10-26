@@ -26,6 +26,13 @@ export default function TransferenciaWBS() {
   const [estoqueReal, setEstoqueReal] = useState([]);
   const [carregandoEstoque, setCarregandoEstoque] = useState(true);
 
+  // ✨ TRAVA DE SEGURANÇA: Limpa todo o estado do formulário se o utilizador trocar de filial a meio da operação
+  useEffect(() => {
+    setItensSelecionados([]);
+    setAnexos([]);
+    setFormDados({ nome: '', wbsDestino: '', justificativa: '', entregaUrgente: false });
+  }, [estoqueAtual]);
+
   // Buscar dados e ligar o radar em tempo real
   useEffect(() => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
