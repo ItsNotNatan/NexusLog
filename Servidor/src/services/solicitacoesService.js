@@ -1143,4 +1143,65 @@ const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
     solicitacao_id: solicitacaoId,
     estoque_id: limparIdEstoque(i.estoque_id || i.idBD), 
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || i.desenho_sap_manual || null,
-    part_number_manual: i.part_number || i.
+    part_number_manual: i.part_number || i.numPecaFabricante || i.part_number_manual || null,
+    fabricante: i.fabricante || null, 
+    fornecedor: i.fornecedor || null,
+    referencia: i.referencia || null,
+    quantidade_solicitada: Math.max(1, Number(i.qtd || i.qtdFornecida || i.quantidade_solicitada || i.quantidade || 1)),
+    nf_entrada: i.nf_entrada || i.nfEntrada || null,
+    unidade_medida_manual: i.unidade_medida || i.unidadeMedida || i.unidade_medida_manual || 'Unid',
+    descricao_manual: limitarTexto(i.descricao || i.vendorDescription || i.materialDescription || i.descricao_manual || 'Sem descrição'),
+    wbs_element: i.wbs_element || i.wbsElement || i.wbs || null,
+    nome_projeto: i.nome_projeto || i.nomeProjeto || null,
+    emissao_nf: i.emissao_nf || i.emissaoNF || null,
+    receb_nf: i.receb_nf || i.recebNF || null,
+    documento_compras: i.documento_compras || i.docCompras || null,
+    valor_unitario_manual: limparValor(i.valor_unitario || i.poNetPrice || i.valor_unitario_manual),
+    centro: i.centro || null,
+    deposito: i.deposito || null,
+    alocacao: i.alocacao || null,
+  }));
+
+  await db.criarVarios('solicitacoes_itens', itensDB);
+  return true;
+};
+
+const listarDemandasPorEstoque = async (estoqueId) => {
+  const itens = await db.listar('solicitacoes_itens', {
+    filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }),
+  });
+
+  const solicitacoes = await db.listarPorIds('solicitacoes', 'id', itens.map((i) => i.solicitacao_id));
+  const porId = Object.fromEntries(solicitacoes.map((s) => [s.id, solicitacaoParaFront(s)]));
+
+  const demandas = itens.filter((item) => porId[item.solicitacao_id]).map((item) => ({
+    quantidade_solicitada: item.quantidade_solicitada,
+    unidade_medida_manual: item.unidade_medida_manual,
+    solicitacoes: porId[item.solicitacao_id],
+  }));
+
+  const edicoesCruas = await db.listar('historico_edicoes', { filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }) });
+  const edicoes = edicoesCruas.map((e) => ({ ...e, created_at: formatarDataBrasil(e.created_at) }));
+
+  return { demandas, edicoes };
+};
+
+module.exports = {
+  listarSolicitacoes,
+  obterSolicitacaoDetalhada,
+  criarMaterial,
+  criarTransferencia,
+  criarEntrada,
+  atualizarLocalizacao,
+  criarCrossdocking,
+  criarNotaFiscal,
+  criarReintegracao,
+  cancelarPL,
+  atualizarStatus,
+  deletarAnexo,
+  reverterItemParaEstoque,
+  buscarHistoricoItem,
+  salvarAnexosExtras,
+  atualizarItensDaSolicitacao,
+  listarDemandasPorEstoque,
+};
