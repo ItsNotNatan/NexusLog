@@ -10,6 +10,7 @@ const verificarToken = require('../middlewares/authMiddleware');
 // ==========================================================
 // 🟢 ROTAS PÚBLICAS (CLIENTE PODE USAR SEM LOGIN)
 // ==========================================================
+router.get('/listar-sap', ctrl.listarParaSAP);
 router.get('/listar', ctrl.listar); 
 router.post('/material', ctrl.criarMaterial);
 router.post('/transferencia', ctrl.criarTransferencia);
@@ -29,7 +30,7 @@ router.patch('/:id/status', verificarToken, ctrl.atualizarStatus);
 router.patch('/:id/local', verificarToken, ctrl.atualizarLocalizacao);
 router.delete('/anexo/:anexoId', verificarToken, ctrl.removerAnexo);
 
-// ✨ ROTA CORRIGIDA: Agora a pesquisa é feita pela ID única da prateleira no estoque!
+// ✨ Pesquisa por ID única da prateleira no estoque
 router.get('/demandas/estoque/:estoqueId', ctrl.listarDemandasPorEstoque);
 
 module.exports = router;
