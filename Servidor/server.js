@@ -3,8 +3,8 @@
 // DESCRICAO: Servidor de producao do NexusLog (Express + PocketBase + Socket.io)
 //
 // Sobe dois servicos no mesmo processo Node:
-//   - API + WebSocket   -> PORT_API   (padrao 3002)
-//   - Front (SPA React) -> PORT_FRONT (padrao 8083)
+//    - API + WebSocket   -> PORT_API   (padrao 3002)
+//    - Front (SPA React) -> PORT_FRONT (padrao 8083)
 //
 // O banco e' o PocketBase (porta 8092), iniciado pelo auto-deploy.
 // As portas sao diferentes das do ATMLog (3001 / 8080 / 8082 / 8091),
@@ -13,6 +13,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -112,8 +113,10 @@ app.use((req, res, next) => {
 });
 
 // =================================================================
-// 🛡️ CORS E MIDDLEWARES
+// 🛡️ COMPRESSÃO, CORS E MIDDLEWARES
 // =================================================================
+app.use(compression());
+
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
@@ -150,27 +153,18 @@ httpServer.listen(PORT_API, '0.0.0.0', () =>
 // =================================================================
 // 💾 SISTEMA DE BACKUP AUTOMÁTICO EM EXCEL
 // =================================================================
-// 1. Importamos a função de gerar Excel que criaremos no ficheiro de serviço.
 const { gerarBackupExcel } = require('./src/services/backupExcelService');
 
-// 2. Definimos de quanto em quanto tempo a rotina deve repetir.
-// A matemática é simples: Horas * Minutos * Segundos * Milissegundos
 const HORAS_INTERVALO = 12;
 const TEMPO_EM_MILISSEGUNDOS = HORAS_INTERVALO * 60 * 60 * 1000;
 
-// 3. O 'setInterval' é uma função nativa do JavaScript que repete uma ação
-// infinitamente, respeitando a pausa definida.
 setInterval(() => {
   gerarBackupExcel();
 }, TEMPO_EM_MILISSEGUNDOS);
 
-// 4. O 'setTimeout' executa a ação apenas UMA VEZ. Usamos isto para garantir 
-// que o sistema faz logo um backup ao ligar (depois de esperar 15 segundos 
-// para dar tempo da base de dados arrancar primeiro).
 setTimeout(() => {
   gerarBackupExcel();
 }, 15000);
-
 
 // =================================================================
 // 🌐 FRONT (SPA React buildado pelo Vite)
@@ -196,11 +190,8 @@ function servirSPA(nome, pastaDist, porta) {
   }
 
   spa.use(express.static(pastaDist));
-  // Fallback do SPA: qualquer rota que nao seja arquivo devolve o index.html,
-  // senao o React Router quebra ao recarregar a pagina (F5).
   spa.use((req, res) => res.sendFile(indexPath));
   spa.listen(porta, '0.0.0.0', () => console.log(`🌐 ${nome} rodando na porta ${porta}`));
 }
 
-// O Vite builda na raiz do repositorio; o Servidor fica um nivel abaixo.
 servirSPA('NexusLog (front)', path.join(__dirname, '..', 'dist'), PORT_FRONT);
