@@ -1,8 +1,8 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Formatação SAP filtrando exclusivamente Material e Crossdocking (Otimizado)
+// DESCRIÇÃO: Formatação SAP de Alta Performance (Set + useDeferredValue)
 // =================================================================
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue, useCallback } from 'react';
 import { 
   FileSpreadsheet, Search, X, CheckCircle2, Circle, 
   Layers, Copy, Lightbulb, AlertTriangle, ChevronLeft, ChevronRight 
@@ -15,7 +15,10 @@ export default function FormatacaoSAP() {
   const [solicitacoes, setSolicitacoes] = useState([]);
   
   const [busca, setBusca] = useState('');
-  const [selecionados, setSelecionados] = useState([]); 
+  const buscaDiferida = useDeferredValue(busca); // ✨ Digitação fluida sem travar o React
+
+  // ✨ OTIMIZAÇÃO: Set nativo para buscas O(1) instantâneas
+  const [selecionados, setSelecionados] = useState(() => new Set()); 
   const [categoriaGeral, setCategoriaGeral] = useState('');
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
   const [copiadoSucesso, setCopiadoSucesso] = useState(false);
@@ -47,7 +50,7 @@ export default function FormatacaoSAP() {
   };
 
   const limparEFormatarValor = (valorSujo) => {
-    if (valorSujo === undefined || valorSujo === null || valorSujo === '-' || String(valorSujo).trim() === 'NaN') return "0.00";
+    if (!valorSujo || valorSujo === '-' || String(valorSujo).trim() === 'NaN') return "0.00";
     let limpo = String(valorSujo).replace(/[^\d.,-]/g, '');
     if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
     else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
@@ -57,6 +60,8 @@ export default function FormatacaoSAP() {
   };
 
   useEffect(() => {
+    let ativo = true;
+
     const buscarDados = async () => {
       try {
         setCarregando(true);
@@ -65,105 +70,137 @@ export default function FormatacaoSAP() {
           apiFetch('/estoque/listar?rastreabilidade=true')
         ]);
 
-        // ✨ OTIMIZAÇÃO 1: Transformar Array em Hash Map (Dicionário) para busca instantânea O(1)
-        const mapaEstoque = {};
-        if (resultadoEst?.sucesso && resultadoEst.dados) {
-          resultadoEst.dados.forEach(item => {
-            mapaEstoque[item.id] = item;
-          });
+        if (!ativo) return;
+
+        // Hash map indexado O(1)
+        const mapaEstoque = Object.create(null);
+        if (resultadoEst?.sucesso && Array.isArray(resultadoEst.dados)) {
+          const dadosEstoque = resultadoEst.dados;
+          for (let i = 0; i < dadosEstoque.length; i++) {
+            mapaEstoque[dadosEstoque[i].id] = dadosEstoque[i];
+          }
         }
         
-        if (resultadoSol?.sucesso && resultadoSol.dados) {
-          const solicitacoesFiltradas = resultadoSol.dados.filter(
-            s => (s.tipo === 'Material' || s.tipo === 'Crossdocking') && 
-                 (s.pl && s.pl !== '-' && s.pl !== '—')
-          );
+        if (resultadoSol?.sucesso && Array.isArray(resultadoSol.dados)) {
+          const dadosSol = resultadoSol.dados;
+          const filtradas = [];
 
-          const solicitacoesEnriquecidas = solicitacoesFiltradas.map(sol => {
-            const itensEnriquecidos = (sol.itens || []).map(it => {
-              // ✨ Busca instantânea no dicionário em vez de usar .find() no array
-              const itemFisico = it.estoque_id ? mapaEstoque[it.estoque_id] : null;
+          for (let i = 0; i < dadosSol.length; i++) {
+            const s = dadosSol[i];
+            if ((s.tipo === 'Material' || s.tipo === 'Crossdocking') && (s.pl && s.pl !== '-' && s.pl !== '—')) {
+              const itens = s.itens || [];
+              const itensEnriquecidos = new Array(itens.length);
 
-              const valSol = it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice;
-              const valEst = itemFisico?.valor_unitario;
-              const valorFinal = extrairValorValido(valSol, valEst);
+              for (let j = 0; j < itens.length; j++) {
+                const it = itens[j];
+                const itemFisico = it.estoque_id ? mapaEstoque[it.estoque_id] : null;
 
-              const fabSol = it.fabricante || it.fabricante_manual;
-              const fabEst = itemFisico?.fabricante;
-              const fabFinal = (fabSol && fabSol !== '-' && fabSol !== 'null') ? fabSol : (fabEst || '-');
+                const valSol = it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice;
+                const valEst = itemFisico?.valor_unitario;
 
-              return { ...it, fabricante_enriquecido: fabFinal, valor_unitario_enriquecido: valorFinal };
-            });
-            return { ...sol, itens: itensEnriquecidos };
-          });
+                const fabSol = it.fabricante || it.fabricante_manual;
+                const fabEst = itemFisico?.fabricante;
 
-          setSolicitacoes(solicitacoesEnriquecidas);
+                itensEnriquecidos[j] = {
+                  ...it,
+                  fabricante_enriquecido: (fabSol && fabSol !== '-' && fabSol !== 'null') ? fabSol : (fabEst || '-'),
+                  valor_unitario_enriquecido: extrairValorValido(valSol, valEst)
+                };
+              }
+
+              filtradas.push({ ...s, itens: itensEnriquecidos });
+            }
+          }
+
+          setSolicitacoes(filtradas);
         }
       } catch (error) {
         console.error('Erro ao buscar dados:', error.message);
       } finally {
-        setCarregando(false);
+        if (ativo) setCarregando(false);
       }
     };
+
     buscarDados();
+    return () => { ativo = false; };
   }, []);
 
-  const toggleSelecao = (id) => {
-    setSelecionados(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
-  };
+  const toggleSelecao = useCallback((id) => {
+    setSelecionados(prev => {
+      const proximo = new Set(prev);
+      if (proximo.has(id)) proximo.delete(id);
+      else proximo.add(id);
+      return proximo;
+    });
+  }, []);
 
-  const limparSelecao = () => {
-    setSelecionados([]);
+  const limparSelecao = useCallback(() => {
+    setSelecionados(new Set());
     setCategoriaGeral('');
     setCategoriasIndividuais({});
-  };
+  }, []);
 
   useEffect(() => { setPaginaAtual(1); }, [selecionados]);
-  useEffect(() => { setPaginaEsquerda(1); }, [busca]);
+  useEffect(() => { setPaginaEsquerda(1); }, [buscaDiferida]);
 
-  // ✨ OTIMIZAÇÃO 2: Cache da filtragem da pesquisa. Só recalcula se a 'busca' ou as 'solicitacoes' mudarem.
   const listaFiltrada = useMemo(() => {
-    const termo = busca.toLowerCase();
+    const termo = buscaDiferida.trim().toLowerCase();
     if (!termo) return solicitacoes;
     return solicitacoes.filter(sol => 
       sol.pl.toLowerCase().includes(termo) || 
       sol.solicitante?.toLowerCase().includes(termo) ||
       sol.wbs?.toLowerCase().includes(termo)
     );
-  }, [solicitacoes, busca]);
+  }, [solicitacoes, buscaDiferida]);
 
   const totalPaginasEsquerda = Math.max(1, Math.ceil(listaFiltrada.length / plsPorPagina));
   const indexPrimeiroPl = (paginaEsquerda - 1) * plsPorPagina;
-  const plsPaginadas = useMemo(() => listaFiltrada.slice(indexPrimeiroPl, indexPrimeiroPl + plsPorPagina), [listaFiltrada, indexPrimeiroPl]);
+  const plsPaginadas = useMemo(() => 
+    listaFiltrada.slice(indexPrimeiroPl, indexPrimeiroPl + plsPorPagina), 
+    [listaFiltrada, indexPrimeiroPl]
+  );
 
-  // ✨ OTIMIZAÇÃO 3: Cache da construção da tabela da direita. Evita loopings desnecessários ao digitar na pesquisa.
   const itensConsolidados = useMemo(() => {
-    return solicitacoes
-      .filter(sol => selecionados.includes(sol.id))
-      .flatMap(sol => {
-        return (sol.itens || []).map(item => ({
-          idLinha: `${sol.id}-${item.id}`,
-          origem: sol.pl,
-          desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
-          quantidade: item.quantidade_solicitada || item.qtd || 1,
-          valorUnitario: limparEFormatarValor(item.valor_unitario_enriquecido),
-          fabricante: item.fabricante_enriquecido || '-',
-          wbs: sol.wbs || item.wbsOrigem || '-',
-          destino: sol.filial || '-',
-        }));
-      });
+    if (selecionados.size === 0) return [];
+    const consolidado = [];
+
+    for (let i = 0; i < solicitacoes.length; i++) {
+      const sol = solicitacoes[i];
+      if (selecionados.has(sol.id)) {
+        const itens = sol.itens || [];
+        for (let j = 0; j < itens.length; j++) {
+          const item = itens[j];
+          consolidado.push({
+            idLinha: `${sol.id}-${item.id}`,
+            origem: sol.pl,
+            desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
+            quantidade: item.quantidade_solicitada || item.qtd || 1,
+            valorUnitario: limparEFormatarValor(item.valor_unitario_enriquecido),
+            fabricante: item.fabricante_enriquecido || '-',
+            wbs: sol.wbs || item.wbsOrigem || '-',
+            destino: sol.filial || '-',
+          });
+        }
+      }
+    }
+    return consolidado;
   }, [solicitacoes, selecionados]);
 
   const totalPaginas = Math.max(1, Math.ceil(itensConsolidados.length / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
   const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, itensConsolidados.length);
-  const itensPaginados = useMemo(() => itensConsolidados.slice(indexPrimeiroItem, indexUltimoItem), [itensConsolidados, indexPrimeiroItem, indexUltimoItem]);
+  const itensPaginados = useMemo(() => 
+    itensConsolidados.slice(indexPrimeiroItem, indexUltimoItem), 
+    [itensConsolidados, indexPrimeiroItem, indexUltimoItem]
+  );
 
   const atualizarCategoriaGeral = (valor) => {
     setCategoriaGeral(valor);
-    const novasCatIndividuais = {};
-    itensConsolidados.forEach(item => { novasCatIndividuais[item.idLinha] = valor; });
-    setCategoriasIndividuais(novasCatIndividuais);
+    const novas = {};
+    for (let i = 0; i < itensConsolidados.length; i++) {
+      novas[itensConsolidados[i].idLinha] = valor;
+    }
+    setCategoriasIndividuais(novas);
   };
 
   const atualizarCategoriaIndividual = (idLinha, valor) => {
@@ -181,18 +218,13 @@ export default function FormatacaoSAP() {
       textArea.value = texto;
       textArea.style.position = "fixed";
       textArea.style.left = "-999999px";
-      textArea.style.top = "-999999px";
       document.body.appendChild(textArea);
-      
       textArea.focus();
       textArea.select();
-      
       const sucesso = document.execCommand('copy');
       document.body.removeChild(textArea);
-      
       return sucesso;
-    } catch (err) {
-      console.error('Falha ao tentar copiar:', err);
+    } catch {
       return false;
     }
   };
@@ -234,8 +266,8 @@ export default function FormatacaoSAP() {
               />
             </div>
             <div className="sap-selecao-info">
-              <span className="texto-selecionados">{selecionados.length} selecionado(s)</span>
-              {selecionados.length > 0 && (
+              <span className="texto-selecionados">{selecionados.size} selecionado(s)</span>
+              {selecionados.size > 0 && (
                 <button className="btn-limpar-selecao" onClick={limparSelecao}><X size={14} /> Limpar</button>
               )}
             </div>
@@ -248,7 +280,7 @@ export default function FormatacaoSAP() {
               <div className="sap-estado-vazio">Nenhuma PL de Material ou Crossdocking concluída encontrada.</div>
             ) : (
               plsPaginadas.map(sol => {
-                const isSelected = selecionados.includes(sol.id);
+                const isSelected = selecionados.has(sol.id);
                 const dataFormatada = sol.criacaoPl && sol.criacaoPl !== '—' ? sol.criacaoPl.split(' ')[0] : 'N/D';
                 
                 return (
@@ -300,7 +332,7 @@ export default function FormatacaoSAP() {
 
         {/* PAINEL DIREITO */}
         <div className="form-sap-coluna-dir">
-          {selecionados.length === 0 ? (
+          {selecionados.size === 0 ? (
             <div className="sap-preview-vazio">
               <FileSpreadsheet size={48} color="#cbd5e1" />
               <h3>Nenhum documento selecionado</h3>
@@ -311,15 +343,15 @@ export default function FormatacaoSAP() {
               <div className="sap-alerta-selecao">
                 <div className="sap-alerta-texto">
                   <AlertTriangle size={16} /> 
-                  {selecionados.length} PL selecionado(s) — {itensConsolidados.length} itens no total
+                  {selecionados.size} PL selecionado(s) — {itensConsolidados.length} itens no total
                 </div>
                 <div className="sap-tags-selecionadas">
-                  {solicitacoes.filter(s => selecionados.includes(s.id)).slice(0, 3).map(s => (
+                  {solicitacoes.filter(s => selecionados.has(s.id)).slice(0, 3).map(s => (
                     <span key={s.id} className="sap-tag">
                       {s.pl} <X size={12} onClick={() => toggleSelecao(s.id)} />
                     </span>
                   ))}
-                  {selecionados.length > 3 && <span className="sap-tag-extra">+{selecionados.length - 3}</span>}
+                  {selecionados.size > 3 && <span className="sap-tag-extra">+{selecionados.size - 3}</span>}
                 </div>
               </div>
 
