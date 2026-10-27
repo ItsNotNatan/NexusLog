@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/services/filiaisService.js
-// DESCRICAO: Filiais no PocketBase
+// DESCRICAO: Filiais no PocketBase (Com Cache na Memória RAM)
 //
 // No Postgres a filial era identificada pelo proprio id ('BR02'). O
 // PocketBase gera o id dele, entao o codigo da filial mora no campo
@@ -21,9 +21,16 @@ const paraFront = (r) => ({
 const acharPorCodigo = async (codigo) =>
   db.um('filiais', db.f('codigo = {:codigo}', { codigo: String(codigo) }));
 
+// ✨ VARIÁVEL DE CACHE: Fica na RAM do servidor
+let cacheFiliais = null;
+
 const listarFiliais = async () => {
+  // ✨ Se a cache já existir, devolve instantaneamente sem consultar a base de dados
+  if (cacheFiliais) return cacheFiliais;
+
   const registros = await db.listar('filiais', { sort: 'codigo' });
-  return registros.map(paraFront);
+  cacheFiliais = registros.map(paraFront);
+  return cacheFiliais;
 };
 
 const criarFilial = async (dadosFilial) => {
@@ -43,6 +50,8 @@ const criarFilial = async (dadosFilial) => {
     cidade: dadosFilial.cidade || '',
   });
 
+  // ✨ Invalida a cache: no próximo pedido, o sistema vai à base de dados buscar os dados novos
+  cacheFiliais = null;
   return true;
 };
 
@@ -51,6 +60,9 @@ const deletarFilial = async (codigoFilial) => {
   if (!filial) throw new Error('Filial nao encontrada.');
 
   await db.remover('filiais', filial.id);
+  
+  // ✨ Invalida a cache
+  cacheFiliais = null;
   return true;
 };
 
@@ -75,6 +87,9 @@ const atualizarFilial = async (codigoFilial, dadosAtualizados) => {
 
   if (Object.keys(atualizacao).length > 0) {
     await db.atualizar('filiais', filial.id, atualizacao);
+    
+    // ✨ Invalida a cache apenas se os dados tiverem sido alterados
+    cacheFiliais = null;
   }
 
   return true;
