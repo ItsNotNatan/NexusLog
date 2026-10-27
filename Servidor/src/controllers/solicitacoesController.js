@@ -21,6 +21,58 @@ const listar = async (req, res) => {
   }
 };
 
+const listarParaSAP = async (req, res) => {
+  try {
+    const db = require('../db');
+    
+    // Filtro no DB: Apenas Concluídos, apenas Material ou Crossdocking e com número de PL preenchido
+    const filtro = `status = 'Concluído' && (tipo = 'Material' || tipo = 'Crossdocking') && pl != '-' && pl != '—' && pl != ''`;
+    
+    const resultado = await db.listar('solicitacoes', {
+      filter: filtro,
+      sort: '-updated_at',
+      limit: 1000
+    });
+
+    const ids = resultado.map(r => r.id);
+    const itens = ids.length > 0 ? await db.listarPorIds('solicitacoes_itens', 'solicitacao_id', ids) : [];
+    
+    // Busca exclusivamente os IDs de estoque referenciados
+    const idsEstoque = [...new Set(itens.map(i => i.estoque_id).filter(Boolean))];
+    const estoqueCru = idsEstoque.length > 0 ? await db.listarPorIds('estoque', 'id', idsEstoque) : [];
+    
+    const mapaEstoque = {};
+    for (const e of estoqueCru) mapaEstoque[e.id] = e;
+
+    const mapaItens = {};
+    for (const it of itens) {
+      const fisico = mapaEstoque[it.estoque_id] || {};
+      
+      it.fabricante_enriquecido = it.fabricante || it.fabricante_manual || fisico.fabricante || '-';
+      it.valor_unitario_enriquecido = it.valor_unitario_manual || it.valor_unitario || it.poNetPrice || fisico.valor_unitario || 0;
+      
+      (mapaItens[it.solicitacao_id] = mapaItens[it.solicitacao_id] || []).push(it);
+    }
+
+    const payloadFormatado = resultado.map(sol => ({
+      id: sol.id,
+      pl: sol.pl,
+      ps: sol.ps,
+      solicitante: sol.nome_solicitante,
+      wbs: sol.wbs_destino,
+      filial: sol.filial_origem_id,
+      tipo: sol.tipo,
+      criacaoPl: db.dt(sol.data_aprovacao_pl || sol.updated_at),
+      itens: mapaItens[sol.id] || []
+    }));
+
+    res.status(200).json({ sucesso: true, dados: payloadFormatado });
+  } catch (error) {
+    console.error('[Erro ao listar para SAP]:', error);
+    res.status(500).json({ sucesso: false, erro: 'Falha ao buscar solicitações otimizadas no banco.' });
+  }
+};
+
 const criarResposta = (res, promessaID) => {
   promessaID
     .then(resultado => {
@@ -90,7 +142,6 @@ const removerAnexo = async (req, res) => {
 };
 
 const reverterItem = async (req, res) => {
-  // Agora recebemos a quantidade do frontend!
   const { id_item, quantidade } = req.body;
 
   try {
@@ -102,7 +153,6 @@ const reverterItem = async (req, res) => {
   }
 };
 
-// ✨ AGORA SIM! O controlador Express correto recebendo (req, res) e extraindo a data_entrega
 const atualizarLocalizacao = async (req, res) => {
   try {
     const { id } = req.params;
@@ -139,7 +189,6 @@ const listarDemandasPorEstoque = async (req, res) => {
   try {
     const { demandas, edicoes } = await service.listarDemandasPorEstoque(estoqueId);
 
-    // Formata os Fluxos Normais
     const dadosFormatados = demandas.map(item => ({
       idOriginal: item.solicitacoes.id,
       id: item.solicitacoes.ps,
@@ -165,7 +214,6 @@ const listarDemandasPorEstoque = async (req, res) => {
       unidade_medida: 'UN.', valor_unitario: 'VALOR', wbs: 'WBS', centro: 'CENTRO', deposito: 'DEPÓSITO'
     };
 
-    // Formata as Edições Manuais
     edicoes.forEach(ed => {
       const nomeCampo = dicionarioCampos[ed.campo_alterado] || ed.campo_alterado.toUpperCase();
       dadosFormatados.push({
@@ -186,7 +234,6 @@ const listarDemandasPorEstoque = async (req, res) => {
       });
     });
 
-    // Ordena tudo cronologicamente (do mais recente para o mais antigo)
     dadosFormatados.sort((a, b) => b.timestamp - a.timestamp);
 
     res.status(200).json({ sucesso: true, dados: dadosFormatados });
@@ -198,6 +245,7 @@ const listarDemandasPorEstoque = async (req, res) => {
 
 module.exports = {
   listar,
+  listarParaSAP,
   criarMaterial,
   criarTransferencia,
   criarEntrada,
