@@ -1,8 +1,8 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Formatação SAP filtrando exclusivamente Material e Crossdocking
+// DESCRIÇÃO: Formatação SAP filtrando exclusivamente Material e Crossdocking (Otimizado)
 // =================================================================
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileSpreadsheet, Search, X, CheckCircle2, Circle, 
   Layers, Copy, Lightbulb, AlertTriangle, ChevronLeft, ChevronRight 
@@ -20,25 +20,15 @@ export default function FormatacaoSAP() {
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
   const [copiadoSucesso, setCopiadoSucesso] = useState(false);
 
-  // Paginação da tabela direita
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 15;
 
-  // Paginação do seletor lateral esquerdo
   const [paginaEsquerda, setPaginaEsquerda] = useState(1);
   const plsPorPagina = 8;
 
   const opcoesCategoria = [
-    'Preencher .', 
-    'Consumo', 
-    'Imobilizado', 
-    'Transferência', 
-    'Venda',
-    'ZBN3',
-    'ZNB4',
-    'ZBRI',
-    'ZBE3',
-    'ZBE4'
+    'Preencher .', 'Consumo', 'Imobilizado', 'Transferência', 
+    'Venda', 'ZBN3', 'ZNB4', 'ZBRI', 'ZBE3', 'ZBE4'
   ];
 
   const extrairValorValido = (valSolicitacao, valEstoque) => {
@@ -48,27 +38,19 @@ export default function FormatacaoSAP() {
       else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
 
       const num = parseFloat(limpo);
-      if (!isNaN(num) && num > 0) {
-        return num;
-      }
+      if (!isNaN(num) && num > 0) return num;
     }
-
     if (valEstoque !== undefined && valEstoque !== null && valEstoque !== '' && valEstoque !== '-' && valEstoque !== 'null') {
       return valEstoque;
     }
-
     return 0;
   };
 
   const limparEFormatarValor = (valorSujo) => {
     if (valorSujo === undefined || valorSujo === null || valorSujo === '-' || String(valorSujo).trim() === 'NaN') return "0.00";
-    
     let limpo = String(valorSujo).replace(/[^\d.,-]/g, '');
-    if (limpo.includes('.') && limpo.includes(',')) {
-      limpo = limpo.replace(/\./g, '').replace(',', '.');
-    } else if (limpo.includes(',')) {
-      limpo = limpo.replace(',', '.');
-    }
+    if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
+    else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
 
     const numReal = parseFloat(limpo);
     return isNaN(numReal) ? "0.00" : numReal.toFixed(2);
@@ -78,18 +60,20 @@ export default function FormatacaoSAP() {
     const buscarDados = async () => {
       try {
         setCarregando(true);
-        
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=1000'),
           apiFetch('/estoque/listar?rastreabilidade=true')
         ]);
 
-        let estoqueReferencia = [];
-        if (resultadoEst && resultadoEst.sucesso && resultadoEst.dados) {
-          estoqueReferencia = resultadoEst.dados;
+        // ✨ OTIMIZAÇÃO 1: Transformar Array em Hash Map (Dicionário) para busca instantânea O(1)
+        const mapaEstoque = {};
+        if (resultadoEst?.sucesso && resultadoEst.dados) {
+          resultadoEst.dados.forEach(item => {
+            mapaEstoque[item.id] = item;
+          });
         }
         
-        if (resultadoSol && resultadoSol.sucesso && resultadoSol.dados) {
+        if (resultadoSol?.sucesso && resultadoSol.dados) {
           const solicitacoesFiltradas = resultadoSol.dados.filter(
             s => (s.tipo === 'Material' || s.tipo === 'Crossdocking') && 
                  (s.pl && s.pl !== '-' && s.pl !== '—')
@@ -97,9 +81,8 @@ export default function FormatacaoSAP() {
 
           const solicitacoesEnriquecidas = solicitacoesFiltradas.map(sol => {
             const itensEnriquecidos = (sol.itens || []).map(it => {
-              const itemFisico = (it.estoque_id && estoqueReferencia.length > 0)
-                ? estoqueReferencia.find(e => e.id === it.estoque_id)
-                : null;
+              // ✨ Busca instantânea no dicionário em vez de usar .find() no array
+              const itemFisico = it.estoque_id ? mapaEstoque[it.estoque_id] : null;
 
               const valSol = it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice;
               const valEst = itemFisico?.valor_unitario;
@@ -109,13 +92,8 @@ export default function FormatacaoSAP() {
               const fabEst = itemFisico?.fabricante;
               const fabFinal = (fabSol && fabSol !== '-' && fabSol !== 'null') ? fabSol : (fabEst || '-');
 
-              return {
-                ...it,
-                fabricante_enriquecido: fabFinal,
-                valor_unitario_enriquecido: valorFinal
-              };
+              return { ...it, fabricante_enriquecido: fabFinal, valor_unitario_enriquecido: valorFinal };
             });
-
             return { ...sol, itens: itensEnriquecidos };
           });
 
@@ -127,14 +105,11 @@ export default function FormatacaoSAP() {
         setCarregando(false);
       }
     };
-    
     buscarDados();
   }, []);
 
   const toggleSelecao = (id) => {
-    setSelecionados(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+    setSelecionados(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   };
 
   const limparSelecao = () => {
@@ -143,51 +118,51 @@ export default function FormatacaoSAP() {
     setCategoriasIndividuais({});
   };
 
-  useEffect(() => {
-    setPaginaAtual(1);
-  }, [selecionados]);
+  useEffect(() => { setPaginaAtual(1); }, [selecionados]);
+  useEffect(() => { setPaginaEsquerda(1); }, [busca]);
 
-  useEffect(() => {
-    setPaginaEsquerda(1);
-  }, [busca]);
-
-  const listaFiltrada = solicitacoes.filter(sol => {
+  // ✨ OTIMIZAÇÃO 2: Cache da filtragem da pesquisa. Só recalcula se a 'busca' ou as 'solicitacoes' mudarem.
+  const listaFiltrada = useMemo(() => {
     const termo = busca.toLowerCase();
-    return sol.pl.toLowerCase().includes(termo) || 
-           sol.solicitante?.toLowerCase().includes(termo) ||
-           sol.wbs?.toLowerCase().includes(termo);
-  });
+    if (!termo) return solicitacoes;
+    return solicitacoes.filter(sol => 
+      sol.pl.toLowerCase().includes(termo) || 
+      sol.solicitante?.toLowerCase().includes(termo) ||
+      sol.wbs?.toLowerCase().includes(termo)
+    );
+  }, [solicitacoes, busca]);
 
   const totalPaginasEsquerda = Math.max(1, Math.ceil(listaFiltrada.length / plsPorPagina));
   const indexPrimeiroPl = (paginaEsquerda - 1) * plsPorPagina;
-  const plsPaginadas = listaFiltrada.slice(indexPrimeiroPl, indexPrimeiroPl + plsPorPagina);
+  const plsPaginadas = useMemo(() => listaFiltrada.slice(indexPrimeiroPl, indexPrimeiroPl + plsPorPagina), [listaFiltrada, indexPrimeiroPl]);
 
-  const itensConsolidados = solicitacoes
-    .filter(sol => selecionados.includes(sol.id))
-    .flatMap(sol => {
-      return (sol.itens || []).map(item => ({
-        idLinha: `${sol.id}-${item.id}`,
-        origem: sol.pl,
-        desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
-        quantidade: item.quantidade_solicitada || item.qtd || 1,
-        valorUnitario: limparEFormatarValor(item.valor_unitario_enriquecido),
-        fabricante: item.fabricante_enriquecido || '-',
-        wbs: sol.wbs || item.wbsOrigem || '-',
-        destino: sol.filial || '-',
-      }));
-    });
+  // ✨ OTIMIZAÇÃO 3: Cache da construção da tabela da direita. Evita loopings desnecessários ao digitar na pesquisa.
+  const itensConsolidados = useMemo(() => {
+    return solicitacoes
+      .filter(sol => selecionados.includes(sol.id))
+      .flatMap(sol => {
+        return (sol.itens || []).map(item => ({
+          idLinha: `${sol.id}-${item.id}`,
+          origem: sol.pl,
+          desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
+          quantidade: item.quantidade_solicitada || item.qtd || 1,
+          valorUnitario: limparEFormatarValor(item.valor_unitario_enriquecido),
+          fabricante: item.fabricante_enriquecido || '-',
+          wbs: sol.wbs || item.wbsOrigem || '-',
+          destino: sol.filial || '-',
+        }));
+      });
+  }, [solicitacoes, selecionados]);
 
   const totalPaginas = Math.max(1, Math.ceil(itensConsolidados.length / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
   const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, itensConsolidados.length);
-  const itensPaginados = itensConsolidados.slice(indexPrimeiroItem, indexUltimoItem);
+  const itensPaginados = useMemo(() => itensConsolidados.slice(indexPrimeiroItem, indexUltimoItem), [itensConsolidados, indexPrimeiroItem, indexUltimoItem]);
 
   const atualizarCategoriaGeral = (valor) => {
     setCategoriaGeral(valor);
     const novasCatIndividuais = {};
-    itensConsolidados.forEach(item => {
-      novasCatIndividuais[item.idLinha] = valor;
-    });
+    itensConsolidados.forEach(item => { novasCatIndividuais[item.idLinha] = valor; });
     setCategoriasIndividuais(novasCatIndividuais);
   };
 
@@ -217,39 +192,28 @@ export default function FormatacaoSAP() {
       
       return sucesso;
     } catch (err) {
-      console.error('Falha ao tentar copiar o texto: ', err);
+      console.error('Falha ao tentar copiar:', err);
       return false;
     }
   };
 
   const copiarLinha = (item) => {
-    const texto = gerarLinhaTsv(item);
-    forcarCopiaClipboard(texto);
+    forcarCopiaClipboard(gerarLinhaTsv(item));
   };
 
   const copiarTudo = () => {
     if (itensConsolidados.length === 0) return;
-    
-    const textoCompleto = itensConsolidados.map(gerarLinhaTsv).join('\n');
-    const copiado = forcarCopiaClipboard(textoCompleto);
-    
+    const copiado = forcarCopiaClipboard(itensConsolidados.map(gerarLinhaTsv).join('\n'));
     if (copiado) {
       setCopiadoSucesso(true);
-      setTimeout(() => {
-        setCopiadoSucesso(false);
-      }, 2000);
-    } else {
-      console.error("Houve um problema de permissão no navegador ao tentar copiar os dados.");
+      setTimeout(() => setCopiadoSucesso(false), 2000);
     }
   };
 
   return (
     <div className="form-sap-wrapper">
-      
       <div className="form-sap-cabecalho">
-        <div className="form-sap-icone-titulo">
-          <FileSpreadsheet size={28} />
-        </div>
+        <div className="form-sap-icone-titulo"><FileSpreadsheet size={28} /></div>
         <div>
           <h1>Formatação para SAP</h1>
           <p>Selecione múltiplas PL concluídas para juntar, preencha a Categoria e copie as linhas formatadas.</p>
@@ -257,7 +221,6 @@ export default function FormatacaoSAP() {
       </div>
 
       <div className="form-sap-grid">
-        
         {/* PAINEL LATERAL ESQUERDO */}
         <div className="form-sap-coluna-esq" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="sap-pesquisa-caixa">
@@ -270,13 +233,10 @@ export default function FormatacaoSAP() {
                 onChange={(e) => setBusca(e.target.value)}
               />
             </div>
-            
             <div className="sap-selecao-info">
               <span className="texto-selecionados">{selecionados.length} selecionado(s)</span>
               {selecionados.length > 0 && (
-                <button className="btn-limpar-selecao" onClick={limparSelecao}>
-                  <X size={14} /> Limpar
-                </button>
+                <button className="btn-limpar-selecao" onClick={limparSelecao}><X size={14} /> Limpar</button>
               )}
             </div>
           </div>
@@ -290,8 +250,7 @@ export default function FormatacaoSAP() {
               plsPaginadas.map(sol => {
                 const isSelected = selecionados.includes(sol.id);
                 const dataFormatada = sol.criacaoPl && sol.criacaoPl !== '—' ? sol.criacaoPl.split(' ')[0] : 'N/D';
-                const qtdItens = sol.itens ? sol.itens.length : 0;
-
+                
                 return (
                   <div 
                     key={sol.id} 
@@ -304,11 +263,9 @@ export default function FormatacaoSAP() {
                     <div className="sap-item-detalhes">
                       <div className="sap-item-titulo">{sol.pl}</div>
                       <div className="sap-item-subtitulo">
-                        {sol.solicitante?.toUpperCase()} · {qtdItens} itens · {dataFormatada}
+                        {sol.solicitante?.toUpperCase()} · {sol.itens?.length || 0} itens · {dataFormatada}
                       </div>
-                      <div className="sap-item-destino">
-                        &rarr; {sol.filial}
-                      </div>
+                      <div className="sap-item-destino">&rarr; {sol.filial}</div>
                     </div>
                   </div>
                 );
@@ -359,8 +316,7 @@ export default function FormatacaoSAP() {
                 <div className="sap-tags-selecionadas">
                   {solicitacoes.filter(s => selecionados.includes(s.id)).slice(0, 3).map(s => (
                     <span key={s.id} className="sap-tag">
-                      {s.pl} 
-                      <X size={12} onClick={() => toggleSelecao(s.id)} />
+                      {s.pl} <X size={12} onClick={() => toggleSelecao(s.id)} />
                     </span>
                   ))}
                   {selecionados.length > 3 && <span className="sap-tag-extra">+{selecionados.length - 3}</span>}
@@ -463,14 +419,6 @@ export default function FormatacaoSAP() {
                   </div>
                 </div>
               )}
-
-              <div className="sap-footer-nota" style={{ marginTop: '0', borderRadius: totalPaginas > 1 ? '0' : '0 0 8px 8px' }}>
-                <Lightbulb size={16} color="#eab308" />
-                <span>
-                  Ordem das colunas: <strong>Desenho SAP · Quantidade · Valor Unitário · WBS · Filial de Destino · Categoria</strong> — Use a <strong>Categoria Geral</strong> para preencher todos de uma vez, ou edite individualmente.
-                </span>
-              </div>
-
             </div>
           )}
         </div>
