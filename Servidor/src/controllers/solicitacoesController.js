@@ -7,12 +7,14 @@ const service = require('../services/solicitacoesService');
 const listar = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10; 
+    const limit = parseInt(req.query.limit) || 10;
     const busca = req.query.busca || '';
     const tipo = req.query.tipo || '';
     const filial = req.query.filial || '';
+    const status = req.query.status || '';
+    const resumido = req.query.resumido === 'true';
 
-    const { dados, total } = await service.listarSolicitacoes(page, limit, busca, tipo, filial);
+    const { dados, total } = await service.listarSolicitacoes(page, limit, busca, tipo, filial, status, resumido);
     
     res.status(200).json({ sucesso: true, dados, total });
   } catch (error) {
@@ -21,11 +23,26 @@ const listar = async (req, res) => {
   }
 };
 
+const obterDetalhes = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const dados = await service.obterSolicitacaoDetalhada(id);
+    
+    if (!dados) {
+      return res.status(404).json({ sucesso: false, erro: 'Solicitação não encontrada.' });
+    }
+
+    res.status(200).json({ sucesso: true, dados });
+  } catch (error) {
+    console.error(`[Erro ao buscar detalhes da solicitação ${req.params.id}]:`, error);
+    res.status(500).json({ sucesso: false, erro: 'Falha ao buscar detalhes da solicitação.' });
+  }
+};
+
 const listarParaSAP = async (req, res) => {
   try {
     const db = require('../db');
     
-    // Filtro no DB: Apenas Concluídos, apenas Material ou Crossdocking e com número de PL preenchido
     const filtro = `status = 'Concluído' && (tipo = 'Material' || tipo = 'Crossdocking') && pl != '-' && pl != '—' && pl != ''`;
     
     const resultado = await db.listar('solicitacoes', {
@@ -37,7 +54,6 @@ const listarParaSAP = async (req, res) => {
     const ids = resultado.map(r => r.id);
     const itens = ids.length > 0 ? await db.listarPorIds('solicitacoes_itens', 'solicitacao_id', ids) : [];
     
-    // Busca exclusivamente os IDs de estoque referenciados
     const idsEstoque = [...new Set(itens.map(i => i.estoque_id).filter(Boolean))];
     const estoqueCru = idsEstoque.length > 0 ? await db.listarPorIds('estoque', 'id', idsEstoque) : [];
     
@@ -245,6 +261,7 @@ const listarDemandasPorEstoque = async (req, res) => {
 
 module.exports = {
   listar,
+  obterDetalhes,
   listarParaSAP,
   criarMaterial,
   criarTransferencia,
