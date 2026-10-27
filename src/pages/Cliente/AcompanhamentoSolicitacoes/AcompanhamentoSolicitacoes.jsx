@@ -1,5 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
+// DESCRIÇÃO: Painel de Acompanhamento (Otimizado com Lazy Loading e Payload Reduzido)
 // =================================================================
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -126,6 +127,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [estoque, setEstoque] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [carregando, setCarregando] = useState(true);
+  const [carregandoDetalhes, setCarregandoDetalhes] = useState(null); // ✨ Estado para o loading sob demanda
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
@@ -172,27 +174,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   useEffect(() => {
     if (perfil === 'cliente' && estoqueAtual === 'TODOS') return;
 
-    const processarESetarSolicitacoes = (novasSolicitacoes, estoqueAtualizado) => {
-      const reints = novasSolicitacoes.filter(sol =>
-        (sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração') &&
-        (sol.status === 'Em Separação' || sol.status === 'Concluído')
-      );
-      
-      const qtdJaDevolvidaGlobal = {};
-      reints.forEach(reint => {
-        if (reint.observacoes) {
-           const match = reint.observacoes.match(/PL #(\d+)/);
-           if (match) {
-             const plKey = `PL #${match[1]}`;
-             if (!qtdJaDevolvidaGlobal[plKey]) qtdJaDevolvidaGlobal[plKey] = {};
-             
-             (reint.itens || []).forEach(it => {
-               qtdJaDevolvidaGlobal[plKey][it.estoque_id] = (qtdJaDevolvidaGlobal[plKey][it.estoque_id] || 0) + Number(it.quantidade_solicitada || 0);
-             });
-           }
-        }
-      });
-
+    const processarESetarSolicitacoes = (novasSolicitacoes) => {
       const idsCanceladosSet = new Set();
       novasSolicitacoes.forEach(sol => {
         if (sol.tipo === 'Cancelado' && sol.status !== 'Recusado' && sol.observacoes) {
@@ -219,20 +201,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         }
 
         let statusFinalVisual = item.status;
-
         if (item.tipo !== 'Cancelado' && idsCanceladosSet.has(item.id)) {
           statusFinalVisual = 'Cancelado';
-        }
-        else if (item.tipo === 'Material' && (item.status === 'Em Separação' || item.status === 'Concluído') && numeroPL !== '-') {
-          const devolucoesDestaPL = qtdJaDevolvidaGlobal[numeroPL] || {};
-          const itensRestantes = (item.itens || []).filter(origItem => {
-            const devolvido = devolucoesDestaPL[origItem.estoque_id] || 0;
-            return (Number(origItem.quantidade_solicitada) - devolvido) > 0;
-          });
-
-          if (itensRestantes.length === 0 && (item.itens || []).length > 0) {
-            statusFinalVisual = 'Reintegrado';
-          }
         }
 
         const wbsProcura = item.wbs || '—';
@@ -257,29 +227,40 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           destino: destinoProcura,
           filial: item.filial_origem_id || item.filial || '-',
           textoBuscavel: textoBuscavel,
-          itensRaw: item.itens || []
+          itensRaw: item.itens || [],
+          anexos: item.anexos || [],
+          detalhesCompletos: false // ✨ Flag de Lazy Loading
         };
       });
 
-      setDadosTabela(dadosFormatados);
+      setDadosTabela(prevTabela => {
+        // Preserva os detalhes completos se já tiverem sido baixados na tabela antiga
+        const tabelaMapa = new Map(prevTabela.map(t => [t.idOriginal, t]));
+        return dadosFormatados.map(novo => {
+          const antigo = tabelaMapa.get(novo.idOriginal);
+          if (antigo && antigo.detalhesCompletos) {
+            return { ...novo, itensRaw: antigo.itensRaw, anexos: antigo.anexos, detalhesCompletos: true };
+          }
+          return novo;
+        });
+      });
     };
 
     const buscarDadosIniciais = async () => {
       try {
         setCarregando(true);
-        const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual}`;
+        // ✨ Otimização: resumido=true (payload minúsculo) e estoque sem rastreabilidade
+        const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual}&resumido=true`;
 
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
-          apiFetch("/estoque/listar?rastreabilidade=true")
+          apiFetch(`/estoque/listar?filial=${estoqueAtual}`)
         ]);
 
-        if (resultadoEst.sucesso) {
-          setEstoque(resultadoEst.dados);
-        }
+        if (resultadoEst.sucesso) setEstoque(resultadoEst.dados);
 
         if (resultadoSol.sucesso) {
-          processarESetarSolicitacoes(resultadoSol.dados, resultadoEst.dados || estoque);
+          processarESetarSolicitacoes(resultadoSol.dados);
         } else {
           showAlert("Erro Operacional", resultadoSol.erro || 'Falha ao buscar dados.', "error");
         }
@@ -296,24 +277,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     
     socket.on('solicitacoes_atualizadas', async (payload) => {
-      // Bloqueio de filial! Se a mensagem tiver filial e NÃO for a minha, ignora completamente.
-      if (payload && payload.filialOrigem && payload.filialOrigem !== estoqueAtual && estoqueAtual !== 'TODOS') {
-         return; 
-      }
+      if (payload && payload.filialOrigem && payload.filialOrigem !== estoqueAtual && estoqueAtual !== 'TODOS') return; 
 
       try {
-        const [resultadoSol, resultadoEst] = await Promise.all([
-          apiFetch(`/solicitacoes/listar?limit=1000&filial=${estoqueAtual}`),
-          apiFetch("/estoque/listar?rastreabilidade=true")
-        ]);
-
-        if (resultadoEst.sucesso) {
-          setEstoque(resultadoEst.dados);
-        }
-
-        if (resultadoSol.sucesso) {
-          processarESetarSolicitacoes(resultadoSol.dados, resultadoEst.dados);
-        }
+        const resultadoSol = await apiFetch(`/solicitacoes/listar?limit=1000&filial=${estoqueAtual}&resumido=true`);
+        if (resultadoSol.sucesso) processarESetarSolicitacoes(resultadoSol.dados);
       } catch (e) {
         console.warn("Falha na atualização silenciosa dupla via socket.", e);
       }
@@ -539,8 +507,44 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  const toggleLinha = (idUnico) => {
-    setLinhaExpandida(linhaExpandida === idUnico ? null : idUnico);
+  // ✨ LAZY LOADING: Carrega detalhes completos só quando a linha é expandida
+  const toggleLinha = async (idUnico, idOriginal) => {
+    if (linhaExpandida === idUnico) {
+      setLinhaExpandida(null);
+      setAnexosNovos([]);
+      return;
+    }
+
+    const linhaAtual = dadosTabela.find(s => s.idOriginal === idOriginal);
+    
+    // Se a linha ainda não tem os detalhes baixados, buscamos no servidor
+    if (linhaAtual && !linhaAtual.detalhesCompletos) {
+      setCarregandoDetalhes(idUnico);
+      try {
+        const res = await apiFetch(`/solicitacoes/${idOriginal}/detalhes`);
+        if (res.sucesso) {
+          setDadosTabela(prev => prev.map(sol => {
+            if (sol.idOriginal === idOriginal) {
+              return {
+                ...sol,
+                itensRaw: res.dados.itens || [],
+                anexos: res.dados.anexos || [],
+                statusExibicao: res.dados.status === 'Concluído' && res.dados.itens?.every(i => Number(i.quantidade_solicitada) === 0) ? 'Reintegrado' : sol.statusExibicao,
+                detalhesCompletos: true
+              };
+            }
+            return sol;
+          }));
+        }
+      } catch (err) {
+        showAlert("Erro", "Não foi possível transferir os detalhes desta solicitação.", "error");
+        setCarregandoDetalhes(null);
+        return;
+      }
+      setCarregandoDetalhes(null);
+    }
+
+    setLinhaExpandida(idUnico);
     setAnexosNovos([]);
   };
 
@@ -765,8 +769,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           transition: 'background-color 0.2s'
                         }}
                       >
-                        <td className="col-chevron" onClick={() => toggleLinha(idUnico)}>
-                          <ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: corTextoFraco }} />
+                        <td className="col-chevron" onClick={() => toggleLinha(idUnico, linha.idOriginal)}>
+                          {carregandoDetalhes === idUnico ? (
+                            <RefreshCw size={18} className="animate-spin" style={{ color: corTextoFraco }} />
+                          ) : (
+                            <ChevronRight size={18} className={isExpandida ? "icone-rotacionado" : "icone-normal"} style={{ color: corTextoFraco }} />
+                          )}
                         </td>
                         <td>
                           <div className="bloco-tipo-id">
@@ -786,13 +794,31 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                         <td>
                           {!esconderPL && linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
-                            <BotaoGerarPDF
-                              linha={{ ...linha, itens: getItensEnriquecidos(linha) }}
-                              nomeFilial={obterNomeFilialDinamico(linha.filial || linha.estoque)}
-                              showAlert={showAlert}
-                              showLoading={showLoading}
-                              closeAlert={closeAlert}
-                            />
+                            <div onClickCapture={async (e) => {
+                              // ✨ Bloqueio Lazy Loading para o PDF: Não gera PDF vazio se os itens não estiverem baixados!
+                              if (!linha.detalhesCompletos) {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                showLoading("Baixando dados completos para o PDF...");
+                                const res = await apiFetch(`/solicitacoes/${linha.idOriginal}/detalhes`);
+                                if (res.sucesso) {
+                                  setDadosTabela(prev => prev.map(s => s.idOriginal === linha.idOriginal ? { ...s, itensRaw: res.dados.itens, anexos: res.dados.anexos, detalhesCompletos: true } : s));
+                                  closeAlert();
+                                  showAlert("Dados Transferidos", "Clique novamente no botão de PDF para o gerar com os detalhes completos.", "info");
+                                } else {
+                                  closeAlert();
+                                  showAlert("Erro", "Falha ao preparar os dados do PDF.", "error");
+                                }
+                              }
+                            }}>
+                              <BotaoGerarPDF
+                                linha={{ ...linha, itens: getItensEnriquecidos(linha) }}
+                                nomeFilial={obterNomeFilialDinamico(linha.filial || linha.estoque)}
+                                showAlert={showAlert}
+                                showLoading={showLoading}
+                                closeAlert={closeAlert}
+                              />
+                            </div>
                           ) : (
                             <span className="traco-vazio" style={{ color: corTextoFraco }}>—</span>
                           )}
@@ -886,7 +912,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
                       </tr>
 
-                      {isExpandida && (
+                      {isExpandida && linha.detalhesCompletos && (
                         <tr>
                           <td colSpan="8" className="td-expandida">
                             <DetalhesSolicitacao item={{ ...linha, itens: getItensEnriquecidos(linha) }} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
