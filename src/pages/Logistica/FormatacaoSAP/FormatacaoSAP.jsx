@@ -80,7 +80,7 @@ export default function FormatacaoSAP() {
         setCarregando(true);
         
         const [resultadoSol, resultadoEst] = await Promise.all([
-          apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=100'),
+          apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=1000'),
           apiFetch('/estoque/listar?rastreabilidade=true')
         ]);
 
@@ -90,12 +90,8 @@ export default function FormatacaoSAP() {
         }
         
         if (resultadoSol && resultadoSol.sucesso && resultadoSol.dados) {
-          // ✨ ALTERAÇÃO: Filtra apenas 'Material' e 'Crossdocking'
           const solicitacoesFiltradas = resultadoSol.dados.filter(
-            s => (
-              s.tipo === 'Material' || 
-              s.tipo === 'Crossdocking'
-            ) && (s.pl && s.pl !== '-' && s.pl !== '—')
+            s => s.tipo === 'Material' || s.tipo === 'Crossdocking'
           );
 
           const solicitacoesEnriquecidas = solicitacoesFiltradas.map(sol => {
@@ -156,7 +152,8 @@ export default function FormatacaoSAP() {
 
   const listaFiltrada = solicitacoes.filter(sol => {
     const termo = busca.toLowerCase();
-    return sol.pl.toLowerCase().includes(termo) || 
+    const identificador = (sol.pl && sol.pl !== '-' && sol.pl !== '—') ? sol.pl : sol.ps;
+    return identificador.toLowerCase().includes(termo) || 
            sol.solicitante?.toLowerCase().includes(termo) ||
            sol.wbs?.toLowerCase().includes(termo);
   });
@@ -170,7 +167,7 @@ export default function FormatacaoSAP() {
     .flatMap(sol => {
       return (sol.itens || []).map(item => ({
         idLinha: `${sol.id}-${item.id}`,
-        origem: sol.pl,
+        origem: (sol.pl && sol.pl !== '-' && sol.pl !== '—') ? sol.pl : sol.ps,
         desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
         quantidade: item.quantidade_solicitada || item.qtd || 1,
         valorUnitario: limparEFormatarValor(item.valor_unitario_enriquecido),
@@ -268,7 +265,7 @@ export default function FormatacaoSAP() {
               <Search size={16} className="sap-icone-pesquisa" />
               <input 
                 type="text" 
-                placeholder="Buscar por nº PL, WBS ou Solicitante..." 
+                placeholder="Buscar por nº PL, PS, WBS ou Solicitante..." 
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
               />
@@ -288,12 +285,13 @@ export default function FormatacaoSAP() {
             {carregando ? (
               <div className="sap-estado-vazio">A carregar Packing Lists...</div>
             ) : listaFiltrada.length === 0 ? (
-              <div className="sap-estado-vazio">Nenhuma PL de Material ou Crossdocking concluída encontrada.</div>
+              <div className="sap-estado-vazio">Nenhuma operação concluída encontrada.</div>
             ) : (
               plsPaginadas.map(sol => {
                 const isSelected = selecionados.includes(sol.id);
                 const dataFormatada = sol.criacaoPl && sol.criacaoPl !== '—' ? sol.criacaoPl.split(' ')[0] : 'N/D';
                 const qtdItens = sol.itens ? sol.itens.length : 0;
+                const tituloDisplay = (sol.pl && sol.pl !== '-' && sol.pl !== '—') ? sol.pl : sol.ps;
 
                 return (
                   <div 
@@ -305,9 +303,9 @@ export default function FormatacaoSAP() {
                       {isSelected ? <CheckCircle2 size={20} color="#2563eb" className="check-preenchido" /> : <Circle size={20} color="#cbd5e1" />}
                     </div>
                     <div className="sap-item-detalhes">
-                      <div className="sap-item-titulo">{sol.pl}</div>
+                      <div className="sap-item-titulo">{tituloDisplay}</div>
                       <div className="sap-item-subtitulo">
-                        {sol.solicitante.toUpperCase()} · {qtdItens} itens · {dataFormatada}
+                        {sol.solicitante?.toUpperCase()} · {qtdItens} itens · {dataFormatada}
                       </div>
                       <div className="sap-item-destino">
                         &rarr; {sol.filial}
@@ -362,7 +360,7 @@ export default function FormatacaoSAP() {
                 <div className="sap-tags-selecionadas">
                   {solicitacoes.filter(s => selecionados.includes(s.id)).slice(0, 3).map(s => (
                     <span key={s.id} className="sap-tag">
-                      {s.pl} 
+                      {(s.pl && s.pl !== '-' && s.pl !== '—') ? s.pl : s.ps} 
                       <X size={12} onClick={() => toggleSelecao(s.id)} />
                     </span>
                   ))}
