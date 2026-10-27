@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Logistica/FormatacaoSAP/FormatacaoSAP.jsx
-// DESCRIÇÃO: Formatação SAP de Alta Performance (Set + useDeferredValue)
+// DESCRIÇÃO: Formatação SAP conectada ao endpoint otimizado /listar-sap
 // =================================================================
 import React, { useState, useEffect, useMemo, useDeferredValue, useCallback } from 'react';
 import { 
@@ -15,17 +15,18 @@ export default function FormatacaoSAP() {
   const [solicitacoes, setSolicitacoes] = useState([]);
   
   const [busca, setBusca] = useState('');
-  const buscaDiferida = useDeferredValue(busca); // ✨ Digitação fluida sem travar o React
+  const buscaDiferida = useDeferredValue(busca);
 
-  // ✨ OTIMIZAÇÃO: Set nativo para buscas O(1) instantâneas
   const [selecionados, setSelecionados] = useState(() => new Set()); 
   const [categoriaGeral, setCategoriaGeral] = useState('');
   const [categoriasIndividuais, setCategoriasIndividuais] = useState({});
   const [copiadoSucesso, setCopiadoSucesso] = useState(false);
 
+  // Paginação da tabela direita
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 15;
 
+  // Paginação do seletor lateral esquerdo
   const [paginaEsquerda, setPaginaEsquerda] = useState(1);
   const plsPorPagina = 8;
 
@@ -33,21 +34,6 @@ export default function FormatacaoSAP() {
     'Preencher .', 'Consumo', 'Imobilizado', 'Transferência', 
     'Venda', 'ZBN3', 'ZNB4', 'ZBRI', 'ZBE3', 'ZBE4'
   ];
-
-  const extrairValorValido = (valSolicitacao, valEstoque) => {
-    if (valSolicitacao !== undefined && valSolicitacao !== null && valSolicitacao !== '' && valSolicitacao !== '-' && valSolicitacao !== 'null') {
-      let limpo = String(valSolicitacao).replace(/[^\d.,-]/g, '');
-      if (limpo.includes('.') && limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
-      else if (limpo.includes(',')) limpo = limpo.replace(',', '.');
-
-      const num = parseFloat(limpo);
-      if (!isNaN(num) && num > 0) return num;
-    }
-    if (valEstoque !== undefined && valEstoque !== null && valEstoque !== '' && valEstoque !== '-' && valEstoque !== 'null') {
-      return valEstoque;
-    }
-    return 0;
-  };
 
   const limparEFormatarValor = (valorSujo) => {
     if (!valorSujo || valorSujo === '-' || String(valorSujo).trim() === 'NaN') return "0.00";
@@ -59,63 +45,32 @@ export default function FormatacaoSAP() {
     return isNaN(numReal) ? "0.00" : numReal.toFixed(2);
   };
 
+  const formatarData = (dataStr) => {
+    if (!dataStr || dataStr === '—' || dataStr === '-') return 'N/D';
+    try {
+      if (dataStr.includes('/')) return dataStr.split(' ')[0];
+      return new Date(dataStr).toLocaleDateString('pt-BR');
+    } catch {
+      return String(dataStr);
+    }
+  };
+
   useEffect(() => {
     let ativo = true;
 
     const buscarDados = async () => {
       try {
         setCarregando(true);
-        const [resultadoSol, resultadoEst] = await Promise.all([
-          apiFetch('/solicitacoes/listar?status=Conclu%C3%ADdo&limit=1000'),
-          apiFetch('/estoque/listar?rastreabilidade=true')
-        ]);
+        // ✨ Consome a rota filtrada e enriquecida no servidor (sem baixar o estoque geral)
+        const resultado = await apiFetch('/solicitacoes/listar-sap');
 
         if (!ativo) return;
 
-        // Hash map indexado O(1)
-        const mapaEstoque = Object.create(null);
-        if (resultadoEst?.sucesso && Array.isArray(resultadoEst.dados)) {
-          const dadosEstoque = resultadoEst.dados;
-          for (let i = 0; i < dadosEstoque.length; i++) {
-            mapaEstoque[dadosEstoque[i].id] = dadosEstoque[i];
-          }
-        }
-        
-        if (resultadoSol?.sucesso && Array.isArray(resultadoSol.dados)) {
-          const dadosSol = resultadoSol.dados;
-          const filtradas = [];
-
-          for (let i = 0; i < dadosSol.length; i++) {
-            const s = dadosSol[i];
-            if ((s.tipo === 'Material' || s.tipo === 'Crossdocking') && (s.pl && s.pl !== '-' && s.pl !== '—')) {
-              const itens = s.itens || [];
-              const itensEnriquecidos = new Array(itens.length);
-
-              for (let j = 0; j < itens.length; j++) {
-                const it = itens[j];
-                const itemFisico = it.estoque_id ? mapaEstoque[it.estoque_id] : null;
-
-                const valSol = it.valor_unitario_manual ?? it.valor_unitario ?? it.poNetPrice;
-                const valEst = itemFisico?.valor_unitario;
-
-                const fabSol = it.fabricante || it.fabricante_manual;
-                const fabEst = itemFisico?.fabricante;
-
-                itensEnriquecidos[j] = {
-                  ...it,
-                  fabricante_enriquecido: (fabSol && fabSol !== '-' && fabSol !== 'null') ? fabSol : (fabEst || '-'),
-                  valor_unitario_enriquecido: extrairValorValido(valSol, valEst)
-                };
-              }
-
-              filtradas.push({ ...s, itens: itensEnriquecidos });
-            }
-          }
-
-          setSolicitacoes(filtradas);
+        if (resultado?.sucesso && Array.isArray(resultado.dados)) {
+          setSolicitacoes(resultado.dados);
         }
       } catch (error) {
-        console.error('Erro ao buscar dados:', error.message);
+        console.error('Erro ao buscar dados formatados:', error.message);
       } finally {
         if (ativo) setCarregando(false);
       }
@@ -147,7 +102,7 @@ export default function FormatacaoSAP() {
     const termo = buscaDiferida.trim().toLowerCase();
     if (!termo) return solicitacoes;
     return solicitacoes.filter(sol => 
-      sol.pl.toLowerCase().includes(termo) || 
+      sol.pl?.toLowerCase().includes(termo) || 
       sol.solicitante?.toLowerCase().includes(termo) ||
       sol.wbs?.toLowerCase().includes(termo)
     );
@@ -173,11 +128,11 @@ export default function FormatacaoSAP() {
           consolidado.push({
             idLinha: `${sol.id}-${item.id}`,
             origem: sol.pl,
-            desenhoSAP: item.desenho_sap_manual || item.desenhoSAP || '-',
+            desenhoSAP: item.desenho_sap_manual || item.desenho_sap || item.desenhoSAP || '-',
             quantidade: item.quantidade_solicitada || item.qtd || 1,
             valorUnitario: limparEFormatarValor(item.valor_unitario_enriquecido),
             fabricante: item.fabricante_enriquecido || '-',
-            wbs: sol.wbs || item.wbsOrigem || '-',
+            wbs: sol.wbs || item.wbs_element || item.wbsOrigem || '-',
             destino: sol.filial || '-',
           });
         }
@@ -281,7 +236,7 @@ export default function FormatacaoSAP() {
             ) : (
               plsPaginadas.map(sol => {
                 const isSelected = selecionados.has(sol.id);
-                const dataFormatada = sol.criacaoPl && sol.criacaoPl !== '—' ? sol.criacaoPl.split(' ')[0] : 'N/D';
+                const dataFormatada = formatarData(sol.criacaoPl);
                 
                 return (
                   <div 
