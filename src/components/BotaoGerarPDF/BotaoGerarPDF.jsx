@@ -97,8 +97,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const bsNumero = linha.pl ? linha.pl.replace(/PL #|BS/g, '').trim() : '';
       const corFundoTipo = obterCorTipoOperacao(linha.tipo);
       const nomeOperacao = getNomeOperacao(linha.tipo);
-      
-      const nomeFilialDestino = nomeFilial ? nomeFilial.toUpperCase() : 'FILIAL NÃO DEFINIDA';
 
       let psNome = String(linha.ps || linha.id || '');
       if (!psNome.toUpperCase().startsWith('PS')) {
@@ -179,7 +177,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         pageOrientation: 'landscape',
         pageMargins: [15, 15, 15, 15], 
         content: [
-          // ✨ NOVO CABEÇALHO DIVIDIDO: TIPO DE OPERAÇÃO + ENVIAR PARA
+          // ✨ CABEÇALHO DIVIDIDO CORRIGIDO: Destino na direita!
           {
             table: {
               widths: ['60%', '40%'],
@@ -198,7 +196,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   { 
                     text: [
                       { text: 'ENVIAR O MATERIAL PARA:\n', fontSize: 9, bold: true, color: '#334155' },
-                      { text: nomeFilialDestino, fontSize: 14, bold: true, color: '#b91c1c' }
+                      { text: destinoMaterial.toUpperCase(), fontSize: 14, bold: true, color: '#b91c1c' }
                     ], 
                     alignment: 'center', 
                     fillColor: corFundoTipo, 
@@ -217,7 +215,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             margin: [0, 0, 0, 8]
           },
           
-          // DADOS AUXILIARES (Agora perfeitamente divididos em 50% / 50% já que o Local sumiu do meio)
           {
             columns: [
               {
@@ -227,9 +224,10 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   body: [
                     [
                       { 
+                        // ✨ Substituído "Destino" por "Filial de Origem" no quadro da esquerda
                         text: [
-                          { text: 'DESTINO MATERIAL: ', fontSize: 6, bold: true },
-                          { text: destinoMaterial, fontSize: 6, bold: true, color: '#b91c1c' }
+                          { text: 'FILIAL DE ORIGEM: ', fontSize: 6, bold: true },
+                          { text: nomeFilial ? nomeFilial.toUpperCase() : 'NÃO DEFINIDA', fontSize: 6, bold: true, color: '#1e293b' }
                         ], 
                         colSpan: 2, fillColor: '#f8fafc', margin: [4, 2], border: [true, true, true, false] 
                       },
