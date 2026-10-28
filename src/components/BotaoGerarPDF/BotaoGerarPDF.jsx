@@ -43,6 +43,22 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     return String(valor);
   };
 
+  // Define a cor do fundo do badge do Tipo de Operação baseado no tipo da linha
+  const obterCorTipoOperacao = (tipo) => {
+    switch (tipo) {
+      case 'Transferencia WBS':
+      case 'Transfer. WBS': return '#fef08a'; // Amarelo Claro
+      case 'Entrada': return '#a7f3d0'; // Verde Claro
+      case 'Reintegracao':
+      case 'Reintegração': return '#fed7aa'; // Laranja Claro
+      case 'Crossdocking': return '#e9d5ff'; // Roxo Claro
+      case 'Cancelado': return '#fecaca'; // Vermelho Claro
+      case 'Nota Fiscal': return '#c7d2fe'; // Anil Claro
+      case 'Material': 
+      default: return '#bae6fd'; // Azul Claro
+    }
+  };
+
   const handleGerarPdf = async (e) => {
     e.stopPropagation(); 
     setGerando(true);
@@ -73,6 +89,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       }
 
       const bsNumero = linha.pl ? linha.pl.replace(/PL #|BS/g, '').trim() : '';
+      const corFundoTipo = obterCorTipoOperacao(linha.tipo);
 
       // ✨ Criação Dinâmica do Nome do Arquivo ('PS 214512-2000 - PL 540')
       let psNome = String(linha.ps || linha.id || '');
@@ -147,7 +164,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       }
 
       const docDefinition = {
-        // ✨ Aplicação do nome dinâmico ao separador e documento gerado
         info: {
           title: tituloDocumento
         },
@@ -167,7 +183,30 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             layout: 'noBorders',
             margin: [0, 0, 0, 4] 
           },
-
+          // ✨ NOVO BLOCO: DESTAQUE DO TIPO DE OPERAÇÃO
+          {
+            table: {
+              widths: ['100%'],
+              body: [
+                [
+                  { 
+                    text: [
+                      { text: 'TIPO DE OPERAÇÃO: ', fontSize: 8, bold: true },
+                      { text: (linha.tipo || 'NÃO DEFINIDO').toUpperCase(), fontSize: 8, bold: true, color: '#1e293b' }
+                    ],
+                    alignment: 'center', fillColor: corFundoTipo, margin: [0, 3], border: [true, true, true, true] 
+                  }
+                ]
+              ]
+            },
+            layout: {
+              hLineWidth: function () { return 0.5; },
+              vLineWidth: function () { return 0.5; },
+              hLineColor: function () { return '#94a3b8'; },
+              vLineColor: function () { return '#94a3b8'; }
+            },
+            margin: [0, 0, 0, 4]
+          },
           {
             columns: [
               {
