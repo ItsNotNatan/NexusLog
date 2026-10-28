@@ -61,7 +61,7 @@ export default function FormatacaoSAP() {
     const buscarDados = async () => {
       try {
         setCarregando(true);
-        // ✨ Consome a rota filtrada e enriquecida no servidor (sem baixar o estoque geral)
+        // ✨ Consome a rota filtrada e enriquecida no servidor
         const resultado = await apiFetch('/solicitacoes/listar-sap');
 
         if (!ativo) return;
@@ -203,7 +203,8 @@ export default function FormatacaoSAP() {
         <div className="form-sap-icone-titulo"><FileSpreadsheet size={28} /></div>
         <div>
           <h1>Formatação para SAP</h1>
-          <p>Selecione múltiplas PL concluídas para juntar, preencha a Categoria e copie as linhas formatadas.</p>
+          {/* ✨ TEXTO ATUALIZADO */}
+          <p>Selecione múltiplas PL concluídas ou em separação para juntar, preencha a Categoria e copie as linhas formatadas.</p>
         </div>
       </div>
 
@@ -232,7 +233,8 @@ export default function FormatacaoSAP() {
             {carregando ? (
               <div className="sap-estado-vazio">A carregar Packing Lists...</div>
             ) : listaFiltrada.length === 0 ? (
-              <div className="sap-estado-vazio">Nenhuma PL de Material ou Crossdocking concluída encontrada.</div>
+              {/* ✨ TEXTO ATUALIZADO */}
+              <div className="sap-estado-vazio">Nenhuma PL de Material ou Crossdocking concluída ou em separação encontrada.</div>
             ) : (
               plsPaginadas.map(sol => {
                 const isSelected = selecionados.has(sol.id);
