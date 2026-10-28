@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/components/BotaoGerarPDF/BotaoGerarPDF.jsx
-// DESCRIÇÃO: Geração de PDFs com Destaque Máximo do Tipo de Operação
+// DESCRIÇÃO: Geração de PDFs com Destaque Máximo do Tipo e Destino
 // =================================================================
 import React, { useState } from 'react';
 import { FileText } from 'lucide-react';
@@ -44,7 +44,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     return String(valor);
   };
 
-  // ✨ Define a cor do cabeçalho baseado no tipo
+  // Define a cor do cabeçalho baseado no tipo
   const obterCorTipoOperacao = (tipo) => {
     switch (tipo) {
       case 'Transferencia WBS':
@@ -60,7 +60,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     }
   };
 
-  // ✨ Traduz o tipo do sistema para um nome imponente no PDF
+  // Traduz o tipo do sistema para um nome imponente no PDF
   const getNomeOperacao = (tipo) => {
     const t = String(tipo || '').toUpperCase();
     if (t === 'MATERIAL') return 'SAÍDA DE MATERIAL';
@@ -97,6 +97,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const bsNumero = linha.pl ? linha.pl.replace(/PL #|BS/g, '').trim() : '';
       const corFundoTipo = obterCorTipoOperacao(linha.tipo);
       const nomeOperacao = getNomeOperacao(linha.tipo);
+      
+      const nomeFilialDestino = nomeFilial ? nomeFilial.toUpperCase() : 'FILIAL NÃO DEFINIDA';
 
       let psNome = String(linha.ps || linha.id || '');
       if (!psNome.toUpperCase().startsWith('PS')) {
@@ -177,16 +179,26 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         pageOrientation: 'landscape',
         pageMargins: [15, 15, 15, 15], 
         content: [
-          // ✨ NOVO CABEÇALHO UNIFICADO E COLORIDO (IMPOSSÍVEL NÃO VER)
+          // ✨ NOVO CABEÇALHO DIVIDIDO: TIPO DE OPERAÇÃO + ENVIAR PARA
           {
             table: {
-              widths: ['100%'],
+              widths: ['60%', '40%'],
               body: [
                 [
                   { 
                     text: [
                       { text: 'COMUNICAÇÃO INTERNA DE LOGÍSTICA\n', fontSize: 9, bold: false, color: '#334155' },
                       { text: `OPERAÇÃO: ${nomeOperacao}`, fontSize: 13, bold: true, color: '#0f172a' }
+                    ], 
+                    alignment: 'center', 
+                    fillColor: corFundoTipo, 
+                    margin: [0, 6],
+                    border: [true, true, true, true]
+                  },
+                  { 
+                    text: [
+                      { text: 'ENVIAR O MATERIAL PARA:\n', fontSize: 9, bold: true, color: '#334155' },
+                      { text: nomeFilialDestino, fontSize: 14, bold: true, color: '#b91c1c' }
                     ], 
                     alignment: 'center', 
                     fillColor: corFundoTipo, 
@@ -204,10 +216,12 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
             },
             margin: [0, 0, 0, 8]
           },
+          
+          // DADOS AUXILIARES (Agora perfeitamente divididos em 50% / 50% já que o Local sumiu do meio)
           {
             columns: [
               {
-                width: '42%',
+                width: '50%',
                 table: {
                   widths: ['35%', '65%'],
                   body: [
@@ -244,23 +258,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   ]
                 }
               },
-              
               {
-                width: '16%', 
-                stack: [
-                  { 
-                    text: nomeFilial ? nomeFilial.toUpperCase() : 'FILIAL', 
-                    alignment: 'center', 
-                    bold: true, 
-                    fontSize: 10, 
-                    color: '#1e293b', 
-                    margin: [0, 10, 0, 0] 
-                  }
-                ]
-              },
-
-              {
-                width: '42%',
+                width: '50%',
                 table: {
                   widths: ['50%', '50%'],
                   body: [
