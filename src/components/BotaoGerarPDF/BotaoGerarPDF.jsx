@@ -1,5 +1,6 @@
 // =================================================================
 // ARQUIVO: src/components/BotaoGerarPDF/BotaoGerarPDF.jsx
+// DESCRIÇÃO: Geração de PDFs com Destaque Máximo do Tipo de Operação
 // =================================================================
 import React, { useState } from 'react';
 import { FileText } from 'lucide-react';
@@ -43,20 +44,33 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     return String(valor);
   };
 
-  // Define a cor do fundo do badge do Tipo de Operação baseado no tipo da linha
+  // ✨ Define a cor do cabeçalho baseado no tipo
   const obterCorTipoOperacao = (tipo) => {
     switch (tipo) {
       case 'Transferencia WBS':
-      case 'Transfer. WBS': return '#fef08a'; // Amarelo Claro
-      case 'Entrada': return '#a7f3d0'; // Verde Claro
+      case 'Transfer. WBS': return '#fef08a'; // Amarelo
+      case 'Entrada': return '#a7f3d0'; // Verde
       case 'Reintegracao':
-      case 'Reintegração': return '#fed7aa'; // Laranja Claro
-      case 'Crossdocking': return '#e9d5ff'; // Roxo Claro
-      case 'Cancelado': return '#fecaca'; // Vermelho Claro
-      case 'Nota Fiscal': return '#c7d2fe'; // Anil Claro
+      case 'Reintegração': return '#fed7aa'; // Laranja
+      case 'Crossdocking': return '#e9d5ff'; // Roxo
+      case 'Cancelado': return '#fecaca'; // Vermelho
+      case 'Nota Fiscal': return '#bfdbfe'; // Azul Metálico
       case 'Material': 
       default: return '#bae6fd'; // Azul Claro
     }
+  };
+
+  // ✨ Traduz o tipo do sistema para um nome imponente no PDF
+  const getNomeOperacao = (tipo) => {
+    const t = String(tipo || '').toUpperCase();
+    if (t === 'MATERIAL') return 'SAÍDA DE MATERIAL (CONSUMO)';
+    if (t === 'TRANSFERENCIA WBS' || t === 'TRANSFER. WBS') return 'TRANSFERÊNCIA WBS';
+    if (t === 'CROSSDOCKING') return 'SAÍDA CROSSDOCKING';
+    if (t === 'ENTRADA') return 'ENTRADA DE ESTOQUE';
+    if (t === 'REINTEGRACAO' || t === 'REINTEGRAÇÃO') return 'REINTEGRAÇÃO DE MATERIAIS';
+    if (t === 'NOTA FISCAL') return 'REGISTO DE NOTA FISCAL';
+    if (t === 'CANCELADO') return 'ESTORNO / CANCELAMENTO';
+    return t || 'OPERAÇÃO PADRÃO';
   };
 
   const handleGerarPdf = async (e) => {
@@ -68,14 +82,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
     }
 
     try {
-      const isReintegracao = linha.tipo === 'Reintegracao' || linha.tipo === 'Reintegração';
-      const isCancelamento = linha.tipo === 'Cancelado';
-
-      // Título Principal
-      let tituloPrincipal = 'BOLETIM DE SAÍDA - COMUNICAÇÃO INTERNA: SAÍDA DE MATERIAIS DA COMAU';
-      if (isReintegracao) tituloPrincipal = 'BOLETIM DE ENTRADA - COMUNICAÇÃO INTERNA: REINTEGRAÇÃO DE MATERIAIS';
-      if (isCancelamento) tituloPrincipal = 'BOLETIM DE CANCELAMENTO - COMUNICAÇÃO INTERNA: ESTORNO DE SOLICITAÇÃO';
-
       const dataSolicitacao = formatarDataSimples(linha.dataCriacaoISO || linha.created_at || linha.dataSolicitacao);
 
       let destinoMaterial = linha.destino || linha.deParaDestino || 'N/A';
@@ -90,8 +96,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
 
       const bsNumero = linha.pl ? linha.pl.replace(/PL #|BS/g, '').trim() : '';
       const corFundoTipo = obterCorTipoOperacao(linha.tipo);
+      const nomeOperacao = getNomeOperacao(linha.tipo);
 
-      // ✨ Criação Dinâmica do Nome do Arquivo ('PS 214512-2000 - PL 540')
       let psNome = String(linha.ps || linha.id || '');
       if (!psNome.toUpperCase().startsWith('PS')) {
         psNome = `PS ${psNome}`;
@@ -99,7 +105,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       
       let plNome = '';
       if (linha.pl && linha.pl !== '-' && linha.pl !== '—') {
-        plNome = String(linha.pl).replace('#', '').trim(); // Remove o '#' se existir
+        plNome = String(linha.pl).replace('#', '').trim();
       }
       
       const tituloDocumento = plNome ? `${psNome} - ${plNome}` : psNome;
@@ -119,17 +125,17 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       ];
       
       const headerRow = [
-        { text: 'ITEM', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'DESENHO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'REFERÊNCIA', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'QTD', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'UNID', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'DESCRIÇÃO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'FORNECEDOR', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', margin: [0, 4] },
-        { text: 'ALOCAÇÃO', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'NF ENTRADA', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'VLOR UNIT', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] },
-        { text: 'WBS', bold: true, fontSize: 7.5, fillColor: '#bfdbfe', alignment: 'center', margin: [0, 4] }
+        { text: 'ITEM', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', alignment: 'center', margin: [0, 4] },
+        { text: 'DESENHO', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', margin: [0, 4] },
+        { text: 'REFERÊNCIA', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', margin: [0, 4] },
+        { text: 'QTD', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', alignment: 'center', margin: [0, 4] },
+        { text: 'UNID', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', alignment: 'center', margin: [0, 4] },
+        { text: 'DESCRIÇÃO', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', margin: [0, 4] },
+        { text: 'FORNECEDOR', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', margin: [0, 4] },
+        { text: 'ALOCAÇÃO', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', alignment: 'center', margin: [0, 4] },
+        { text: 'NF ENTRADA', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', alignment: 'center', margin: [0, 4] },
+        { text: 'VLOR UNIT', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', alignment: 'center', margin: [0, 4] },
+        { text: 'WBS', bold: true, fontSize: 7.5, fillColor: '#cbd5e1', alignment: 'center', margin: [0, 4] }
       ];
 
       let bodyRows = [headerRow];
@@ -171,19 +177,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         pageOrientation: 'landscape',
         pageMargins: [15, 15, 15, 15], 
         content: [
-          {
-            table: {
-              widths: ['100%'],
-              body: [
-                [
-                  { text: tituloPrincipal, alignment: 'center', bold: true, fontSize: 11, fillColor: '#e2e8f0', margin: [0, 3] }
-                ]
-              ]
-            },
-            layout: 'noBorders',
-            margin: [0, 0, 0, 4] 
-          },
-          // ✨ NOVO BLOCO: DESTAQUE DO TIPO DE OPERAÇÃO
+          // ✨ NOVO CABEÇALHO UNIFICADO E COLORIDO (IMPOSSÍVEL NÃO VER)
           {
             table: {
               widths: ['100%'],
@@ -191,10 +185,13 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                 [
                   { 
                     text: [
-                      { text: 'TIPO DE OPERAÇÃO: ', fontSize: 8, bold: true },
-                      { text: (linha.tipo || 'NÃO DEFINIDO').toUpperCase(), fontSize: 8, bold: true, color: '#1e293b' }
-                    ],
-                    alignment: 'center', fillColor: corFundoTipo, margin: [0, 3], border: [true, true, true, true] 
+                      { text: 'COMUNICAÇÃO INTERNA DE LOGÍSTICA\n', fontSize: 9, bold: false, color: '#334155' },
+                      { text: `OPERAÇÃO: ${nomeOperacao}`, fontSize: 13, bold: true, color: '#0f172a' }
+                    ], 
+                    alignment: 'center', 
+                    fillColor: corFundoTipo, 
+                    margin: [0, 6],
+                    border: [true, true, true, true]
                   }
                 ]
               ]
@@ -205,7 +202,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
               hLineColor: function () { return '#94a3b8'; },
               vLineColor: function () { return '#94a3b8'; }
             },
-            margin: [0, 0, 0, 4]
+            margin: [0, 0, 0, 8]
           },
           {
             columns: [
@@ -220,7 +217,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                           { text: 'DESTINO MATERIAL: ', fontSize: 6, bold: true },
                           { text: destinoMaterial, fontSize: 6, bold: true, color: '#b91c1c' }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, true, true, false] 
+                        colSpan: 2, fillColor: '#f8fafc', margin: [4, 2], border: [true, true, true, false] 
                       },
                       {}
                     ],
@@ -230,7 +227,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                           { text: 'PROJETO TAREFA WBS: ', fontSize: 6, bold: true },
                           { text: linha.wbs || 'N/A', fontSize: 6, bold: true }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, false] 
+                        colSpan: 2, fillColor: '#f8fafc', margin: [4, 2], border: [true, false, true, false] 
                       },
                       {}
                     ],
@@ -240,7 +237,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                           { text: 'OBSERVAÇÕES: ', fontSize: 6, bold: true },
                           { text: observacoesTexto, fontSize: 6 }
                         ], 
-                        colSpan: 2, fillColor: '#f1f5f9', margin: [4, 2], border: [true, false, true, true] 
+                        colSpan: 2, fillColor: '#f8fafc', margin: [4, 2], border: [true, false, true, true] 
                       },
                       {}
                     ]
@@ -279,10 +276,10 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     ],
                     [
                       { text: 'NÚMERO FORMULÁRIO:\nP&S/CROSS DOCKING/LOGISTICA', fontSize: 6, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
-                      { text: `${linha.ps || linha.id}`, alignment: 'center', fontSize: 9, bold: true, fillColor: '#a5f3fc', margin: [0, 1], border: [true, true, true, true] }
+                      { text: `${linha.ps || linha.id}`, alignment: 'center', fontSize: 9, bold: true, fillColor: '#bae6fd', margin: [0, 1], border: [true, true, true, true] }
                     ],
                     [
-                      { text: 'DATA DO SOLICITAÇÃO FORMULÁRIO:', fontSize: 6, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
+                      { text: 'DATA DA SOLICITAÇÃO:', fontSize: 6, bold: true, alignment: 'right', margin: [0, 1, 4, 0], border: [false, false, false, false] },
                       { text: dataSolicitacao, alignment: 'center', fontSize: 7, margin: [0, 1], border: [true, true, true, true] }
                     ]
                   ]
@@ -359,9 +356,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         }
       };
 
-      // Abre o PDF numa nova aba. Se o utilizador clicar em transferir (download) nessa aba,
-      // o browser assumirá o nome configurado em info.title automaticamente.
-      // Força o download direto com o nome correto em vez de abrir um separador temporário
       pdfMake.createPdf(docDefinition).download(`${tituloDocumento}.pdf`);
 
     } catch (error) {
