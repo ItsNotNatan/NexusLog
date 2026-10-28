@@ -63,7 +63,7 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
   // ✨ Traduz o tipo do sistema para um nome imponente no PDF
   const getNomeOperacao = (tipo) => {
     const t = String(tipo || '').toUpperCase();
-    if (t === 'MATERIAL') return 'SAÍDA DE MATERIAL (CONSUMO)';
+    if (t === 'MATERIAL') return 'SAÍDA DE MATERIAL';
     if (t === 'TRANSFERENCIA WBS' || t === 'TRANSFER. WBS') return 'TRANSFERÊNCIA WBS';
     if (t === 'CROSSDOCKING') return 'SAÍDA CROSSDOCKING';
     if (t === 'ENTRADA') return 'ENTRADA DE ESTOQUE';
