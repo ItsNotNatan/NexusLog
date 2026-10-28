@@ -127,7 +127,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [estoque, setEstoque] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [carregando, setCarregando] = useState(true);
-  const [carregandoDetalhes, setCarregandoDetalhes] = useState(null); // ✨ Estado para o loading sob demanda
+  const [carregandoDetalhes, setCarregandoDetalhes] = useState(null); 
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
@@ -229,12 +229,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           textoBuscavel: textoBuscavel,
           itensRaw: item.itens || [],
           anexos: item.anexos || [],
-          detalhesCompletos: false // ✨ Flag de Lazy Loading
+          detalhesCompletos: false 
         };
       });
 
       setDadosTabela(prevTabela => {
-        // Preserva os detalhes completos se já tiverem sido baixados na tabela antiga
         const tabelaMapa = new Map(prevTabela.map(t => [t.idOriginal, t]));
         return dadosFormatados.map(novo => {
           const antigo = tabelaMapa.get(novo.idOriginal);
@@ -249,7 +248,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const buscarDadosIniciais = async () => {
       try {
         setCarregando(true);
-        // ✨ Otimização: resumido=true (payload minúsculo) e estoque sem rastreabilidade
         const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual}&resumido=true`;
 
         const [resultadoSol, resultadoEst] = await Promise.all([
@@ -507,7 +505,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     }
   };
 
-  // ✨ LAZY LOADING: Carrega detalhes completos só quando a linha é expandida
   const toggleLinha = async (idUnico, idOriginal) => {
     if (linhaExpandida === idUnico) {
       setLinhaExpandida(null);
@@ -517,7 +514,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     const linhaAtual = dadosTabela.find(s => s.idOriginal === idOriginal);
     
-    // Se a linha ainda não tem os detalhes baixados, buscamos no servidor
     if (linhaAtual && !linhaAtual.detalhesCompletos) {
       setCarregandoDetalhes(idUnico);
       try {
@@ -795,7 +791,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         <td>
                           {!esconderPL && linha.pl && linha.pl !== "-" && linha.pl !== "—" ? (
                             <div onClickCapture={async (e) => {
-                              // ✨ Bloqueio Lazy Loading para o PDF: Não gera PDF vazio se os itens não estiverem baixados!
                               if (!linha.detalhesCompletos) {
                                 e.stopPropagation();
                                 e.preventDefault();
@@ -895,7 +890,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               statusBloqueado ? (
                                 <div title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '600' }}><AlertCircle size={14} /> Aguardando NF</div>
                               ) : (
-                                <button className="btn-aprovar-acao" style={{ backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao); }}><RefreshCw size={14} /> Aprovar</button>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button className="btn-aprovar-acao" style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao); }}>
+                                    <Check size={14} /> Aprovar
+                                  </button>
+                                  {/* ✨ NOVO BOTÃO DE RECUSAR */}
+                                  <button style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, 'Recusado'); }}>
+                                    <X size={14} /> Recusar
+                                  </button>
+                                </div>
                               )
                             ) : (
                               <select className="select-acao" value={linha.status} onChange={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value); }} style={{ padding: '4px 10px', border: '1px solid #bfdbfe', borderRadius: '999px', backgroundColor: '#eff6ff', fontSize: '0.75rem', color: '#2563eb', fontWeight: '600', outline: 'none', cursor: 'pointer' }}>
