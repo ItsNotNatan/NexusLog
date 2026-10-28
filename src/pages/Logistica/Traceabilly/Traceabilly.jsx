@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, Archive, Calendar, User, Box, ArrowRight, RotateCcw, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Loader2, Archive, Calendar, User, Box, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText, X, ChevronLeft, ChevronRight, Filter, RotateCcw } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 import PaginacaoTabela from "../../../components/PaginacaoTabela/PaginacaoTabela";
+// ✨ NOVO: Componente do Modal
+import FiltroTraceabillyModal from "../../../components/FiltroTraceabillyModal/FiltroTraceabillyModal";
 import './Traceabilly.css';
 
 export default function Traceabilly({ perfil }) {
-  const { estoqueAtual, filiaisGlobais, usuario } = useContext(AuthContext);
+  const { estoqueAtual, usuario } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
   const [itensArquivados, setItensArquivados] = useState([]);
@@ -23,11 +25,17 @@ export default function Traceabilly({ perfil }) {
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(10);
 
+  // ✨ NOVOS ESTADOS PARA O FILTRO
+  const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
+  const [filtrosAvancados, setFiltrosAvancados] = useState({
+    tipoOriginal: '', desenhoSAP: '', partNumber: '', nfEntrada: '', bsSaida: '', solicitante: '', wbs: '', alocacao: ''
+  });
+
   const isAdminOuLider = perfil !== 'cliente' && (usuario?.cargo === 'ADM' || usuario?.cargo === 'LIDER');
 
   useEffect(() => {
     setPaginaAtual(1);
-  }, [termoPesquisa]);
+  }, [termoPesquisa, filtrosAvancados]);
 
   const formatarData = (dataISO) => {
     if (!dataISO) return '-';
@@ -79,7 +87,6 @@ export default function Traceabilly({ perfil }) {
         const resSol = await apiFetch(`/solicitacoes/listar${urlSol}`);
         
         if (resEstoque.sucesso && resSol.sucesso) {
-          
           const itensZerados = resEstoque.dados.filter(e => e.status === 'Zerado' || e.quantidade_disponivel <= 0);
           const setIdsZerados = new Set(itensZerados.map(e => e.id));
 
@@ -91,9 +98,7 @@ export default function Traceabilly({ perfil }) {
           movimentos.forEach(sol => {
             if (sol.itens && sol.itens.length > 0) {
               sol.itens.forEach(it => {
-                
                 if (it.estoque_id && setIdsZerados.has(it.estoque_id)) {
-                  
                   const isEntrada = sol.tipo === 'Entrada' || sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração';
 
                   itemsList.push({
@@ -156,10 +161,7 @@ export default function Traceabilly({ perfil }) {
       setCarregando(true);
       const resposta = await apiFetch('/solicitacoes/reverter', {
         method: 'POST',
-        body: JSON.stringify({ 
-          id_item: itemReverter.idItem,
-          quantidade: qtdNum 
-        })
+        body: JSON.stringify({ id_item: itemReverter.idItem, quantidade: qtdNum })
       });
 
       if (resposta.sucesso) {
@@ -176,14 +178,40 @@ export default function Traceabilly({ perfil }) {
     }
   };
 
-  const historicoFiltrado = itensArquivados.filter(item => 
-    (item.partNumber && item.partNumber.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.nfEntrada && item.nfEntrada.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.bsSaida && item.bsSaida.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.wbs && item.wbs.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.solicitante && item.solicitante.toLowerCase().includes(termoPesquisa.toLowerCase())) ||
-    (item.solicitacao && item.solicitacao.toLowerCase().includes(termoPesquisa.toLowerCase()))
-  );
+  const handleLimparFiltros = () => {
+    setFiltrosAvancados({ tipoOriginal: '', desenhoSAP: '', partNumber: '', nfEntrada: '', bsSaida: '', solicitante: '', wbs: '', alocacao: '' });
+  };
+
+  const passaNoFiltro = (valorItem, valorFiltro) => {
+    if (!valorFiltro) return true;
+    const tagsArray = String(valorFiltro).split(',');
+    return tagsArray.includes(String(valorItem));
+  };
+
+  const historicoFiltrado = itensArquivados.filter(item => {
+    // 1. Pesquisa de Texto
+    if (termoPesquisa) {
+      const termo = termoPesquisa.toLowerCase();
+      const textoBuscavel = `${item.partNumber} ${item.nfEntrada} ${item.bsSaida} ${item.wbs} ${item.solicitante} ${item.solicitacao} ${item.desenhoSAP}`.toLowerCase();
+      if (!textoBuscavel.includes(termo)) return false;
+    }
+
+    // 2. Filtros Avançados
+    if (!passaNoFiltro(item.tipoOriginal, filtrosAvancados.tipoOriginal)) return false;
+    if (!passaNoFiltro(item.desenhoSAP, filtrosAvancados.desenhoSAP)) return false;
+    if (!passaNoFiltro(item.partNumber, filtrosAvancados.partNumber)) return false;
+    if (!passaNoFiltro(item.nfEntrada, filtrosAvancados.nfEntrada)) return false;
+    if (!passaNoFiltro(item.solicitante, filtrosAvancados.solicitante)) return false;
+    if (!passaNoFiltro(item.wbs, filtrosAvancados.wbs)) return false;
+    if (!passaNoFiltro(item.alocacao, filtrosAvancados.alocacao)) return false;
+
+    if (filtrosAvancados.bsSaida) {
+      const bsOuSolicitacao = item.bsSaida !== '-' ? item.bsSaida : item.solicitacao;
+      if (!passaNoFiltro(bsOuSolicitacao, filtrosAvancados.bsSaida)) return false;
+    }
+
+    return true;
+  });
 
   const totalRegistrosFiltrados = historicoFiltrado.length;
   const totalPaginas = Math.max(1, Math.ceil(totalRegistrosFiltrados / itensPorPagina));
@@ -201,35 +229,45 @@ export default function Traceabilly({ perfil }) {
             <h2>Itens Arquivados</h2>
             <span className="badge-contador">{totalRegistrosFiltrados}</span>
           </div>
-          <div className="header-direita">
-            <Search size={16} className="icone-pesquisa" />
-            <input 
-              type="text" 
-              placeholder="Buscar por PN, NF, BS, WBS, Solicitante..." 
-              value={termoPesquisa}
-              onChange={(e) => setTermoPesquisa(e.target.value)}
-              className="input-pesquisa"
-            />
+          <div className="header-direita" style={{ display: 'flex', gap: '12px', height: '42px', alignItems: 'stretch' }}>
+            <div style={{ position: 'relative', height: '100%', width: '350px' }}>
+              <Search size={16} className="icone-pesquisa" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input 
+                type="text" 
+                placeholder="Buscar por PN, NF, BS, WBS, Solicitante..." 
+                value={termoPesquisa}
+                onChange={(e) => setTermoPesquisa(e.target.value)}
+                style={{ height: '100%', width: '100%', boxSizing: 'border-box', paddingLeft: '36px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+              />
+            </div>
+            <button 
+              onClick={() => setModalFiltroAberto(true)}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px', borderRadius: '8px', 
+                border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontSize: '0.875rem', 
+                fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s', height: '100%'
+              }}
+            >
+              <Filter size={18} color="#475569" />
+              Filtros
+              {Object.values(filtrosAvancados).some(v => v !== '') && (
+                <span style={{ width: '8px', height: '8px', backgroundColor: '#3b82f6', borderRadius: '50%' }}></span>
+              )}
+            </button>
           </div>
         </div>
 
         <div className="traceabilly-subheader">
-          <div className="subheader-item">
-            <User size={14} /> Quem solicitou
-          </div>
-          <div className="subheader-item">
-            <Calendar size={14} /> Quando foi a movimentação
-          </div>
-          <div className="subheader-item">
-            <Box size={14} /> Qual BS/Solicitação
-          </div>
+          <div className="subheader-item"><User size={14} /> Quem solicitou</div>
+          <div className="subheader-item"><Calendar size={14} /> Quando foi a movimentação</div>
+          <div className="subheader-item"><Box size={14} /> Qual BS/Solicitação</div>
         </div>
 
         <div className="tabela-container" style={{ flex: 1, overflowY: 'auto' }}>
           {carregando ? (
             <div className="estado-vazio"><Loader2 className="animate-spin" size={32} /> A analisar o ciclo de vida dos materiais...</div>
           ) : dadosPaginados.length === 0 ? (
-            <div className="estado-vazio"><Archive size={48} className="icone-vazio" /> Nenhum fluxo encontrado para materiais zerados.</div>
+            <div className="estado-vazio"><Archive size={48} className="icone-vazio" /> Nenhum fluxo encontrado.</div>
           ) : (
             <table className="tabela-rastreabilidade">
               <thead>
@@ -253,9 +291,7 @@ export default function Traceabilly({ perfil }) {
                     <td className="texto-azul">{item.desenhoSAP}</td>
                     <td className="texto-negrito">{item.partNumber}</td>
                     <td className="texto-truncado" title={item.descricao}>{item.descricao}</td>
-                    <td>
-                      {item.nfEntrada !== '-' ? <span className="badge-nf">{item.nfEntrada}</span> : '-'}
-                    </td>
+                    <td>{item.nfEntrada !== '-' ? <span className="badge-nf">{item.nfEntrada}</span> : '-'}</td>
                     <td>
                       <div className="flex-centro" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
                          <span className="badge-bs" style={{ fontSize: '0.75rem' }}>{item.bsSaida !== '-' ? item.bsSaida : 'S/ PL'}</span>
@@ -273,16 +309,9 @@ export default function Traceabilly({ perfil }) {
 
                     <td style={{ textAlign: 'center' }}>
                       <span style={{
-                        display: 'inline-block',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontWeight: '700',
-                        fontSize: '0.8rem',
-                        fontFamily: 'monospace, sans-serif',
-                        textAlign: 'center',
-                        minWidth: '60px',
-                        backgroundColor: item.isEntrada ? '#ecfdf5' : '#fef2f2',
-                        color: item.isEntrada ? '#059669' : '#dc2626',
+                        display: 'inline-block', padding: '4px 10px', borderRadius: '6px', fontWeight: '700', fontSize: '0.8rem',
+                        fontFamily: 'monospace, sans-serif', minWidth: '60px',
+                        backgroundColor: item.isEntrada ? '#ecfdf5' : '#fef2f2', color: item.isEntrada ? '#059669' : '#dc2626',
                         border: `1px solid ${item.isEntrada ? '#a7f3d0' : '#fecaca'}`
                       }}>
                         {item.isEntrada ? '+' : '-'}{item.qtdMovimentada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{item.unidadeMedida}</span>
@@ -301,16 +330,8 @@ export default function Traceabilly({ perfil }) {
                     {isAdminOuLider && (
                       <td style={{ textAlign: 'center' }}>
                         {['Material', 'Transferencia WBS', 'Crossdocking'].includes(item.tipoOriginal) ? (
-                          <button 
-                            onClick={() => abrirModalReverter(item)} 
-                            className="btn-reverter"
-                            title="Devolver quantidade ao estoque"
-                          >
-                            <RotateCcw size={18} />
-                          </button>
-                        ) : (
-                          <span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>-</span>
-                        )}
+                          <button onClick={() => abrirModalReverter(item)} className="btn-reverter" title="Devolver quantidade ao estoque"><RotateCcw size={18} /></button>
+                        ) : (<span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>-</span>)}
                       </td>
                     )}
                   </tr>
@@ -332,61 +353,39 @@ export default function Traceabilly({ perfil }) {
           setPaginaAtual={setPaginaAtual}
           carregando={carregando}
         />
-
       </div>
+
+      <FiltroTraceabillyModal
+        aberto={modalFiltroAberto}
+        onClose={() => setModalFiltroAberto(false)}
+        dadosTabela={itensArquivados}
+        filtros={filtrosAvancados}
+        setFiltros={setFiltrosAvancados} 
+        onLimpar={handleLimparFiltros}
+      />
 
       {modalReverter && itemReverter && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, animation: 'fadeIn 0.2s ease-out' }}>
           <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '450px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-            
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b', fontSize: '1.125rem' }}>
-                <RotateCcw size={20} color="#2563eb" /> Reverter ao Estoque
-              </h3>
-              <button onClick={() => setModalReverter(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                <X size={20} />
-              </button>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b', fontSize: '1.125rem' }}><RotateCcw size={20} color="#2563eb" /> Reverter ao Estoque</h3>
+              <button onClick={() => setModalReverter(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><X size={20} /></button>
             </div>
-
             <div style={{ marginBottom: '20px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '0.875rem', color: '#475569' }}>
-                Vai devolver itens retirados pela solicitação <strong>{itemReverter.solicitacao}</strong>.
-              </p>
-              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>
-                {itemReverter.partNumber} — {itemReverter.descricao}
-              </p>
+              <p style={{ margin: '0 0 4px 0', fontSize: '0.875rem', color: '#475569' }}>Vai devolver itens retirados pela solicitação <strong>{itemReverter.solicitacao}</strong>.</p>
+              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>{itemReverter.partNumber} — {itemReverter.descricao}</p>
             </div>
-
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '8px' }}>
-                QUANTIDADE A DEVOLVER (MÁX: {itemReverter.qtdMovimentada})
-              </label>
-              <input
-                type="number"
-                min="1"
-                max={itemReverter.qtdMovimentada}
-                value={qtdReverter}
-                onChange={(e) => setQtdReverter(e.target.value)}
-                style={{ 
-                  width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', 
-                  fontSize: '1rem', outline: 'none', boxSizing: 'border-box', color: '#2563eb', fontWeight: 'bold'
-                }}
-              />
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '8px' }}>QUANTIDADE A DEVOLVER (MÁX: {itemReverter.qtdMovimentada})</label>
+              <input type="number" min="1" max={itemReverter.qtdMovimentada} value={qtdReverter} onChange={(e) => setQtdReverter(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', boxSizing: 'border-box', color: '#2563eb', fontWeight: 'bold' }} />
             </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button onClick={() => setModalReverter(false)} style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
-                Cancelar
-              </button>
-              <button onClick={confirmarReversao} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <RotateCcw size={16} /> Confirmar Devolução
-              </button>
+              <button onClick={() => setModalReverter(false)} style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Cancelar</button>
+              <button onClick={confirmarReversao} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}><RotateCcw size={16} /> Confirmar Devolução</button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }
