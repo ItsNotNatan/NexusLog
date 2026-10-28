@@ -1,5 +1,6 @@
 // =================================================================
 // ARQUIVO: src/components/FiltroSolicitacoesModal/FiltroSolicitacoesModal.jsx
+// DESCRIÇÃO: Filtros Avançados com Lógica de Cascata (Filtros Interdependentes)
 // =================================================================
 import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -12,7 +13,6 @@ const X = ({ size = 20 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
 );
 
-// ✨ NOVO: Adicionados Desenho SAP e NF para dar poder total ao filtro!
 const CAMPOS_FILTRO = [
   { chave: 'tipo', label: 'Tipo de Operação' },
   { chave: 'id', label: 'ID (PS)' },
@@ -29,16 +29,61 @@ const CAMPOS_FILTRO = [
 export default function FiltroSolicitacoesModal({ 
   aberto, onClose, dadosTabela, filtros, setFiltros, onLimpar
 }) {
-  
-  // ✨ LÓGICA PROFUNDA: Agora o useMemo vasculha dentro dos "itens" da solicitação
+
+  // Função auxiliar para cruzar dados: checa se a linha passa num filtro específico
+  const passaNoFiltro = (valorItem, valorFiltro) => {
+    if (!valorFiltro) return true;
+    const tagsArray = String(valorFiltro).split(',');
+    return tagsArray.includes(String(valorItem));
+  };
+
+  // ✨ LÓGICA DE CASCATA: Gera as opções respeitando as outras seleções já feitas!
   const opcoesMapeadas = useMemo(() => {
+    if (!aberto) return {}; // Otimização: Não processa se o modal estiver fechado
+
     const mapaOpcoes = {};
-    
+
     CAMPOS_FILTRO.forEach(({ chave }) => {
       const valoresUnicos = new Set();
 
       dadosTabela.forEach(item => {
-        // 1. Puxa os dados da "capa" da solicitação
+        // 1. CHECAGEM CRUZADA (CASCATA)
+        // Antes de extrair o valor para este dropdown, verifica se esta linha
+        // sobrevive aos OUTROS filtros que o utilizador já aplicou.
+        let sobreviveAosOutrosFiltros = true;
+        
+        for (const campo of CAMPOS_FILTRO) {
+          const outraChave = campo.chave;
+          const valorFiltroAtivo = filtros[outraChave];
+          
+          // Ignora o próprio campo que estamos a construir e filtros vazios
+          if (outraChave === chave || !valorFiltroAtivo) continue;
+
+          let bateu = false;
+          const listaItens = item.itensRaw || item.itens || [];
+
+          if (outraChave === 'wbs') {
+            bateu = passaNoFiltro(item.wbs, valorFiltroAtivo) || listaItens.some(it => passaNoFiltro(it.wbs_element || it.wbs, valorFiltroAtivo));
+          } else if (outraChave === 'sap') {
+            bateu = listaItens.some(it => passaNoFiltro(it.desenho_sap_manual || it.desenho_sap, valorFiltroAtivo));
+          } else if (outraChave === 'nf') {
+            bateu = passaNoFiltro(item.nfCrossdocking, valorFiltroAtivo) || listaItens.some(it => passaNoFiltro(it.nf_entrada || it.nfEntrada || it.nf, valorFiltroAtivo));
+          } else {
+            bateu = passaNoFiltro(item[outraChave], valorFiltroAtivo);
+          }
+
+          if (!bateu) {
+            sobreviveAosOutrosFiltros = false;
+            break;
+          }
+        }
+
+        // Se a linha foi reprovada por outro filtro (ex: outra filial), ela NÃO entra na lista de opções
+        if (!sobreviveAosOutrosFiltros) return;
+
+        // 2. EXTRAÇÃO DE VALORES (A linha sobreviveu, logo os seus dados podem ir para o Dropdown)
+        const listaItens = item.itensRaw || item.itens || [];
+
         if (chave !== 'sap' && chave !== 'nf') {
           const val = item[chave];
           if (val && val !== '—' && val !== '-' && val !== 'Não informado') {
@@ -46,9 +91,8 @@ export default function FiltroSolicitacoesModal({
           }
         }
 
-        // 2. Puxa os dados de DENTRO dos itens da solicitação
-        if ((chave === 'wbs' || chave === 'sap' || chave === 'nf') && item.itens) {
-          item.itens.forEach(it => {
+        if ((chave === 'wbs' || chave === 'sap' || chave === 'nf') && listaItens.length > 0) {
+          listaItens.forEach(it => {
             if (chave === 'wbs') {
               const v = it.wbs_element || it.wbs;
               if (v && v !== '-' && v !== '—') valoresUnicos.add(v);
@@ -65,6 +109,7 @@ export default function FiltroSolicitacoesModal({
         }
       });
 
+      // Ordena alfabeticamente para facilitar a procura
       mapaOpcoes[chave] = Array.from(valoresUnicos).sort().map(val => ({
         value: val,
         label: String(val)
@@ -72,7 +117,7 @@ export default function FiltroSolicitacoesModal({
     });
 
     return mapaOpcoes;
-  }, [dadosTabela]);
+  }, [dadosTabela, filtros, aberto]);
 
   const getMultiValue = (str) => {
     if (!str) return [];
@@ -113,7 +158,7 @@ export default function FiltroSolicitacoesModal({
   return createPortal(
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(2px)' }}>
       <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '900px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-        
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid #e2e8f0' }}>
           <div>
             <span style={{ fontSize: '0.875rem', color: '#64748b', display: 'block', marginBottom: '4px' }}>Refine a sua listagem com precisão</span>
