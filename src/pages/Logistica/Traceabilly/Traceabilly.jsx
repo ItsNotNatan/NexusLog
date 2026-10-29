@@ -4,7 +4,6 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 import PaginacaoTabela from "../../../components/PaginacaoTabela/PaginacaoTabela";
-// ✨ NOVO: Componente do Modal
 import FiltroTraceabillyModal from "../../../components/FiltroTraceabillyModal/FiltroTraceabillyModal";
 import './Traceabilly.css';
 
@@ -25,7 +24,6 @@ export default function Traceabilly({ perfil }) {
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(10);
 
-  // ✨ NOVOS ESTADOS PARA O FILTRO
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     tipoOriginal: '', desenhoSAP: '', partNumber: '', nfEntrada: '', bsSaida: '', solicitante: '', wbs: '', alocacao: ''
@@ -100,6 +98,9 @@ export default function Traceabilly({ perfil }) {
               sol.itens.forEach(it => {
                 if (it.estoque_id && setIdsZerados.has(it.estoque_id)) {
                   const isEntrada = sol.tipo === 'Entrada' || sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração';
+                  
+                  // ✨ CORREÇÃO: Captura a NF de todas as propriedades possíveis do JSON
+                  const notaFiscalFinal = it.nf_entrada || it.nfEntrada || it.nf || sol.nfCrossdocking || sol.nf_entrada || '-';
 
                   itemsList.push({
                     idUnico: `${sol.id}-${it.id}`,
@@ -108,7 +109,7 @@ export default function Traceabilly({ perfil }) {
                     desenhoSAP: it.desenho_sap_manual || '-',
                     partNumber: it.part_number_manual || '-',
                     descricao: it.descricao_manual || 'Sem descrição',
-                    nfEntrada: it.nf_entrada || '-',
+                    nfEntrada: notaFiscalFinal, // ✨ Agora usa a variável consolidada
                     bsSaida: sol.pl || '-', 
                     solicitacao: sol.ps || '-',
                     solicitante: sol.solicitante || '-',
@@ -189,14 +190,12 @@ export default function Traceabilly({ perfil }) {
   };
 
   const historicoFiltrado = itensArquivados.filter(item => {
-    // 1. Pesquisa de Texto
     if (termoPesquisa) {
       const termo = termoPesquisa.toLowerCase();
       const textoBuscavel = `${item.partNumber} ${item.nfEntrada} ${item.bsSaida} ${item.wbs} ${item.solicitante} ${item.solicitacao} ${item.desenhoSAP}`.toLowerCase();
       if (!textoBuscavel.includes(termo)) return false;
     }
 
-    // 2. Filtros Avançados
     if (!passaNoFiltro(item.tipoOriginal, filtrosAvancados.tipoOriginal)) return false;
     if (!passaNoFiltro(item.desenhoSAP, filtrosAvancados.desenhoSAP)) return false;
     if (!passaNoFiltro(item.partNumber, filtrosAvancados.partNumber)) return false;
@@ -216,7 +215,7 @@ export default function Traceabilly({ perfil }) {
   const totalRegistrosFiltrados = historicoFiltrado.length;
   const totalPaginas = Math.max(1, Math.ceil(totalRegistrosFiltrados / itensPorPagina));
   const indexPrimeiroItem = (paginaAtual - 1) * itensPorPagina;
-  const indexUltimoItem = paginaAtual * itensPorPagina;
+  const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, totalRegistrosFiltrados);
   const dadosPaginados = historicoFiltrado.slice(indexPrimeiroItem, indexUltimoItem);
 
   return (
