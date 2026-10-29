@@ -2,7 +2,7 @@
 // ARQUIVO: src/pages/Logistica/TransferenciaEstoque/TransferenciaEstoque.jsx
 // =================================================================
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { Lock, FileText, Search, CheckSquare, Square, Box, Download, ArrowRight, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Lock, FileText, Search, CheckSquare, Square, Box, Download, ArrowRight, Loader2, Filter, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { io } from 'socket.io-client';
@@ -25,17 +25,34 @@ const obterNomeFilialCurto = (codigo) => {
 };
 
 export default function TransferenciaEstoque() {
-  const { estoqueAtual, carregandoInicial } = useContext(AuthContext);
+  const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
   const [solicitacoes, setSolicitacoes] = useState([]);
-  const [estoqueGlobal, setEstoqueGlobal] = useState([]); // ✨ NOVO: Guarda o estoque para enriquecer dados
+  const [estoqueGlobal, setEstoqueGlobal] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  
   const [termoBusca, setTermoBusca] = useState('');
+  // ✨ NOVO: Estado para filtrar as listagens pela origem
+  const [filtroOrigem, setFiltroOrigem] = useState('TODAS'); 
+  
   const [selecionadosIds, setSelecionadosIds] = useState(new Set());
 
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 20;
+
+  // Usa as filiais que já estão no AuthContext, ou cria uma lista de fallback
+  const listaDeFiliais = useMemo(() => {
+    if (filiaisGlobais && filiaisGlobais.length > 0) {
+      return [{ id: 'TODAS', nome: 'Todas' }, ...filiaisGlobais];
+    }
+    return [
+      { id: 'TODAS', nome: 'Todas' },
+      { id: 'BR02', nome: 'Santo André' },
+      { id: 'BR04', nome: 'Goiana' },
+      { id: 'BR06', nome: 'Betim' }
+    ];
+  }, [filiaisGlobais]);
 
   useEffect(() => {
     if (carregandoInicial) return;
@@ -45,7 +62,6 @@ export default function TransferenciaEstoque() {
         if (!silencioso) setCarregando(true);
         const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
         
-        // ✨ NOVO: Traz o estoque físico em simultâneo para cruzamento de dados!
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(`/solicitacoes/listar?limit=1000&filial=${filialFiltro}&t=${Date.now()}`),
           apiFetch('/estoque/listar?rastreabilidade=true')
@@ -90,10 +106,18 @@ export default function TransferenciaEstoque() {
   }, [estoqueAtual, carregandoInicial, showAlert]);
 
   const transferenciasFiltradas = useMemo(() => {
-    if (!termoBusca) return solicitacoes;
+    let filtradas = solicitacoes;
+
+    // ✨ Aplica primeiro o filtro por Origem (Se não for 'TODAS')
+    if (filtroOrigem !== 'TODAS') {
+      filtradas = filtradas.filter(sol => sol.filial === filtroOrigem);
+    }
+
+    // Depois aplica a barra de pesquisa
+    if (!termoBusca) return filtradas;
     const termo = termoBusca.toLowerCase();
     
-    return solicitacoes.filter(sol => {
+    return filtradas.filter(sol => {
       return (
         (sol.ps && sol.ps.toLowerCase().includes(termo)) ||
         (sol.pl && sol.pl.toLowerCase().includes(termo)) ||
@@ -102,11 +126,12 @@ export default function TransferenciaEstoque() {
         (sol.wbs && sol.wbs.toLowerCase().includes(termo))
       );
     });
-  }, [solicitacoes, termoBusca]);
+  }, [solicitacoes, termoBusca, filtroOrigem]);
 
   useEffect(() => {
     setPaginaAtual(1);
-  }, [termoBusca]);
+    limparSelecao(); // Limpa as seleções ao mudar de filial para evitar cruzar itens de filiais diferentes sem querer
+  }, [termoBusca, filtroOrigem]);
 
   const totalPaginas = Math.max(1, Math.ceil(transferenciasFiltradas.length / itensPorPagina));
   
@@ -136,9 +161,6 @@ export default function TransferenciaEstoque() {
     setSelecionadosIds(new Set());
   };
 
-  // ---------------------------------------------------------------------------
-  // 4. CONSOLIDAÇÃO DOS ITENS SELECIONADOS (COM ENRIQUECIMENTO DE DADOS)
-  // ---------------------------------------------------------------------------
   const itensConsolidados = useMemo(() => {
     const itens = [];
     solicitacoes.forEach(sol => {
@@ -148,7 +170,6 @@ export default function TransferenciaEstoque() {
           const origemWBS = sol.wbs && sol.wbs.includes('➔') ? sol.wbs.split('➔')[0]?.trim() : '-';
           const destinoWBS = sol.wbs && sol.wbs.includes('➔') ? sol.wbs.split('➔')[1]?.trim() : sol.wbs;
           
-          // ✨ MÁGICA: Cruza com o item físico original para resgatar Referência, Fornecedor, etc.
           const itemFisico = (item.estoque_id && estoqueGlobal.length > 0)
             ? estoqueGlobal.find(e => e.id === item.estoque_id)
             : null;
@@ -168,7 +189,6 @@ export default function TransferenciaEstoque() {
             wbs_destino: destinoWBS,
             filial_origem: sol.filial,
             
-            // Dados Resgatados
             desenho_sap_manual: valorSeguro(item.desenho_sap_manual || item.desenho_sap, itemFisico?.desenho_sap),
             part_number_manual: valorSeguro(item.part_number_manual || item.part_number, itemFisico?.part_number),
             descricao_manual: valorSeguro(item.descricao_manual || item.descricao, itemFisico?.descricao),
@@ -190,9 +210,6 @@ export default function TransferenciaEstoque() {
     return itens;
   }, [solicitacoes, selecionadosIds, estoqueGlobal]);
 
-  // ---------------------------------------------------------------------------
-  // 5. EXPORTAR PARA EXCEL (Ordem Exata que Você Pediu)
-  // ---------------------------------------------------------------------------
   const exportarExcel = async () => {
     if (itensConsolidados.length === 0) return;
 
@@ -200,7 +217,6 @@ export default function TransferenciaEstoque() {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Itens Transferidos');
 
-      // ✨ COLUNAS COM A ORDEM RIGOROSA DA SUA BASE DE DADOS
       worksheet.columns = [
         { header: 'NUM SAP | DESENHO', key: 'sap', width: 20 },
         { header: 'REFERÊNCIA', key: 'ref', width: 20 },
@@ -302,6 +318,33 @@ export default function TransferenciaEstoque() {
           </div>
 
           <div className="transf-controles">
+            
+            {/* ✨ NOVO: Seletor Rápido de Filiais */}
+            {estoqueAtual === 'TODOS' && (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <MapPin size={16} color="#64748b" style={{ marginRight: '4px' }} />
+                {listaDeFiliais.map(filial => (
+                  <button 
+                    key={filial.id}
+                    onClick={() => setFiltroOrigem(filial.id)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '999px',
+                      border: filtroOrigem === filial.id ? 'none' : '1px solid #cbd5e1',
+                      backgroundColor: filtroOrigem === filial.id ? '#3b82f6' : '#ffffff',
+                      color: filtroOrigem === filial.id ? '#ffffff' : '#475569',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {filial.id === 'TODAS' ? 'Todas' : filial.id}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="transf-pesquisa-wrapper">
               <Search size={16} className="icone-busca" />
               <input 
