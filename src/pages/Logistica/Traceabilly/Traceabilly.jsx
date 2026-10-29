@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, Archive, Calendar, User, Box, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText, X, ChevronLeft, ChevronRight, Filter, RotateCcw } from 'lucide-react';
+import { Search, Loader2, Archive, Calendar, User, Box, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText, X, ChevronLeft, ChevronRight, Filter, RotateCcw, Activity } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
@@ -20,6 +20,11 @@ export default function Traceabilly({ perfil }) {
   const [modalReverter, setModalReverter] = useState(false);
   const [itemReverter, setItemReverter] = useState(null);
   const [qtdReverter, setQtdReverter] = useState(1);
+
+  // ✨ ESTADOS DO NOVO MODAL DE CICLO DE VIDA (DUPLO CLIQUE)
+  const [modalCicloVida, setModalCicloVida] = useState(false);
+  const [detalhesCicloVida, setDetalhesCicloVida] = useState(null);
+  const [movimentosCicloVida, setMovimentosCicloVida] = useState([]);
 
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(10);
@@ -42,7 +47,9 @@ export default function Traceabilly({ perfil }) {
     const dia = String(d.getDate()).padStart(2, '0');
     const mes = String(d.getMonth() + 1).padStart(2, '0');
     const ano = d.getFullYear();
-    return `${dia}/${mes}/${ano}`;
+    const hora = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes}/${ano} ${hora}:${min}`;
   };
 
   const getIniciais = (nome) => {
@@ -98,18 +105,17 @@ export default function Traceabilly({ perfil }) {
               sol.itens.forEach(it => {
                 if (it.estoque_id && setIdsZerados.has(it.estoque_id)) {
                   const isEntrada = sol.tipo === 'Entrada' || sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração';
-                  
-                  // ✨ CORREÇÃO: Captura a NF de todas as propriedades possíveis do JSON
                   const notaFiscalFinal = it.nf_entrada || it.nfEntrada || it.nf || sol.nfCrossdocking || sol.nf_entrada || '-';
 
                   itemsList.push({
                     idUnico: `${sol.id}-${it.id}`,
                     idItem: it.id, 
+                    estoqueId: it.estoque_id, // ✨ NOVO: Guarda o ID físico para cruzar o ciclo de vida
                     tipoOriginal: sol.tipo, 
                     desenhoSAP: it.desenho_sap_manual || '-',
                     partNumber: it.part_number_manual || '-',
                     descricao: it.descricao_manual || 'Sem descrição',
-                    nfEntrada: notaFiscalFinal, // ✨ Agora usa a variável consolidada
+                    nfEntrada: notaFiscalFinal,
                     bsSaida: sol.pl || '-', 
                     solicitacao: sol.ps || '-',
                     solicitante: sol.solicitante || '-',
@@ -144,6 +150,25 @@ export default function Traceabilly({ perfil }) {
       buscarHistorico();
     }
   }, [estoqueAtual, showAlert, recarregar]);
+
+  // ✨ FUNÇÃO PARA ABRIR O CICLO DE VIDA (DUPLO CLIQUE)
+  const handleDoubleClickRow = (item) => {
+    if (!item.estoqueId) return;
+    
+    // Filtra todas as movimentações deste ID de estoque específico, ordenadas da mais antiga para a mais recente
+    const historicoCompleto = itensArquivados
+      .filter(i => i.estoqueId === item.estoqueId)
+      .sort((a, b) => a.dataSort - b.dataSort);
+      
+    setMovimentosCicloVida(historicoCompleto);
+    setDetalhesCicloVida({
+      partNumber: item.partNumber,
+      desenhoSAP: item.desenhoSAP,
+      descricao: item.descricao,
+      nfEntrada: item.nfEntrada
+    });
+    setModalCicloVida(true);
+  };
 
   const abrirModalReverter = (item) => {
     setItemReverter(item);
@@ -257,7 +282,7 @@ export default function Traceabilly({ perfil }) {
         </div>
 
         <div className="traceabilly-subheader">
-          <div className="subheader-item"><User size={14} /> Quem solicitou</div>
+          <div className="subheader-item"><User size={14} /> Duplo clique numa linha para ver a vida útil do item</div>
           <div className="subheader-item"><Calendar size={14} /> Quando foi a movimentação</div>
           <div className="subheader-item"><Box size={14} /> Qual BS/Solicitação</div>
         </div>
@@ -286,7 +311,14 @@ export default function Traceabilly({ perfil }) {
               </thead>
               <tbody>
                 {dadosPaginados.map(item => (
-                  <tr key={item.idUnico}>
+                  <tr 
+                    key={item.idUnico} 
+                    onDoubleClick={() => handleDoubleClickRow(item)}
+                    style={{ cursor: 'pointer' }}
+                    title="Dê um duplo clique para ver o histórico completo de entradas e saídas deste material"
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
                     <td className="texto-azul">{item.desenhoSAP}</td>
                     <td className="texto-negrito">{item.partNumber}</td>
                     <td className="texto-truncado" title={item.descricao}>{item.descricao}</td>
@@ -329,7 +361,7 @@ export default function Traceabilly({ perfil }) {
                     {isAdminOuLider && (
                       <td style={{ textAlign: 'center' }}>
                         {['Material', 'Transferencia WBS', 'Crossdocking'].includes(item.tipoOriginal) ? (
-                          <button onClick={() => abrirModalReverter(item)} className="btn-reverter" title="Devolver quantidade ao estoque"><RotateCcw size={18} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); abrirModalReverter(item); }} className="btn-reverter" title="Devolver quantidade ao estoque"><RotateCcw size={18} /></button>
                         ) : (<span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>-</span>)}
                       </td>
                     )}
@@ -353,6 +385,87 @@ export default function Traceabilly({ perfil }) {
           carregando={carregando}
         />
       </div>
+
+      {/* ✨ MODAL DE CICLO DE VIDA DO MATERIAL */}
+      {modalCicloVida && detalhesCicloVida && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1050, backdropFilter: 'blur(3px)' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', width: '900px', maxWidth: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', padding: '20px 24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ backgroundColor: '#eff6ff', padding: '8px', borderRadius: '8px', color: '#2563eb' }}><Activity size={24} /></div>
+                <div>
+                  <h3 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem', fontWeight: '700' }}>Ciclo de Vida do Material</h3>
+                  <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Rastreabilidade de Entradas e Saídas até zerar no estoque</span>
+                </div>
+              </div>
+              <button onClick={() => setModalCicloVida(false)} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', color: '#64748b', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={20} /></button>
+            </div>
+
+            <div style={{ padding: '16px 24px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+              <div>
+                <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Part Number</span>
+                <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{detalhesCicloVida.partNumber}</strong>
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Desenho SAP</span>
+                <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{detalhesCicloVida.desenhoSAP}</strong>
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>NF Principal</span>
+                <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{detalhesCicloVida.nfEntrada}</strong>
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Descrição</span>
+                <span style={{ color: '#334155', fontSize: '0.9rem' }}>{detalhesCicloVida.descricao}</span>
+              </div>
+            </div>
+
+            <div style={{ overflowY: 'auto', padding: '24px', flex: 1, backgroundColor: '#ffffff' }}>
+              <div style={{ position: 'relative', paddingLeft: '16px', borderLeft: '2px solid #e2e8f0' }}>
+                {movimentosCicloVida.map((mov, index) => (
+                  <div key={mov.idUnico} style={{ position: 'relative', marginBottom: index === movimentosCicloVida.length - 1 ? '0' : '24px' }}>
+                    
+                    {/* Ponto na linha do tempo */}
+                    <div style={{ position: 'absolute', left: '-21px', top: '4px', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: mov.isEntrada ? '#10b981' : '#ef4444', border: '2px solid #fff', boxShadow: '0 0 0 1px #e2e8f0' }}></div>
+                    
+                    <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            {renderFluxo(mov.tipoOriginal)}
+                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>{mov.dataSaida}</span>
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: '#334155', display: 'flex', gap: '16px' }}>
+                            <span><strong>PL/BS:</strong> {mov.bsSaida !== '-' ? mov.bsSaida : 'S/ PL'}</span>
+                            <span><strong>PS:</strong> {mov.solicitacao}</span>
+                          </div>
+                        </div>
+                        
+                        <div style={{ 
+                          backgroundColor: mov.isEntrada ? '#ecfdf5' : '#fef2f2', color: mov.isEntrada ? '#059669' : '#dc2626', 
+                          border: `1px solid ${mov.isEntrada ? '#a7f3d0' : '#fecaca'}`, padding: '6px 12px', borderRadius: '8px', 
+                          fontWeight: '700', fontSize: '1rem', fontFamily: 'monospace' 
+                        }}>
+                          {mov.isEntrada ? '+' : '-'}{mov.qtdMovimentada} <span style={{ fontSize: '0.75rem', fontWeight: 'normal' }}>{mov.unidadeMedida}</span>
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '12px', marginTop: '8px' }}>
+                        <div className="avatar-solicitante" style={{ width: '24px', height: '24px', fontSize: '0.7rem' }}>{getIniciais(mov.solicitante)}</div>
+                        <span style={{ fontSize: '0.875rem', color: '#475569' }}>Solicitado por <strong>{mov.solicitante}</strong></span>
+                        <span style={{ color: '#cbd5e1' }}>•</span>
+                        <span style={{ fontSize: '0.875rem', color: '#475569' }}>Destino/WBS: <strong>{mov.wbs}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      )}
 
       <FiltroTraceabillyModal
         aberto={modalFiltroAberto}
