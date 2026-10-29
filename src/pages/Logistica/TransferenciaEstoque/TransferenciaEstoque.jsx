@@ -10,6 +10,7 @@ import { io } from 'socket.io-client';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch, urlDoServidor } from '../../../services/api';
+import FiltroTransferenciaModal from '../../../components/FiltroTransferenciaModal/FiltroTransferenciaModal'; // ✨ IMPORTAÇÃO DO NOVO MODAL
 import './TransferenciaEstoque.css';
 
 const obterNomeFilialCurto = (codigo) => {
@@ -40,6 +41,12 @@ export default function TransferenciaEstoque() {
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 20;
 
+  // ✨ NOVOS ESTADOS PARA O FILTRO AVANÇADO
+  const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
+  const [filtrosAvancados, setFiltrosAvancados] = useState({
+    filial: '', tipo: '', ps: '', pl: '', solicitante: '', wbs: ''
+  });
+
   const listaDeFiliais = useMemo(() => {
     if (filiaisGlobais && filiaisGlobais.length > 0) {
       return [{ id: 'TODAS', nome: 'Todas' }, ...filiaisGlobais];
@@ -59,8 +66,6 @@ export default function TransferenciaEstoque() {
       try {
         if (!silencioso) setCarregando(true);
         
-        // ✨ MUDANÇA: Traz sempre TODAS as solicitações do sistema, 
-        // ignorando a filial selecionada no topo, pois a logística precisa ver o todo nesta tela.
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(`/solicitacoes/listar?limit=1000&t=${Date.now()}`),
           apiFetch('/estoque/listar?rastreabilidade=true')
@@ -104,31 +109,54 @@ export default function TransferenciaEstoque() {
     return () => socket.disconnect();
   }, [carregandoInicial, showAlert]);
 
+  const passaNoFiltro = (valorItem, valorFiltro) => {
+    if (!valorFiltro) return true;
+    const tagsArray = String(valorFiltro).split(',');
+    return tagsArray.includes(String(valorItem));
+  };
+
+  const handleLimparFiltros = () => {
+    setFiltrosAvancados({ filial: '', tipo: '', ps: '', pl: '', solicitante: '', wbs: '' });
+  };
+
   const transferenciasFiltradas = useMemo(() => {
     let filtradas = solicitacoes;
 
+    // Filtro Rápido
     if (filtroOrigem !== 'TODAS') {
       filtradas = filtradas.filter(sol => sol.filial === filtroOrigem);
     }
 
-    if (!termoBusca) return filtradas;
-    const termo = termoBusca.toLowerCase();
-    
+    // Filtro de Texto
+    if (termoBusca) {
+      const termo = termoBusca.toLowerCase();
+      filtradas = filtradas.filter(sol => {
+        return (
+          (sol.ps && sol.ps.toLowerCase().includes(termo)) ||
+          (sol.pl && sol.pl.toLowerCase().includes(termo)) ||
+          (sol.solicitante && sol.solicitante.toLowerCase().includes(termo)) ||
+          (sol.filial && sol.filial.toLowerCase().includes(termo)) ||
+          (sol.wbs && sol.wbs.toLowerCase().includes(termo))
+        );
+      });
+    }
+
+    // ✨ Filtros Avançados
     return filtradas.filter(sol => {
-      return (
-        (sol.ps && sol.ps.toLowerCase().includes(termo)) ||
-        (sol.pl && sol.pl.toLowerCase().includes(termo)) ||
-        (sol.solicitante && sol.solicitante.toLowerCase().includes(termo)) ||
-        (sol.filial && sol.filial.toLowerCase().includes(termo)) ||
-        (sol.wbs && sol.wbs.toLowerCase().includes(termo))
-      );
+      if (!passaNoFiltro(sol.filial, filtrosAvancados.filial)) return false;
+      if (!passaNoFiltro(sol.tipo, filtrosAvancados.tipo)) return false;
+      if (!passaNoFiltro(sol.ps, filtrosAvancados.ps)) return false;
+      if (!passaNoFiltro(sol.pl, filtrosAvancados.pl)) return false;
+      if (!passaNoFiltro(sol.solicitante, filtrosAvancados.solicitante)) return false;
+      if (!passaNoFiltro(sol.wbs, filtrosAvancados.wbs)) return false;
+      return true;
     });
-  }, [solicitacoes, termoBusca, filtroOrigem]);
+  }, [solicitacoes, termoBusca, filtroOrigem, filtrosAvancados]);
 
   useEffect(() => {
     setPaginaAtual(1);
     limparSelecao();
-  }, [termoBusca, filtroOrigem]);
+  }, [termoBusca, filtroOrigem, filtrosAvancados]);
 
   const totalPaginas = Math.max(1, Math.ceil(transferenciasFiltradas.length / itensPorPagina));
   
@@ -316,7 +344,6 @@ export default function TransferenciaEstoque() {
 
           <div className="transf-controles">
             
-            {/* ✨ MUDANÇA: Os botões de filial aparecem SEMPRE agora, permitindo navegação rápida */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
               <MapPin size={16} color="#64748b" style={{ marginRight: '4px' }} />
               {listaDeFiliais.map(filial => (
@@ -340,14 +367,32 @@ export default function TransferenciaEstoque() {
               ))}
             </div>
 
-            <div className="transf-pesquisa-wrapper">
-              <Search size={16} className="icone-busca" />
-              <input 
-                type="text" 
-                placeholder="Buscar PS, PL, solicitante, filial..." 
-                value={termoBusca}
-                onChange={(e) => setTermoBusca(e.target.value)}
-              />
+            {/* ✨ MUDANÇA: Barra de Pesquisa + Botão de Filtro Avançado lado a lado */}
+            <div style={{ display: 'flex', gap: '12px', height: '42px', alignItems: 'stretch', marginBottom: '16px' }}>
+              <div className="transf-pesquisa-wrapper" style={{ flex: 1, margin: 0, height: '100%', position: 'relative' }}>
+                <Search size={16} className="icone-busca" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar PS, PL, solicitante, filial..." 
+                  value={termoBusca}
+                  onChange={(e) => setTermoBusca(e.target.value)}
+                  style={{ width: '100%', height: '100%', paddingLeft: '36px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <button 
+                onClick={() => setModalFiltroAberto(true)}
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px', borderRadius: '8px', 
+                  border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontSize: '0.875rem', 
+                  fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s'
+                }}
+              >
+                <Filter size={18} color="#475569" />
+                Filtros
+                {Object.values(filtrosAvancados).some(v => v !== '') && (
+                  <span style={{ width: '8px', height: '8px', backgroundColor: '#3b82f6', borderRadius: '50%' }}></span>
+                )}
+              </button>
             </div>
             
             <div className="transf-acoes-selecao">
@@ -497,6 +542,16 @@ export default function TransferenciaEstoque() {
         </div>
 
       </div>
+
+      {/* ✨ RENDERIZAÇÃO DO MODAL DE FILTRO */}
+      <FiltroTransferenciaModal
+        aberto={modalFiltroAberto}
+        onClose={() => setModalFiltroAberto(false)}
+        dadosTabela={solicitacoes}
+        filtros={filtrosAvancados}
+        setFiltros={setFiltrosAvancados} 
+        onLimpar={handleLimparFiltros}
+      />
     </div>
   );
 }
