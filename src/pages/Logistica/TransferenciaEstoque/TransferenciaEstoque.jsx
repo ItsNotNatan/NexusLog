@@ -25,7 +25,7 @@ const obterNomeFilialCurto = (codigo) => {
 };
 
 export default function TransferenciaEstoque() {
-  const { estoqueAtual, carregandoInicial, filiaisGlobais } = useContext(AuthContext);
+  const { carregandoInicial, filiaisGlobais } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
   const [solicitacoes, setSolicitacoes] = useState([]);
@@ -33,7 +33,6 @@ export default function TransferenciaEstoque() {
   const [carregando, setCarregando] = useState(true);
   
   const [termoBusca, setTermoBusca] = useState('');
-  // ✨ NOVO: Estado para filtrar as listagens pela origem
   const [filtroOrigem, setFiltroOrigem] = useState('TODAS'); 
   
   const [selecionadosIds, setSelecionadosIds] = useState(new Set());
@@ -41,7 +40,6 @@ export default function TransferenciaEstoque() {
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 20;
 
-  // Usa as filiais que já estão no AuthContext, ou cria uma lista de fallback
   const listaDeFiliais = useMemo(() => {
     if (filiaisGlobais && filiaisGlobais.length > 0) {
       return [{ id: 'TODAS', nome: 'Todas' }, ...filiaisGlobais];
@@ -60,10 +58,11 @@ export default function TransferenciaEstoque() {
     const buscarTransferencias = async (silencioso = false) => {
       try {
         if (!silencioso) setCarregando(true);
-        const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
         
+        // ✨ MUDANÇA: Traz sempre TODAS as solicitações do sistema, 
+        // ignorando a filial selecionada no topo, pois a logística precisa ver o todo nesta tela.
         const [resultadoSol, resultadoEst] = await Promise.all([
-          apiFetch(`/solicitacoes/listar?limit=1000&filial=${filialFiltro}&t=${Date.now()}`),
+          apiFetch(`/solicitacoes/listar?limit=1000&t=${Date.now()}`),
           apiFetch('/estoque/listar?rastreabilidade=true')
         ]);
 
@@ -103,17 +102,15 @@ export default function TransferenciaEstoque() {
     });
 
     return () => socket.disconnect();
-  }, [estoqueAtual, carregandoInicial, showAlert]);
+  }, [carregandoInicial, showAlert]);
 
   const transferenciasFiltradas = useMemo(() => {
     let filtradas = solicitacoes;
 
-    // ✨ Aplica primeiro o filtro por Origem (Se não for 'TODAS')
     if (filtroOrigem !== 'TODAS') {
       filtradas = filtradas.filter(sol => sol.filial === filtroOrigem);
     }
 
-    // Depois aplica a barra de pesquisa
     if (!termoBusca) return filtradas;
     const termo = termoBusca.toLowerCase();
     
@@ -130,7 +127,7 @@ export default function TransferenciaEstoque() {
 
   useEffect(() => {
     setPaginaAtual(1);
-    limparSelecao(); // Limpa as seleções ao mudar de filial para evitar cruzar itens de filiais diferentes sem querer
+    limparSelecao();
   }, [termoBusca, filtroOrigem]);
 
   const totalPaginas = Math.max(1, Math.ceil(transferenciasFiltradas.length / itensPorPagina));
@@ -319,31 +316,29 @@ export default function TransferenciaEstoque() {
 
           <div className="transf-controles">
             
-            {/* ✨ NOVO: Seletor Rápido de Filiais */}
-            {estoqueAtual === 'TODOS' && (
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <MapPin size={16} color="#64748b" style={{ marginRight: '4px' }} />
-                {listaDeFiliais.map(filial => (
-                  <button 
-                    key={filial.id}
-                    onClick={() => setFiltroOrigem(filial.id)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '999px',
-                      border: filtroOrigem === filial.id ? 'none' : '1px solid #cbd5e1',
-                      backgroundColor: filtroOrigem === filial.id ? '#3b82f6' : '#ffffff',
-                      color: filtroOrigem === filial.id ? '#ffffff' : '#475569',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {filial.id === 'TODAS' ? 'Todas' : filial.id}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* ✨ MUDANÇA: Os botões de filial aparecem SEMPRE agora, permitindo navegação rápida */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <MapPin size={16} color="#64748b" style={{ marginRight: '4px' }} />
+              {listaDeFiliais.map(filial => (
+                <button 
+                  key={filial.id}
+                  onClick={() => setFiltroOrigem(filial.id)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '999px',
+                    border: filtroOrigem === filial.id ? 'none' : '1px solid #cbd5e1',
+                    backgroundColor: filtroOrigem === filial.id ? '#3b82f6' : '#ffffff',
+                    color: filtroOrigem === filial.id ? '#ffffff' : '#475569',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {filial.id === 'TODAS' ? 'Todas as Filiais' : filial.id}
+                </button>
+              ))}
+            </div>
 
             <div className="transf-pesquisa-wrapper">
               <Search size={16} className="icone-busca" />
