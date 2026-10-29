@@ -143,7 +143,17 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       let bodyRows = [headerRow];
       
       if (linha.itens && linha.itens.length > 0) {
-        linha.itens.forEach((it, index) => {
+        // ✨ ORDENAÇÃO ALFABÉTICA POR ALOCAÇÃO (WBS/ALOCACAO)
+        const itensOrdenados = [...linha.itens].sort((a, b) => {
+          const alocacaoA = String(a.alocacao || '').toUpperCase();
+          const alocacaoB = String(b.alocacao || '').toUpperCase();
+          
+          if (alocacaoA < alocacaoB) return -1;
+          if (alocacaoA > alocacaoB) return 1;
+          return 0;
+        });
+
+        itensOrdenados.forEach((it, index) => {
           const notaFiscalFinal = it.nf_entrada || it.nfEntrada || it.nf || linha.nfCrossdocking || linha.nf_entrada || '-';
 
           bodyRows.push([
@@ -245,7 +255,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     ],
                     [
                       { 
-                        // ✨ FONTE AUMENTADA NAS OBSERVAÇÕES
                         text: [
                           { text: 'OBSERVAÇÕES: ', fontSize: 8, bold: true },
                           { text: observacoesTexto, fontSize: 8, bold: true }
