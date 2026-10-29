@@ -97,6 +97,8 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
       const bsNumero = linha.pl ? linha.pl.replace(/PL #|BS/g, '').trim() : '';
       const corFundoTipo = obterCorTipoOperacao(linha.tipo);
       const nomeOperacao = getNomeOperacao(linha.tipo);
+      
+      const nomeFilialDestino = nomeFilial ? nomeFilial.toUpperCase() : 'FILIAL NÃO DEFINIDA';
 
       let psNome = String(linha.ps || linha.id || '');
       if (!psNome.toUpperCase().startsWith('PS')) {
@@ -177,7 +179,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
         pageOrientation: 'landscape',
         pageMargins: [15, 15, 15, 15], 
         content: [
-          // ✨ CABEÇALHO DIVIDIDO CORRIGIDO: Destino na direita!
           {
             table: {
               widths: ['60%', '40%'],
@@ -224,7 +225,6 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                   body: [
                     [
                       { 
-                        // ✨ Substituído "Destino" por "Filial de Origem" no quadro da esquerda
                         text: [
                           { text: 'FILIAL DE ORIGEM: ', fontSize: 6, bold: true },
                           { text: nomeFilial ? nomeFilial.toUpperCase() : 'NÃO DEFINIDA', fontSize: 6, bold: true, color: '#1e293b' }
@@ -245,9 +245,10 @@ export default function BotaoGerarPDF({ linha, nomeFilial, showAlert, showLoadin
                     ],
                     [
                       { 
+                        // ✨ FONTE AUMENTADA NAS OBSERVAÇÕES
                         text: [
-                          { text: 'OBSERVAÇÕES: ', fontSize: 6, bold: true },
-                          { text: observacoesTexto, fontSize: 6 }
+                          { text: 'OBSERVAÇÕES: ', fontSize: 8, bold: true },
+                          { text: observacoesTexto, fontSize: 8, bold: true }
                         ], 
                         colSpan: 2, fillColor: '#f8fafc', margin: [4, 2], border: [true, false, true, true] 
                       },
