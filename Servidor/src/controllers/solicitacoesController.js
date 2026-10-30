@@ -43,7 +43,6 @@ const listarParaSAP = async (req, res) => {
   try {
     const db = require('../db');
     
-    // ✨ FILTRO ATUALIZADO: Agora aceita 'Concluído' OU 'Em Separação'
     const filtro = `(status = 'Concluído' || status = 'Em Separação') && (tipo = 'Material' || tipo = 'Crossdocking') && pl != '-' && pl != '—' && pl != ''`;
     
     const resultado = await db.listar('solicitacoes', {
