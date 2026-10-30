@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Package, Truck, User, Paperclip, Send, FileSpreadsheet } from 'lucide-react';
+import { Package, Truck, User, Paperclip, Send, FileSpreadsheet, X } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
 import './EntradaEstoque.css';
@@ -13,7 +13,8 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 
-const LIMITE_LOGISTICA = 60;
+// ✨ LIMITE AUMENTADO PARA 100 LINHAS CONFORME SOLICITADO
+const LIMITE_LOGISTICA = 100;
 
 export default function EntradaEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
