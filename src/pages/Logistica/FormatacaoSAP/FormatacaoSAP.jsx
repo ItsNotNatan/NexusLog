@@ -31,8 +31,7 @@ export default function FormatacaoSAP() {
   const plsPorPagina = 8;
 
   const opcoesCategoria = [
-    'Preencher .', 'Consumo', 'Imobilizado', 'Transferência', 
-    'Venda', 'ZBN3', 'ZNB4', 'ZBRI', 'ZBE3', 'ZBE4'
+     'ZBN3', 'ZBN4', 'ZBRI', 'ZBE3', 'ZBE4'
   ];
 
   const limparEFormatarValor = (valorSujo) => {
