@@ -1,6 +1,5 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
-// DESCRIÇÃO: Painel de Acompanhamento (Otimizado com Lazy Loading e Payload Reduzido)
 // =================================================================
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,7 +7,7 @@ import "./AcompanhamentoSolicitacoes.css";
 import {
   Search, ChevronRight, GitBranch, FileText,
   RefreshCw, CheckCircle2, XCircle, Zap, Upload, AlertCircle, MapPin, 
-  Filter, Check, X, ChevronUp, ChevronDown
+  Filter, Check, X, ChevronUp, ChevronDown, MessageSquare
 } from "lucide-react";
 
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -132,6 +131,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
   
+  // ✨ NOVO: Estado para a observação temporária
+  const [observacaoTemp, setObservacaoTemp] = useState('');
+
   const [ordenacao, setOrdenacao] = useState({ coluna: 'dataCriacaoISO', direcao: 'desc' });
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(10);
@@ -509,6 +511,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     if (linhaExpandida === idUnico) {
       setLinhaExpandida(null);
       setAnexosNovos([]);
+      setObservacaoTemp('');
       return;
     }
 
@@ -542,6 +545,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     setLinhaExpandida(idUnico);
     setAnexosNovos([]);
+    setObservacaoTemp('');
   };
 
   const handleDeletarAnexo = async (idSolicitacao, anexo) => {
@@ -894,7 +898,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                   <button className="btn-aprovar-acao" style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao); }}>
                                     <Check size={14} /> Aprovar
                                   </button>
-                                  {/* ✨ NOVO BOTÃO DE RECUSAR */}
                                   <button style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, 'Recusado'); }}>
                                     <X size={14} /> Recusar
                                   </button>
@@ -921,14 +924,46 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             <DetalhesSolicitacao item={{ ...linha, itens: getItensEnriquecidos(linha) }} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
 
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
-                              <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc" }}>
-                                <hr style={{ border: "none", borderTop: "1px dashed #cbd5e1", margin: "0 0 16px 0" }} />
-                                <GerenciadorAnexos anexos={anexosNovos} setAnexos={setAnexosNovos} titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO" />
-                                {anexosNovos.length > 0 && (
-                                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
-                                    <button onClick={() => handleEnviarAnexosExtras(linha.idOriginal)} disabled={carregando} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", backgroundColor: carregando ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "600", cursor: carregando ? "not-allowed" : "pointer" }}><Upload size={16} />{carregando ? "A salvar..." : "Salvar Novos Anexos"}</button>
+                              <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc", display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                
+                                {/* ✨ NOVO BLOCO: Observação da Logística (Apenas visual / Teste) */}
+                                <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "24px" }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                    <MessageSquare size={18} color="#0f172a" />
+                                    <h4 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>Observações Internas (Logística)</h4>
                                   </div>
-                                )}
+                                  
+                                  <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '12px', marginBottom: '12px', color: '#92400e', fontSize: '0.875rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                    <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                    <span><strong>Aviso Visual Apenas:</strong> Este campo é apenas uma demonstração visual de como a funcionalidade ficaria. Ao clicar em Salvar, os dados não serão guardados na base de dados no momento.</span>
+                                  </div>
+
+                                  <textarea 
+                                    placeholder="Adicione notas, instruções ou observações internas sobre a separação deste material..."
+                                    value={observacaoTemp}
+                                    onChange={(e) => setObservacaoTemp(e.target.value)}
+                                    style={{ width: '100%', height: '100px', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.875rem', resize: 'vertical', fontFamily: 'inherit' }}
+                                  />
+                                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+                                    <button 
+                                      onClick={() => showAlert("Em Desenvolvimento", "A funcionalidade de gravar observações da logística na base de dados ainda não foi ativada. Este é apenas um teste visual.", "info")} 
+                                      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", backgroundColor: "#0f172a", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "600", cursor: "pointer", fontSize: "0.875rem" }}
+                                    >
+                                      <Check size={14} /> Salvar Observação
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Bloco Existente de Anexos */}
+                                <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "24px" }}>
+                                  <GerenciadorAnexos anexos={anexosNovos} setAnexos={setAnexosNovos} titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO" />
+                                  {anexosNovos.length > 0 && (
+                                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
+                                      <button onClick={() => handleEnviarAnexosExtras(linha.idOriginal)} disabled={carregando} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", backgroundColor: carregando ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "600", cursor: carregando ? "not-allowed" : "pointer" }}><Upload size={16} />{carregando ? "A salvar..." : "Salvar Novos Anexos"}</button>
+                                    </div>
+                                  )}
+                                </div>
+
                               </div>
                             )}
                           </td>
