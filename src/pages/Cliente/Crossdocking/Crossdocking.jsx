@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react'; 
-import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText, MapPin } from 'lucide-react';
+import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText, MapPin, Truck } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -15,14 +15,14 @@ export default function Crossdocking() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
-  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
+  // ✨ NOVO: Adicionado campo "fornecedor" ao estado
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', fornecedor: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
   const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
   const [anexos, setAnexos] = useState([]);
 
-  // ✨ TRAVA DE SEGURANÇA: Limpa todo o estado do formulário se o utilizador trocar de filial a meio da operação
   useEffect(() => {
-    setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
+    setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', fornecedor: '' });
     setTipoSaida(null);
     setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]);
     setAnexos([]);
@@ -39,7 +39,6 @@ export default function Crossdocking() {
     setItensParciais(itensParciais.map(item => {
       if (item.id === id) {
         let valorValidado = valor;
-        // ✨ LÓGICA DE INTEIROS
         if (campo === 'quantidade') {
           if (valor === '') {
             valorValidado = ''; 
@@ -60,8 +59,9 @@ export default function Crossdocking() {
       return;
     }
     
-    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.nf || !tipoSaida) {
-      showAlert("Campos Obrigatórios", "Por favor, preencha o Nome, WBS, Destino, Número da NF e selecione o Tipo de Saída.", "warning");
+    // ✨ NOVO: Validação do Fornecedor
+    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.nf || !formDados.fornecedor || !tipoSaida) {
+      showAlert("Campos Obrigatórios", "Por favor, preencha todos os campos obrigatórios (Nome, WBS, Destino, Fornecedor, Número da NF) e selecione o Tipo de Saída.", "warning");
       return;
     }
     if (anexos.length === 0) {
@@ -84,16 +84,19 @@ export default function Crossdocking() {
       return;
     }
 
+    // ✨ NOVO: Injetando a NF e o Fornecedor nos itens para rastreabilidade
     const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
       desenho_sap_manual: i.desenhoSAP,
       quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
-      unidade_medida_manual: 'Unid'
+      unidade_medida_manual: 'Unid',
+      nf_entrada: formDados.nf,
+      fornecedor: formDados.fornecedor
     }));
 
     const payload = {
       solicitante: {
         nome: formDados.nome, wbs: formDados.wbs, nf: formDados.nf, destino: formDados.destino, 
-        observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'}] ${formDados.observacoes}`,
+        observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${formDados.fornecedor}] ${formDados.observacoes}`,
         tipo: 'Crossdocking', filial_origem: estoqueAtual 
       },
       itens: listaItensFinais, anexos: anexosProcessados 
@@ -104,7 +107,7 @@ export default function Crossdocking() {
 
       if (dados.sucesso || dados.ps) {
         showAlert("Sucesso!", `Solicitação de Crossdocking enviada com sucesso. ID: ${dados.ps}`, "success");
-        setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '' });
+        setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', fornecedor: '' });
         setTipoSaida(null); 
         setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
         setAnexos([]); 
@@ -149,10 +152,6 @@ export default function Crossdocking() {
             />
           </div>
           <div className="input-grupo">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} color="#2563eb" /> NÚMERO DA NOTA FISCAL *</label>
-            <input type="text" className="input-campo foco-ciano" placeholder="Ex: 123456" value={formDados.nf} onChange={(e) => setFormDados({...formDados, nf: e.target.value})} />
-          </div>
-          <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
             <div className="input-wrapper-fixo">
               <MapPin size={16} className="icone-dentro-input" color="#0891b2" />
@@ -160,15 +159,21 @@ export default function Crossdocking() {
               <span className="badge-fixo">Fixo</span>
             </div>
           </div>
-          <div className="input-grupo" style={{ gridColumn: '1 / -1' }}>
+          <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> DESTINO *</label>
-            <textarea 
-              className="input-campo foco-ciano" 
-              placeholder="Local de destino do material..." 
-              rows="2" 
-              value={formDados.destino} 
-              onChange={(e) => setFormDados({...formDados, destino: e.target.value})}
-            ></textarea>
+            <input type="text" className="input-campo foco-ciano" placeholder="Local de destino do material..." value={formDados.destino} onChange={(e) => setFormDados({...formDados, destino: e.target.value})} />
+          </div>
+          
+          {/* ✨ NOVO: NF e Fornecedor agrupados lado a lado */}
+          <div className="input-grupo" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} color="#0891b2" /> NÚMERO DA NOTA FISCAL *</label>
+              <input type="text" className="input-campo foco-ciano" placeholder="Ex: 123456" value={formDados.nf} onChange={(e) => setFormDados({...formDados, nf: e.target.value})} />
+            </div>
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Truck size={14} color="#0891b2" /> FORNECEDOR / EMISSOR DA NF *</label>
+              <input type="text" className="input-campo foco-ciano" placeholder="Ex: Siemens Infraestrutura" value={formDados.fornecedor} onChange={(e) => setFormDados({...formDados, fornecedor: e.target.value})} />
+            </div>
           </div>
         </div>
       </div>
