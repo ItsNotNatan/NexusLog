@@ -21,7 +21,6 @@ const limparIdEstoque = (id) => {
   return idString;
 };
 
-// Função Global para forçar o horário do Brasil (UTC-3)
 const formatarDataBrasil = (isoString) => {
   if (!isoString) return null;
   try {
@@ -438,7 +437,6 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
   };
 
-  // ✨ NOVO: Grava NF e Fornecedor direto na criação para a rastreabilidade
   const itensDB = (itens || []).map((i) => ({
     desenho_sap_manual: i.desenho_sap_manual,
     quantidade_solicitada: Math.max(1, i.quantidade_solicitada || 1),
@@ -612,13 +610,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
     const tiposDeSaida = ['Material', 'Transferencia WBS', 'Crossdocking'];
 
-    // =========================================================================
-    // LÓGICA DE DEDUÇÃO E VINCULAÇÃO NO CROSSDOCKING E ENTRADAS
-    // =========================================================================
-
-    // ✨ CENÁRIO 1: APROVOU A ENTRADA DE MATERIAL
-    // Devemos registar tudo no estoque e, caso haja um Crossdocking PENDENTE à espera
-    // desta NF, vinculamo-lo imediatamente às linhas físicas geradas.
+    // ✨ APROVOU ENTRADA: Verifica NF + Fornecedor + SAP para vincular Crossdockings
     if (solicitacao.tipo === 'Entrada') {
       const itensEntrada = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
@@ -652,24 +644,18 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           }))
         );
 
-        // Verifica se há Crossdocking Pendente à espera
-        const nfParaProcurar = String(itensEntrada[0].nf_entrada || '').trim().toUpperCase();
+        const nfsDaEntrada = [...new Set(itensEntrada.map(i => String(i.nf_entrada || '').trim().toUpperCase()).filter(nf => nf !== 'SEM-NF' && nf !== '-'))];
 
-        if (nfParaProcurar && nfParaProcurar !== 'SEM-NF' && nfParaProcurar !== '-') {
-          const notasCandidatas = await db.listar('notas_fiscais', {
-            filter: db.f('numero_nf ~ {:nf}', { nf: nfParaProcurar }),
-            fields: 'solicitacao_id,numero_nf',
-          });
-
+        if (nfsDaEntrada.length > 0) {
+          const notasCandidatas = await db.listar('notas_fiscais', { fields: 'solicitacao_id,numero_nf' });
           const idsCandidatos = notasCandidatas
-            .filter((n) => String(n.numero_nf || '').trim().toUpperCase() === nfParaProcurar)
+            .filter((n) => nfsDaEntrada.includes(String(n.numero_nf || '').trim().toUpperCase()))
             .map((n) => n.solicitacao_id)
             .filter(Boolean);
 
           if (idsCandidatos.length > 0) {
             const candidatos = await db.listarPorIds('solicitacoes', 'id', idsCandidatos);
             
-            // Só vincula Crossdockings que ainda não foram aprovados
             const crossdockingsPendentes = candidatos
               .filter((s) => s.tipo === 'Crossdocking' && s.status === 'Pendente')
               .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
@@ -679,36 +665,57 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
               let vinculouAlgo = false;
               const isParcial = cross.observacoes && cross.observacoes.includes('[Saída Parcial]');
+              
+              let fornCross = '';
+              const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
+              if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
+
+              const resNfCross = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
+              const nfCrossLimpa = String(resNfCross ? resNfCross.numero_nf : '').trim().toUpperCase();
+
+              const indicesItensValidos = [];
+              itensEntrada.forEach((item, idx) => {
+                  const nfEnt = String(item.nf_entrada || '').trim().toUpperCase();
+                  const fornEnt = String(item.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
+                  if (nfEnt === nfCrossLimpa && fornEnt === fornCross) {
+                      indicesItensValidos.push(idx);
+                  }
+              });
+
+              if (indicesItensValidos.length === 0) continue; 
 
               if (!isParcial) {
-                // Crossdocking Total: Transfere tudo da Entrada para a Saída
+                // Crossdocking Total
                 await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
 
                 await db.criarVarios(
                   'solicitacoes_itens',
-                  itensEntrada.map((item, index) => ({
-                    solicitacao_id: cross.id,
-                    estoque_id: estoqueCriado[index] ? estoqueCriado[index].id : null,
-                    desenho_sap_manual: item.desenho_sap_manual,
-                    part_number_manual: item.part_number_manual,
-                    fabricante: item.fabricante || null,
-                    descricao_manual: item.descricao_manual,
-                    quantidade_solicitada: item.quantidade_solicitada, // Todo o saldo
-                    unidade_medida_manual: item.unidade_medida_manual,
-                    valor_unitario_manual: item.valor_unitario_manual,
-                    fornecedor: item.fornecedor,
-                    referencia: item.referencia,
-                    nf_entrada: item.nf_entrada,
-                    wbs_element: item.wbs_element,
-                    nome_projeto: item.nome_projeto,
-                    centro: item.centro,
-                    deposito: item.deposito,
-                    alocacao: item.alocacao || '-', 
-                  }))
+                  indicesItensValidos.map((idxOriginal) => {
+                    const item = itensEntrada[idxOriginal];
+                    return {
+                      solicitacao_id: cross.id,
+                      estoque_id: estoqueCriado[idxOriginal] ? estoqueCriado[idxOriginal].id : null,
+                      desenho_sap_manual: item.desenho_sap_manual,
+                      part_number_manual: item.part_number_manual,
+                      fabricante: item.fabricante || null,
+                      descricao_manual: item.descricao_manual,
+                      quantidade_solicitada: item.quantidade_solicitada,
+                      unidade_medida_manual: item.unidade_medida_manual,
+                      valor_unitario_manual: item.valor_unitario_manual,
+                      fornecedor: item.fornecedor,
+                      referencia: item.referencia,
+                      nf_entrada: item.nf_entrada,
+                      wbs_element: item.wbs_element,
+                      nome_projeto: item.nome_projeto,
+                      centro: item.centro,
+                      deposito: item.deposito,
+                      alocacao: item.alocacao || '-', 
+                    };
+                  })
                 );
                 vinculouAlgo = true;
               } else {
-                // Crossdocking Parcial: Vincula apenas aos itens desenhados no formulário
+                // Crossdocking Parcial
                 const itensPedidosCross = await db.listar('solicitacoes_itens', {
                   filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
                 });
@@ -719,15 +726,21 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
                   if (!sapCross && !pnCross) continue;
 
-                  const itemEstoqueCriado = estoqueCriado.find(
-                    (e) => {
+                  let indexEncontrado = -1;
+                  for (let i = 0; i < indicesItensValidos.length; i++) {
+                      const idx = indicesItensValidos[i];
+                      const e = estoqueCriado[idx];
+                      if (!e) continue;
                       const sapE = String(e.desenho_sap || '').trim().toUpperCase();
                       const pnE = String(e.part_number || '').trim().toUpperCase();
-                      return (sapE && sapE !== '-' && sapE === sapCross) || (pnE && pnE !== '-' && pnE === pnCross);
-                    }
-                  );
+                      if ((sapE && sapE !== '-' && sapE === sapCross) || (pnE && pnE !== '-' && pnE === pnCross)) {
+                          indexEncontrado = idx;
+                          break;
+                      }
+                  }
 
-                  if (itemEstoqueCriado) {
+                  if (indexEncontrado !== -1) {
+                    const itemEstoqueCriado = estoqueCriado[indexEncontrado];
                     await db.atualizar('solicitacoes_itens', pedido.id, {
                       estoque_id: itemEstoqueCriado.id,
                       alocacao: itemEstoqueCriado.alocacao || '-',
@@ -741,8 +754,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 await db.atualizar('solicitacoes', cross.id, {
                   observacoes: (cross.observacoes || '') + '\n[NF VINCULADA]',
                 });
-                // ✨ FIX: Não sai do laço! Porque se o fornecedor enviou 2 crossdockings na mesma NF,
-                // ambos precisam de ser vinculados.
               }
             }
           }
@@ -750,21 +761,18 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-
-    // ✨ CENÁRIO 2: APROVOU UM CROSSDOCKING QUE JÁ ESTAVA VINCULADO NO ESTOQUE (Dedução)
+    // ✨ APROVOU O CROSSDOCKING: Dedução (Prevenindo Bug de duplicação)
     else if (solicitacao.tipo === 'Crossdocking') {
       const itensCross = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
       });
 
       for (const item of itensCross) {
-        if (!item.estoque_id) continue; // Se não tem vínculo, foi aprovado sem a NF ter chegado
+        if (!item.estoque_id) continue; 
 
         const estoqueAtual = await db.porId('estoque', item.estoque_id);
         if (!estoqueAtual) continue;
 
-        // ✨ FIX CRÍTICO: Prevenção de dupla dedução no mesmo item
-        // O estoque só é deduzido se a quantidade pedida for válida
         const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
         const quantidadeRetirada = Number(item.quantidade_solicitada || 0); 
         
@@ -781,8 +789,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-
-    // ✨ CENÁRIO 3: APROVOU SAÍDA DE MATERIAL OU TRANSFERÊNCIA (Dedução Normal)
     else if (solicitacao.tipo === 'Material' || solicitacao.tipo === 'Transferencia WBS') {
       const itensPedidos = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
@@ -857,8 +863,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-
-    // ✨ CENÁRIO 4: REINTEGRAÇÃO / DEVOLUÇÃO
     else if (
       solicitacao.tipo === 'Reintegracao' ||
       solicitacao.tipo === 'Reintegração' ||
