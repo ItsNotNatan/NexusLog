@@ -13,7 +13,6 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 
-// ✨ LIMITE AUMENTADO PARA 100 LINHAS CONFORME SOLICITADO
 const LIMITE_LOGISTICA = 100;
 
 export default function EntradaEstoque() {
@@ -49,7 +48,8 @@ export default function EntradaEstoque() {
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
   
-  const [nfsCrossdocking, setNfsCrossdocking] = useState([]);
+  // ✨ NOVO: Guarda o objeto completo do Crossdocking para cruzar Fornecedor e SAP
+  const [crossdockingsPendentes, setCrossdockingsPendentes] = useState([]);
   const processador = useProcessadorExcel();
 
   useEffect(() => {
@@ -59,12 +59,8 @@ export default function EntradaEstoque() {
         const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
         
         if (resultado.sucesso && Array.isArray(resultado.dados)) {
-          const nfsAguardadas = resultado.dados
-            .filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente')
-            .map(sol => sol.nfCrossdocking)
-            .filter(nf => nf !== null && nf !== undefined && nf !== ''); 
-            
-          setNfsCrossdocking(nfsAguardadas);
+          const pendentes = resultado.dados.filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente');
+          setCrossdockingsPendentes(pendentes);
         }
       } catch (error) {
         console.error("Erro ao buscar as solicitações de Crossdocking:", error);
@@ -343,12 +339,43 @@ export default function EntradaEstoque() {
     }
   };
 
-  const nfsNormalizadas = nfsCrossdocking.map(nf => String(nf).trim().toUpperCase());
-  const nfsNaTabela = itens
-    .map(i => String(i.nfEntrada || '').trim().toUpperCase())
-    .filter(nf => nf !== '' && nfsNormalizadas.includes(nf));
-    
-  const nfsUnicasEncontradas = [...new Set(nfsNaTabela)];
+  // ✨ VERIFICAÇÃO TRIPLA: Cruza NF + Fornecedor + SAP para mostrar o Banner
+  const verificarCrossdocking = () => {
+    const nfsEncontradas = new Set();
+
+    itens.forEach(linhaTabela => {
+      const nfTab = String(linhaTabela.nfEntrada || '').trim().toUpperCase();
+      const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
+      const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0]; // Pega o primeiro nome
+
+      if (!nfTab || !sapTab || !fornTab) return; // Só valida se a linha tiver os 3 preenchidos
+
+      crossdockingsPendentes.forEach(cross => {
+        const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
+        
+        let fornCross = '';
+        const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
+        if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
+
+        if (nfTab === nfCross && fornTab === fornCross) {
+          const isParcial = cross.observacoes && cross.observacoes.includes('[Saída Parcial]');
+
+          if (isParcial) {
+            const itensCross = cross.itens || [];
+            const bateuSap = itensCross.some(ic => String(ic.desenho_sap_manual || '').trim().toUpperCase() === sapTab);
+            if (bateuSap) nfsEncontradas.add(nfTab);
+          } else {
+            // Saída Total: Não há itens específicos, NF + Fornecedor já basta
+            nfsEncontradas.add(nfTab);
+          }
+        }
+      });
+    });
+
+    return Array.from(nfsEncontradas);
+  };
+
+  const nfsUnicasEncontradas = verificarCrossdocking();
   const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
 
   return (
