@@ -6,7 +6,6 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
-// ✨ IMPORTAÇÃO DO FORMATADOR CENTRALIZADO
 import { formatarWBS } from '../../../utils/formatadores';
 
 import './Crossdocking.css';
@@ -15,7 +14,6 @@ export default function Crossdocking() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
-  // ✨ NOVO: Adicionado campo "fornecedor" ao estado
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', fornecedor: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
   const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
@@ -59,7 +57,6 @@ export default function Crossdocking() {
       return;
     }
     
-    // ✨ NOVO: Validação do Fornecedor
     if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.nf || !formDados.fornecedor || !tipoSaida) {
       showAlert("Campos Obrigatórios", "Por favor, preencha todos os campos obrigatórios (Nome, WBS, Destino, Fornecedor, Número da NF) e selecione o Tipo de Saída.", "warning");
       return;
@@ -84,19 +81,21 @@ export default function Crossdocking() {
       return;
     }
 
-    // ✨ NOVO: Injetando a NF e o Fornecedor nos itens para rastreabilidade
+    // ✨ EXTRAÇÃO INTELIGENTE: Pega apenas o primeiro nome e garante que está em maiúsculas
+    const fornecedorProcessado = formDados.fornecedor.trim().split(/\s+/)[0].toUpperCase();
+
     const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
       desenho_sap_manual: i.desenhoSAP,
       quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
       unidade_medida_manual: 'Unid',
       nf_entrada: formDados.nf,
-      fornecedor: formDados.fornecedor
+      fornecedor: fornecedorProcessado // Usa o nome filtrado
     }));
 
     const payload = {
       solicitante: {
         nome: formDados.nome, wbs: formDados.wbs, nf: formDados.nf, destino: formDados.destino, 
-        observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${formDados.fornecedor}] ${formDados.observacoes}`,
+        observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${fornecedorProcessado}] ${formDados.observacoes}`,
         tipo: 'Crossdocking', filial_origem: estoqueAtual 
       },
       itens: listaItensFinais, anexos: anexosProcessados 
@@ -164,7 +163,6 @@ export default function Crossdocking() {
             <input type="text" className="input-campo foco-ciano" placeholder="Local de destino do material..." value={formDados.destino} onChange={(e) => setFormDados({...formDados, destino: e.target.value})} />
           </div>
           
-          {/* ✨ NOVO: NF e Fornecedor agrupados lado a lado */}
           <div className="input-grupo" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} color="#0891b2" /> NÚMERO DA NOTA FISCAL *</label>
@@ -172,7 +170,14 @@ export default function Crossdocking() {
             </div>
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Truck size={14} color="#0891b2" /> FORNECEDOR / EMISSOR DA NF *</label>
-              <input type="text" className="input-campo foco-ciano" placeholder="Ex: Siemens Infraestrutura" value={formDados.fornecedor} onChange={(e) => setFormDados({...formDados, fornecedor: e.target.value})} />
+              <input 
+                type="text" 
+                className="input-campo foco-ciano" 
+                placeholder="Ex: SIEMENS" 
+                value={formDados.fornecedor} 
+                // ✨ FORÇA MAIÚSCULAS IMEDIATAMENTE NO VISUAL
+                onChange={(e) => setFormDados({...formDados, fornecedor: e.target.value.toUpperCase()})} 
+              />
             </div>
           </div>
         </div>
