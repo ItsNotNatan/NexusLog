@@ -213,7 +213,7 @@ export default function MaterialEstoque() {
           <div className="input-grupo"><label>WBS *</label><input type="text" className="input-campo" placeholder="Ex: ABCDE-12345" value={formDados.wbs} onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} /></div>
           <div className="input-grupo"><label><MapPin size={14} /> FILIAL</label><div className="input-wrapper-fixo"><MapPin size={16} className="icone-dentro-input" /><input type="text" className="input-campo" value={estoqueAtual} readOnly /><span className="badge-fixo">Fixo</span></div></div>
           <div className="input-grupo row-span-2"><label><MapPin size={14} /> DESTINO *</label><textarea className="input-campo" placeholder="Local de destino" value={formDados.destino} onChange={(e) => setFormDados({ ...formDados, destino: e.target.value })}></textarea></div>
-          <div className="input-grupo"><label><Calendar size={14} /> DATA *</label><input type="date" className="input-campo" value={formDados.dataNecessidade} min={dataMinima} onChange={(e) => setFormDados({ ...formDados, dataNecessidade: e.target.value })} /></div>
+          <div className="input-grupo"><label><Calendar size={14} /> DATA DE NECESSIDADE *</label><input type="date" className="input-campo" value={formDados.dataNecessidade} min={dataMinima} onChange={(e) => setFormDados({ ...formDados, dataNecessidade: e.target.value })} /></div>
           <div className="input-grupo span-2"><label>OBSERVAÇÕES</label><textarea className="input-campo" rows="2" value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea></div>
         </div>
       </div>
