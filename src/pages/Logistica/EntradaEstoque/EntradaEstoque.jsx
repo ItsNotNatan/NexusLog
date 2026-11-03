@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { Package, Truck, User, Paperclip, Send, FileSpreadsheet, X } from 'lucide-react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
+import { Package, Truck, User, Paperclip, Send, FileSpreadsheet, X, Info } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
 import './EntradaEstoque.css';
@@ -338,16 +338,17 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ VERIFICAÇÃO TRIPLA: Cruza NF + Fornecedor + SAP COM COMPARAÇÃO EXATA (===)
-  const verificarCrossdocking = () => {
+  // ✨ MAPEAMENTO DE LINHAS ESPECÍFICAS QUE SERÃO DESCONTADAS NO CROSSDOCKING
+  const { idsLinhasCrossdocking, nfsUnicasEncontradas } = useMemo(() => {
+    const idsMarcados = new Set();
     const nfsEncontradas = new Set();
 
     itens.forEach(linhaTabela => {
       const nfTab = String(linhaTabela.nfEntrada || '').trim().toUpperCase();
       const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
-      const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0]; // Pega o primeiro nome
+      const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
 
-      if (!nfTab || !fornTab) return; // Força ter pelo menos NF e Fornecedor na tabela para tentar
+      if (!nfTab || !fornTab) return;
 
       crossdockingsPendentes.forEach(cross => {
         const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
@@ -356,29 +357,34 @@ export default function EntradaEstoque() {
         const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
         if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
 
-        // Lógica Exata: A NF e o Fornecedor da Tabela têm que ser IGUAIS ao do pedido Pendente.
+        // Comparação exata de NF e Fornecedor
         if (nfTab === nfCross && fornTab === fornCross) {
           const isParcial = cross.observacoes && cross.observacoes.includes('[Saída Parcial]');
 
           if (isParcial) {
-            if (!sapTab) return; // Se é parcial e a tabela não tem SAP, não pode cruzar.
-            
+            if (!sapTab) return;
             const itensCross = cross.itens || [];
             const bateuSap = itensCross.some(ic => String(ic.desenho_sap_manual || '').trim().toUpperCase() === sapTab);
             
-            if (bateuSap) nfsEncontradas.add(nfTab);
+            if (bateuSap) {
+              idsMarcados.add(linhaTabela.id);
+              nfsEncontradas.add(nfTab);
+            }
           } else {
-            // Saída Total: Não há itens específicos, NF exata + Fornecedor exato já basta.
+            // Saída Total: Toda linha correspondente àquela NF e Fornecedor será descontada
+            idsMarcados.add(linhaTabela.id);
             nfsEncontradas.add(nfTab);
           }
         }
       });
     });
 
-    return Array.from(nfsEncontradas);
-  };
+    return { 
+      idsLinhasCrossdocking: idsMarcados, 
+      nfsUnicasEncontradas: Array.from(nfsEncontradas) 
+    };
+  }, [itens, crossdockingsPendentes]);
 
-  const nfsUnicasEncontradas = verificarCrossdocking();
   const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
 
   return (
@@ -413,20 +419,34 @@ export default function EntradaEstoque() {
 
       {temCrossdockingAguardando && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '16px',
-          backgroundColor: '#e0f2fe', border: '1px solid #bae6fd',
-          padding: '16px 24px', borderRadius: '12px', marginBottom: '24px',
-          color: '#0369a1', animation: 'fadeIn 0.3s ease-in-out'
+          display: 'flex', flexDirection: 'column', gap: '12px',
+          backgroundColor: '#eff6ff', border: '1px solid #93c5fd',
+          padding: '16px 20px', borderRadius: '12px', marginBottom: '24px',
+          color: '#1e3a8a', animation: 'fadeIn 0.3s ease-in-out'
         }}>
-          <div style={{ backgroundColor: '#bae6fd', padding: '10px', borderRadius: '50%', color: '#0284c7' }}>
-            <Truck size={24} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ backgroundColor: '#dbeafe', padding: '8px', borderRadius: '50%', color: '#2563eb' }}>
+              <Truck size={22} />
+            </div>
+            <div>
+              <strong style={{ fontSize: '1rem', display: 'block', color: '#1e40af' }}>
+                Crossdocking Identificado (NF: {nfsUnicasEncontradas.join(', ')})
+              </strong>
+              <span style={{ fontSize: '0.85rem', color: '#334155' }}>
+                Detectamos solicitações pendentes associadas a estes itens.
+              </span>
+            </div>
           </div>
-          <div>
-            <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '4px' }}>
-              Crossdocking Identificado!
-            </strong>
-            <span style={{ fontSize: '0.85rem' }}>
-              A Nota Fiscal <strong>{nfsUnicasEncontradas.join(', ')}</strong> pertence a uma solicitação de Crossdocking pendente. Ao registar esta entrada, o pedido de Crossdocking ficará automaticamente disponível para aprovação e separação!
+
+          {/* ✨ DISCLAIMER SOBRE AS LINHAS DESTACADAS */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            backgroundColor: '#ffffff', border: '1px solid #bfdbfe',
+            padding: '10px 14px', borderRadius: '8px', fontSize: '0.825rem', color: '#1d4ed8'
+          }}>
+            <Info size={16} style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Atenção:</strong> Apenas as linhas <span style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>destacadas em azul</span> na tabela abaixo correspondem aos materiais exatos que serão deduzidos pelo Crossdocking. As demais linhas entrarão normalmente no estoque.
             </span>
           </div>
         </div>
@@ -435,6 +455,7 @@ export default function EntradaEstoque() {
       <TabelaInsercaoItens 
         itens={itens}
         limiteLinhas={LIMITE_LOGISTICA} 
+        linhasDestacadas={idsLinhasCrossdocking} 
         onAtualizarCampo={atualizarCampo}
         onRemoverItem={removerItem}
         onAdicionarLinha={adicionarLinhaEmBranco}
