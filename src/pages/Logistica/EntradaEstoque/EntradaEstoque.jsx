@@ -338,7 +338,7 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ MAPEAMENTO DE LINHAS ESPECÍFICAS QUE SERÃO DESCONTADAS NO CROSSDOCKING
+  // ✨ MAPEAMENTO RIGOROSO DE LINHAS DESTACADAS (DIFERENCIA PARCIAL DE TOTAL)
   const { idsLinhasCrossdocking, nfsUnicasEncontradas } = useMemo(() => {
     const idsMarcados = new Set();
     const nfsEncontradas = new Set();
@@ -348,30 +348,43 @@ export default function EntradaEstoque() {
       const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
       const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
 
+      // A linha da tabela precisa ter pelo menos NF e Fornecedor
       if (!nfTab || !fornTab) return;
 
       crossdockingsPendentes.forEach(cross => {
         const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
         
+        // Extrai o primeiro nome do Fornecedor da observação ou dos itens
         let fornCross = '';
-        const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
-        if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
+        if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
+          fornCross = String(cross.itens[0].fornecedor).trim().toUpperCase().split(/\s+/)[0];
+        }
+        if (!fornCross && cross.observacoes) {
+          const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
+          if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
+        }
 
-        // Comparação exata de NF e Fornecedor
+        // Validação 1: NF e Fornecedor têm de ser estritamente iguais
         if (nfTab === nfCross && fornTab === fornCross) {
-          const isParcial = cross.observacoes && cross.observacoes.includes('[Saída Parcial]');
+          // Identifica se é Parcial usando regex flexível ou presença de itens específicos
+          const obs = String(cross.observacoes || '');
+          const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
 
           if (isParcial) {
+            // ✨ NO PARCIAL: Só destaca se o Desenho SAP estiver preenchido e bater com algum item pedido
             if (!sapTab) return;
             const itensCross = cross.itens || [];
-            const bateuSap = itensCross.some(ic => String(ic.desenho_sap_manual || '').trim().toUpperCase() === sapTab);
-            
+            const bateuSap = itensCross.some(ic => {
+              const sapCross = String(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP || '').trim().toUpperCase();
+              return sapCross && sapCross === sapTab;
+            });
+
             if (bateuSap) {
               idsMarcados.add(linhaTabela.id);
               nfsEncontradas.add(nfTab);
             }
           } else {
-            // Saída Total: Toda linha correspondente àquela NF e Fornecedor será descontada
+            // ✨ NO TOTAL: Toda e qualquer linha com essa NF e Fornecedor pertence à saída total
             idsMarcados.add(linhaTabela.id);
             nfsEncontradas.add(nfTab);
           }
@@ -438,7 +451,6 @@ export default function EntradaEstoque() {
             </div>
           </div>
 
-          {/* ✨ DISCLAIMER SOBRE AS LINHAS DESTACADAS */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             backgroundColor: '#ffffff', border: '1px solid #bfdbfe',
