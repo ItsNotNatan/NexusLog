@@ -2,7 +2,7 @@
 // ARQUIVO: src/components/TabelaInsercaoItens/TabelaInsercaoItens.jsx
 // =================================================================
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle, Info } from 'lucide-react';
 
 import CarregarArquivo from '../CarregarArquivo/CarregarArquivo';
 import ExemploExcel from '../ExemploExcel/ExemploExcel';
@@ -15,6 +15,7 @@ export default function TabelaInsercaoItens({
   limiteLinhas = 20, 
   wbsGlobal, 
   bloquearWBS = false, 
+  linhasDestacadas = new Set(), // ✨ Recebe o Set com os IDs das linhas a descontar
   onAtualizarCampo,
   onRemoverItem,
   onAdicionarLinha,
@@ -38,9 +39,21 @@ export default function TabelaInsercaoItens({
 
   const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
   const limiteAtingido = itens.length >= limiteLinhas;
-  const larguraMinimaTabela = '2750px'; // Reajustado após remover o Part Number
+  const larguraMinimaTabela = '2750px';
 
   const isWbsBloqueada = wbsGlobal !== undefined || bloquearWBS;
+
+  // Helper para verificar se a linha está no conjunto de destaque
+  const estaDestacada = (id) => {
+    if (!linhasDestacadas) return false;
+    if (linhasDestacadas instanceof Set) return linhasDestacadas.has(id);
+    if (Array.isArray(linhasDestacadas)) return linhasDestacadas.includes(id);
+    return false;
+  };
+
+  const totalDestacadas = linhasDestacadas instanceof Set 
+    ? linhasDestacadas.size 
+    : (Array.isArray(linhasDestacadas) ? linhasDestacadas.length : 0);
 
   return (
     <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
@@ -90,6 +103,25 @@ export default function TabelaInsercaoItens({
         </div>
       </div>
 
+      {/* ✨ DISCLAIMER INFORMATIVO: Aparece quando existem linhas correspondentes ao Crossdocking */}
+      {totalDestacadas > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '10px 24px',
+          backgroundColor: '#eff6ff',
+          borderBottom: '1px solid #bfdbfe',
+          color: '#1e40af',
+          fontSize: '0.825rem'
+        }}>
+          <Info size={16} color="#2563eb" style={{ flexShrink: 0 }} />
+          <span>
+            <strong>Atenção Crossdocking:</strong> Apenas as linhas marcadas em <span style={{ backgroundColor: '#dbeafe', color: '#1d4ed8', fontWeight: '700', padding: '2px 6px', borderRadius: '4px' }}>azul</span> com a etiqueta <strong>CROSS</strong> serão deduzidas na saída de Crossdocking. As demais linhas entrarão normalmente no saldo disponível de estoque.
+          </span>
+        </div>
+      )}
+
       <div style={{ position: 'relative' }}>
         {itens.length === 0 && (
           <div style={{ 
@@ -109,13 +141,10 @@ export default function TabelaInsercaoItens({
           <table className="tabela-solicitacao-dados" style={{ minWidth: larguraMinimaTabela, width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr>
-                <th style={{ width: '60px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
+                <th style={{ width: '80px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
                 <th style={{ minWidth: '200px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESCRIÇÃO</th>
-                
-                {/* ✨ COLUNA FABRICANTE (PART NUMBER REMOVIDO) */}
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
-                
                 <th style={{ width: '120px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>QTDE ENTRADA</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
                 <th style={{ width: '140px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>UNID. MEDIDA</th>
@@ -144,156 +173,194 @@ export default function TabelaInsercaoItens({
               </tr>
             </thead>
             <tbody>
-              {itensDaPagina.map((item) => (
-                <tr key={item.id} style={{ height: `${alturaLinhaPx}px`, borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ textAlign: 'center' }}>
-                    <button onClick={() => onRemoverItem(item.id)} className="btn-deletar-linha" style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                  
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.desenhoSAP || ''} onChange={(e) => onAtualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP / Desenho" />
-                  </td>
+              {itensDaPagina.map((item) => {
+                const isCrossdockingMatch = estaDestacada(item.id);
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.vendorDescription || ''} onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição" />
-                  </td>
+                return (
+                  <tr 
+                    key={item.id} 
+                    style={{ 
+                      height: `${alturaLinhaPx}px`, 
+                      borderBottom: '1px solid #f1f5f9',
+                      // ✨ DESTAQUE EM AZUL E BORDA LATERAL
+                      backgroundColor: isCrossdockingMatch ? '#f0f7ff' : 'transparent',
+                      borderLeft: isCrossdockingMatch ? '4px solid #2563eb' : '4px solid transparent',
+                      transition: 'background-color 0.2s'
+                    }}
+                  >
+                    <td style={{ textAlign: 'center', padding: '4px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+                        <button 
+                          onClick={() => onRemoverItem(item.id)} 
+                          className="btn-deletar-linha" 
+                          style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+                          title="Remover linha"
+                        >
+                          <Trash2 size={16} />
+                        </button>
 
-                  {/* ✨ NOVO INPUT DO FABRICANTE */}
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fabricante || ''} onChange={(e) => onAtualizarCampo(item.id, 'fabricante', e.target.value)} placeholder="Nome do Fabricante" />
-                  </td>
+                        {/* ✨ BADGE INDICADOR DA LINHA SELECIONADA PELO CROSSDOCKING */}
+                        {isCrossdockingMatch && (
+                          <span 
+                            title="Item reconhecido: será deduzido pelo Crossdocking" 
+                            style={{ 
+                              fontSize: '0.625rem', 
+                              fontWeight: '700', 
+                              color: '#1d4ed8', 
+                              backgroundColor: '#dbeafe', 
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '4px', 
+                              padding: '1px 5px',
+                              lineHeight: '1.2'
+                            }}
+                          >
+                            CROSS
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.desenhoSAP || ''} onChange={(e) => onAtualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP / Desenho" />
+                    </td>
 
-                  <td style={{ padding: '8px', textAlign: 'center' }}>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      step="1"
-                      style={{ 
-                        width: '75px', padding: '6px 8px', border: '1px solid #bfdbfe', 
-                        borderRadius: '6px', color: '#2563eb', fontWeight: '700', 
-                        textAlign: 'center', backgroundColor: '#eff6ff', outline: 'none',
-                        cursor: 'text'
-                      }} 
-                      value={item.qtdFornecida} 
-                      onKeyDown={(e) => {
-                        if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
-                      }}
-                      onBlur={(e) => {
-                        if (!e.target.value || parseInt(e.target.value, 10) < 1) onAtualizarCampo(item.id, 'qtdFornecida', 1);
-                      }}
-                      onChange={(e) => {
-                        let val = e.target.value;
-                        if (val === '0') val = '1';
-                        onAtualizarCampo(item.id, 'qtdFornecida', val);
-                      }} 
-                      placeholder="1" 
-                    />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.vendorDescription || ''} onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição" />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.referencia || ''} onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Referência" />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fabricante || ''} onChange={(e) => onAtualizarCampo(item.id, 'fabricante', e.target.value)} placeholder="Nome do Fabricante" />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida || 'Unid'} onChange={(e) => onAtualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
-                      <option value="Unid">Unid</option>
-                      <option value="Kg">Kg</option>
-                      <option value="Metro">Metro</option>
-                      <option value="Caixa">Caixa</option>
-                      <option value="Litro">Litro</option>
-                      <option value="NR">NR</option>
-                    </select>
-                  </td>
+                    <td style={{ padding: '8px', textAlign: 'center' }}>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        step="1"
+                        style={{ 
+                          width: '75px', padding: '6px 8px', border: '1px solid #bfdbfe', 
+                          borderRadius: '6px', color: '#2563eb', fontWeight: '700', 
+                          textAlign: 'center', backgroundColor: isCrossdockingMatch ? '#ffffff' : '#eff6ff', outline: 'none',
+                          cursor: 'text'
+                        }} 
+                        value={item.qtdFornecida} 
+                        onKeyDown={(e) => {
+                          if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                        }}
+                        onBlur={(e) => {
+                          if (!e.target.value || parseInt(e.target.value, 10) < 1) onAtualizarCampo(item.id, 'qtdFornecida', 1);
+                        }}
+                        onChange={(e) => {
+                          let val = e.target.value;
+                          if (val === '0') val = '1';
+                          onAtualizarCampo(item.id, 'qtdFornecida', val);
+                        }} 
+                        placeholder="1" 
+                      />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-preto" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} value={item.nfEntrada || ''} onChange={(e) => onAtualizarCampo(item.id, 'nfEntrada', e.target.value)} placeholder="NF" />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.referencia || ''} onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Referência" />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor || ''} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida || 'Unid'} onChange={(e) => onAtualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
+                        <option value="Unid">Unid</option>
+                        <option value="Kg">Kg</option>
+                        <option value="Metro">Metro</option>
+                        <option value="Caixa">Caixa</option>
+                        <option value="Litro">Litro</option>
+                        <option value="NR">NR</option>
+                      </select>
+                    </td>
 
-                  <td style={{ 
-                    padding: '8px', 
-                    backgroundColor: isWbsBloqueada ? '#f1f5f9' : 'transparent',
-                    borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
-                    borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none'
-                  }}>
-                    <input 
-                      style={{ 
-                        width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', 
-                        color: isWbsBloqueada ? '#94a3b8' : '#2563eb', 
-                        fontFamily: 'monospace',
-                        fontWeight: isWbsBloqueada ? '500' : 'normal',
-                        cursor: isWbsBloqueada ? 'not-allowed' : 'text'
-                      }} 
-                      disabled={isWbsBloqueada}
-                      value={isWbsBloqueada ? (wbsGlobal || '-') : (item.wbsElement || '')} 
-                      onChange={(e) => !isWbsBloqueada && onAtualizarCampo(item.id, 'wbsElement', e.target.value)} 
-                      placeholder="-" 
-                    />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-preto" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} value={item.nfEntrada || ''} onChange={(e) => onAtualizarCampo(item.id, 'nfEntrada', e.target.value)} placeholder="NF" />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.nomeProjeto || ''} onChange={(e) => onAtualizarCampo(item.id, 'nomeProjeto', e.target.value)} placeholder="Nome Projeto" />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor || ''} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input 
-                      type="date" 
-                      className="input-editavel-tabela texto-cinza" 
-                      style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
-                      value={item.emissaoNF === '-' ? '' : (item.emissaoNF || '')} 
-                      onChange={(e) => onAtualizarCampo(item.id, 'emissaoNF', e.target.value)} 
-                      onClick={(e) => e.target.showPicker && e.target.showPicker()} 
-                    />
-                  </td>
+                    <td style={{ 
+                      padding: '8px', 
+                      backgroundColor: isWbsBloqueada ? '#f1f5f9' : 'transparent',
+                      borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
+                      borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none'
+                    }}>
+                      <input 
+                        style={{ 
+                          width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', 
+                          color: isWbsBloqueada ? '#94a3b8' : '#2563eb', 
+                          fontFamily: 'monospace',
+                          fontWeight: isWbsBloqueada ? '500' : 'normal',
+                          cursor: isWbsBloqueada ? 'not-allowed' : 'text'
+                        }} 
+                        disabled={isWbsBloqueada}
+                        value={isWbsBloqueada ? (wbsGlobal || '-') : (item.wbsElement || '')} 
+                        onChange={(e) => !isWbsBloqueada && onAtualizarCampo(item.id, 'wbsElement', e.target.value)} 
+                        placeholder="-" 
+                      />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input 
-                      type="date" 
-                      className="input-editavel-tabela texto-cinza" 
-                      style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
-                      value={item.recebNF === '-' ? '' : (item.recebNF || '')} 
-                      onChange={(e) => onAtualizarCampo(item.id, 'recebNF', e.target.value)} 
-                      onClick={(e) => e.target.showPicker && e.target.showPicker()} 
-                    />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.nomeProjeto || ''} onChange={(e) => onAtualizarCampo(item.id, 'nomeProjeto', e.target.value)} placeholder="Nome Projeto" />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.docCompras || ''} onChange={(e) => onAtualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input 
+                        type="date" 
+                        className="input-editavel-tabela texto-cinza" 
+                        style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
+                        value={item.emissaoNF === '-' ? '' : (item.emissaoNF || '')} 
+                        onChange={(e) => onAtualizarCampo(item.id, 'emissaoNF', e.target.value)} 
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()} 
+                      />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input 
-                      className="input-editavel-tabela texto-preto" 
-                      style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} 
-                      value={item.poNetPrice || ''} 
-                      onChange={(e) => {
-                        const valorFormatado = formatarDinheiroTempoReal(e.target.value);
-                        onAtualizarCampo(item.id, 'poNetPrice', valorFormatado);
-                      }} 
-                      placeholder="R$ 0,00" 
-                    />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input 
+                        type="date" 
+                        className="input-editavel-tabela texto-cinza" 
+                        style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
+                        value={item.recebNF === '-' ? '' : (item.recebNF || '')} 
+                        onChange={(e) => onAtualizarCampo(item.id, 'recebNF', e.target.value)} 
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()} 
+                      />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.centro || ''} onChange={(e) => onAtualizarCampo(item.id, 'centro', e.target.value)} placeholder="Filial" />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.docCompras || ''} onChange={(e) => onAtualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.deposito || ''} onChange={(e) => onAtualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
-                  </td>
+                    <td style={{ padding: '8px' }}>
+                      <input 
+                        className="input-editavel-tabela texto-preto" 
+                        style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} 
+                        value={item.poNetPrice || ''} 
+                        onChange={(e) => {
+                          const valorFormatado = formatarDinheiroTempoReal(e.target.value);
+                          onAtualizarCampo(item.id, 'poNetPrice', valorFormatado);
+                        }} 
+                        placeholder="R$ 0,00" 
+                      />
+                    </td>
 
-                  <td style={{ padding: '8px' }}>
-                    <input className="input-editavel-tabela link-azul-fake" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#2563eb', fontFamily: 'monospace' }} value={item.alocacao || ''} onChange={(e) => onAtualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
-                  </td>
-                </tr>
-              ))}
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.centro || ''} onChange={(e) => onAtualizarCampo(item.id, 'centro', e.target.value)} placeholder="Filial" />
+                    </td>
+
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.deposito || ''} onChange={(e) => onAtualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
+                    </td>
+
+                    <td style={{ padding: '8px' }}>
+                      <input className="input-editavel-tabela link-azul-fake" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#2563eb', fontFamily: 'monospace' }} value={item.alocacao || ''} onChange={(e) => onAtualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
+                    </td>
+                  </tr>
+                );
+              })}
               
-              {/* ✨ COLSPAN REAJUSTADO PARA 18 DEVIDO À REMOÇÃO DO PART NUMBER */}
               {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
                 <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
                   <td colSpan={18} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
