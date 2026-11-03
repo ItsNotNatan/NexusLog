@@ -131,7 +131,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   const [linhaExpandida, setLinhaExpandida] = useState(null);
   const [anexosNovos, setAnexosNovos] = useState([]);
   
-  // ✨ NOVO: Estado para a observação temporária
   const [observacaoTemp, setObservacaoTemp] = useState('');
 
   const [ordenacao, setOrdenacao] = useState({ coluna: 'dataCriacaoISO', direcao: 'desc' });
@@ -891,18 +890,20 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             ) : linha.statusExibicao === 'Cancelado' && linha.tipo !== 'Cancelado' ? (
                               <span className="badge-status status-cancelado"><AlertCircle size={14} /> Cancelamento Solicitado</span>
                             ) : linha.status === 'Pendente' ? (
-                              statusBloqueado ? (
-                                <div title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '600' }}><AlertCircle size={14} /> Aguardando NF</div>
-                              ) : (
-                                <div style={{ display: 'flex', gap: '6px' }}>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                {/* ✨ MUDANÇA: O botão "Aprovar" fica oculto/desativado se aguardar NF, mas o botão Recusar continua lá! */}
+                                {statusBloqueado ? (
+                                  <div title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '600' }}><AlertCircle size={14} /> Aguardando NF</div>
+                                ) : (
                                   <button className="btn-aprovar-acao" style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, linha.statusDestinoAprovacao); }}>
                                     <Check size={14} /> Aprovar
                                   </button>
-                                  <button style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, 'Recusado'); }}>
-                                    <X size={14} /> Recusar
-                                  </button>
-                                </div>
-                              )
+                                )}
+                                
+                                <button style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, 'Recusado'); }}>
+                                  <X size={14} /> Recusar
+                                </button>
+                              </div>
                             ) : (
                               <select className="select-acao" value={linha.status} onChange={(e) => { e.stopPropagation(); lidarComMudancaStatus(linha.idOriginal || linha.id, e.target.value); }} style={{ padding: '4px 10px', border: '1px solid #bfdbfe', borderRadius: '999px', backgroundColor: '#eff6ff', fontSize: '0.75rem', color: '#2563eb', fontWeight: '600', outline: 'none', cursor: 'pointer' }}>
                                 <option value="Pendente" disabled>Pendente</option>
@@ -926,7 +927,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
                               <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc", display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                 
-                                {/* ✨ NOVO BLOCO: Observação da Logística (Apenas visual / Teste) */}
                                 <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "24px" }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                                     <MessageSquare size={18} color="#0f172a" />
@@ -954,7 +954,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                   </div>
                                 </div>
 
-                                {/* Bloco Existente de Anexos */}
                                 <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "24px" }}>
                                   <GerenciadorAnexos anexos={anexosNovos} setAnexos={setAnexosNovos} titulo="ADICIONAR NOVOS ANEXOS A ESTA SOLICITAÇÃO" />
                                   {anexosNovos.length > 0 && (
