@@ -608,9 +608,11 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       await db.atualizar('solicitacoes', id, { pl: `PL #${numeroPLGerado}` });
     }
 
-    const tiposDeSaida = ['Material', 'Transferencia WBS', 'Crossdocking'];
+    // =========================================================================
+    // LÓGICA DE DEDUÇÃO E VINCULAÇÃO NO CROSSDOCKING E ENTRADAS
+    // =========================================================================
 
-    // ✨ APROVOU ENTRADA: Verifica NF + Fornecedor + SAP para vincular Crossdockings
+    // ✨ CENÁRIO 1: APROVOU A ENTRADA DE MATERIAL
     if (solicitacao.tipo === 'Entrada') {
       const itensEntrada = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
@@ -761,7 +763,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // ✨ APROVOU O CROSSDOCKING: Dedução (Prevenindo Bug de duplicação)
+    // ✨ CENÁRIO 2: APROVOU O CROSSDOCKING: Dedução (Prevenindo Bug de duplicação E deduzindo apenas a QTD pedida no parcial)
     else if (solicitacao.tipo === 'Crossdocking') {
       const itensCross = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
@@ -774,6 +776,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         if (!estoqueAtual) continue;
 
         const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
+        // ✨ AQUI ESTÁ A FIX: Ele deve usar a quantidade que foi solicitada neste item específico do Crossdocking (mesmo que seja parcial)
         const quantidadeRetirada = Number(item.quantidade_solicitada || 0); 
         
         if (quantidadeRetirada > 0) {
@@ -789,6 +792,8 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
+
+    // ✨ CENÁRIO 3: APROVOU SAÍDA DE MATERIAL OU TRANSFERÊNCIA (Dedução Normal)
     else if (solicitacao.tipo === 'Material' || solicitacao.tipo === 'Transferencia WBS') {
       const itensPedidos = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
@@ -863,6 +868,8 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
+
+    // ✨ CENÁRIO 4: REINTEGRAÇÃO / DEVOLUÇÃO
     else if (
       solicitacao.tipo === 'Reintegracao' ||
       solicitacao.tipo === 'Reintegração' ||
