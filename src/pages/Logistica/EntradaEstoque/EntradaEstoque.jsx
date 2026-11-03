@@ -48,7 +48,6 @@ export default function EntradaEstoque() {
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
   
-  // ✨ NOVO: Guarda o objeto completo do Crossdocking para cruzar Fornecedor e SAP
   const [crossdockingsPendentes, setCrossdockingsPendentes] = useState([]);
   const processador = useProcessadorExcel();
 
@@ -339,7 +338,7 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ VERIFICAÇÃO TRIPLA: Cruza NF + Fornecedor + SAP para mostrar o Banner
+  // ✨ VERIFICAÇÃO TRIPLA: Cruza NF + Fornecedor + SAP COM COMPARAÇÃO EXATA (===)
   const verificarCrossdocking = () => {
     const nfsEncontradas = new Set();
 
@@ -348,7 +347,7 @@ export default function EntradaEstoque() {
       const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
       const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0]; // Pega o primeiro nome
 
-      if (!nfTab || !sapTab || !fornTab) return; // Só valida se a linha tiver os 3 preenchidos
+      if (!nfTab || !fornTab) return; // Força ter pelo menos NF e Fornecedor na tabela para tentar
 
       crossdockingsPendentes.forEach(cross => {
         const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
@@ -357,15 +356,19 @@ export default function EntradaEstoque() {
         const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
         if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
 
+        // Lógica Exata: A NF e o Fornecedor da Tabela têm que ser IGUAIS ao do pedido Pendente.
         if (nfTab === nfCross && fornTab === fornCross) {
           const isParcial = cross.observacoes && cross.observacoes.includes('[Saída Parcial]');
 
           if (isParcial) {
+            if (!sapTab) return; // Se é parcial e a tabela não tem SAP, não pode cruzar.
+            
             const itensCross = cross.itens || [];
             const bateuSap = itensCross.some(ic => String(ic.desenho_sap_manual || '').trim().toUpperCase() === sapTab);
+            
             if (bateuSap) nfsEncontradas.add(nfTab);
           } else {
-            // Saída Total: Não há itens específicos, NF + Fornecedor já basta
+            // Saída Total: Não há itens específicos, NF exata + Fornecedor exato já basta.
             nfsEncontradas.add(nfTab);
           }
         }
