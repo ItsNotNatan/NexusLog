@@ -28,6 +28,7 @@ export default function ExportarDados() {
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     periodo: 'Todo Período',
+    mesEspecifico: '', // ✨ NOVO: Campo para o mês específico (Formato: YYYY-MM)
     status: 'Todos os Status',
     tipo: 'Todos',
     target: 'Todos',
@@ -110,7 +111,6 @@ export default function ExportarDados() {
             const statusLimpo = item.status || '';
             const deveComputarSLA = !tiposIgnoradosSLA.includes(tipoLimpo) && statusLimpo !== 'Cancelado';
 
-            // ✨ Lógica corrigida: Só calcula se estiver Concluído E tiver Data de Entrega
             if (deveComputarSLA) {
               if (item.status === 'Concluído' && dataCriacao && dataEntregaFisica) {
                 const diferencaMs = dataEntregaFisica.getTime() - dataCriacao.getTime();
@@ -187,7 +187,15 @@ export default function ExportarDados() {
     if (filtrosAvancados.pl) batePl = item.pl.toLowerCase().includes(filtrosAvancados.pl.toLowerCase());
 
     let bateData = true;
-    if (filtrosAvancados.periodo !== 'Todo Período' && item.criacaoPsRaw) {
+    // ✨ Lógica para aplicar o mês específico prioritariamente ao período rápido
+    if (filtrosAvancados.mesEspecifico && item.criacaoPsRaw) {
+      const dataItem = new Date(item.criacaoPsRaw);
+      const [anoFiltro, mesFiltro] = filtrosAvancados.mesEspecifico.split('-');
+      
+      bateData = dataItem.getFullYear() === parseInt(anoFiltro, 10) && 
+                 dataItem.getMonth() === (parseInt(mesFiltro, 10) - 1);
+                 
+    } else if (filtrosAvancados.periodo !== 'Todo Período' && item.criacaoPsRaw) {
       const hoje = new Date();
       const dataItem = new Date(item.criacaoPsRaw);
       
@@ -225,6 +233,7 @@ export default function ExportarDados() {
   const handleLimparFiltros = () => {
     setFiltrosAvancados({
       periodo: 'Todo Período',
+      mesEspecifico: '',
       status: 'Todos os Status',
       tipo: 'Todos',
       target: 'Todos',
@@ -236,6 +245,7 @@ export default function ExportarDados() {
   };
 
   const temFiltroAtivo = filtrosAvancados.periodo !== 'Todo Período' || 
+                         filtrosAvancados.mesEspecifico !== '' ||
                          filtrosAvancados.status !== 'Todos os Status' || 
                          filtrosAvancados.tipo !== 'Todos' || 
                          filtrosAvancados.target !== 'Todos' ||
