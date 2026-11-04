@@ -40,14 +40,36 @@ export default function FiltroExportacaoModal({ aberto, onClose, filtros, setFil
             <input type="text" value={filtros.pl || ''} onChange={(e) => handleChange('pl', e.target.value)} placeholder="Ex: 356" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} />
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Período de Criação</label>
-            <select value={filtros.periodo} onChange={(e) => handleChange('periodo', e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', outline: 'none' }}>
-              <option value="Todo Período">Todo Período</option>
-              <option value="Este Mês">Este Mês</option>
-              <option value="Semana Passada">Semana Passada</option>
-              <option value="Hoje">Hoje</option>
-            </select>
+          {/* ✨ NOVO: Dropdown lado a lado com Mês Específico */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Período Rápido</label>
+              <select 
+                value={filtros.periodo} 
+                onChange={(e) => {
+                  handleChange('periodo', e.target.value);
+                  handleChange('mesEspecifico', ''); // Desativa o mês específico ao usar atalho
+                }} 
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', outline: 'none' }}
+              >
+                <option value="Todo Período">Todo Período</option>
+                <option value="Este Mês">Este Mês</option>
+                <option value="Semana Passada">Semana Passada</option>
+                <option value="Hoje">Hoje</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Mês Específico</label>
+              <input 
+                type="month" 
+                value={filtros.mesEspecifico || ''} 
+                onChange={(e) => {
+                  handleChange('mesEspecifico', e.target.value);
+                  handleChange('periodo', 'Todo Período'); // Desativa o atalho
+                }} 
+                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#ffffff', color: '#334155', boxSizing: 'border-box' }} 
+              />
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
