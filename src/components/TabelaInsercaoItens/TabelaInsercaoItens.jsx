@@ -7,7 +7,7 @@ import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, Aler
 import CarregarArquivo from '../CarregarArquivo/CarregarArquivo';
 import ExemploExcel from '../ExemploExcel/ExemploExcel';
 import ScrollDuplo from '../ScrollDuplo/ScrollDuplo';
-
+import { apiFetch } from '../../services/api';
 import { formatarDinheiroTempoReal } from '../../utils/formatadores';
 
 export default function TabelaInsercaoItens({
@@ -15,23 +15,36 @@ export default function TabelaInsercaoItens({
   limiteLinhas = 20, 
   wbsGlobal, 
   bloquearWBS = false, 
-  linhasDestacadas = new Set(), // ✨ Recebe o Set com os IDs das linhas a descontar
+  linhasDestacadas = new Set(),
   onAtualizarCampo,
   onRemoverItem,
   onAdicionarLinha,
   onImportarExcel
 }) {
   const [paginaAtual, setPaginaAtual] = useState(1);
+  const [crossdockingsPendentes, setCrossdockingsPendentes] = useState([]);
+  
   const itensPorPagina = 10;
   const alturaLinhaPx = 62;
-
   const totalPaginas = Math.max(1, Math.ceil(itens.length / itensPorPagina));
 
   useEffect(() => {
-    if (paginaAtual > totalPaginas) {
-      setPaginaAtual(totalPaginas);
-    }
+    if (paginaAtual > totalPaginas) setPaginaAtual(totalPaginas);
   }, [itens.length, totalPaginas, paginaAtual]);
+
+  useEffect(() => {
+    const buscarCrossdockings = async () => {
+      try {
+        const res = await apiFetch(`/solicitacoes/listar?tipo=Crossdocking&status=Pendente&limit=100`);
+        if (res.sucesso && res.dados) {
+          setCrossdockingsPendentes(res.dados);
+        }
+      } catch (e) {
+        console.error("Erro ao buscar crossdockings pendentes:", e);
+      }
+    };
+    buscarCrossdockings();
+  }, []);
 
   const indexUltimoItem = paginaAtual * itensPorPagina;
   const indexPrimeiroItem = indexUltimoItem - itensPorPagina;
@@ -40,10 +53,30 @@ export default function TabelaInsercaoItens({
   const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
   const limiteAtingido = itens.length >= limiteLinhas;
   const larguraMinimaTabela = '2750px';
-
   const isWbsBloqueada = wbsGlobal !== undefined || bloquearWBS;
 
-  // Helper para verificar se a linha está no conjunto de destaque
+  const verificarMatchCrossdocking = (itemLinha) => {
+    const nf = itemLinha.nfEntrada || itemLinha.nf_entrada || itemLinha.nf;
+    if (!nf || !itemLinha.fornecedor) return false;
+
+    const nfLinha = String(nf).trim().toUpperCase();
+    const fornLinha = String(itemLinha.fornecedor).trim().toUpperCase().split(/\s+/)[0];
+    const sapLinha = String(itemLinha.desenhoSAP || itemLinha.desenho_sap || '').trim().toUpperCase();
+
+    return crossdockingsPendentes.some(cross => {
+      const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
+      const fornCrossBruto = cross.itens?.[0]?.fornecedor || '';
+      const fornCross = String(fornCrossBruto).trim().toUpperCase().split(/\s+/)[0];
+      
+      if (nfLinha !== nfCross || fornLinha !== fornCross) return false;
+
+      const isParcial = cross.itens?.some(i => i.desenho_sap_manual && i.desenho_sap_manual !== '-');
+      if (!isParcial) return true; 
+
+      return cross.itens?.some(i => String(i.desenho_sap_manual || '').trim().toUpperCase() === sapLinha);
+    });
+  };
+
   const estaDestacada = (id) => {
     if (!linhasDestacadas) return false;
     if (linhasDestacadas instanceof Set) return linhasDestacadas.has(id);
@@ -51,9 +84,9 @@ export default function TabelaInsercaoItens({
     return false;
   };
 
-  const totalDestacadas = linhasDestacadas instanceof Set 
-    ? linhasDestacadas.size 
-    : (Array.isArray(linhasDestacadas) ? linhasDestacadas.length : 0);
+  const temMatchTempoReal = itens.some(item => verificarMatchCrossdocking(item));
+  const totalDestacadas = linhasDestacadas instanceof Set ? linhasDestacadas.size : (Array.isArray(linhasDestacadas) ? linhasDestacadas.length : 0);
+  const mostrarBannerCross = totalDestacadas > 0 || temMatchTempoReal;
 
   return (
     <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
@@ -103,17 +136,10 @@ export default function TabelaInsercaoItens({
         </div>
       </div>
 
-      {/* ✨ DISCLAIMER INFORMATIVO: Aparece quando existem linhas correspondentes ao Crossdocking */}
-      {totalDestacadas > 0 && (
+      {mostrarBannerCross && (
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '10px 24px',
-          backgroundColor: '#eff6ff',
-          borderBottom: '1px solid #bfdbfe',
-          color: '#1e40af',
-          fontSize: '0.825rem'
+          display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 24px',
+          backgroundColor: '#eff6ff', borderBottom: '1px solid #bfdbfe', color: '#1e40af', fontSize: '0.825rem'
         }}>
           <Info size={16} color="#2563eb" style={{ flexShrink: 0 }} />
           <span>
@@ -150,18 +176,13 @@ export default function TabelaInsercaoItens({
                 <th style={{ width: '140px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>UNID. MEDIDA</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
-                
                 <th style={{ 
-                  padding: '12px', 
-                  backgroundColor: isWbsBloqueada ? '#f1f5f9' : '#fafafa', 
-                  borderBottom: '1px solid #e2e8f0',
-                  borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
-                  borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
-                  color: isWbsBloqueada ? '#64748b' : 'inherit'
+                  padding: '12px', backgroundColor: isWbsBloqueada ? '#f1f5f9' : '#fafafa', 
+                  borderBottom: '1px solid #e2e8f0', borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
+                  borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none', color: isWbsBloqueada ? '#64748b' : 'inherit'
                 }}>
                   CENTRO DE CUSTO - WBS
                 </th>
-                
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NOME CENTRO DE CUSTO / PROJETO</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>EMISSÃO NF</th>
                 <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>RECEB. NF</th>
@@ -174,15 +195,13 @@ export default function TabelaInsercaoItens({
             </thead>
             <tbody>
               {itensDaPagina.map((item) => {
-                const isCrossdockingMatch = estaDestacada(item.id);
+                const isCrossdockingMatch = estaDestacada(item.id) || verificarMatchCrossdocking(item);
 
                 return (
                   <tr 
                     key={item.id} 
                     style={{ 
-                      height: `${alturaLinhaPx}px`, 
-                      borderBottom: '1px solid #f1f5f9',
-                      // ✨ DESTAQUE EM AZUL E BORDA LATERAL
+                      height: `${alturaLinhaPx}px`, borderBottom: '1px solid #f1f5f9',
                       backgroundColor: isCrossdockingMatch ? '#f0f7ff' : 'transparent',
                       borderLeft: isCrossdockingMatch ? '4px solid #2563eb' : '4px solid transparent',
                       transition: 'background-color 0.2s'
@@ -198,20 +217,13 @@ export default function TabelaInsercaoItens({
                         >
                           <Trash2 size={16} />
                         </button>
-
-                        {/* ✨ BADGE INDICADOR DA LINHA SELECIONADA PELO CROSSDOCKING */}
                         {isCrossdockingMatch && (
                           <span 
                             title="Item reconhecido: será deduzido pelo Crossdocking" 
                             style={{ 
-                              fontSize: '0.625rem', 
-                              fontWeight: '700', 
-                              color: '#1d4ed8', 
-                              backgroundColor: '#dbeafe', 
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '4px', 
-                              padding: '1px 5px',
-                              lineHeight: '1.2'
+                              fontSize: '0.625rem', fontWeight: '700', color: '#1d4ed8', 
+                              backgroundColor: '#dbeafe', border: '1px solid #bfdbfe',
+                              borderRadius: '4px', padding: '1px 5px', lineHeight: '1.2'
                             }}
                           >
                             CROSS
@@ -234,9 +246,7 @@ export default function TabelaInsercaoItens({
 
                     <td style={{ padding: '8px', textAlign: 'center' }}>
                       <input 
-                        type="number" 
-                        min="1" 
-                        step="1"
+                        type="number" min="1" step="1"
                         style={{ 
                           width: '75px', padding: '6px 8px', border: '1px solid #bfdbfe', 
                           borderRadius: '6px', color: '#2563eb', fontWeight: '700', 
@@ -244,12 +254,8 @@ export default function TabelaInsercaoItens({
                           cursor: 'text'
                         }} 
                         value={item.qtdFornecida} 
-                        onKeyDown={(e) => {
-                          if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
-                        }}
-                        onBlur={(e) => {
-                          if (!e.target.value || parseInt(e.target.value, 10) < 1) onAtualizarCampo(item.id, 'qtdFornecida', 1);
-                        }}
+                        onKeyDown={(e) => { if (['.', ',', '-', 'e', 'E'].includes(e.key)) e.preventDefault(); }}
+                        onBlur={(e) => { if (!e.target.value || parseInt(e.target.value, 10) < 1) onAtualizarCampo(item.id, 'qtdFornecida', 1); }}
                         onChange={(e) => {
                           let val = e.target.value;
                           if (val === '0') val = '1';
@@ -283,18 +289,14 @@ export default function TabelaInsercaoItens({
                     </td>
 
                     <td style={{ 
-                      padding: '8px', 
-                      backgroundColor: isWbsBloqueada ? '#f1f5f9' : 'transparent',
-                      borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
-                      borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none'
+                      padding: '8px', backgroundColor: isWbsBloqueada ? '#f1f5f9' : 'transparent',
+                      borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none', borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none'
                     }}>
                       <input 
                         style={{ 
                           width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', 
-                          color: isWbsBloqueada ? '#94a3b8' : '#2563eb', 
-                          fontFamily: 'monospace',
-                          fontWeight: isWbsBloqueada ? '500' : 'normal',
-                          cursor: isWbsBloqueada ? 'not-allowed' : 'text'
+                          color: isWbsBloqueada ? '#94a3b8' : '#2563eb', fontFamily: 'monospace',
+                          fontWeight: isWbsBloqueada ? '500' : 'normal', cursor: isWbsBloqueada ? 'not-allowed' : 'text'
                         }} 
                         disabled={isWbsBloqueada}
                         value={isWbsBloqueada ? (wbsGlobal || '-') : (item.wbsElement || '')} 
@@ -309,8 +311,7 @@ export default function TabelaInsercaoItens({
 
                     <td style={{ padding: '8px' }}>
                       <input 
-                        type="date" 
-                        className="input-editavel-tabela texto-cinza" 
+                        type="date" className="input-editavel-tabela texto-cinza" 
                         style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
                         value={item.emissaoNF === '-' ? '' : (item.emissaoNF || '')} 
                         onChange={(e) => onAtualizarCampo(item.id, 'emissaoNF', e.target.value)} 
@@ -320,8 +321,7 @@ export default function TabelaInsercaoItens({
 
                     <td style={{ padding: '8px' }}>
                       <input 
-                        type="date" 
-                        className="input-editavel-tabela texto-cinza" 
+                        type="date" className="input-editavel-tabela texto-cinza" 
                         style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
                         value={item.recebNF === '-' ? '' : (item.recebNF || '')} 
                         onChange={(e) => onAtualizarCampo(item.id, 'recebNF', e.target.value)} 
