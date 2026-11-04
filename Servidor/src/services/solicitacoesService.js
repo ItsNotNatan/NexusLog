@@ -426,6 +426,7 @@ const criarEntrada = async (solicitante, itens, anexos) => {
   return salvarNoBanco(dados, itensDB, anexos);
 };
 
+// ✨ CORREÇÃO: Salva a primeira palavra do fornecedor e upper da NF no nível do item para o SQL
 const criarCrossdocking = async (solicitante, itens, anexos) => {
   const dados = {
     tipo: 'Crossdocking',
@@ -437,12 +438,15 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
     filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
   };
 
+  const nfSolicitante = String(solicitante.nf || '').trim().toUpperCase();
+  const fornecedorSolicitante = String(solicitante.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
+
   const itensDB = (itens || []).map((i) => ({
     desenho_sap_manual: i.desenho_sap_manual,
     quantidade_solicitada: Math.max(1, i.quantidade_solicitada || 1),
     unidade_medida_manual: i.unidade_medida_manual,
-    nf_entrada: i.nf_entrada, 
-    fornecedor: i.fornecedor, 
+    nf_entrada: String(i.nf_entrada || nfSolicitante).trim().toUpperCase(), 
+    fornecedor: String(i.fornecedor || fornecedorSolicitante).trim().toUpperCase().split(/\s+/)[0], 
     fabricante: i.fabricante || null,
     descricao_manual: limitarTexto(i.descricao_manual),
   }));
@@ -665,26 +669,34 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             for (const cross of crossdockingsPendentes) {
               if (cross.observacoes && cross.observacoes.includes('[NF VINCULADA]')) continue;
 
-              let vinculouAlgo = false;
-              const isParcial = cross.observacoes && cross.observacoes.includes('[Saída Parcial]');
-              
-              let fornCross = '';
-              const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
-              if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
-
               const resNfCross = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
               const nfCrossLimpa = String(resNfCross ? resNfCross.numero_nf : '').trim().toUpperCase();
+
+              // ✨ CORREÇÃO: Extração rigorosa baseada nos itens gravados
+              const itensPedidosCross = await db.listar('solicitacoes_itens', {
+                filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
+              });
+
+              const fornCrossBruto = itensPedidosCross.length > 0 ? itensPedidosCross[0].fornecedor : '';
+              const fornCross = String(fornCrossBruto || '').trim().toUpperCase().split(/\s+/)[0];
 
               const indicesItensValidos = [];
               itensEntrada.forEach((item, idx) => {
                   const nfEnt = String(item.nf_entrada || '').trim().toUpperCase();
                   const fornEnt = String(item.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
+                  
+                  // Validação Tripla 
                   if (nfEnt === nfCrossLimpa && fornEnt === fornCross) {
                       indicesItensValidos.push(idx);
                   }
               });
 
               if (indicesItensValidos.length === 0) continue; 
+
+              let vinculouAlgo = false;
+              
+              // ✨ CORREÇÃO: A regra agora determina parcialidade tecnicamente pelo SAP nos itens
+              const isParcial = itensPedidosCross.some(p => p.desenho_sap_manual && p.desenho_sap_manual !== '-');
 
               if (!isParcial) {
                 // Crossdocking Total
@@ -711,42 +723,28 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                       nome_projeto: item.nome_projeto,
                       centro: item.centro,
                       deposito: item.deposito,
-                      alocacao: item.alocacao || '-', 
+                      alocacao: 'CROSSDOCKING', 
                     };
                   })
                 );
                 vinculouAlgo = true;
               } else {
                 // Crossdocking Parcial
-                const itensPedidosCross = await db.listar('solicitacoes_itens', {
-                  filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
-                });
-
                 for (const pedido of itensPedidosCross) {
                   const sapCross = String(pedido.desenho_sap_manual || '').trim().toUpperCase();
-                  const pnCross = String(pedido.part_number_manual || '').trim().toUpperCase();
 
-                  if (!sapCross && !pnCross) continue;
+                  const indexEncontrado = indicesItensValidos.find(idx => {
+                    const e = estoqueCriado[idx];
+                    return e && String(e.desenho_sap || '').trim().toUpperCase() === sapCross;
+                  });
 
-                  let indexEncontrado = -1;
-                  for (let i = 0; i < indicesItensValidos.length; i++) {
-                      const idx = indicesItensValidos[i];
-                      const e = estoqueCriado[idx];
-                      if (!e) continue;
-                      const sapE = String(e.desenho_sap || '').trim().toUpperCase();
-                      const pnE = String(e.part_number || '').trim().toUpperCase();
-                      if ((sapE && sapE !== '-' && sapE === sapCross) || (pnE && pnE !== '-' && pnE === pnCross)) {
-                          indexEncontrado = idx;
-                          break;
-                      }
-                  }
-
-                  if (indexEncontrado !== -1) {
+                  if (indexEncontrado !== undefined) {
                     const itemEstoqueCriado = estoqueCriado[indexEncontrado];
                     await db.atualizar('solicitacoes_itens', pedido.id, {
                       estoque_id: itemEstoqueCriado.id,
-                      alocacao: itemEstoqueCriado.alocacao || '-',
+                      alocacao: 'CROSSDOCKING',
                     });
+                    // ✨ CORREÇÃO: Não recria o item nem sobrescreve quantidade_solicitada
                     vinculouAlgo = true;
                   }
                 }
@@ -763,7 +761,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // ✨ CENÁRIO 2: APROVOU O CROSSDOCKING: Dedução (Prevenindo Bug de duplicação E deduzindo apenas a QTD pedida no parcial)
+    // ✨ CENÁRIO 2: APROVOU O CROSSDOCKING (Dedução Blindada)
     else if (solicitacao.tipo === 'Crossdocking') {
       const itensCross = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
@@ -776,7 +774,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         if (!estoqueAtual) continue;
 
         const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
-        // ✨ AQUI ESTÁ A FIX: Ele deve usar a quantidade que foi solicitada neste item específico do Crossdocking (mesmo que seja parcial)
+        // ✨ CORREÇÃO: Usa apenas a quantidade rigorosamente solicitada no item
         const quantidadeRetirada = Number(item.quantidade_solicitada || 0); 
         
         if (quantidadeRetirada > 0) {
