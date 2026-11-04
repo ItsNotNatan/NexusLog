@@ -921,7 +921,41 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                       {isExpandida && linha.detalhesCompletos && (
                         <tr>
-                          <td colSpan="8" className="td-expandida">
+                          <td colSpan="8" className="td-expandida" style={{ padding: 0 }}>
+                            
+                            {/* ✨ NOVO: DESTAQUE DA NF PARA CROSSDOCKING ✨ */}
+                            {linha.tipo === 'Crossdocking' && (
+                              <div style={{ padding: '24px 32px 12px 32px', backgroundColor: '#f8fafc' }}>
+                                <div style={{
+                                  display: 'flex', alignItems: 'center', gap: '16px',
+                                  backgroundColor: '#eff6ff', border: '1px solid #bfdbfe',
+                                  padding: '16px 24px', borderRadius: '12px', color: '#1e40af',
+                                  boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.1)'
+                                }}>
+                                  <div style={{ backgroundColor: '#dbeafe', padding: '12px', borderRadius: '8px' }}>
+                                    <FileText size={28} color="#2563eb" />
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                      Nota Fiscal Vinculada ao Crossdocking
+                                    </span>
+                                    <span style={{ fontSize: '0.85rem', color: '#3b82f6' }}>
+                                      Valide se a NF física confere com o registo abaixo antes de aprovar a saída.
+                                    </span>
+                                  </div>
+                                  <div style={{ marginLeft: 'auto' }}>
+                                    <strong style={{ 
+                                      fontSize: '1.5rem', fontFamily: 'monospace', letterSpacing: '0.05em', 
+                                      backgroundColor: '#ffffff', padding: '8px 24px', borderRadius: '8px', 
+                                      border: '2px dashed #3b82f6', color: '#1d4ed8', display: 'inline-block' 
+                                    }}>
+                                      {linha.nfCrossdocking || linha.itensRaw?.[0]?.nf_entrada || 'SEM-NF'}
+                                    </strong>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             <DetalhesSolicitacao item={{ ...linha, itens: getItensEnriquecidos(linha) }} perfil={perfil} onDeleteAnexo={!isOperador ? ((anexo) => handleDeletarAnexo(linha.idOriginal, anexo)) : undefined} />
 
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
