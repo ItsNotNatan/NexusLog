@@ -37,7 +37,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   const RenderizarObsLogistica = () => (
     <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px dashed #e2e8f0', paddingTop: '16px' }}>
       <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569', textTransform: 'uppercase' }}>
-        Observações da Equipa de Logística
+        Observações da Equipe de Logística
       </label>
       
       <textarea 
