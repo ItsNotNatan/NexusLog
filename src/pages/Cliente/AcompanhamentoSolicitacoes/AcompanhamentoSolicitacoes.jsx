@@ -227,6 +227,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           wbs: wbsProcura, 
           destino: destinoProcura,
           filial: item.filial_origem_id || item.filial || '-',
+          observacoes_logistica: item.observacoes_logistica || '',
           textoBuscavel: textoBuscavel,
           itensRaw: item.itens || [],
           anexos: item.anexos || [],
@@ -239,7 +240,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         return dadosFormatados.map(novo => {
           const antigo = tabelaMapa.get(novo.idOriginal);
           if (antigo && antigo.detalhesCompletos) {
-            return { ...novo, itensRaw: antigo.itensRaw, anexos: antigo.anexos, detalhesCompletos: true };
+            return { 
+              ...novo, 
+              itensRaw: antigo.itensRaw, 
+              anexos: antigo.anexos, 
+              observacoes_logistica: antigo.observacoes_logistica, 
+              detalhesCompletos: true 
+            };
           }
           return novo;
         });
@@ -516,17 +523,27 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     const linhaAtual = dadosTabela.find(s => s.idOriginal === idOriginal);
     
+    // ✨ INJETA A OBSERVAÇÃO AO ABRIR (Se já estiver carregada localmente)
+    if (linhaAtual) {
+      setObservacaoTemp(linhaAtual.observacoes_logistica || '');
+    }
+
     if (linhaAtual && !linhaAtual.detalhesCompletos) {
       setCarregandoDetalhes(idUnico);
       try {
         const res = await apiFetch(`/solicitacoes/${idOriginal}/detalhes`);
         if (res.sucesso) {
+          
+          // ✨ INJETA A OBSERVAÇÃO VINDA DA API (Garante atualização fresca)
+          setObservacaoTemp(res.dados.observacoes_logistica || '');
+
           setDadosTabela(prev => prev.map(sol => {
             if (sol.idOriginal === idOriginal) {
               return {
                 ...sol,
                 itensRaw: res.dados.itens || [],
                 anexos: res.dados.anexos || [],
+                observacoes_logistica: res.dados.observacoes_logistica || '',
                 statusExibicao: res.dados.status === 'Concluído' && res.dados.itens?.every(i => Number(i.quantidade_solicitada) === 0) ? 'Reintegrado' : sol.statusExibicao,
                 detalhesCompletos: true
               };
@@ -544,7 +561,29 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     setLinhaExpandida(idUnico);
     setAnexosNovos([]);
-    setObservacaoTemp('');
+  };
+
+  // ✨ FUNÇÃO QUE FAZ O CAMPO DE OBSERVAÇÕES DA LOGÍSTICA FUNCIONAR
+  const handleSalvarObservacaoLogistica = async (idSolicitacao) => {
+    try {
+      const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/observacoes-logistica`, {
+        method: 'PATCH',
+        body: JSON.stringify({ observacoes_logistica: observacaoTemp })
+      });
+
+      if (dados.sucesso) {
+        showAlert("Sucesso!", "Observações internas salvas na base de dados.", "success");
+        setDadosTabela(prev => prev.map(sol => 
+          sol.idOriginal === idSolicitacao 
+            ? { ...sol, observacoes_logistica: observacaoTemp } 
+            : sol
+        ));
+      } else {
+        showAlert("Erro", dados.erro || "Falha ao gravar as observações.", "error");
+      }
+    } catch (error) {
+      showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
+    }
   };
 
   const handleDeletarAnexo = async (idSolicitacao, anexo) => {
@@ -800,7 +839,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                 showLoading("Baixando dados completos para o PDF...");
                                 const res = await apiFetch(`/solicitacoes/${linha.idOriginal}/detalhes`);
                                 if (res.sucesso) {
-                                  setDadosTabela(prev => prev.map(s => s.idOriginal === linha.idOriginal ? { ...s, itensRaw: res.dados.itens, anexos: res.dados.anexos, detalhesCompletos: true } : s));
+                                  setDadosTabela(prev => prev.map(s => s.idOriginal === linha.idOriginal ? { ...s, itensRaw: res.dados.itens, anexos: res.dados.anexos, observacoes_logistica: res.dados.observacoes_logistica, detalhesCompletos: true } : s));
                                   closeAlert();
                                   showAlert("Dados Transferidos", "Clique novamente no botão de PDF para o gerar com os detalhes completos.", "info");
                                 } else {
@@ -891,7 +930,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               <span className="badge-status status-cancelado"><AlertCircle size={14} /> Cancelamento Solicitado</span>
                             ) : linha.status === 'Pendente' ? (
                               <div style={{ display: 'flex', gap: '6px' }}>
-                                {/* ✨ MUDANÇA: O botão "Aprovar" fica oculto/desativado se aguardar NF, mas o botão Recusar continua lá! */}
                                 {statusBloqueado ? (
                                   <div title={`Aguardando NF ${linha.nfCrossdocking || ''} dar entrada no estoque`} style={{ color: '#d97706', backgroundColor: '#fefce8', border: '1px solid #fde047', padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '600' }}><AlertCircle size={14} /> Aguardando NF</div>
                                 ) : (
@@ -923,7 +961,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         <tr>
                           <td colSpan="8" className="td-expandida" style={{ padding: 0 }}>
                             
-                            {/* ✨ NOVO: DESTAQUE DA NF PARA CROSSDOCKING ✨ */}
+                            {/* DESTAQUE DA NF PARA CROSSDOCKING */}
                             {linha.tipo === 'Crossdocking' && (
                               <div style={{ padding: '24px 32px 12px 32px', backgroundColor: '#f8fafc' }}>
                                 <div style={{
@@ -961,17 +999,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
                               <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc", display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                 
+                                {/* ✨ CAMPO DE OBSERVAÇÃO FUNCIONAL */}
                                 <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "24px" }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                                     <MessageSquare size={18} color="#0f172a" />
                                     <h4 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>Observações Internas (Logística)</h4>
                                   </div>
                                   
-                                  <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '12px', marginBottom: '12px', color: '#92400e', fontSize: '0.875rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                                    <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                                    <span><strong>Aviso Visual Apenas:</strong> Este campo é apenas uma demonstração visual de como a funcionalidade ficaria. Ao clicar em Salvar, os dados não serão guardados na base de dados no momento.</span>
-                                  </div>
-
                                   <textarea 
                                     placeholder="Adicione notas, instruções ou observações internas sobre a separação deste material..."
                                     value={observacaoTemp}
@@ -980,8 +1014,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                                   />
                                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
                                     <button 
-                                      onClick={() => showAlert("Em Desenvolvimento", "A funcionalidade de gravar observações da logística na base de dados ainda não foi ativada. Este é apenas um teste visual.", "info")} 
-                                      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", backgroundColor: "#0f172a", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "600", cursor: "pointer", fontSize: "0.875rem" }}
+                                      onClick={() => handleSalvarObservacaoLogistica(linha.idOriginal)} 
+                                      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", backgroundColor: "#0f172a", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "600", cursor: "pointer", fontSize: "0.875rem", transition: 'background-color 0.2s' }}
+                                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
+                                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0f172a'}
                                     >
                                       <Check size={14} /> Salvar Observação
                                     </button>
