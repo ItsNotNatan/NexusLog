@@ -36,6 +36,7 @@ const formatarDataBrasil = (isoString) => {
 
 const solicitacaoParaFront = (r) => ({
   ...r,
+  observacoes_logistica: db.txt(r.observacoes_logistica), // ✨ MAPEADO PARA O FRONTEND
   data_necessidade: db.dt(r.data_necessidade),
   data_entrega: db.dt(r.data_entrega),
   data_aprovacao_pl: db.dt(r.data_aprovacao_pl),
@@ -72,6 +73,7 @@ const salvarNoBanco = async (dadosPrincipais, itensArray, anexosArray = [], nume
         wbs_destino: dadosPrincipais.wbs_destino || '',
         data_necessidade: db.paraData(dadosPrincipais.data_necessidade),
         observacoes: dadosPrincipais.observacoes || '',
+        observacoes_logistica: '', 
         entrega_urgente: dadosPrincipais.entrega_urgente || false,
         status: dadosPrincipais.status || 'Pendente',
       });
@@ -225,6 +227,7 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
 
       status: sol.status,
       observacoes: db.txt(sol.observacoes),
+      observacoes_logistica: sol.observacoes_logistica, // ✨ INJETADO
       entregaUrgente: sol.entrega_urgente,
       
       anexos: resumido ? listaAnexos.map(a => ({ id: a.id })) : listaAnexos,
@@ -298,6 +301,7 @@ const obterSolicitacaoDetalhada = async (id) => {
     dataEntrega: sol.data_entrega ? formatarDataBrasil(sol.data_entrega) : sol.status === 'Concluído' ? 'Disponível' : null,
     status: sol.status,
     observacoes: db.txt(sol.observacoes),
+    observacoes_logistica: sol.observacoes_logistica, // ✨ INJETADO
     entregaUrgente: sol.entrega_urgente,
     anexos: anexos,
     itens: itens,
@@ -426,7 +430,7 @@ const criarEntrada = async (solicitante, itens, anexos) => {
   return salvarNoBanco(dados, itensDB, anexos);
 };
 
-// ✨ CORREÇÃO: Salva a primeira palavra do fornecedor e upper da NF no nível do item para o SQL
+// ✨ CRIAÇÃO DO CROSSDOCKING: Grava o fornecedor e NF padronizados direto no nível do item
 const criarCrossdocking = async (solicitante, itens, anexos) => {
   const dados = {
     tipo: 'Crossdocking',
@@ -439,14 +443,14 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
   };
 
   const nfSolicitante = String(solicitante.nf || '').trim().toUpperCase();
-  const fornecedorSolicitante = String(solicitante.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
+  const fornSolicitante = String(solicitante.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
 
   const itensDB = (itens || []).map((i) => ({
-    desenho_sap_manual: i.desenho_sap_manual,
+    desenho_sap_manual: i.desenho_sap_manual || '-',
     quantidade_solicitada: Math.max(1, i.quantidade_solicitada || 1),
     unidade_medida_manual: i.unidade_medida_manual,
-    nf_entrada: String(i.nf_entrada || nfSolicitante).trim().toUpperCase(), 
-    fornecedor: String(i.fornecedor || fornecedorSolicitante).trim().toUpperCase().split(/\s+/)[0], 
+    nf_entrada: String(i.nf_entrada || nfSolicitante).trim().toUpperCase(),
+    fornecedor: String(i.fornecedor || fornSolicitante).trim().toUpperCase().split(/\s+/)[0],
     fabricante: i.fabricante || null,
     descricao_manual: limitarTexto(i.descricao_manual),
   }));
@@ -661,7 +665,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
           if (idsCandidatos.length > 0) {
             const candidatos = await db.listarPorIds('solicitacoes', 'id', idsCandidatos);
-            
             const crossdockingsPendentes = candidatos
               .filter((s) => s.tipo === 'Crossdocking' && s.status === 'Pendente')
               .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
@@ -669,23 +672,21 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             for (const cross of crossdockingsPendentes) {
               if (cross.observacoes && cross.observacoes.includes('[NF VINCULADA]')) continue;
 
-              const resNfCross = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
-              const nfCrossLimpa = String(resNfCross ? resNfCross.numero_nf : '').trim().toUpperCase();
-
-              // ✨ CORREÇÃO: Extração rigorosa baseada nos itens gravados
               const itensPedidosCross = await db.listar('solicitacoes_itens', {
                 filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
               });
 
-              const fornCrossBruto = itensPedidosCross.length > 0 ? itensPedidosCross[0].fornecedor : '';
-              const fornCross = String(fornCrossBruto || '').trim().toUpperCase().split(/\s+/)[0];
+              if (itensPedidosCross.length === 0) continue;
+
+              // Extrai os dados normalizados salvos no momento da criação
+              const nfCrossLimpa = String(itensPedidosCross[0].nf_entrada || '').trim().toUpperCase();
+              const fornCross = String(itensPedidosCross[0].fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
 
               const indicesItensValidos = [];
               itensEntrada.forEach((item, idx) => {
                   const nfEnt = String(item.nf_entrada || '').trim().toUpperCase();
                   const fornEnt = String(item.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
                   
-                  // Validação Tripla 
                   if (nfEnt === nfCrossLimpa && fornEnt === fornCross) {
                       indicesItensValidos.push(idx);
                   }
@@ -694,48 +695,40 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               if (indicesItensValidos.length === 0) continue; 
 
               let vinculouAlgo = false;
-              
-              // ✨ CORREÇÃO: A regra agora determina parcialidade tecnicamente pelo SAP nos itens
+              // Parcialidade técnica: Existe Desenho SAP especificado no pedido?
               const isParcial = itensPedidosCross.some(p => p.desenho_sap_manual && p.desenho_sap_manual !== '-');
 
               if (!isParcial) {
-                // Crossdocking Total
+                // TOTAL
                 await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
-
-                await db.criarVarios(
-                  'solicitacoes_itens',
-                  indicesItensValidos.map((idxOriginal) => {
-                    const item = itensEntrada[idxOriginal];
-                    return {
-                      solicitacao_id: cross.id,
-                      estoque_id: estoqueCriado[idxOriginal] ? estoqueCriado[idxOriginal].id : null,
-                      desenho_sap_manual: item.desenho_sap_manual,
-                      part_number_manual: item.part_number_manual,
-                      fabricante: item.fabricante || null,
-                      descricao_manual: item.descricao_manual,
-                      quantidade_solicitada: item.quantidade_solicitada,
-                      unidade_medida_manual: item.unidade_medida_manual,
-                      valor_unitario_manual: item.valor_unitario_manual,
-                      fornecedor: item.fornecedor,
-                      referencia: item.referencia,
-                      nf_entrada: item.nf_entrada,
-                      wbs_element: item.wbs_element,
-                      nome_projeto: item.nome_projeto,
-                      centro: item.centro,
-                      deposito: item.deposito,
-                      alocacao: 'CROSSDOCKING', 
-                    };
-                  })
-                );
+                await db.criarVarios('solicitacoes_itens', indicesItensValidos.map((idxOriginal) => {
+                  const item = itensEntrada[idxOriginal];
+                  return {
+                    solicitacao_id: cross.id,
+                    estoque_id: estoqueCriado[idxOriginal] ? estoqueCriado[idxOriginal].id : null,
+                    desenho_sap_manual: item.desenho_sap_manual,
+                    part_number_manual: item.part_number_manual,
+                    quantidade_solicitada: item.quantidade_solicitada,
+                    unidade_medida_manual: item.unidade_medida_manual,
+                    valor_unitario_manual: item.valor_unitario_manual,
+                    fornecedor: item.fornecedor,
+                    nf_entrada: item.nf_entrada,
+                    alocacao: 'CROSSDOCKING', 
+                  };
+                }));
                 vinculouAlgo = true;
               } else {
-                // Crossdocking Parcial
+                // PARCIAL
                 for (const pedido of itensPedidosCross) {
                   const sapCross = String(pedido.desenho_sap_manual || '').trim().toUpperCase();
+                  const pnCross = String(pedido.part_number_manual || '').trim().toUpperCase();
 
                   const indexEncontrado = indicesItensValidos.find(idx => {
                     const e = estoqueCriado[idx];
-                    return e && String(e.desenho_sap || '').trim().toUpperCase() === sapCross;
+                    if (!e) return false;
+                    const sapE = String(e.desenho_sap || '').trim().toUpperCase();
+                    const pnE = String(e.part_number || '').trim().toUpperCase();
+                    return (sapE !== '-' && sapE === sapCross) || (pnE !== '-' && pnE === pnCross);
                   });
 
                   if (indexEncontrado !== undefined) {
@@ -744,16 +737,13 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                       estoque_id: itemEstoqueCriado.id,
                       alocacao: 'CROSSDOCKING',
                     });
-                    // ✨ CORREÇÃO: Não recria o item nem sobrescreve quantidade_solicitada
                     vinculouAlgo = true;
                   }
                 }
               }
 
               if (vinculouAlgo) {
-                await db.atualizar('solicitacoes', cross.id, {
-                  observacoes: (cross.observacoes || '') + '\n[NF VINCULADA]',
-                });
+                await db.atualizar('solicitacoes', cross.id, { observacoes: (cross.observacoes || '') + '\n[NF VINCULADA]' });
               }
             }
           }
@@ -761,11 +751,9 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // ✨ CENÁRIO 2: APROVOU O CROSSDOCKING (Dedução Blindada)
+    // ✨ CENÁRIO 2: APROVOU O CROSSDOCKING (Evitando dedução total no Parcial e Dupla Dedução)
     else if (solicitacao.tipo === 'Crossdocking') {
-      const itensCross = await db.listar('solicitacoes_itens', {
-        filter: db.f('solicitacao_id = {:sid}', { sid: id }),
-      });
+      const itensCross = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
 
       for (const item of itensCross) {
         if (!item.estoque_id) continue; 
@@ -774,43 +762,34 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         if (!estoqueAtual) continue;
 
         const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
-        // ✨ CORREÇÃO: Usa apenas a quantidade rigorosamente solicitada no item
+        // Deduz ESTRITAMENTE a quantidade_solicitada preservada no pedido original
         const quantidadeRetirada = Number(item.quantidade_solicitada || 0); 
         
         if (quantidadeRetirada > 0) {
           const novoSaldo = saldoAtual - quantidadeRetirada;
           const saldoFinalSeguro = novoSaldo < 0 ? 0 : novoSaldo;
-          const novoStatusEstoque = saldoFinalSeguro <= 0 ? 'Zerado' : 'Disponível';
-
-          await db.atualizar('estoque', estoqueAtual.id, {
-            quantidade_disponivel: saldoFinalSeguro,
-            status: novoStatusEstoque,
+          
+          await db.atualizar('estoque', estoqueAtual.id, { 
+            quantidade_disponivel: saldoFinalSeguro, 
+            status: saldoFinalSeguro <= 0 ? 'Zerado' : 'Disponível' 
           });
         }
       }
     }
 
-
-    // ✨ CENÁRIO 3: APROVOU SAÍDA DE MATERIAL OU TRANSFERÊNCIA (Dedução Normal)
+    // ✨ CENÁRIO 3: APROVOU SAÍDA DE MATERIAL OU TRANSFERÊNCIA
     else if (solicitacao.tipo === 'Material' || solicitacao.tipo === 'Transferencia WBS') {
-      const itensPedidos = await db.listar('solicitacoes_itens', {
-        filter: db.f('solicitacao_id = {:sid}', { sid: id }),
-      });
+      const itensPedidos = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
 
       for (const item of itensPedidos) {
         let estoqueFisico = null;
 
-        if (item.estoque_id) {
-          estoqueFisico = await db.porId('estoque', item.estoque_id);
-        }
+        if (item.estoque_id) estoqueFisico = await db.porId('estoque', item.estoque_id);
 
         if (!estoqueFisico) {
           const sapItem = String(item.desenho_sap_manual || '').trim().toUpperCase();
           const pnItem = String(item.part_number_manual || '').trim().toUpperCase();
-
-          const candidatosEstoque = await db.listar('estoque', {
-            filter: db.f('filial_id = {:filial}', { filial: solicitacao.filial_origem_id })
-          });
+          const candidatosEstoque = await db.listar('estoque', { filter: db.f('filial_id = {:filial}', { filial: solicitacao.filial_origem_id }) });
 
           estoqueFisico = candidatosEstoque.find(e => {
             const sapE = String(e.desenho_sap || '').trim().toUpperCase();
@@ -818,9 +797,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             return (sapE && sapE !== '-' && sapE === sapItem) || (pnE && pnE !== '-' && pnE === pnItem);
           });
 
-          if (estoqueFisico) {
-            await db.atualizar('solicitacoes_itens', item.id, { estoque_id: estoqueFisico.id });
-          }
+          if (estoqueFisico) await db.atualizar('solicitacoes_itens', item.id, { estoque_id: estoqueFisico.id });
         }
 
         if (!estoqueFisico) continue;
@@ -832,207 +809,123 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const saldoFinalSeguro = novoSaldo < 0 ? 0 : novoSaldo;
         const novoStatusEstoque = saldoFinalSeguro <= 0 ? 'Zerado' : 'Disponível';
 
-        await db.atualizar('estoque', estoqueFisico.id, {
-          quantidade_disponivel: saldoFinalSeguro,
-          status: novoStatusEstoque,
-        });
+        await db.atualizar('estoque', estoqueFisico.id, { quantidade_disponivel: saldoFinalSeguro, status: novoStatusEstoque });
 
         if (solicitacao.tipo === 'Transferencia WBS') {
           await db.criar('estoque', {
-            material_id: estoqueFisico.material_id || '',
-            filial_id: estoqueFisico.filial_id || '',
-            desenho_sap: estoqueFisico.desenho_sap,
-            part_number: estoqueFisico.part_number,
-            fabricante: estoqueFisico.fabricante || '',
-            descricao: estoqueFisico.descricao,
-            nf_entrada: estoqueFisico.nf_entrada,
-            documento_compras: estoqueFisico.documento_compras,
-            quantidade_disponivel: quantidadeRetirada,
-            status: 'Disponível',
-            wbs: solicitacao.wbs_destino,
-            nome_projeto: estoqueFisico.nome_projeto || '',
-            is_transferencia: true,
-            alocacao: estoqueFisico.alocacao || '',
-            fornecedor: estoqueFisico.fornecedor || '',
-            referencia: estoqueFisico.referencia || '',
-            unidade_medida: estoqueFisico.unidade_medida || 'Unid',
-            emissao_nf: estoqueFisico.emissao_nf || '',
-            receb_nf: estoqueFisico.receb_nf || '',
-            valor_unitario: estoqueFisico.valor_unitario || 0,
-            centro: estoqueFisico.centro || '',
-            deposito: estoqueFisico.deposito || '',
+            material_id: estoqueFisico.material_id || '', filial_id: estoqueFisico.filial_id || '',
+            desenho_sap: estoqueFisico.desenho_sap, part_number: estoqueFisico.part_number,
+            fabricante: estoqueFisico.fabricante || '', descricao: estoqueFisico.descricao,
+            nf_entrada: estoqueFisico.nf_entrada, documento_compras: estoqueFisico.documento_compras,
+            quantidade_disponivel: quantidadeRetirada, status: 'Disponível', wbs: solicitacao.wbs_destino,
+            nome_projeto: estoqueFisico.nome_projeto || '', is_transferencia: true,
+            alocacao: estoqueFisico.alocacao || '', fornecedor: estoqueFisico.fornecedor || '',
+            referencia: estoqueFisico.referencia || '', unidade_medida: estoqueFisico.unidade_medida || 'Unid',
+            emissao_nf: estoqueFisico.emissao_nf || '', receb_nf: estoqueFisico.receb_nf || '',
+            valor_unitario: estoqueFisico.valor_unitario || 0, centro: estoqueFisico.centro || '', deposito: estoqueFisico.deposito || '',
           });
         }
       }
     }
 
-
     // ✨ CENÁRIO 4: REINTEGRAÇÃO / DEVOLUÇÃO
-    else if (
-      solicitacao.tipo === 'Reintegracao' ||
-      solicitacao.tipo === 'Reintegração' ||
-      solicitacao.tipo === 'Cancelado'
-    ) {
+    else if (solicitacao.tipo === 'Reintegracao' || solicitacao.tipo === 'Reintegração' || solicitacao.tipo === 'Cancelado') {
       let deveDevolverAoEstoque = true;
       let wbsDestinoTransferencia = null; 
 
       if (solicitacao.tipo === 'Cancelado' && solicitacao.observacoes) {
         const idOriginalParaCancelar = acharIdOriginalNoTexto(solicitacao.observacoes);
-
         if (idOriginalParaCancelar) {
           const solOriginal = await db.porId('solicitacoes', idOriginalParaCancelar);
-
           if (solOriginal) {
             if (solOriginal.status === 'Pendente') deveDevolverAoEstoque = false;
-            
-            if (solOriginal.tipo === 'Transferencia WBS' && (solOriginal.status === 'Em Separação' || solOriginal.status === 'Concluído')) {
-              wbsDestinoTransferencia = solOriginal.wbs_destino;
-            }
-
+            if (solOriginal.tipo === 'Transferencia WBS' && (solOriginal.status === 'Em Separação' || solOriginal.status === 'Concluído')) wbsDestinoTransferencia = solOriginal.wbs_destino;
             await db.atualizar('solicitacoes', idOriginalParaCancelar, { status: 'Cancelado' });
-
-            await db.atualizarOnde(
-              'packing_lists',
-              db.f('solicitacao_id = {:sid}', { sid: idOriginalParaCancelar }),
-              { status: 'Cancelado' }
-            );
+            await db.atualizarOnde('packing_lists', db.f('solicitacao_id = {:sid}', { sid: idOriginalParaCancelar }), { status: 'Cancelado' });
           }
         }
-      } 
-      else if ((solicitacao.tipo === 'Reintegracao' || solicitacao.tipo === 'Reintegração') && solicitacao.observacoes) {
+      } else if ((solicitacao.tipo === 'Reintegracao' || solicitacao.tipo === 'Reintegração') && solicitacao.observacoes) {
         const matchPL = solicitacao.observacoes.match(/PL #(\d+)/);
         if (matchPL) {
-          const numPL = matchPL[1];
-          const plOrigem = await db.um('packing_lists', db.f('numero_pl = {:n}', { n: Number(numPL) }));
+          const plOrigem = await db.um('packing_lists', db.f('numero_pl = {:n}', { n: Number(matchPL[1]) }));
           if (plOrigem) {
             const solOrigem = await db.porId('solicitacoes', plOrigem.solicitacao_id);
-            if (solOrigem && solOrigem.tipo === 'Transferencia WBS') {
-              wbsDestinoTransferencia = solOrigem.wbs_destino;
-            }
+            if (solOrigem && solOrigem.tipo === 'Transferencia WBS') wbsDestinoTransferencia = solOrigem.wbs_destino;
           }
         }
       }
 
       if (deveDevolverAoEstoque) {
-        const itensReintegracao = await db.listar('solicitacoes_itens', {
-          filter: db.f('solicitacao_id = {:sid}', { sid: id }),
-        });
-
+        const itensReintegracao = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
         for (const item of itensReintegracao) {
           if (!item.estoque_id) continue;
-
           let estoqueAtual = await db.porId('estoque', item.estoque_id);
           const quantidadeDevolvida = Number(item.quantidade_solicitada || 0);
 
           if (!estoqueAtual) {
             try {
               const novaLinha = await db.criar('estoque', {
-                material_id: item.material_id || '',
-                filial_id: solicitacao.filial_origem_id || '',
-                desenho_sap: item.desenho_sap_manual || item.desenhoSAP || '-',
-                part_number: item.part_number_manual || '-',
-                fabricante: item.fabricante || '',
-                descricao: item.descricao_manual || 'Item Reintegrado',
-                nf_entrada: item.nf_entrada || '',
-                documento_compras: item.documento_compras || '',
-                quantidade_disponivel: quantidadeDevolvida,
-                status: 'Disponível',
-                wbs: item.wbs_element || '',
-                nome_projeto: item.nome_projeto || '',
-                is_transferencia: false,
-                alocacao: item.alocacao || '',
-                fornecedor: item.fornecedor || '',
-                referencia: item.referencia || '',
-                unidade_medida: item.unidade_medida_manual || 'Unid',
-                emissao_nf: item.emissao_nf || '',
-                receb_nf: item.receb_nf || '',
-                valor_unitario: item.valor_unitario_manual || 0,
-                centro: item.centro || '',
-                deposito: item.deposito || ''
+                material_id: item.material_id || '', filial_id: solicitacao.filial_origem_id || '',
+                desenho_sap: item.desenho_sap_manual || item.desenhoSAP || '-', part_number: item.part_number_manual || '-',
+                fabricante: item.fabricante || '', descricao: item.descricao_manual || 'Item Reintegrado',
+                nf_entrada: item.nf_entrada || '', documento_compras: item.documento_compras || '',
+                quantidade_disponivel: quantidadeDevolvida, status: 'Disponível', wbs: item.wbs_element || '',
+                nome_projeto: item.nome_projeto || '', is_transferencia: false, alocacao: item.alocacao || '',
+                fornecedor: item.fornecedor || '', referencia: item.referencia || '',
+                unidade_medida: item.unidade_medida_manual || 'Unid', emissao_nf: item.emissao_nf || '',
+                receb_nf: item.receb_nf || '', valor_unitario: item.valor_unitario_manual || 0,
+                centro: item.centro || '', deposito: item.deposito || ''
               });
               estoqueAtual = novaLinha; 
-              
               await db.atualizar('solicitacoes_itens', item.id, { estoque_id: novaLinha.id });
             } catch (e) { continue; }
           } else {
-            const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
-            await db.atualizar('estoque', estoqueAtual.id, {
-              quantidade_disponivel: saldoAtual + quantidadeDevolvida,
-              status: 'Disponível',
-            });
+            await db.atualizar('estoque', estoqueAtual.id, { quantidade_disponivel: Number(estoqueAtual.quantidade_disponivel || 0) + quantidadeDevolvida, status: 'Disponível' });
           }
 
           if (wbsDestinoTransferencia) {
             const sapOrigin = String(estoqueAtual.desenho_sap || '').trim().toUpperCase();
             const pnOrigin = String(estoqueAtual.part_number || '').trim().toUpperCase();
             const wbsDestinoLimpo = String(wbsDestinoTransferencia || '').trim().toUpperCase();
-
-            const candidatosAmarelos = await db.listar('estoque', {
-              filter: db.f('is_transferencia = true && filial_id = {:filial}', { filial: estoqueAtual.filial_id || '' })
-            });
-
+            const candidatosAmarelos = await db.listar('estoque', { filter: db.f('is_transferencia = true && filial_id = {:filial}', { filial: estoqueAtual.filial_id || '' }) });
             const linhaAmarela = candidatosAmarelos.find(e => {
-              const sapE = String(e.desenho_sap || '').trim().toUpperCase();
-              const pnE = String(e.part_number || '').trim().toUpperCase();
-              const wbsE = String(e.wbs || '').trim().toUpperCase();
-              
-              const bateWbs = wbsE === wbsDestinoLimpo;
-              const bateSapPn = (sapE && sapE !== '-' && sapE === sapOrigin) || (pnE && pnE !== '-' && pnE === pnOrigin);
-              
+              const bateWbs = String(e.wbs || '').trim().toUpperCase() === wbsDestinoLimpo;
+              const bateSapPn = (String(e.desenho_sap || '').trim().toUpperCase() === sapOrigin) || (String(e.part_number || '').trim().toUpperCase() === pnOrigin);
               return bateWbs && bateSapPn;
             });
 
             if (linhaAmarela) {
               const novoSaldoAmarelo = Number(linhaAmarela.quantidade_disponivel || 0) - quantidadeDevolvida;
               const saldoSeguro = novoSaldoAmarelo < 0 ? 0 : novoSaldoAmarelo;
-              
-              await db.atualizar('estoque', linhaAmarela.id, {
-                quantidade_disponivel: saldoSeguro,
-                status: saldoSeguro <= 0 ? 'Zerado' : 'Disponível'
-              });
-            } else {
-              console.warn(`[REINTEGRACAO] Linha Amarela nao encontrada para SAP ${sapOrigin} e WBS ${wbsDestinoLimpo}`);
+              await db.atualizar('estoque', linhaAmarela.id, { quantidade_disponivel: saldoSeguro, status: saldoSeguro <= 0 ? 'Zerado' : 'Disponível' });
             }
           }
         }
       }
     }
   }
-
   return { sucesso: true, numeroPL: numeroPLGerado };
 };
 
-const extrairIdDocumento = (url) => {
-  const m = String(url).match(/\/api\/arquivos\/([A-Za-z0-9_-]+)/);
-  return m ? m[1] : null;
-}
+const extrairIdDocumento = (url) => { const m = String(url).match(/\/api\/arquivos\/([A-Za-z0-9_-]+)/); return m ? m[1] : null; }
 
 const salvarAnexosExtras = async (solicitacaoId, anexosArray) => {
   if (!anexosArray || anexosArray.length === 0) return false;
-
-  await db.criarVarios(
-    'anexos',
-    anexosArray.map((anexo) => ({
-      solicitacao_id: solicitacaoId,
-      nome_arquivo: anexo.nome_arquivo,
-      url_arquivo: anexo.url_arquivo,
-      origem: 'logistica',
-    }))
-  );
-
+  await db.criarVarios('anexos', anexosArray.map((anexo) => ({ solicitacao_id: solicitacaoId, nome_arquivo: anexo.nome_arquivo, url_arquivo: anexo.url_arquivo, origem: 'logistica' })));
   return true;
+};
+
+// ✨ FUNÇÃO PARA GRAVAR AS OBSERVAÇÕES INTERNAS
+const atualizarObservacoesLogistica = async (id, texto) => {
+  return await db.atualizar('solicitacoes', id, { observacoes_logistica: texto || '' });
 };
 
 const deletarAnexo = async (anexoId) => {
   const anexo = await db.porId('anexos', anexoId);
-
   if (anexo && anexo.url_arquivo) {
     const idDocumento = extrairIdDocumento(anexo.url_arquivo);
-    if (idDocumento) {
-      try { await db.remover('documentos', idDocumento); } catch (erro) { }
-    }
+    if (idDocumento) { try { await db.remover('documentos', idDocumento); } catch (erro) { } }
   }
-
   await db.remover('anexos', anexoId);
   return true;
 };
@@ -1041,46 +934,27 @@ const reverterItemParaEstoque = async (idItem, qtdDevolver) => {
   const itemPedido = await db.porId('solicitacoes_itens', idItem);
   if (!itemPedido) throw new Error('Item não encontrado na solicitação.');
   if (!itemPedido.estoque_id) throw new Error('Este item não possui vínculo direto com uma prateleira de estoque para devolução.');
-
   const itemEstoque = await db.porId('estoque', itemPedido.estoque_id);
   if (!itemEstoque) throw new Error('Material não encontrado no estoque para devolução.');
 
   const qtdRealDevolver = qtdDevolver ? Number(qtdDevolver) : Number(itemPedido.quantidade_solicitada);
-
-  await db.atualizar('estoque', itemEstoque.id, {
-    quantidade_disponivel: Number(itemEstoque.quantidade_disponivel || 0) + qtdRealDevolver,
-    status: 'Disponível',
-  });
+  await db.atualizar('estoque', itemEstoque.id, { quantidade_disponivel: Number(itemEstoque.quantidade_disponivel || 0) + qtdRealDevolver, status: 'Disponível' });
 
   const novaQtdPedido = Number(itemPedido.quantidade_solicitada) - qtdRealDevolver;
-
-  if (novaQtdPedido <= 0) {
-    await db.remover('solicitacoes_itens', idItem);
-  } else {
-    await db.atualizar('solicitacoes_itens', idItem, { quantidade_solicitada: novaQtdPedido });
-  }
+  if (novaQtdPedido <= 0) await db.remover('solicitacoes_itens', idItem);
+  else await db.atualizar('solicitacoes_itens', idItem, { quantidade_solicitada: novaQtdPedido });
 
   return true;
 };
 
 const buscarHistoricoItem = async (estoqueId) => {
-  const itens = await db.listar('solicitacoes_itens', {
-    filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }),
-  });
-
+  const itens = await db.listar('solicitacoes_itens', { filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }) });
   const solicitacoes = await db.listarPorIds('solicitacoes', 'id', itens.map((i) => i.solicitacao_id));
   const porId = Object.fromEntries(solicitacoes.map((s) => [s.id, solicitacaoParaFront(s)]));
 
   return itens.map((item) => {
     const sol = porId[item.solicitacao_id];
-    return {
-      quantidade: item.quantidade_solicitada,
-      dataSaida: formatarDataBrasil(sol?.created_at),
-      solicitacao: sol?.id,
-      solicitante: sol?.nome_solicitante,
-      status: sol?.status,
-      wbs: sol?.wbs_destino,
-    };
+    return { quantidade: item.quantidade_solicitada, dataSaida: formatarDataBrasil(sol?.created_at), solicitacao: sol?.id, solicitante: sol?.nome_solicitante, status: sol?.status, wbs: sol?.wbs_destino };
   });
 };
 
@@ -1089,9 +963,7 @@ const atualizarLocalizacao = async (id, dadosLocal) => {
   if (dadosLocal.filial) atualizacaoSol.filial_origem_id = dadosLocal.filial;
   if (dadosLocal.data_entrega !== undefined) atualizacaoSol.data_entrega = db.paraData(dadosLocal.data_entrega);
 
-  if (Object.keys(atualizacaoSol).length > 0) {
-    await db.atualizar('solicitacoes', id, atualizacaoSol);
-  }
+  if (Object.keys(atualizacaoSol).length > 0) await db.atualizar('solicitacoes', id, atualizacaoSol);
 
   if (dadosLocal.centro || dadosLocal.deposito) {
     const atualizacaoItens = {};
@@ -1107,26 +979,17 @@ const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
   if (!itens || itens.length === 0) return true;
 
   const itensDB = itens.map((i) => ({
-    solicitacao_id: solicitacaoId,
-    estoque_id: limparIdEstoque(i.estoque_id || i.idBD), 
+    solicitacao_id: solicitacaoId, estoque_id: limparIdEstoque(i.estoque_id || i.idBD), 
     desenho_sap_manual: i.desenho_sap || i.desenhoSAP || i.desenho_sap_manual || null,
     part_number_manual: i.part_number || i.numPecaFabricante || i.part_number_manual || null,
-    fabricante: i.fabricante || null, 
-    fornecedor: i.fornecedor || null,
-    referencia: i.referencia || null,
+    fabricante: i.fabricante || null, fornecedor: i.fornecedor || null, referencia: i.referencia || null,
     quantidade_solicitada: Math.max(1, Number(i.qtd || i.qtdFornecida || i.quantidade_solicitada || i.quantidade || 1)),
-    nf_entrada: i.nf_entrada || i.nfEntrada || null,
-    unidade_medida_manual: i.unidade_medida || i.unidadeMedida || i.unidade_medida_manual || 'Unid',
+    nf_entrada: i.nf_entrada || i.nfEntrada || null, unidade_medida_manual: i.unidade_medida || i.unidadeMedida || i.unidade_medida_manual || 'Unid',
     descricao_manual: limitarTexto(i.descricao || i.vendorDescription || i.materialDescription || i.descricao_manual || 'Sem descrição'),
-    wbs_element: i.wbs_element || i.wbsElement || i.wbs || null,
-    nome_projeto: i.nome_projeto || i.nomeProjeto || null,
-    emissao_nf: i.emissao_nf || i.emissaoNF || null,
-    receb_nf: i.receb_nf || i.recebNF || null,
-    documento_compras: i.documento_compras || i.docCompras || null,
-    valor_unitario_manual: limparValor(i.valor_unitario || i.poNetPrice || i.valor_unitario_manual),
-    centro: i.centro || null,
-    deposito: i.deposito || null,
-    alocacao: i.alocacao || null,
+    wbs_element: i.wbs_element || i.wbsElement || i.wbs || null, nome_projeto: i.nome_projeto || i.nomeProjeto || null,
+    emissao_nf: i.emissao_nf || i.emissaoNF || null, receb_nf: i.receb_nf || i.recebNF || null,
+    documento_compras: i.documento_compras || i.docCompras || null, valor_unitario_manual: limparValor(i.valor_unitario || i.poNetPrice || i.valor_unitario_manual),
+    centro: i.centro || null, deposito: i.deposito || null, alocacao: i.alocacao || null,
   }));
 
   await db.criarVarios('solicitacoes_itens', itensDB);
@@ -1134,10 +997,7 @@ const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
 };
 
 const listarDemandasPorEstoque = async (estoqueId) => {
-  const itens = await db.listar('solicitacoes_itens', {
-    filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }),
-  });
-
+  const itens = await db.listar('solicitacoes_itens', { filter: db.f('estoque_id = {:eid}', { eid: String(estoqueId) }) });
   const solicitacoes = await db.listarPorIds('solicitacoes', 'id', itens.map((i) => i.solicitacao_id));
   const porId = Object.fromEntries(solicitacoes.map((s) => [s.id, solicitacaoParaFront(s)]));
 
@@ -1154,21 +1014,7 @@ const listarDemandasPorEstoque = async (estoqueId) => {
 };
 
 module.exports = {
-  listarSolicitacoes,
-  obterSolicitacaoDetalhada,
-  criarMaterial,
-  criarTransferencia,
-  criarEntrada,
-  atualizarLocalizacao,
-  criarCrossdocking,
-  criarNotaFiscal,
-  criarReintegracao,
-  cancelarPL,
-  atualizarStatus,
-  deletarAnexo,
-  reverterItemParaEstoque,
-  buscarHistoricoItem,
-  salvarAnexosExtras,
-  atualizarItensDaSolicitacao,
-  listarDemandasPorEstoque,
+  listarSolicitacoes, obterSolicitacaoDetalhada, criarMaterial, criarTransferencia, criarEntrada, atualizarLocalizacao,
+  criarCrossdocking, criarNotaFiscal, criarReintegracao, cancelarPL, atualizarStatus, atualizarObservacoesLogistica, deletarAnexo, reverterItemParaEstoque,
+  buscarHistoricoItem, salvarAnexosExtras, atualizarItensDaSolicitacao, listarDemandasPorEstoque,
 };
