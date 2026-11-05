@@ -12,7 +12,7 @@ const verificarToken = require('../middlewares/authMiddleware');
 // ==========================================================
 router.get('/listar-sap', ctrl.listarParaSAP);
 router.get('/listar', ctrl.listar);
-router.get('/:id/detalhes', ctrl.obterDetalhes); // ✨ Rota sob demanda para modais e detalhes
+router.get('/:id/detalhes', ctrl.obterDetalhes); 
 
 router.post('/material', ctrl.criarMaterial);
 router.post('/transferencia', ctrl.criarTransferencia);
@@ -30,6 +30,7 @@ router.post('/:id/anexos', verificarToken, ctrl.adicionarAnexosExtras);
 router.patch('/:id/itens', verificarToken, ctrl.atualizarItens);
 router.patch('/:id/status', verificarToken, ctrl.atualizarStatus);
 router.patch('/:id/local', verificarToken, ctrl.atualizarLocalizacao);
+router.patch('/:id/observacoes-logistica', verificarToken, ctrl.atualizarObservacoesLogistica); // ✨ NOVA ROTA
 router.delete('/anexo/:anexoId', verificarToken, ctrl.removerAnexo);
 
 router.get('/demandas/estoque/:estoqueId', ctrl.listarDemandasPorEstoque);
