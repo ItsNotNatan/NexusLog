@@ -102,17 +102,7 @@ const criarResposta = (res, promessaID) => {
     });
 };
 
-const criarMaterial = (req, res) => {
-  console.log("\n==================================================");
-  console.log("📡 [NODE.JS] CHEGOU UM PEDIDO DE MATERIAL!");
-  console.log("👤 Solicitante:", req.body.solicitante.nome);
-  console.log("📍 Filial:", req.body.solicitante.filial_origem || req.body.solicitante.filial_id);
-  console.log("📦 Total de itens recebidos:", req.body.itens.length);
-  console.log("==================================================\n");
-
-  criarResposta(res, service.criarMaterial(req.body.solicitante, req.body.itens, req.body.anexos));
-};
-
+const criarMaterial = (req, res) => criarResposta(res, service.criarMaterial(req.body.solicitante, req.body.itens, req.body.anexos));
 const criarTransferencia = (req, res) => criarResposta(res, service.criarTransferencia(req.body.solicitante, req.body.itens, req.body.anexos));
 const criarEntrada = (req, res) => criarResposta(res, service.criarEntrada(req.body.solicitante, req.body.itens, req.body.anexos));
 const criarCrossdocking = (req, res) => criarResposta(res, service.criarCrossdocking(req.body.solicitante, req.body.itens, req.body.anexos));
@@ -146,6 +136,17 @@ const adicionarAnexosExtras = async (req, res) => {
   }
 };
 
+// ✨ NOVO CONTROLADOR (OBSERVAÇÕES LOGÍSTICA)
+const atualizarObservacoesLogistica = async (req, res) => {
+  try {
+    await service.atualizarObservacoesLogistica(req.params.id, req.body.observacoes_logistica);
+    res.status(200).json({ sucesso: true, mensagem: 'Observações atualizadas!' });
+  } catch (error) {
+    console.error(`[Erro ao atualizar observacoes logistica ${req.params.id}]:`, error);
+    res.status(500).json({ sucesso: false, erro: 'Falha ao gravar observação.' });
+  }
+};
+
 const removerAnexo = async (req, res) => {
   const { anexoId } = req.params;
   try {
@@ -159,7 +160,6 @@ const removerAnexo = async (req, res) => {
 
 const reverterItem = async (req, res) => {
   const { id_item, quantidade } = req.body;
-
   try {
     await service.reverterItemParaEstoque(id_item, quantidade);
     res.status(200).json({ sucesso: true, mensagem: 'Item revertido para o estoque com sucesso!' });
@@ -272,6 +272,7 @@ module.exports = {
   criarReintegracao,
   cancelarPL,
   atualizarStatus,
+  atualizarObservacoesLogistica, // ✨ EXPORTADO
   removerAnexo,
   reverterItem,
   adicionarAnexosExtras,
