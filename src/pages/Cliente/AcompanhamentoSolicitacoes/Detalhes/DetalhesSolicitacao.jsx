@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao.jsx
-// DESCRIÇÃO: Detalhamento expandido das solicitações (Sem Valor Estimado na NF)
+// DESCRIÇÃO: Detalhamento expandido das solicitações (Sem Valor Estimado na NF e com Obs da Logística read-only)
 // =================================================================
 import React from 'react';
 import { PackageX, Box, ArrowRightLeft, FileText, PackagePlus, Truck, RefreshCcw, XCircle, AlertCircle } from 'lucide-react';
@@ -30,6 +30,42 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
         exibirOrigem={perfil === 'logistica'} 
         onDelete={perfil === 'logistica' ? onDeleteAnexo : undefined}
       />
+    </div>
+  );
+
+  // ✨ NOVO: FUNÇÃO PARA RENDERIZAR O CAMPO DE OBSERVAÇÕES DA LOGÍSTICA (APENAS LEITURA)
+  const RenderizarObsLogistica = () => (
+    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px dashed #e2e8f0', paddingTop: '16px' }}>
+      <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569', textTransform: 'uppercase' }}>
+        Observações da Equipa de Logística
+      </label>
+      
+      <textarea 
+        // Mostra o texto da base de dados ou uma mensagem padrão se estiver vazio
+        value={item.observacoes_logistica || 'Nenhuma observação registada pela logística até ao momento.'}
+        // Bloqueia a digitação (o React ignora as teclas pressionadas)
+        readOnly 
+        // Desativa o campo visualmente e funcionalmente para o navegador
+        disabled 
+        // Aplica o estilo visual de bloqueio
+        style={{
+          width: '100%',
+          minHeight: '100px',
+          padding: '12px',
+          borderRadius: '8px',
+          border: '1px solid #cbd5e1',
+          backgroundColor: '#f1f5f9', // Fundo cinza para dar a sensação de inativo
+          color: '#64748b',           // Texto ligeiramente mais claro
+          fontSize: '0.875rem',
+          cursor: 'not-allowed',      // O cursor do rato muda para um sinal de proibido
+          resize: 'none',             // Impede que o utilizador estique a caixa de texto
+          outline: 'none',
+          boxSizing: 'border-box'
+        }}
+      />
+      <small style={{ color: '#94a3b8', fontSize: '0.75rem', fontStyle: 'italic' }}>
+        * Este campo é de uso exclusivo da logística e não pode ser editado.
+      </small>
     </div>
   );
 
@@ -140,6 +176,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </table>
         </div>
 
+        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
+        <RenderizarObsLogistica />
         <RenderizarAnexos tituloLogistica={item.tipo === 'Entrada' ? "Documentos de Recebimento Final" : "Documentos de Liberação (Logística)"} />
       </div>
     );
@@ -231,6 +269,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </table>
         </div>
 
+        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
+        <RenderizarObsLogistica />
         <RenderizarAnexos />
       </div>
     );
@@ -259,6 +299,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </div>
         </div>
 
+        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
+        <RenderizarObsLogistica />
         <RenderizarAnexos tituloCliente="Notas Fiscais e Espelhos (Solicitante)" />
       </div>
     );
@@ -314,6 +356,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </table>
         </div>
 
+        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
+        <RenderizarObsLogistica />
         <RenderizarAnexos 
           tituloCliente="Nota Fiscal Original (Solicitante)" 
           tituloLogistica="Conhecimento de Transporte (CT-e) e NFs (Logística)" 
@@ -374,6 +418,8 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </table>
         </div>
 
+        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
+        <RenderizarObsLogistica />
         <RenderizarAnexos tituloLogistica={isCancelamento ? "Documento de Cancelamento" : "Documento Final de Reintegração"} />
       </div>
     );
@@ -385,6 +431,9 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   return (
     <div className="area-expandida-cliente" style={{ textAlign: 'center', color: '#64748b' }}>
       <p>O painel detalhado para o tipo <strong>{item.tipo}</strong> será construído em breve.</p>
+      
+      {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
+      <RenderizarObsLogistica />
       <RenderizarAnexos />
     </div>
   );
