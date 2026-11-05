@@ -1,5 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
+// DESCRIÇÃO: Tabela principal com nova coluna de Data de Necessidade
 // =================================================================
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -71,6 +72,20 @@ const converterParaInputDateTime = (dataString) => {
     return `${ano}-${mes}-${dia}T${hora}`;
   }
   return '';
+};
+
+// Função para formatar apenas o dia/mês/ano para a data de necessidade
+const formatarDataSimples = (dataIso) => {
+  if (!dataIso) return "—";
+  try {
+    const data = new Date(dataIso);
+    // Verifica se a data é válida
+    if (isNaN(data.getTime())) return "—";
+    
+    return data.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  } catch (error) {
+    return "—";
+  }
 };
 
 const obterValorSeguroNumero = (valItem, valEstoque) => {
@@ -223,6 +238,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           dataSolicitacao: item.dataSolicitacao || "-",
           dataCriacaoISO: item.created_at || item.dataCriacaoISO || item.dataSolicitacao, 
           dataEntrega: item.dataEntrega || "-",
+          // ✨ NOVO: Guarda a data de necessidade crua
+          dataNecessidadeOriginal: item.dataNecessidade || null,
+          dataNecessidade: formatarDataSimples(item.dataNecessidade),
           pl: numeroPL,
           wbs: wbsProcura, 
           destino: destinoProcura,
@@ -395,7 +413,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (coluna === 'dataCriacaoISO' || coluna === 'dataEntrega') {
         valA = new Date(valA).getTime() || 0;
         valB = new Date(valB).getTime() || 0;
-      } else if (typeof valA === 'string') {
+      }
+      else if (coluna === 'dataNecessidadeOriginal') {
+        valA = a.dataNecessidadeOriginal ? new Date(a.dataNecessidadeOriginal).getTime() : 0;
+        valB = b.dataNecessidadeOriginal ? new Date(b.dataNecessidadeOriginal).getTime() : 0;
+      }
+      else if (typeof valA === 'string') {
         valA = valA.toLowerCase();
         valB = String(valB).toLowerCase();
       }
@@ -523,7 +546,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
     const linhaAtual = dadosTabela.find(s => s.idOriginal === idOriginal);
     
-    // ✨ INJETA A OBSERVAÇÃO AO ABRIR (Se já estiver carregada localmente)
     if (linhaAtual) {
       setObservacaoTemp(linhaAtual.observacoes_logistica || '');
     }
@@ -534,7 +556,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         const res = await apiFetch(`/solicitacoes/${idOriginal}/detalhes`);
         if (res.sucesso) {
           
-          // ✨ INJETA A OBSERVAÇÃO VINDA DA API (Garante atualização fresca)
           setObservacaoTemp(res.dados.observacoes_logistica || '');
 
           setDadosTabela(prev => prev.map(sol => {
@@ -563,7 +584,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     setAnexosNovos([]);
   };
 
-  // ✨ FUNÇÃO QUE FAZ O CAMPO DE OBSERVAÇÕES DA LOGÍSTICA FUNCIONAR
   const handleSalvarObservacaoLogistica = async (idSolicitacao) => {
     try {
       const dados = await apiFetch(`/solicitacoes/${idSolicitacao}/observacoes-logistica`, {
@@ -736,8 +756,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           </div>
         </div>
 
-        <ScrollDuplo larguraConteudo="1100px">
-          <table className="tabela-solicitacoes" style={{ width: '100%', minWidth: '1100px' }}>
+        <ScrollDuplo larguraConteudo="1250px">
+          <table className="tabela-solicitacoes" style={{ width: '100%', minWidth: '1250px' }}>
             <thead>
               <tr>
                 <th className="col-chevron"></th>
@@ -746,6 +766,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <HeaderOrdenavel coluna="pl" label="Nº DA PL" />
                 <HeaderOrdenavel coluna="destino" label="DE ➔ PARA" />
                 <HeaderOrdenavel coluna="dataCriacaoISO" label="DATA CRIAÇÃO" />
+                
+                {/* ✨ NOVA COLUNA: DATA NECESSIDADE */}
+                <HeaderOrdenavel coluna="dataNecessidadeOriginal" label="DATA NECESSIDADE" />
+
                 <HeaderOrdenavel coluna="dataEntrega" label="DATA ENTREGA" />
                 <HeaderOrdenavel coluna="statusExibicao" label={`STATUS ${perfil === "logistica" ? "/ AÇÃO" : ""}`} />
               </tr>
@@ -769,12 +793,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                       <div className="skeleton-box" style={{ width: '90px', height: '20px' }}></div>
                     </td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
+                    
+                    {/* ✨ Skeleton da Nova Coluna */}
+                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '70px', height: '14px' }}></div></td>
+
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '100px', height: '28px', borderRadius: '999px' }}></div></td>
                   </tr>
                 ))
               ) : dadosPaginados.length === 0 ? (
-                <tr><td colSpan="8" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
+                <tr><td colSpan="9" style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>Nenhuma solicitação encontrada.</td></tr>
               ) : (
                 dadosPaginados.map((linha, index) => {
                   const idUnico = `${linha.idOriginal}-${index}`;
@@ -874,6 +902,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         </td>
 
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
+                        
+                        {/* ✨ CÉLULA DA NOVA COLUNA: DATA NECESSIDADE */}
+                        <td className="texto-data" style={{ color: corTextoForte, fontWeight: '500' }}>
+                          {linha.dataNecessidade || "—"}
+                        </td>
 
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
@@ -959,7 +992,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                       {isExpandida && linha.detalhesCompletos && (
                         <tr>
-                          <td colSpan="8" className="td-expandida" style={{ padding: 0 }}>
+                          {/* ✨ O colSpan subiu para 9 porque adicionámos mais uma coluna! */}
+                          <td colSpan="9" className="td-expandida" style={{ padding: 0 }}>
                             
                             {/* DESTAQUE DA NF PARA CROSSDOCKING */}
                             {linha.tipo === 'Crossdocking' && (
