@@ -1,6 +1,7 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/TransferenciaWBS/TransferenciaWBS.jsx
-// DESCRIÇÃO: Ecrã de transferência com anexo opcional e formatação WBS
+// DESCRIÇÃO: Ecrã de transferência com anexo opcional, formatação WBS, 
+//            e Proteções de Segurança (Anti-Duplo Clique + Saldo)
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import './TransferenciaWBS.css';
@@ -19,6 +20,9 @@ import { formatarWBS } from '../../../utils/formatadores';
 export default function TransferenciaWBS() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useAlert();
+
+  // ✨ ESTADO DE SEGURANÇA 1: Trava contra duplo clique
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formDados, setFormDados] = useState({ nome: '', wbsDestino: '', justificativa: '', entregaUrgente: false });
   const [itensSelecionados, setItensSelecionados] = useState([]);
@@ -115,51 +119,79 @@ export default function TransferenciaWBS() {
   };
 
   const handleEnviar = async () => {
+    // ✨ BLOQUEIO 1: Interceta o duplo clique
+    if (isSubmitting) {
+      console.warn("Bloqueado: Tentativa de duplo clique interceptada.");
+      return;
+    }
+
     if (!estoqueAtual || estoqueAtual === 'TODOS') { showAlert("Atenção", "Selecione uma filial de origem.", "warning"); return; }
     if (!formDados.nome || !formDados.wbsDestino) { showAlert("Campos Obrigatórios", "Preencha o Nome e o WBS de Destino.", "warning"); return; }
     if (itensSelecionados.length === 0) { showAlert("Carrinho Vazio", "Selecione pelo menos um item para transferir.", "warning"); return; }
 
-    let anexosProcessados = [];
-    if (anexos.length > 0) {
-      try {
-        anexosProcessados = await enviarArquivos(anexos);
-      } catch (erroUpload) {
-        showAlert("Falha no Anexo", erroUpload.message || "Erro ao anexar os ficheiros.", "error");
-        return;
-      }
+    // ✨ BLOQUEIO 2: VERIFICAÇÃO RIGOROSA DO SALDO
+    const temItemComQuantidadeSuperiorAoSaldo = itensSelecionados.some(item => {
+      const saldoLivre = item.quantidade_disponivel - (item.quantidade_reservada || 0);
+      return item.qtdTransferencia > saldoLivre;
+    });
+
+    if (temItemComQuantidadeSuperiorAoSaldo) {
+       showAlert("Erro de Quantidade", "Algum item possui quantidade superior ao saldo livre. Revise a sua lista antes de enviar.", "error");
+       return;
     }
 
-    // ✨ CORREÇÃO CRÍTICA DO PAYLOAD DE TRANSFERÊNCIA
-    const payload = {
-      solicitante: { 
-        ...formDados, 
-        wbs: formDados.wbsDestino, // Mantido para compatibilidade
-        wbs_destino: formDados.wbsDestino, // Passando explícito para a API
-        tipo: 'Transferencia WBS', 
-        filial_origem: estoqueAtual 
-      },
-      itens: itensSelecionados.map(item => ({
-        estoque_id: item.id, 
-        desenhoSAP: item.desenho_sap || item.desenhoSAP || '-', 
-        numPecaFabricante: item.part_number || item.numPecaFabricante || '-',
-        fabricante: item.fabricante || null, 
-        materialDescription: item.descricao || item.materialDescription || '-',
-        qtd: item.qtdTransferencia, 
-        // ✨ CORREÇÃO AQUI: Garante a passagem rigorosa do WBS da prateleira do item para montar "Origem -> Destino"
-        wbsOrigem: item.wbs || item.wbs_element || 'Desconhecido', 
-        alocacao: item.alocacao || '-'
-      })),
-      anexos: anexosProcessados 
-    };
+    // ✨ FECHA A TRANCA
+    setIsSubmitting(true);
 
     try {
+      let anexosProcessados = [];
+      if (anexos.length > 0) {
+        try {
+          anexosProcessados = await enviarArquivos(anexos);
+        } catch (erroUpload) {
+          showAlert("Falha no Anexo", erroUpload.message || "Erro ao anexar os ficheiros.", "error");
+          setIsSubmitting(false); // Solta a trava
+          return;
+        }
+      }
+
+      // ✨ CORREÇÃO CRÍTICA DO PAYLOAD DE TRANSFERÊNCIA
+      const payload = {
+        solicitante: { 
+          ...formDados, 
+          wbs: formDados.wbsDestino, // Mantido para compatibilidade
+          wbs_destino: formDados.wbsDestino, // Passando explícito para a API
+          tipo: 'Transferencia WBS', 
+          filial_origem: estoqueAtual 
+        },
+        itens: itensSelecionados.map(item => ({
+          estoque_id: item.id, 
+          desenhoSAP: item.desenho_sap || item.desenhoSAP || '-', 
+          numPecaFabricante: item.part_number || item.numPecaFabricante || '-',
+          fabricante: item.fabricante || null, 
+          materialDescription: item.descricao || item.materialDescription || '-',
+          qtd: item.qtdTransferencia, 
+          wbsOrigem: item.wbs || item.wbs_element || 'Desconhecido', 
+          alocacao: item.alocacao || '-'
+        })),
+        anexos: anexosProcessados 
+      };
+
       const dados = await apiFetch('/solicitacoes/transferencia', { method: 'POST', body: JSON.stringify(payload) });
       if (dados.sucesso || dados.ps) {
         showAlert("Sucesso!", `Transferência solicitada com sucesso. PS Gerada: ${dados.ps}`, "success");
         setFormDados({ nome: '', wbsDestino: '', justificativa: '', entregaUrgente: false });
-        setItensSelecionados([]); setAnexos([]); 
-      } else { showAlert("Erro do Servidor", dados.erro, "error"); }
-    } catch (error) { showAlert("Falha de Conexão", "Não foi possível ligar ao servidor.", "error"); }
+        setItensSelecionados([]); 
+        setAnexos([]); 
+      } else { 
+        showAlert("Erro do Servidor", dados.erro, "error"); 
+      }
+    } catch (error) { 
+      showAlert("Falha de Conexão", "Não foi possível ligar ao servidor.", "error"); 
+    } finally {
+      // ✨ LIBERTA A TRANCA
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -168,7 +200,14 @@ export default function TransferenciaWBS() {
         <div className="form-grid">
           <div className="input-grupo">
             <label>SOLICITANTE *</label>
-            <input type="text" className="input-campo" placeholder="Seu nome" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} />
+            <input 
+              type="text" 
+              className="input-campo" 
+              placeholder="Seu nome" 
+              value={formDados.nome} 
+              onChange={(e) => setFormDados({...formDados, nome: e.target.value})} 
+              disabled={isSubmitting}
+            />
           </div>
           <div className="input-grupo">
             <label>WBS DE DESTINO *</label>
@@ -178,6 +217,7 @@ export default function TransferenciaWBS() {
               placeholder="WBS do projeto destino" 
               value={formDados.wbsDestino} 
               onChange={(e) => setFormDados({...formDados, wbsDestino: formatarWBS(e.target.value)})} 
+              disabled={isSubmitting}
             />
           </div>
           <div className="input-grupo">
@@ -190,7 +230,14 @@ export default function TransferenciaWBS() {
           </div>
           <div className="input-grupo span-2">
             <label>JUSTIFICATIVA</label>
-            <textarea className="input-campo" placeholder="Motivo..." rows="2" value={formDados.justificativa} onChange={(e) => setFormDados({...formDados, justificativa: e.target.value})}></textarea>
+            <textarea 
+              className="input-campo" 
+              placeholder="Motivo..." 
+              rows="2" 
+              value={formDados.justificativa} 
+              onChange={(e) => setFormDados({...formDados, justificativa: e.target.value})}
+              disabled={isSubmitting}
+            ></textarea>
           </div>
         </div>
         
@@ -211,7 +258,21 @@ export default function TransferenciaWBS() {
       </div>
 
       <div className="form-acoes-final mt-4">
-        <button className="btn-enviar-azul" onClick={handleEnviar}><Send size={16} /> Confirmar Transferência</button>
+        <button 
+          className="btn-enviar-azul" 
+          onClick={handleEnviar}
+          disabled={isSubmitting}
+          style={{ 
+            display: 'flex', alignItems: 'center', gap: '8px', 
+            padding: '12px 24px', borderRadius: '8px', fontWeight: 'bold', border: 'none',
+            backgroundColor: isSubmitting ? '#94a3b8' : '#2563eb', 
+            color: 'white',
+            cursor: isSubmitting ? 'not-allowed' : 'pointer'
+          }}
+        >
+          <Send size={16} /> 
+          {isSubmitting ? "A processar..." : "Confirmar Transferência"}
+        </button>
       </div>
     </>
   );
