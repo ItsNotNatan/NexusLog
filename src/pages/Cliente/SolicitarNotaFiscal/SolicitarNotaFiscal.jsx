@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/SolicitarNotaFiscal/SolicitarNotaFiscal.jsx
+// DESCRIÇÃO: Ecrã de Solicitação de Nota Fiscal com Proteção Anti-Duplo Clique
+// =================================================================
 import React, { useState, useContext } from 'react';
 import { User, FileText, Paperclip, Send, MapPin } from 'lucide-react'; 
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
@@ -11,11 +15,20 @@ export default function SolicitarNotaFiscal() {
   const { showAlert } = useAlert();
   const { estoqueAtual } = useContext(AuthContext); 
 
+  // ✨ ESTADO DE SEGURANÇA 1: Trava contra múltiplos cliques (Race Condition)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // ✨ CAMPO DESTINO ADICIONADO AO ESTADO INICIAL
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', descricao: '', observacoes: '' });
   const [anexos, setAnexos] = useState([]);
 
   const handleEnviar = async () => {
+    // ✨ BLOQUEIO DE SEGURANÇA: Se já está a enviar, descarta cliques adicionais
+    if (isSubmitting) {
+      console.warn("Bloqueado: Tentativa de duplo clique interceptada.");
+      return; 
+    }
+
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       showAlert("Atenção", "Por favor, selecione uma filial no topo da página antes de prosseguir.", "warning");
       return;
@@ -27,30 +40,34 @@ export default function SolicitarNotaFiscal() {
       return;
     }
 
-    const anexosProcessados = [];
-    if (anexos.length > 0) {
-      try {
-        anexosProcessados.push(...await enviarArquivos(anexos));
-      } catch (erroUpload) {
-        showAlert("Erro no Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
-        return;
-      }
-    }
-
-    const payload = {
-      solicitante: {
-        nome: formDados.nome, 
-        wbs: formDados.wbs, 
-        destino: formDados.destino, // ✨ ENVIADO PARA O SERVIDOR
-        descricao: formDados.descricao, 
-        observacoes: formDados.observacoes,
-        tipo: 'Nota Fiscal', 
-        filial_origem: estoqueAtual 
-      },
-      anexos: anexosProcessados 
-    };
+    // ✨ FECHA A TRANCA
+    setIsSubmitting(true);
 
     try {
+      const anexosProcessados = [];
+      if (anexos.length > 0) {
+        try {
+          anexosProcessados.push(...await enviarArquivos(anexos));
+        } catch (erroUpload) {
+          showAlert("Erro no Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+          setIsSubmitting(false); // Solta a trava se falhar o upload
+          return;
+        }
+      }
+
+      const payload = {
+        solicitante: {
+          nome: formDados.nome, 
+          wbs: formDados.wbs, 
+          destino: formDados.destino, // ✨ ENVIADO PARA O SERVIDOR
+          descricao: formDados.descricao, 
+          observacoes: formDados.observacoes,
+          tipo: 'Nota Fiscal', 
+          filial_origem: estoqueAtual 
+        },
+        anexos: anexosProcessados 
+      };
+
       const dados = await apiFetch('/solicitacoes/nota-fiscal', { method: 'POST', body: JSON.stringify(payload) });
 
       if (dados.sucesso || dados.ps_id) {
@@ -62,6 +79,9 @@ export default function SolicitarNotaFiscal() {
       }
     } catch (error) {
       showAlert("Falha de Conexão", "Não foi possível ligar ao servidor. Verifica a tua internet.", "error");
+    } finally {
+      // ✨ LIBERTA A TRANCA: quer dê sucesso ou erro, volta a libertar o botão
+      setIsSubmitting(false);
     }
   };
 
@@ -78,7 +98,14 @@ export default function SolicitarNotaFiscal() {
           <div className="form-grid coluna-unica">
             <div className="input-grupo">
               <label>NOME *</label>
-              <input type="text" className="input-campo foco-roxo" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} />
+              <input 
+                type="text" 
+                className="input-campo foco-roxo" 
+                placeholder="Seu nome completo" 
+                value={formDados.nome} 
+                onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} 
+                disabled={isSubmitting}
+              />
             </div>
             
             <div className="input-grupo">
@@ -89,6 +116,7 @@ export default function SolicitarNotaFiscal() {
                 placeholder="Ex: ABCDE-12345" 
                 value={formDados.wbs} 
                 onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} 
+                disabled={isSubmitting}
               />
             </div>
 
@@ -101,6 +129,7 @@ export default function SolicitarNotaFiscal() {
                 placeholder="Local de entrega / destino" 
                 value={formDados.destino} 
                 onChange={(e) => setFormDados({ ...formDados, destino: e.target.value })} 
+                disabled={isSubmitting}
               />
             </div>
 
@@ -125,11 +154,25 @@ export default function SolicitarNotaFiscal() {
           <div className="form-grid coluna-unica flex-1">
             <div className="input-grupo flex-1">
               <label>DESCRIÇÃO / MOTIVO *</label>
-              <textarea className="input-campo foco-roxo flex-1" placeholder="Descreva o motivo..." style={{ minHeight: '120px' }} value={formDados.descricao} onChange={(e) => setFormDados({ ...formDados, descricao: e.target.value })}></textarea>
+              <textarea 
+                className="input-campo foco-roxo flex-1" 
+                placeholder="Descreva o motivo..." 
+                style={{ minHeight: '120px' }} 
+                value={formDados.descricao} 
+                onChange={(e) => setFormDados({ ...formDados, descricao: e.target.value })}
+                disabled={isSubmitting}
+              ></textarea>
             </div>
             <div className="input-grupo mt-4">
               <label>OBSERVAÇÕES</label>
-              <input type="text" className="input-campo foco-roxo" placeholder="Info adicional..." value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })} />
+              <input 
+                type="text" 
+                className="input-campo foco-roxo" 
+                placeholder="Info adicional..." 
+                value={formDados.observacoes} 
+                onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })} 
+                disabled={isSubmitting}
+              />
             </div>
           </div>
         </div>
@@ -148,7 +191,13 @@ export default function SolicitarNotaFiscal() {
         <GerenciadorAnexos anexos={anexos} setAnexos={setAnexos} titulo="" />
       </div>
 
-      <BotaoAcaoGlobal texto="Enviar Solicitação de NF" icone={<Send size={16} />} cor="roxo" onClick={handleEnviar} />
+      <BotaoAcaoGlobal 
+        texto={isSubmitting ? "A processar..." : "Enviar Solicitação de NF"} 
+        icone={<Send size={16} />} 
+        cor="roxo" 
+        onClick={handleEnviar} 
+        carregando={isSubmitting} // ✨ O botão reage à trava
+      />
     </div>
   );
 }
