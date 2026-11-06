@@ -1,5 +1,9 @@
-import React, { useState, useEffect, useContext } from 'react'; 
-import { Package, User, Upload, Send, Plus, Trash2, AlertTriangle, FileText, MapPin, Truck } from 'lucide-react';
+// =================================================================
+// ARQUIVO: src/pages/Cliente/Crossdocking/Crossdocking.jsx
+// DESCRIÇÃO: Ecrã de Saída Crossdocking com Proteção Anti-Duplo Clique
+// =================================================================
+import React, { useState, useEffect, useContext } from 'react';
+import { Package, User, Send, Plus, Trash2, AlertTriangle, FileText, MapPin, Truck } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -13,6 +17,9 @@ import './Crossdocking.css';
 export default function Crossdocking() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useAlert();
+
+  // ✨ ESTADO DE SEGURANÇA: Trava contra múltiplos cliques (Race Condition)
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', fornecedor: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
@@ -52,6 +59,12 @@ export default function Crossdocking() {
   };
 
   const handleEnviar = async () => {
+    // ✨ BLOQUEIO DE SEGURANÇA 1: Impede envio múltiplo acidental
+    if (isSubmitting) {
+      console.warn("Bloqueado: Tentativa de duplo clique interceptada.");
+      return; 
+    }
+
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       showAlert("Atenção", "Por favor, selecione uma filial no topo da página antes de prosseguir.", "warning");
       return;
@@ -73,35 +86,39 @@ export default function Crossdocking() {
       }
     }
 
-    let anexosProcessados = [];
-    try {
-      anexosProcessados = await enviarArquivos(anexos);
-    } catch (erroUpload) {
-      showAlert("Erro no Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
-      return;
-    }
-
-    // ✨ EXTRAÇÃO INTELIGENTE: Pega apenas o primeiro nome e garante que está em maiúsculas
-    const fornecedorProcessado = formDados.fornecedor.trim().split(/\s+/)[0].toUpperCase();
-
-    const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
-      desenho_sap_manual: i.desenhoSAP,
-      quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
-      unidade_medida_manual: 'Unid',
-      nf_entrada: formDados.nf,
-      fornecedor: fornecedorProcessado // Usa o nome filtrado
-    }));
-
-    const payload = {
-      solicitante: {
-        nome: formDados.nome, wbs: formDados.wbs, nf: formDados.nf, destino: formDados.destino, 
-        observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${fornecedorProcessado}] ${formDados.observacoes}`,
-        tipo: 'Crossdocking', filial_origem: estoqueAtual 
-      },
-      itens: listaItensFinais, anexos: anexosProcessados 
-    };
+    // ✨ FECHA A TRANCA: Todos os botões e inputs serão bloqueados a partir daqui
+    setIsSubmitting(true);
 
     try {
+      let anexosProcessados = [];
+      try {
+        anexosProcessados = await enviarArquivos(anexos);
+      } catch (erroUpload) {
+        showAlert("Erro no Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+        setIsSubmitting(false); // Solta a trava
+        return;
+      }
+
+      // ✨ EXTRAÇÃO INTELIGENTE: Pega apenas o primeiro nome e garante que está em maiúsculas
+      const fornecedorProcessado = formDados.fornecedor.trim().split(/\s+/)[0].toUpperCase();
+
+      const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
+        desenho_sap_manual: i.desenhoSAP,
+        quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
+        unidade_medida_manual: 'Unid',
+        nf_entrada: formDados.nf,
+        fornecedor: fornecedorProcessado 
+      }));
+
+      const payload = {
+        solicitante: {
+          nome: formDados.nome, wbs: formDados.wbs, nf: formDados.nf, destino: formDados.destino, 
+          observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${fornecedorProcessado}] ${formDados.observacoes}`,
+          tipo: 'Crossdocking', filial_origem: estoqueAtual 
+        },
+        itens: listaItensFinais, anexos: anexosProcessados 
+      };
+
       const dados = await apiFetch('/solicitacoes/crossdocking', { method: 'POST', body: JSON.stringify(payload) });
 
       if (dados.sucesso || dados.ps) {
@@ -115,6 +132,9 @@ export default function Crossdocking() {
       }
     } catch (error) {
       showAlert("Falha de Conexão", "Não foi possível ligar ao servidor. Verifica a tua internet.", "error");
+    } finally {
+      // ✨ LIBERTA A TRANCA
+      setIsSubmitting(false);
     }
   };
 
@@ -138,7 +158,7 @@ export default function Crossdocking() {
         <div className="form-grid">
           <div className="input-grupo">
             <label>NOME *</label>
-            <input type="text" className="input-campo foco-ciano" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} />
+            <input type="text" className="input-campo foco-ciano" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} disabled={isSubmitting} />
           </div>
           <div className="input-grupo">
             <label>WBS *</label>
@@ -148,6 +168,7 @@ export default function Crossdocking() {
               placeholder="WBS do projeto" 
               value={formDados.wbs} 
               onChange={(e) => setFormDados({...formDados, wbs: formatarWBS(e.target.value)})} 
+              disabled={isSubmitting}
             />
           </div>
           <div className="input-grupo">
@@ -160,13 +181,13 @@ export default function Crossdocking() {
           </div>
           <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> DESTINO *</label>
-            <input type="text" className="input-campo foco-ciano" placeholder="Local de destino do material..." value={formDados.destino} onChange={(e) => setFormDados({...formDados, destino: e.target.value})} />
+            <input type="text" className="input-campo foco-ciano" placeholder="Local de destino do material..." value={formDados.destino} onChange={(e) => setFormDados({...formDados, destino: e.target.value})} disabled={isSubmitting} />
           </div>
           
           <div className="input-grupo" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} color="#0891b2" /> NÚMERO DA NOTA FISCAL *</label>
-              <input type="text" className="input-campo foco-ciano" placeholder="Ex: 123456" value={formDados.nf} onChange={(e) => setFormDados({...formDados, nf: e.target.value})} />
+              <input type="text" className="input-campo foco-ciano" placeholder="Ex: 123456" value={formDados.nf} onChange={(e) => setFormDados({...formDados, nf: e.target.value})} disabled={isSubmitting} />
             </div>
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Truck size={14} color="#0891b2" /> FORNECEDOR / EMISSOR DA NF *</label>
@@ -175,8 +196,8 @@ export default function Crossdocking() {
                 className="input-campo foco-ciano" 
                 placeholder="Ex: SIEMENS" 
                 value={formDados.fornecedor} 
-                // ✨ FORÇA MAIÚSCULAS IMEDIATAMENTE NO VISUAL
                 onChange={(e) => setFormDados({...formDados, fornecedor: e.target.value.toUpperCase()})} 
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -198,8 +219,8 @@ export default function Crossdocking() {
           <div className="input-grupo">
             <label>TIPO DE SAÍDA *</label>
             <div className="botoes-toggle-container">
-              <button className={`btn-toggle ${tipoSaida === 'parcial' ? 'selecionado' : ''}`} onClick={() => setTipoSaida('parcial')}>Saída Parcial</button>
-              <button className={`btn-toggle ${tipoSaida === 'total' ? 'selecionado' : ''}`} onClick={() => setTipoSaida('total')}>Saída Total</button>
+              <button disabled={isSubmitting} className={`btn-toggle ${tipoSaida === 'parcial' ? 'selecionado' : ''}`} onClick={() => setTipoSaida('parcial')}>Saída Parcial</button>
+              <button disabled={isSubmitting} className={`btn-toggle ${tipoSaida === 'total' ? 'selecionado' : ''}`} onClick={() => setTipoSaida('total')}>Saída Total</button>
             </div>
           </div>
 
@@ -210,7 +231,7 @@ export default function Crossdocking() {
                   <AlertTriangle size={16} /> 
                   Os itens abaixo serão descontados automaticamente pela combinação de NF e Desenho SAP durante a Entrada.
                 </span>
-                <button onClick={adicionarItemParcial} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', color: '#2563eb', cursor: 'pointer' }}><Plus size={14} /> Adicionar Item</button>
+                <button disabled={isSubmitting} onClick={adicionarItemParcial} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', color: isSubmitting ? '#cbd5e1' : '#2563eb', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}><Plus size={14} /> Adicionar Item</button>
               </div>
 
               <div className="scroll-tabela-solicitacao" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '8px 16px', backgroundColor: '#f8fafc' }}>
@@ -227,7 +248,7 @@ export default function Crossdocking() {
                     {itensParciais.map((item, index) => (
                       <tr key={item.id}>
                         <td style={{ color: '#64748b', fontSize: '0.875rem', fontWeight: '500', padding: '8px' }}>{index + 1}</td>
-                        <td><input type="text" className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff', fontFamily: 'monospace', fontWeight: '600' }} placeholder="Ex: 12345-A" value={item.desenhoSAP} onChange={(e) => atualizarItemParcial(item.id, 'desenhoSAP', e.target.value)} /></td>
+                        <td><input type="text" className="input-campo foco-ciano" style={{ backgroundColor: '#ffffff', fontFamily: 'monospace', fontWeight: '600' }} placeholder="Ex: 12345-A" value={item.desenhoSAP} onChange={(e) => atualizarItemParcial(item.id, 'desenhoSAP', e.target.value)} disabled={isSubmitting} /></td>
                         
                         <td>
                           <input 
@@ -238,6 +259,7 @@ export default function Crossdocking() {
                             step="1"
                             placeholder="1" 
                             value={item.quantidade} 
+                            disabled={isSubmitting}
                             onKeyDown={(e) => {
                               if (e.key === '.' || e.key === ',' || e.key === '-' || e.key === 'e' || e.key === 'E') {
                                 e.preventDefault();
@@ -257,7 +279,7 @@ export default function Crossdocking() {
                         </td>
 
                         <td style={{ textAlign: 'center' }}>
-                          <button onClick={() => removerItemParcial(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                          <button disabled={isSubmitting} onClick={() => removerItemParcial(item.id)} style={{ background: 'none', border: 'none', color: isSubmitting ? '#cbd5e1' : '#ef4444', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}><Trash2 size={16} /></button>
                         </td>
                       </tr>
                     ))}
@@ -269,12 +291,18 @@ export default function Crossdocking() {
 
           <div className="input-grupo">
             <label>OBSERVAÇÕES</label>
-            <textarea className="input-campo foco-ciano" placeholder="Informações adicionais..." value={formDados.observacoes} onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})}></textarea>
+            <textarea className="input-campo foco-ciano" placeholder="Informações adicionais..." value={formDados.observacoes} onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})} disabled={isSubmitting}></textarea>
           </div>
         </div>
       </div>
 
-      <BotaoAcaoGlobal texto="Enviar Crossdocking" icone={<Send size={16} />} cor="ciano" onClick={handleEnviar} />
+      <BotaoAcaoGlobal 
+        texto={isSubmitting ? "A processar..." : "Enviar Crossdocking"} 
+        icone={<Send size={16} />} 
+        cor="ciano" 
+        onClick={handleEnviar} 
+        carregando={isSubmitting} // ✨ Botão recebe a trava
+      />
     </div>
   );
 }
