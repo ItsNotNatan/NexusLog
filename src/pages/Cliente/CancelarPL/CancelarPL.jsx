@@ -1,5 +1,9 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/CancelarPL/CancelarPL.jsx
+// DESCRIÇÃO: Formulário para Cancelar PS/PL com Proteção Anti-Duplo Clique
+// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
-import { AlertTriangle, XCircle, Search, Loader2, MapPin } from 'lucide-react'; // ✨ Adicionado MapPin
+import { AlertTriangle, XCircle, Search, Loader2, MapPin } from 'lucide-react'; 
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import './CancelarPL.css';
 
@@ -10,6 +14,9 @@ import { apiFetch } from '../../../services/api';
 export default function CancelarPL() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useContext(AlertContext);
+
+  // ✨ ESTADO DE SEGURANÇA: Trava contra múltiplos cliques (Race Condition)
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [listaSolicitacoes, setListaSolicitacoes] = useState([]);
   const [pesquisa, setPesquisa] = useState('');
@@ -49,12 +56,21 @@ export default function CancelarPL() {
   }, [estoqueAtual]);
 
   const handleEnviar = async () => {
+    // ✨ BLOQUEIO DE SEGURANÇA 1: Impede envio múltiplo acidental
+    if (isSubmitting) {
+      console.warn("Bloqueado: Tentativa de duplo clique interceptada.");
+      return; 
+    }
+
     if (!solicitacaoSelecionada) {
       showAlert("Atenção", "Por favor, selecione uma solicitação na lista para prosseguir com o cancelamento.", "warning"); return;
     }
     if (!nomeSolicitante || !justificativa) {
       showAlert("Campos Obrigatórios", "Por favor, preencha o seu nome e a justificativa para o cancelamento.", "warning"); return;
     }
+
+    // ✨ FECHA A TRANCA: Todos os botões e inputs serão bloqueados a partir daqui
+    setIsSubmitting(true);
 
     const solAtiva = listaSolicitacoes.find(p => p.id === solicitacaoSelecionada);
     const identificadorCancelado = solAtiva.pl && solAtiva.pl !== '-' ? solAtiva.pl : solAtiva.ps;
@@ -78,6 +94,9 @@ export default function CancelarPL() {
       }
     } catch (error) {
       showAlert("Falha de Conexão", "Não foi possível conectar ao servidor.", "error");
+    } finally {
+      // ✨ LIBERTA A TRANCA
+      setIsSubmitting(false);
     }
   };
 
@@ -111,7 +130,15 @@ export default function CancelarPL() {
         
         <div className="pesquisa-wrapper">
           <Search size={18} className="icone-pesquisa" />
-          <input type="text" className="input-campo foco-vermelho" placeholder="Buscar por PS, PL, ID ou solicitante..." style={{ paddingLeft: '40px' }} value={pesquisa} onChange={(e) => setPesquisa(e.target.value)} />
+          <input 
+            type="text" 
+            className="input-campo foco-vermelho" 
+            placeholder="Buscar por PS, PL, ID ou solicitante..." 
+            style={{ paddingLeft: '40px' }} 
+            value={pesquisa} 
+            onChange={(e) => setPesquisa(e.target.value)} 
+            disabled={isSubmitting} // ✨ Desativado durante o envio
+          />
         </div>
         
         <div className="lista-pl-container">
@@ -121,7 +148,17 @@ export default function CancelarPL() {
             <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem', marginTop: '16px', padding: '16px' }}>Nenhuma solicitação ativa encontrada para essa busca.</p>
           ) : (
             listaFiltrada.map((sol) => (
-              <div key={sol.id} className="item-pl" style={{ border: solicitacaoSelecionada === sol.id ? '2px solid #ef4444' : '1px solid #e2e8f0', backgroundColor: solicitacaoSelecionada === sol.id ? '#fef2f2' : '#ffffff' }} onClick={() => setSolicitacaoSelecionada(sol.id)} >
+              <div 
+                key={sol.id} 
+                className="item-pl" 
+                style={{ 
+                  border: solicitacaoSelecionada === sol.id ? '2px solid #ef4444' : '1px solid #e2e8f0', 
+                  backgroundColor: solicitacaoSelecionada === sol.id ? '#fef2f2' : '#ffffff',
+                  opacity: isSubmitting ? 0.6 : 1, // ✨ Feedback visual se estiver a enviar
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                }} 
+                onClick={() => { if(!isSubmitting) setSolicitacaoSelecionada(sol.id) }} 
+              >
                 <div className="item-pl-info">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <span className="item-pl-titulo" style={{ color: solicitacaoSelecionada === sol.id ? '#dc2626' : '#1e293b' }}>{sol.ps}</span>
@@ -174,7 +211,14 @@ export default function CancelarPL() {
             <div className="form-grid">
               <div className="input-grupo">
                 <label>NOME DO SOLICITANTE *</label>
-                <input type="text" className="input-campo foco-vermelho" placeholder="Nome de quem está solicitando o cancelamento" value={nomeSolicitante} onChange={(e) => setNomeSolicitante(e.target.value)} />
+                <input 
+                  type="text" 
+                  className="input-campo foco-vermelho" 
+                  placeholder="Nome de quem está solicitando o cancelamento" 
+                  value={nomeSolicitante} 
+                  onChange={(e) => setNomeSolicitante(e.target.value)} 
+                  disabled={isSubmitting} // ✨ Desativado durante o envio
+                />
               </div>
               {/* ✨ FILIAL DE ORIGEM */}
               <div className="input-grupo">
@@ -187,11 +231,24 @@ export default function CancelarPL() {
               </div>
               <div className="input-grupo span-2">
                 <label>JUSTIFICATIVA *</label>
-                <textarea className="input-campo foco-vermelho" placeholder="Informe o motivo do cancelamento..." rows="3" value={justificativa} onChange={(e) => setJustificativa(e.target.value)}></textarea>
+                <textarea 
+                  className="input-campo foco-vermelho" 
+                  placeholder="Informe o motivo do cancelamento..." 
+                  rows="3" 
+                  value={justificativa} 
+                  onChange={(e) => setJustificativa(e.target.value)}
+                  disabled={isSubmitting} // ✨ Desativado durante o envio
+                ></textarea>
               </div>
             </div>
 
-            <BotaoAcaoGlobal texto={`Cancelar ${solAtivaParaTabela.pl && solAtivaParaTabela.pl !== '-' ? solAtivaParaTabela.pl : solAtivaParaTabela.ps}`} icone={<XCircle size={16} />} cor="vermelho" onClick={handleEnviar} />
+            <BotaoAcaoGlobal 
+              texto={isSubmitting ? "A processar..." : `Cancelar ${solAtivaParaTabela.pl && solAtivaParaTabela.pl !== '-' ? solAtivaParaTabela.pl : solAtivaParaTabela.ps}`} 
+              icone={<XCircle size={16} />} 
+              cor="vermelho" 
+              onClick={handleEnviar} 
+              carregando={isSubmitting} // ✨ O botão reage à trava
+            />
           </div>
         </>
       )}
