@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
-// DESCRIÇÃO: Tabela principal com nova coluna de Data de Necessidade (Resiliente)
+// DESCRIÇÃO: Tabela principal com nova coluna de Data de Necessidade (Corrigido)
 // =================================================================
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -74,35 +74,16 @@ const converterParaInputDateTime = (dataString) => {
   return '';
 };
 
-// ✨ Função reforçada para extrair a data de necessidade
-const obterDataNecessidade = (item) => {
-  // 1. Tenta encontrar na raiz do objeto
-  if (item.data_necessidade) return item.data_necessidade;
-  if (item.dataNecessidade) return item.dataNecessidade;
-  
-  // 2. Se não encontrou, tenta vasculhar o primeiro item anexado (caso a API o esconda lá)
-  if (item.itens && item.itens.length > 0) {
-    const primeiroItem = item.itens[0];
-    if (primeiroItem.data_necessidade) return primeiroItem.data_necessidade;
-    if (primeiroItem.dataNecessidade) return primeiroItem.dataNecessidade;
-  }
-  
-  return null;
-};
-
-// Função para formatar apenas o dia/mês/ano para a data de necessidade
+// ✨ FUNÇÃO PARA FORMATAR A DATA DE NECESSIDADE
 const formatarDataSimples = (dataIso) => {
-  if (!dataIso || dataIso === 'null' || dataIso === 'undefined' || dataIso === '-' || dataIso === '—') return "—";
+  if (!dataIso || dataIso === '-' || dataIso === '—' || dataIso === 'null') return "—";
   
   try {
-    if (dataIso.includes('/') && !dataIso.includes('-')) {
-        return dataIso; // Se já vier formatado do backend
-    }
-
+    if (dataIso.includes('/')) return dataIso;
     const data = new Date(dataIso);
     if (isNaN(data.getTime())) return "—";
     
-    // Força o UTC para não subtrair fuso horário
+    // Força o fuso horário UTC para evitar erros de dia anterior
     return data.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
   } catch (error) {
     return "—";
@@ -248,8 +229,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         const solicitanteProcura = item.solicitante || '';
         const textoBuscavel = `${idProcura} ${solicitanteProcura} ${wbsProcura} ${destinoProcura} ${numeroPL}`.toLowerCase();
 
-        // ✨ CAPTURA PROFUNDA DA DATA DE NECESSIDADE
-        const necessidadeCrua = obterDataNecessidade(item);
+        // ✨ AQUI: Verifica de onde vem a data_necessidade. O backend está a devolver sol.data_necessidade
+        const necessidadeCrua = item.data_necessidade || item.dataNecessidade || null;
 
         return {
           ...item,
@@ -263,7 +244,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           dataCriacaoISO: item.created_at || item.dataCriacaoISO || item.dataSolicitacao, 
           dataEntrega: item.dataEntrega || "-",
           
-          // Valores mapeados para renderização e ordenação
+          // ✨ NOVO: Guarda e formata a Data de Necessidade corretamente
           dataNecessidadeOriginal: necessidadeCrua,
           dataNecessidadeFormatada: formatarDataSimples(necessidadeCrua),
 
