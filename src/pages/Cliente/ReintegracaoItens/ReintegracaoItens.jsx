@@ -1,3 +1,8 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/ReintegracaoItens/ReintegracaoItens.jsx
+// DESCRIÇÃO: Ecrã de reintegração com Proteção Anti-Duplo Clique e 
+//            Validação Rigorosa de Quantidades Máximas de Devolução.
+// =================================================================
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { User, RefreshCcw, Search, Send, Box, ChevronDown, ChevronUp, MapPin, ArrowRightLeft } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
@@ -10,10 +15,13 @@ export default function ReintegracaoItens() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useContext(AlertContext);
 
+  // ✨ ESTADO DE SEGURANÇA: Trava contra múltiplos cliques (Race Condition)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [nome, setNome] = useState('');
   const [pesquisa, setPesquisa] = useState('');
   
-  // ✨ ESTADO NOVO: Alterna entre Reintegrar Material ou Transferência
+  // Alterna entre Reintegrar Material ou Transferência
   const [abaReintegracao, setAbaReintegracao] = useState('Material'); 
   
   const [listaDePl, setListaDePl] = useState([]);
@@ -30,7 +38,7 @@ export default function ReintegracaoItens() {
       const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
 
       if (resultado.sucesso) {
-        // ✨ AGORA FILTRA TANTO MATERIAL COMO TRANSFERÊNCIA WBS
+        // AGORA FILTRA TANTO MATERIAL COMO TRANSFERÊNCIA WBS
         const plsValidas = resultado.dados.filter(sol => 
           (sol.tipo === 'Material' || sol.tipo === 'Transferencia WBS' || sol.tipo === 'Transfer. WBS') && 
           (sol.status === 'Em Separação' || sol.status === 'Concluído') && 
@@ -75,6 +83,9 @@ export default function ReintegracaoItens() {
   useEffect(() => { buscarDados(); }, [buscarDados]);
 
   const handleSelecionarPL = (plOriginal) => {
+    // Bloqueia a seleção se estiver a submeter
+    if (isSubmitting) return;
+
     if (plOriginal.statusExibicao === 'Reintegrado') {
       showAlert("PL Totalmente Reintegrada", "Todos os itens desta Packing List já foram devolvidos e constam no estoque.", "info"); return;
     }
@@ -111,15 +122,32 @@ export default function ReintegracaoItens() {
   };
 
   const handleEnviar = async () => {
+    // ✨ BLOQUEIO 1: Interceta o duplo clique
+    if (isSubmitting) {
+      console.warn("Bloqueado: Tentativa de duplo clique interceptada.");
+      return; 
+    }
+
     if (!nome) { showAlert("Campo Obrigatório", "Por favor, preencha o seu nome.", "warning"); return; }
     if (!plSelecionada) { showAlert("PL Obrigatória", "Selecione uma PL da lista.", "warning"); return; }
 
     const itensParaDevolver = itensDaPL.filter(item => item.quantidade_devolvida > 0);
     if (itensParaDevolver.length === 0) { showAlert("Nenhum item selecionado", "Tem de informar a quantidade a devolver de pelo menos 1 item da lista.", "warning"); return; }
 
+    // ✨ BLOQUEIO 2: Validação de segurança no Frontend
+    // Garante que o utilizador não manipule o HTML para injetar uma devolução maior que a permitida.
+    const temItemInvalido = itensParaDevolver.some(item => item.quantidade_devolvida > item.quantidade_maxima_permitida);
+    if (temItemInvalido) {
+      showAlert("Erro de Segurança", "Está a tentar devolver uma quantidade superior à permitida. Por favor, reveja os itens.", "error");
+      return;
+    }
+
+    // ✨ FECHA A TRANCA
+    setIsSubmitting(true);
+
     const plDados = listaDePl.find(p => p.id === plSelecionada);
     
-    // ✨ Adiciona um identificador visual se for transferência para a logística saber
+    // Adiciona um identificador visual se for transferência para a logística saber
     const observacaoCustomizada = abaReintegracao === 'Transferencia' 
       ? `[Reintegração de Transferência WBS] Retornar os itens ao WBS Original.` 
       : '';
@@ -146,10 +174,13 @@ export default function ReintegracaoItens() {
       }
     } catch (error) {
       showAlert("Falha de Conexão", "Não foi possível ligar ao servidor.", "error");
+    } finally {
+      // ✨ LIBERTA A TRANCA: Garante que o botão volta ao normal mesmo que a net falhe
+      setIsSubmitting(false);
     }
   };
 
-  // ✨ FILTRA A LISTA PELA ABA ATIVA E DEPOIS PELA PESQUISA
+  // FILTRA A LISTA PELA ABA ATIVA E DEPOIS PELA PESQUISA
   const listaPorAba = listaDePl.filter(pl => {
     if (abaReintegracao === 'Material') return pl.tipo === 'Material';
     return pl.tipo === 'Transferencia WBS' || pl.tipo === 'Transfer. WBS';
@@ -174,7 +205,14 @@ export default function ReintegracaoItens() {
         <div className="form-grid">
           <div className="input-grupo">
             <label>NOME *</label>
-            <input type="text" className="input-campo foco-laranja" placeholder="Seu nome completo" value={nome} onChange={(e) => setNome(e.target.value)} />
+            <input 
+              type="text" 
+              className="input-campo foco-laranja" 
+              placeholder="Seu nome completo" 
+              value={nome} 
+              onChange={(e) => setNome(e.target.value)}
+              disabled={isSubmitting} // ✨ Desativa campo durante envio
+            />
           </div>
           <div className="input-grupo">
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> FILIAL DE ORIGEM</label>
@@ -195,7 +233,7 @@ export default function ReintegracaoItens() {
           </div>
         </div>
 
-        {/* ✨ NOVOS BOTÕES PARA ALTERNAR ENTRE MATERIAL E TRANSFERÊNCIA */}
+        {/* NOVOS BOTÕES PARA ALTERNAR ENTRE MATERIAL E TRANSFERÊNCIA */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
           <button 
             style={{ 
@@ -204,9 +242,11 @@ export default function ReintegracaoItens() {
               backgroundColor: abaReintegracao === 'Material' ? '#fff7ed' : '#f8fafc', 
               color: abaReintegracao === 'Material' ? '#ea580c' : '#64748b', 
               fontWeight: abaReintegracao === 'Material' ? '600' : '500', 
-              cursor: 'pointer', transition: 'all 0.2s' 
+              cursor: isSubmitting ? 'not-allowed' : 'pointer', // ✨ Cursor proibido ao submeter
+              transition: 'all 0.2s',
+              opacity: isSubmitting ? 0.6 : 1
             }}
-            onClick={() => { setAbaReintegracao('Material'); setPlSelecionada(null); setPesquisa(''); }}
+            onClick={() => { if(!isSubmitting) { setAbaReintegracao('Material'); setPlSelecionada(null); setPesquisa(''); } }}
           >
             <Box size={18} /> Retirada de Material
           </button>
@@ -217,9 +257,11 @@ export default function ReintegracaoItens() {
               backgroundColor: abaReintegracao === 'Transferencia' ? '#fff7ed' : '#f8fafc', 
               color: abaReintegracao === 'Transferencia' ? '#ea580c' : '#64748b', 
               fontWeight: abaReintegracao === 'Transferencia' ? '600' : '500', 
-              cursor: 'pointer', transition: 'all 0.2s' 
+              cursor: isSubmitting ? 'not-allowed' : 'pointer', // ✨ Cursor proibido ao submeter
+              transition: 'all 0.2s',
+              opacity: isSubmitting ? 0.6 : 1
             }}
-            onClick={() => { setAbaReintegracao('Transferencia'); setPlSelecionada(null); setPesquisa(''); }}
+            onClick={() => { if(!isSubmitting) { setAbaReintegracao('Transferencia'); setPlSelecionada(null); setPesquisa(''); } }}
           >
             <ArrowRightLeft size={18} /> Transferência WBS
           </button>
@@ -234,7 +276,15 @@ export default function ReintegracaoItens() {
         
         <div className="pesquisa-wrapper">
           <Search size={18} className="icone-pesquisa" />
-          <input type="text" className="input-campo foco-laranja" placeholder="Buscar por nº PL, ID da solicitação, solicitante ou WBS..." style={{ paddingLeft: '40px' }} value={pesquisa} onChange={(e) => setPesquisa(e.target.value)} />
+          <input 
+            type="text" 
+            className="input-campo foco-laranja" 
+            placeholder="Buscar por nº PL, ID da solicitação, solicitante ou WBS..." 
+            style={{ paddingLeft: '40px' }} 
+            value={pesquisa} 
+            onChange={(e) => setPesquisa(e.target.value)} 
+            disabled={isSubmitting} // ✨ Desativa campo
+          />
         </div>
 
         <div className="lista-pl-container">
@@ -247,7 +297,19 @@ export default function ReintegracaoItens() {
           ) : (
             listaFiltrada.map((pl) => (
               <React.Fragment key={pl.id}>
-                <div className="item-pl" style={{ border: plSelecionada === pl.id ? '2px solid #f97316' : '1px solid #e2e8f0', backgroundColor: plSelecionada === pl.id ? '#fff7ed' : '#ffffff', borderBottomLeftRadius: plSelecionada === pl.id ? '0px' : '8px', borderBottomRightRadius: plSelecionada === pl.id ? '0px' : '8px', marginBottom: plSelecionada === pl.id ? '0px' : '12px', opacity: pl.statusExibicao === 'Reintegrado' ? 0.7 : 1 }} onClick={() => handleSelecionarPL(pl)}>
+                <div 
+                  className="item-pl" 
+                  style={{ 
+                    border: plSelecionada === pl.id ? '2px solid #f97316' : '1px solid #e2e8f0', 
+                    backgroundColor: plSelecionada === pl.id ? '#fff7ed' : '#ffffff', 
+                    borderBottomLeftRadius: plSelecionada === pl.id ? '0px' : '8px', 
+                    borderBottomRightRadius: plSelecionada === pl.id ? '0px' : '8px', 
+                    marginBottom: plSelecionada === pl.id ? '0px' : '12px', 
+                    opacity: pl.statusExibicao === 'Reintegrado' || isSubmitting ? 0.6 : 1, // ✨ Fica opaco ao submeter
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                  }} 
+                  onClick={() => handleSelecionarPL(pl)}
+                >
                   <div className="item-pl-info">
                     <span className="item-pl-titulo" style={{ color: plSelecionada === pl.id ? '#ea580c' : '#1e293b' }}>{pl.pl || `ID: ${pl.id}`}</span>
                     <span className="item-pl-detalhes">{pl.solicitante} &middot; WBS: {pl.wbs} &middot; {pl.itens ? pl.itens.length : 0} itens listados</span>
@@ -269,7 +331,17 @@ export default function ReintegracaoItens() {
                             <td style={{ padding: '12px 8px', fontWeight: '600', color: '#431407' }}>{itemTabela.part_number_manual}</td>
                             <td style={{ padding: '12px 8px', color: '#7c2d12' }}>{itemTabela.descricao_manual}</td>
                             <td style={{ padding: '12px 8px', color: '#7c2d12', fontWeight: 'bold' }}>{itemTabela.quantidade_maxima_permitida} {itemTabela.unidade_medida_manual}</td>
-                            <td style={{ padding: '8px' }}><input type="number" min="0" max={itemTabela.quantidade_maxima_permitida} value={itemTabela.quantidade_devolvida} onChange={(e) => alterarQuantidade(itemTabela.id, e.target.value)} style={{ width: '80px', padding: '6px', borderRadius: '6px', border: '1px solid #fdba74', outline: 'none', textAlign: 'center', color: '#c2410c', fontWeight: 'bold' }} /></td>
+                            <td style={{ padding: '8px' }}>
+                              <input 
+                                type="number" 
+                                min="0" 
+                                max={itemTabela.quantidade_maxima_permitida} 
+                                value={itemTabela.quantidade_devolvida} 
+                                onChange={(e) => alterarQuantidade(itemTabela.id, e.target.value)} 
+                                disabled={isSubmitting} // ✨ Desativa campo numérico
+                                style={{ width: '80px', padding: '6px', borderRadius: '6px', border: '1px solid #fdba74', outline: 'none', textAlign: 'center', color: '#c2410c', fontWeight: 'bold', backgroundColor: isSubmitting ? '#f8fafc' : '#ffffff' }} 
+                              />
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -282,7 +354,13 @@ export default function ReintegracaoItens() {
         </div>
       </div>
 
-      <BotaoAcaoGlobal texto="Reintegrar Itens Selecionados" icone={<Send size={16} />} cor="laranja" onClick={handleEnviar} />
+      <BotaoAcaoGlobal 
+        texto={isSubmitting ? "A processar..." : "Reintegrar Itens Selecionados"} 
+        icone={<Send size={16} />} 
+        cor="laranja" 
+        onClick={handleEnviar} 
+        carregando={isSubmitting} // ✨ Botão recebe a trava
+      />
     </div>
   );
 }
