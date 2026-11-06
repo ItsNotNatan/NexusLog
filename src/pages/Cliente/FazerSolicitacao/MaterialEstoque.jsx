@@ -1,12 +1,27 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/FazerSolicitacao/MaterialEstoque.jsx
-// DESCRIÇÃO: Ecrã para solicitar material do estoque com TEMPO REAL e Verificação de WBS (Prefixo)
+// DESCRIÇÃO: Ecrã para solicitar material do estoque com TEMPO REAL, Verificação de WBS,
+// e Correções de Segurança (Anti-Duplo Clique e Proteção de Saldo).
 // =================================================================
 import React, { useState, useEffect, useContext } from "react";
-import { User, MapPin, Calendar, Send, Zap, AlertTriangle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import "./FazerSolicitacao.css";
 
-import { AuthContext } from '../../../contexts/AuthContext';
-import { AlertContext } from '../../../contexts/AlertContext';
+import { 
+  Boxes, 
+  ArrowLeftRight, 
+  FileText, 
+  PackagePlus, 
+  Truck, 
+  RefreshCcw, 
+  XCircle,
+  User, 
+  MapPin, 
+  Calendar, 
+  Send, 
+  Zap, 
+  AlertTriangle 
+} from 'lucide-react';
 
 import GerenciadorAnexos from "../../../components/GerenciadorAnexos/GerenciadorAnexos";
 import SeletorEstoqueLateral from "../../../components/SeletorEstoqueLateral/SeletorEstoqueLateral";
@@ -14,10 +29,15 @@ import { apiFetch, urlDoServidor, enviarArquivos } from '../../../services/api';
 import { io } from 'socket.io-client'; 
 
 import { formatarWBS } from '../../../utils/formatadores';
+import { AuthContext } from '../../../contexts/AuthContext';
+import { useAlert } from '../../../contexts/AlertContext'; // <-- Correção do Import (de AlertContext para useAlert)
 
 export default function MaterialEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
-  const { showAlert } = useContext(AlertContext);
+  const { showAlert } = useAlert(); // <-- Utilizar o Hook correto
+
+  // ✨ ESTADO DE SEGURANÇA 1: A trava contra os múltiplos cliques
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formDados, setFormDados] = useState({
     nome: "", wbs: "", destino: "", dataNecessidade: "",
@@ -67,7 +87,6 @@ export default function MaterialEstoque() {
               wbs: item.wbs_element || item.wbs || "-",
               alocacao: item.alocacao || "-",
               isTransferencia: item.is_transferencia || false,
-              // ✨ O SEGREDO 1: Puxar os dados da base de dados logo na primeira leitura!
               referencia: item.referencia || "-",
               documento_compras: item.documento_compras || "-",
               valor_unitario: item.valor_unitario || 0
@@ -142,7 +161,6 @@ export default function MaterialEstoque() {
       showAlert("Estoque Reservado", "A quantidade deste item já se encontra 100% reservada.", "warning"); return;
     }
 
-    // ✨ O SEGREDO 2: Garantir que todos os campos vão para o "carrinho"
     setItensSelecionados((prev) => [
       ...prev, 
       { 
@@ -159,6 +177,13 @@ export default function MaterialEstoque() {
   };
 
   const handleEnviar = async () => {
+    // ✨ BLOQUEIO 1: Se já estivermos a enviar, descarta novos cliques
+    if (isSubmitting) {
+      console.warn("Bloqueado: Tentativa de duplo clique interceptada.");
+      return; 
+    }
+
+    // VALIDAÇÕES BÁSICAS
     if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.dataNecessidade) { showAlert("Campos Obrigatórios", "Preencha os campos (*).", "warning"); return; }
     if (itensSelecionados.length === 0) { showAlert("Lista Vazia", "Adicione um item.", "warning"); return; }
     if (itensSelecionados.some(i => !i.qtdSelecionada)) { showAlert("Incompleto", "Verifique as quantidades.", "warning"); return; }
@@ -167,6 +192,21 @@ export default function MaterialEstoque() {
       showAlert("Autorização Pendente", "Como existe divergência no prefixo da WBS, é OBRIGATÓRIO incluir o documento de autorização na área de Anexos.", "warning");
       return;
     }
+
+    // ✨ BLOQUEIO 2: VERIFICAÇÃO RIGOROSA DO SALDO
+    // Garante que o utilizador não tentou injetar um valor inválido.
+    const temItemComQuantidadeSuperiorAoSaldo = itensSelecionados.some(item => {
+      const saldoLivre = item.qtdFornecida - (item.qtdReservada || 0);
+      return item.qtdSelecionada > saldoLivre;
+    });
+
+    if (temItemComQuantidadeSuperiorAoSaldo) {
+       showAlert("Erro de Quantidade", "Algum item possui quantidade superior ao saldo livre. Revise a sua lista antes de enviar.", "error");
+       return;
+    }
+
+    // FECHA A TRANCA DE ENVIO! A PARTIR DAQUI O BOTÃO FICA BLOQUEADO!
+    setIsSubmitting(true);
 
     const anexosProcessados = [];
     
@@ -177,6 +217,7 @@ export default function MaterialEstoque() {
           enviados = await enviarArquivos(anexos);
         } catch (erroUpload) {
           showAlert("Erro Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+          setIsSubmitting(false); // Solta a trava se falhar
           return;
         }
 
@@ -198,8 +239,15 @@ export default function MaterialEstoque() {
         setFormDados({ nome: "", wbs: "", destino: "", dataNecessidade: "", observacoes: "", entregaUrgente: false, justificativaUrgencia: "" });
         setItensSelecionados([]); 
         setAnexos([]);
-      } else { showAlert("Erro Servidor", dados.erro, "error"); }
-    } catch (error) { showAlert("Erro Conexão", "Falha no servidor.", "error"); }
+      } else { 
+        showAlert("Erro Servidor", dados.erro, "error"); 
+      }
+    } catch (error) { 
+      showAlert("Erro Conexão", "Falha no servidor.", "error"); 
+    } finally {
+      // ✨ LIBERTA A TRANCA: quer a operação falhe ou dê sucesso, o botão volta a ficar livre
+      setIsSubmitting(false);
+    }
   };
 
   const listaSegura = Array.isArray(itensSelecionados) ? itensSelecionados : [];
@@ -209,12 +257,12 @@ export default function MaterialEstoque() {
       <div className="form-cartao">
         <div className="form-header"><div className="form-header-esquerda"><div className="form-header-icone"><User size={18} /></div><h2>Dados do Solicitante</h2></div></div>
         <div className="form-grid">
-          <div className="input-grupo"><label>NOME *</label><input type="text" className="input-campo" placeholder="Seu nome" value={formDados.nome} onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} /></div>
-          <div className="input-grupo"><label>WBS *</label><input type="text" className="input-campo" placeholder="Ex: ABCDE-12345" value={formDados.wbs} onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} /></div>
+          <div className="input-grupo"><label>NOME *</label><input type="text" className="input-campo" placeholder="Seu nome" value={formDados.nome} onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} disabled={isSubmitting} /></div>
+          <div className="input-grupo"><label>WBS *</label><input type="text" className="input-campo" placeholder="Ex: ABCDE-12345" value={formDados.wbs} onChange={(e) => setFormDados({ ...formDados, wbs: formatarWBS(e.target.value) })} disabled={isSubmitting} /></div>
           <div className="input-grupo"><label><MapPin size={14} /> FILIAL</label><div className="input-wrapper-fixo"><MapPin size={16} className="icone-dentro-input" /><input type="text" className="input-campo" value={estoqueAtual} readOnly /><span className="badge-fixo">Fixo</span></div></div>
-          <div className="input-grupo row-span-2"><label><MapPin size={14} /> DESTINO *</label><textarea className="input-campo" placeholder="Local de destino" value={formDados.destino} onChange={(e) => setFormDados({ ...formDados, destino: e.target.value })}></textarea></div>
-          <div className="input-grupo"><label><Calendar size={14} /> DATA DE NECESSIDADE *</label><input type="date" className="input-campo" value={formDados.dataNecessidade} min={dataMinima} onChange={(e) => setFormDados({ ...formDados, dataNecessidade: e.target.value })} /></div>
-          <div className="input-grupo span-2"><label>OBSERVAÇÕES</label><textarea className="input-campo" rows="2" value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea></div>
+          <div className="input-grupo row-span-2"><label><MapPin size={14} /> DESTINO *</label><textarea className="input-campo" placeholder="Local de destino" value={formDados.destino} onChange={(e) => setFormDados({ ...formDados, destino: e.target.value })} disabled={isSubmitting} ></textarea></div>
+          <div className="input-grupo"><label><Calendar size={14} /> DATA DE NECESSIDADE *</label><input type="date" className="input-campo" value={formDados.dataNecessidade} min={dataMinima} onChange={(e) => setFormDados({ ...formDados, dataNecessidade: e.target.value })} disabled={isSubmitting} /></div>
+          <div className="input-grupo span-2"><label>OBSERVAÇÕES</label><textarea className="input-campo" rows="2" value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })} disabled={isSubmitting} ></textarea></div>
         </div>
       </div>
 
@@ -262,6 +310,7 @@ export default function MaterialEstoque() {
           <input 
             type="checkbox" id="checkbox-urgente" checked={formDados.entregaUrgente} 
             onChange={(e) => setFormDados({ ...formDados, entregaUrgente: e.target.checked, justificativaUrgencia: "" })} 
+            disabled={isSubmitting}
             style={{ marginTop: "4px", width: "20px", height: "20px", cursor: "pointer", accentColor: "#dc2626" }} 
           />
           <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
@@ -296,6 +345,7 @@ export default function MaterialEstoque() {
                   className="input-campo" 
                   placeholder="Por que você não conseguiu se planejar a tempo? Justifique detalhadamente o motivo da falha e o impacto direto caso o material não seja entregue." 
                   rows="4" value={formDados.justificativaUrgencia} onChange={(e) => setFormDados({ ...formDados, justificativaUrgencia: e.target.value })} 
+                  disabled={isSubmitting}
                   style={{ borderColor: "#ef4444", backgroundColor: "#ffffff", color: "#450a0a", outlineColor: "#dc2626", boxShadow: "inset 0 1px 3px rgba(220,38,38,0.1)", fontWeight: "500" }}
                 ></textarea>
               </div>
@@ -316,8 +366,23 @@ export default function MaterialEstoque() {
         />
       </div>
 
-      <div className="form-acoes-final mt-4">
-        <button className="btn-enviar-azul" onClick={handleEnviar}><Send size={16} /> Enviar Solicitação</button>
+      {/* ✨ O botão agora fica mais elegante: Cinzento durante a submissão e não reage a cliques duplicados */}
+      <div className="form-acoes-final mt-4" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button 
+          className="btn-enviar-azul" 
+          onClick={handleEnviar}
+          disabled={isSubmitting}
+          style={{ 
+            display: 'flex', alignItems: 'center', gap: '8px', 
+            padding: '12px 24px', borderRadius: '8px', fontWeight: 'bold', border: 'none',
+            backgroundColor: isSubmitting ? '#94a3b8' : '#2563eb', // Fica cinzento a submeter
+            color: 'white',
+            cursor: isSubmitting ? 'not-allowed' : 'pointer'
+          }}
+        >
+          <Send size={16} /> 
+          {isSubmitting ? "A processar..." : "Enviar Solicitação"}
+        </button>
       </div>
     </>
   );
