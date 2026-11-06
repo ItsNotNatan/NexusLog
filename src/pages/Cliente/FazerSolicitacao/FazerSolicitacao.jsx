@@ -1,3 +1,7 @@
+// =================================================================
+// ARQUIVO: src/pages/Cliente/FazerSolicitacao/FazerSolicitacao.jsx
+// DESCRIÇÃO: Menu de solicitações com as novas opções Robótica e General Stock
+// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './FazerSolicitacao.css';
@@ -9,7 +13,9 @@ import {
   PackagePlus, 
   Truck, 
   RefreshCcw, 
-  XCircle 
+  XCircle,
+  Cpu,      // ✨ NOVO ÍCONE: Para a secção de Robótica
+  Archive   // ✨ NOVO ÍCONE: Para a secção de General Stock
 } from 'lucide-react';
 
 import MaterialEstoque from './MaterialEstoque'; 
@@ -19,6 +25,10 @@ import EntradaMaterial from '../EntradaMaterial/EntradaMaterial';
 import Crossdocking from '../Crossdocking/Crossdocking';
 import ReintegracaoItens from '../ReintegracaoItens/ReintegracaoItens';
 import CancelarPL from '../CancelarPL/CancelarPL';
+
+// ✨ IMPORTAÇÃO DOS NOVOS MÓDULOS (Componentes que vamos criar a seguir)
+import Robotica from '../Robotica/Robotica';
+import GeneralStock from '../GeneralStock/GeneralStock';
 
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
@@ -43,6 +53,7 @@ export default function FazerSolicitacao() {
     }
   }, [estoqueAtual, navigate, showAlert, carregandoInicial]);
 
+  // ✨ AQUI DEFINIMOS OS CARTÕES QUE APARECEM NO TOPO DA PÁGINA
   const tiposSolicitacao = [
     { id: 'material', titulo: 'Material de Estoque', desc: 'Retirada de itens do almoxarifado', icone: <Boxes size={20} /> },
     { id: 'transferencia', titulo: 'Transferência de WBS', desc: 'Mover material para outro projeto', icone: <ArrowLeftRight size={20} />, cor: 'amarelo' },
@@ -50,7 +61,11 @@ export default function FazerSolicitacao() {
     { id: 'entrada', titulo: 'Entrada de Material', desc: 'Solicitar entrada no estoque', icone: <PackagePlus size={20} />, cor: 'verde' },
     { id: 'crossdocking', titulo: 'Crossdocking', desc: 'Saída via nota fiscal', icone: <Truck size={20} />, cor: 'ciano' },
     { id: 'reintegracao', titulo: 'Reintegração de Itens', desc: 'Devolver material ao estoque', icone: <RefreshCcw size={20} />, cor: 'laranja' },
-    { id: 'cancelar', titulo: 'Cancelar PL', desc: 'Cancelar Packing List emitido', icone: <XCircle size={20} />, cor: 'vermelho' }
+    { id: 'cancelar', titulo: 'Cancelar PL', desc: 'Cancelar Packing List emitido', icone: <XCircle size={20} />, cor: 'vermelho' },
+    
+    // ✨ NOVOS CARTÕES ADICIONADOS
+    { id: 'robotica', titulo: 'Robótica', desc: 'Solicitações de equipamentos de robótica', icone: <Cpu size={20} />, cor: 'rosa' },
+    { id: 'general_stock', titulo: 'General Stock', desc: 'Solicitações de estoque geral', icone: <Archive size={20} />, cor: 'cinza' }
   ];
 
   if (carregandoInicial || estoqueAtual === 'TODOS') {
@@ -99,6 +114,10 @@ export default function FazerSolicitacao() {
         {tipoAtivo === 'crossdocking' && <Crossdocking key={`cross-${estoqueAtual}`} />}
         {tipoAtivo === 'reintegracao' && <ReintegracaoItens key={`reint-${estoqueAtual}`} />}
         {tipoAtivo === 'cancelar' && <CancelarPL key={`canc-${estoqueAtual}`} />}
+        
+        {/* ✨ RENDERIZAÇÃO DOS NOVOS COMPONENTES */}
+        {tipoAtivo === 'robotica' && <Robotica key={`robo-${estoqueAtual}`} />}
+        {tipoAtivo === 'general_stock' && <GeneralStock key={`gen-${estoqueAtual}`} />}
       </div>
     </div>
   );
