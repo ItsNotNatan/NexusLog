@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/AcompanhamentoSolicitacoes.jsx
-// DESCRIÇÃO: Tabela principal com nova coluna de Data de Necessidade (Corrigido)
+// DESCRIÇÃO: Tabela principal com Data de Necessidade apenas para o tipo "Material"
 // =================================================================
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -74,7 +74,6 @@ const converterParaInputDateTime = (dataString) => {
   return '';
 };
 
-// ✨ FUNÇÃO PARA FORMATAR A DATA DE NECESSIDADE
 const formatarDataSimples = (dataIso) => {
   if (!dataIso || dataIso === '-' || dataIso === '—' || dataIso === 'null') return "—";
   
@@ -83,11 +82,23 @@ const formatarDataSimples = (dataIso) => {
     const data = new Date(dataIso);
     if (isNaN(data.getTime())) return "—";
     
-    // Força o fuso horário UTC para evitar erros de dia anterior
     return data.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
   } catch (error) {
     return "—";
   }
+};
+
+const obterDataNecessidade = (item) => {
+  if (item.data_necessidade) return item.data_necessidade;
+  if (item.dataNecessidade) return item.dataNecessidade;
+  
+  if (item.itens && item.itens.length > 0) {
+    const primeiroItem = item.itens[0];
+    if (primeiroItem.data_necessidade) return primeiroItem.data_necessidade;
+    if (primeiroItem.dataNecessidade) return primeiroItem.dataNecessidade;
+  }
+  
+  return null;
 };
 
 const obterValorSeguroNumero = (valItem, valEstoque) => {
@@ -229,8 +240,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         const solicitanteProcura = item.solicitante || '';
         const textoBuscavel = `${idProcura} ${solicitanteProcura} ${wbsProcura} ${destinoProcura} ${numeroPL}`.toLowerCase();
 
-        // ✨ AQUI: Verifica de onde vem a data_necessidade. O backend está a devolver sol.data_necessidade
-        const necessidadeCrua = item.data_necessidade || item.dataNecessidade || null;
+        const necessidadeCrua = obterDataNecessidade(item);
 
         return {
           ...item,
@@ -244,7 +254,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           dataCriacaoISO: item.created_at || item.dataCriacaoISO || item.dataSolicitacao, 
           dataEntrega: item.dataEntrega || "-",
           
-          // ✨ NOVO: Guarda e formata a Data de Necessidade corretamente
           dataNecessidadeOriginal: necessidadeCrua,
           dataNecessidadeFormatada: formatarDataSimples(necessidadeCrua),
 
@@ -910,9 +919,12 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
                         
-                        {/* ✨ CÉLULA DA NOVA COLUNA: DATA NECESSIDADE */}
+                        {/* ✨ CÉLULA DA NOVA COLUNA: DATA NECESSIDADE (APENAS PARA MATERIAL) */}
                         <td className="texto-data" style={{ color: corTextoForte, fontWeight: '500' }}>
-                          {linha.dataNecessidadeFormatada || "—"}
+                          {linha.tipo === 'Material' 
+                            ? (linha.dataNecessidadeFormatada !== "—" ? linha.dataNecessidadeFormatada : <span style={{ color: '#94a3b8' }}>Não informada</span>)
+                            : <span style={{ color: corTextoFraco }}>—</span>
+                          }
                         </td>
 
                         <td>
@@ -999,7 +1011,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
                       {isExpandida && linha.detalhesCompletos && (
                         <tr>
-                          {/* ✨ O colSpan subiu para 9 porque adicionámos mais uma coluna! */}
                           <td colSpan="9" className="td-expandida" style={{ padding: 0 }}>
                             
                             {/* DESTAQUE DA NF PARA CROSSDOCKING */}
