@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/EntradaMaterial/EntradaMaterial.jsx
-// DESCRIÇÃO: Formulário de Entrada de Material pelo Cliente com validação corrigida
+// DESCRIÇÃO: Formulário de Entrada de Material pelo Cliente com Proteção Anti-Duplo Clique
 // =================================================================
 import React, { useState, useContext } from 'react';
 import { User, Send, Paperclip, X, MapPin } from 'lucide-react'; 
@@ -22,6 +22,9 @@ export default function EntradaMaterial() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useContext(AlertContext);
 
+  // ✨ ESTADO DE SEGURANÇA: Trava contra múltiplos cliques (Race Condition)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', observacoes: '' });
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
@@ -31,7 +34,7 @@ export default function EntradaMaterial() {
   const gerarLinhaVazia = () => ({
     id: `linha-vazia-${Date.now()}-${Math.random()}`, 
     desenhoSAP: '', 
-    fabricante: '', // ✨ NOVO CAMPO
+    fabricante: '',
     numPecaFabricante: '', 
     fornecedor: '',
     referencia: '', 
@@ -170,6 +173,12 @@ export default function EntradaMaterial() {
   const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
 
   const handleEnviar = async () => {
+    // ✨ BLOQUEIO DE SEGURANÇA: Impede submissão múltipla
+    if (isSubmitting) {
+      console.warn("Bloqueado: Tentativa de duplo clique interceptada.");
+      return; 
+    }
+
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       showAlert("Filial Inválida", "Por favor, selecione em qual filial você está dando entrada lá no topo da página antes de enviar.", "warning");
       return;
@@ -183,11 +192,13 @@ export default function EntradaMaterial() {
       return;
     }
 
-    // ✨ CORRIGIDO: Removida a verificação obrigatória de 'numPecaFabricante'
     if (itens.some(i => !i.qtdFornecida || i.qtdFornecida === '' || Number(i.qtdFornecida) < 1)) {
       showAlert("Dados da Tabela", "Preencha o campo de Quantidade em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
       return;
     }
+
+    // ✨ FECHA A TRANCA AQUI
+    setIsSubmitting(true);
 
     try {
       const anexosProcessados = [];
@@ -197,6 +208,7 @@ export default function EntradaMaterial() {
           anexosProcessados.push(...await enviarArquivos(anexos));
         } catch (erroUpload) {
           showAlert("Erro de Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+          setIsSubmitting(false); // Liberta a trava se falhar o anexo
           return;
         }
       }
@@ -210,7 +222,7 @@ export default function EntradaMaterial() {
         itens: itens.map(item => ({
           desenho_sap: item.desenhoSAP || '-',
           part_number: item.numPecaFabricante || '-',
-          fabricante: item.fabricante || null, // ✨ ENVIO DO FABRICANTE
+          fabricante: item.fabricante || null,
           fornecedor: item.fornecedor || null,
           referencia: item.referencia || null,
           qtd: parseInt(item.qtdFornecida, 10) || 1,
@@ -242,6 +254,9 @@ export default function EntradaMaterial() {
       }
     } catch (error) {
       showAlert("Erro de Conexão", "Falha ao conectar com o servidor.", "error");
+    } finally {
+      // ✨ LIBERTA A TRANCA: quer dê sucesso ou erro, volta a libertar o botão
+      setIsSubmitting(false);
     }
   };
 
@@ -260,7 +275,14 @@ export default function EntradaMaterial() {
         <div className="form-grid">
           <div className="input-grupo">
             <label>NOME *</label>
-            <input type="text" className="input-campo foco-verde" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} />
+            <input 
+              type="text" 
+              className="input-campo foco-verde" 
+              placeholder="Seu nome completo" 
+              value={formDados.nome} 
+              onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })} 
+              disabled={isSubmitting} // ✨ Desativa enquanto envia
+            />
           </div>
           <div className="input-grupo">
             <label>WBS *</label>
@@ -270,6 +292,7 @@ export default function EntradaMaterial() {
               placeholder="Ex: ABCDE-12345" 
               value={formDados.wbs} 
               onChange={handleWbsGlobalChange}
+              disabled={isSubmitting}
             />
           </div>
           <div className="input-grupo">
@@ -282,7 +305,13 @@ export default function EntradaMaterial() {
           </div>
           <div className="input-grupo">
             <label>OBSERVAÇÕES</label>
-            <textarea className="input-campo foco-verde" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}></textarea>
+            <textarea 
+              className="input-campo foco-verde" 
+              placeholder="Informações adicionais para a conferência..." 
+              value={formDados.observacoes} 
+              onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}
+              disabled={isSubmitting}
+            ></textarea>
           </div>
         </div>
       </div>
@@ -298,7 +327,7 @@ export default function EntradaMaterial() {
               {anexos.map((arquivo, index) => (
                 <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', width: 'fit-content', minWidth: '300px' }}>
                   <span style={{ fontSize: '0.85rem', color: '#334155' }}>{arquivo.name}</span>
-                  <button onClick={() => removerAnexo(index)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={16} /></button>
+                  <button onClick={() => removerAnexo(index)} disabled={isSubmitting} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}><X size={16} /></button>
                 </div>
               ))}
             </div>
@@ -316,7 +345,13 @@ export default function EntradaMaterial() {
         onImportarExcel={handleImportarExcel}
       />
 
-      <BotaoAcaoGlobal texto="Registrar Entrada" icone={<Send size={16} />} cor="verde" onClick={handleEnviar} />
+      <BotaoAcaoGlobal 
+        texto={isSubmitting ? "A processar..." : "Registrar Entrada"} 
+        icone={<Send size={16} />} 
+        cor="verde" 
+        onClick={handleEnviar} 
+        carregando={isSubmitting} // ✨ O botão reage à trava
+      />
     </div>
   );
 }
