@@ -47,25 +47,24 @@ export default function EntradaEstoque() {
 
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
-  
   const [crossdockingsPendentes, setCrossdockingsPendentes] = useState([]);
   const processador = useProcessadorExcel();
 
-  useEffect(() => {
-    const buscarCrossdockingsPendentes = async () => {
-      try {
-        const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
-        const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
-        
-        if (resultado.sucesso && Array.isArray(resultado.dados)) {
-          const pendentes = resultado.dados.filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente');
-          setCrossdockingsPendentes(pendentes);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar as solicitações de Crossdocking:", error);
+  const buscarCrossdockingsPendentes = async () => {
+    try {
+      const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
+      const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
+      
+      if (resultado.sucesso && Array.isArray(resultado.dados)) {
+        const pendentes = resultado.dados.filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente');
+        setCrossdockingsPendentes(pendentes);
       }
-    };
+    } catch (error) {
+      console.error("Erro ao buscar solicitações de Crossdocking:", error);
+    }
+  };
 
+  useEffect(() => {
     if (estoqueAtual) {
       buscarCrossdockingsPendentes();
     }
@@ -92,7 +91,6 @@ export default function EntradaEstoque() {
           if (rowNumber > 30) return; 
 
           const tempMap = {};
-          
           row.eachCell((cell, colNumber) => {
             let val = cell.value;
             if (val && typeof val === 'object' && val.richText) {
@@ -119,7 +117,7 @@ export default function EntradaEstoque() {
 
       if (!worksheetParaLer) {
         closeAlert();
-        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados em nenhuma das abas da planilha. Verifique o ficheiro.", "error");
+        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados nas abas da planilha.", "error");
         return;
       }
 
@@ -156,7 +154,7 @@ export default function EntradaEstoque() {
         const desc = puxarDado(['DESCRIÇÃO', 'DESCRICAO', 'VENDOR']);
         const nomeFab = puxarDado(['FABRICANTE', 'MARCA', 'FABR']);
         const numPeca = puxarDado(['PEÇA', 'PART NUMBER', 'PN', 'REF. FABRICANTE']);
-        const qtd = parseInt(puxarDado(['QTDE ENTRADA', 'QTD', 'QUANTIDADE'])) || 1;
+        const qtd = parseInt(puxarDado(['QTDE ENTRADA', 'QTD', 'QUANTIDADE']), 10) || 1;
         const ref = puxarDado(['REFERÊNCIA', 'REFERENCIA']);
         const unid = puxarDado(['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid';
         const nf = puxarDado(['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NFE ENTRADA', 'NOTA FISCAL']);
@@ -205,7 +203,7 @@ export default function EntradaEstoque() {
         const novaLista = [...listaLimpa, ...novosItensFormatados];
 
         if (novaLista.length > LIMITE_LOGISTICA) {
-          showAlert("Limite de Linhas Excedido", `A planilha contém mais itens do que o limite permitido. Foram importados os primeiros ${LIMITE_LOGISTICA} itens (de um total detetado de ${novaLista.length}).`, "warning");
+          showAlert("Limite de Linhas Excedido", `Foram importados os primeiros ${LIMITE_LOGISTICA} itens permitidos.`, "warning");
           return novaLista.slice(0, LIMITE_LOGISTICA);
         }
 
@@ -246,10 +244,70 @@ export default function EntradaEstoque() {
 
   const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
   const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
-  
-  const removerItem = (idParaRemover) => {
-    setItens(itens.filter(item => item.id !== idParaRemover));
-  };
+  const removerItem = (idParaRemover) => setItens(itens.filter(item => item.id !== idParaRemover));
+
+  // ✨ MAPEAMENTO DE MATCHING RIGOROSO: Impede falsos positivos em nomes compostos
+  const { idsLinhasCrossdocking, nfsUnicasEncontradas } = useMemo(() => {
+    const idsMarcados = new Set();
+    const nfsEncontradas = new Set();
+
+    itens.forEach(linhaTabela => {
+      const nfTab = String(linhaTabela.nfEntrada || '').trim().toUpperCase();
+      const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
+      const fornTabRaw = String(linhaTabela.fornecedor || '').trim().toUpperCase();
+
+      if (!nfTab || !fornTabRaw) return;
+
+      crossdockingsPendentes.forEach(cross => {
+        const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
+        
+        let fornCrossRaw = '';
+        if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
+          fornCrossRaw = String(cross.itens[0].fornecedor).trim().toUpperCase();
+        }
+        if (!fornCrossRaw && cross.observacoes) {
+          const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
+          if (matchForn) fornCrossRaw = matchForn[1].trim().toUpperCase();
+        }
+
+        const fornCrossEsperado = fornCrossRaw.split(/\s+/)[0];
+        if (!fornCrossEsperado) return;
+
+        const primeiroFornLinha = fornTabRaw.split(/\s+/)[0];
+        const bateuFornecedor = (fornTabRaw === fornCrossEsperado) || 
+                                (primeiroFornLinha === fornCrossEsperado && fornCrossRaw.startsWith(fornTabRaw));
+
+        if (nfTab === nfCross && bateuFornecedor) {
+          const obs = String(cross.observacoes || '');
+          const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && cross.itens.some(i => i.desenho_sap_manual && i.desenho_sap_manual !== '-'));
+
+          if (isParcial) {
+            if (!sapTab) return;
+            const itensCross = cross.itens || [];
+            const bateuSap = itensCross.some(ic => {
+              const sapCross = String(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP || '').trim().toUpperCase();
+              return sapCross && sapCross === sapTab;
+            });
+
+            if (bateuSap) {
+              idsMarcados.add(linhaTabela.id);
+              nfsEncontradas.add(nfTab);
+            }
+          } else {
+            idsMarcados.add(linhaTabela.id);
+            nfsEncontradas.add(nfTab);
+          }
+        }
+      });
+    });
+
+    return { 
+      idsLinhasCrossdocking: idsMarcados, 
+      nfsUnicasEncontradas: Array.from(nfsEncontradas) 
+    };
+  }, [itens, crossdockingsPendentes]);
+
+  const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
 
   const handleEnviar = async () => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
@@ -284,9 +342,10 @@ export default function EntradaEstoque() {
           return;
         }
 
-        anexosProcessados.push(...enviados.map((anexo) => ({ ...anexo, origem: 'logistica' })));
+        anexosProcessados.push(...enviados.map(anexo => ({ ...anexo, origem: 'logistica' })));
       }
 
+      // Payload completo preservando 100% dos dados para o backend
       const payload = {
         solicitante: { 
           ...formDados, 
@@ -328,6 +387,7 @@ export default function EntradaEstoque() {
         setFormDados({ nome: '', observacoes: '' }); 
         setItens([]);
         setAnexos([]);
+        buscarCrossdockingsPendentes();
       } else {
         closeAlert();
         showAlert("Erro no Servidor", dados.erro, "error");
@@ -337,68 +397,6 @@ export default function EntradaEstoque() {
       showAlert("Erro de Conexão", `Falha ao conectar com o servidor. Motivo: ${error.message}`, "error");
     }
   };
-
-  // ✨ MAPEAMENTO DE LINHAS DESTACADAS COM COMPARAÇÃO ESTRITA DA 1ª PALAVRA
-  const { idsLinhasCrossdocking, nfsUnicasEncontradas } = useMemo(() => {
-    const idsMarcados = new Set();
-    const nfsEncontradas = new Set();
-
-    itens.forEach(linhaTabela => {
-      const nfTab = String(linhaTabela.nfEntrada || '').trim().toUpperCase();
-      const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
-      const fornTabRaw = String(linhaTabela.fornecedor || '').trim().toUpperCase();
-      const primeiroNomeTab = fornTabRaw.split(/\s+/)[0];
-
-      if (!nfTab || !primeiroNomeTab) return;
-
-      crossdockingsPendentes.forEach(cross => {
-        const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
-        
-        let fornCrossRaw = '';
-        if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
-          fornCrossRaw = String(cross.itens[0].fornecedor).trim().toUpperCase();
-        }
-        if (!fornCrossRaw && cross.observacoes) {
-          const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) fornCrossRaw = matchForn[1].trim().toUpperCase();
-        }
-
-        const primeiroNomeCross = fornCrossRaw.split(/\s+/)[0];
-
-        // Comparação estrita da primeira palavra do fornecedor
-        const bateuFornecedor = primeiroNomeCross !== '' && primeiroNomeTab === primeiroNomeCross;
-
-        if (nfTab === nfCross && bateuFornecedor) {
-          const obs = String(cross.observacoes || '');
-          const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && cross.itens.some(i => i.desenho_sap_manual && i.desenho_sap_manual !== '-'));
-
-          if (isParcial) {
-            if (!sapTab) return;
-            const itensCross = cross.itens || [];
-            const bateuSap = itensCross.some(ic => {
-              const sapCross = String(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP || '').trim().toUpperCase();
-              return sapCross && sapCross === sapTab;
-            });
-
-            if (bateuSap) {
-              idsMarcados.add(linhaTabela.id);
-              nfsEncontradas.add(nfTab);
-            }
-          } else {
-            idsMarcados.add(linhaTabela.id);
-            nfsEncontradas.add(nfTab);
-          }
-        }
-      });
-    });
-
-    return { 
-      idsLinhasCrossdocking: idsMarcados, 
-      nfsUnicasEncontradas: Array.from(nfsEncontradas) 
-    };
-  }, [itens, crossdockingsPendentes]);
-
-  const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
 
   return (
     <div className="estoque-wrapper">
