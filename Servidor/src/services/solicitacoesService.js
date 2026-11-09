@@ -819,12 +819,14 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     else if (solicitacao.tipo === 'Crossdocking') {
       const jaFoiDeduzido = solicitacao.observacoes && solicitacao.observacoes.includes('[NF VINCULADA]');
       
-      if (!jaFoiDeduzido) {
+      // Só avança para a dedução se a solicitação estiver a ser efetivamente aprovada
+      if (!jaFoiDeduzido && foiAprovado) {
         const nfRecord = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
         let nfCross = normalizar(nfRecord ? nfRecord.numero_nf : '');
 
         let fornCross = '';
-        const matchForn = solicitacao.observacoes?.match(/Fornecedor:\s*([^\]|\n]+)/i);
+        // Extração exata do Fornecedor gerado no texto automático da observação
+        const matchForn = solicitacao.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
         if (matchForn) fornCross = normalizar(matchForn[1]);
 
         let itensCross = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
@@ -835,10 +837,12 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const obs = String(solicitacao.observacoes || '');
         const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (itensCross.length > 0 && !/sa[íi]da\s+total/i.test(obs));
 
+        // Varredura ativa no estoque físico da mesma filial
         const candidatosEstoque = await db.listar('estoque', { 
           filter: db.f('filial_id = {:filial}', { filial: solicitacao.filial_origem_id }) 
         });
 
+        // Filtro Triplo Estrito (NF + Fornecedor + Saldo Positivo)
         const estoqueValido = candidatosEstoque.filter(e => {
           const bateuNF = normalizar(e.nf_entrada) === nfCross;
           const bateuForn = fornCross ? normalizar(e.fornecedor) === fornCross : true;
@@ -846,12 +850,15 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         });
 
         if (!isParcial) {
+          // ----------------------------------------------------
+          // SAÍDA TOTAL
+          // ----------------------------------------------------
           if (estoqueValido.length > 0) {
             await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: id }));
 
             const novosItens = estoqueValido.map(e => ({
               solicitacao_id: id,
-              estoque_id: e.id,
+              estoque_id: e.id, // ✨ SOLUÇÃO PROB 2: O Carimbo que faz o PDF funcionar!
               desenho_sap_manual: e.desenho_sap,
               part_number_manual: e.part_number,
               fabricante: e.fabricante,
@@ -871,6 +878,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
             await db.criarVarios('solicitacoes_itens', novosItens);
 
+            // Esvazia a prateleira
             for (const e of estoqueValido) {
               await db.atualizar('estoque', e.id, {
                 quantidade_disponivel: 0,
@@ -883,6 +891,9 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             });
           }
         } else {
+          // ----------------------------------------------------
+          // SAÍDA PARCIAL
+          // ----------------------------------------------------
           let deduziuAlgo = false;
 
           for (const itemPedido of itensCross) {
@@ -893,12 +904,14 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             });
 
             if (itemEstoque) {
+              // ✨ SOLUÇÃO PROB 3: Usa apenas a quantidade que o cliente pediu
               const qtdPedida = Number(itemPedido.quantidade_solicitada || 1);
               const qtdDisp = Number(itemEstoque.quantidade_disponivel || 0);
               const novoSaldo = Math.max(0, qtdDisp - qtdPedida);
 
+              // Atualiza o item do pedido carimbando o ID físico (PDF ganha vida)
               await db.atualizar('solicitacoes_itens', itemPedido.id, {
-                estoque_id: itemEstoque.id,
+                estoque_id: itemEstoque.id, // ✨ SOLUÇÃO PROB 2
                 part_number_manual: itemEstoque.part_number || itemPedido.part_number_manual,
                 fabricante: itemEstoque.fabricante || itemPedido.fabricante,
                 descricao_manual: itemEstoque.descricao || itemPedido.descricao_manual,
@@ -913,6 +926,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 alocacao: 'CROSSDOCKING PARCIAL'
               });
 
+              // Deduz a quantidade exata da prateleira (Baixa real)
               await db.atualizar('estoque', itemEstoque.id, {
                 quantidade_disponivel: novoSaldo,
                 status: novoSaldo <= 0 ? 'Zerado' : 'Disponível'
