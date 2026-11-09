@@ -12,6 +12,7 @@ import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaI
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
+import { normalizarString } from '../../../utils/formatadores';
 
 const LIMITE_LOGISTICA = 100;
 
@@ -305,14 +306,14 @@ export default function EntradaEstoque() {
           filial_id: estoqueAtual 
         },
         itens: itensValidos.map(item => ({
-          desenho_sap: item.desenhoSAP || '-',
-          part_number: item.numPecaFabricante || '-',
+          desenho_sap: normalizarString(item.desenhoSAP) || '-',
+          part_number: normalizarString(item.numPecaFabricante) || '-',
           fabricante: item.fabricante || null,
-          fornecedor: item.fornecedor || null,
+          fornecedor: normalizarString(item.fornecedor) || null,
           referencia: item.referencia || null,
           qtd: parseInt(item.qtdFornecida, 10) || 1,
           unidade_medida: item.unidadeMedida || 'Unid',
-          nf_entrada: item.nfEntrada || null,
+          nf_entrada: normalizarString(item.nfEntrada) || null,
           descricao: item.vendorDescription || 'Sem descrição',
           materialDescription: item.vendorDescription || 'Sem descrição',
           wbs_element: item.wbsElement || '-',
@@ -349,33 +350,31 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ COMPARAÇÃO EXATA DE FORNECEDOR (Sem remover palavras) E RETORNO DOS CROSSDOCKINGS RECONHECIDOS
+  // ✨ MATCH VISUAL REFORÇADO (O CORAÇÃO DA SOLUÇÃO DO PROBLEMA 1)
   const { idsLinhasCrossdocking, solicitacoesCrossEncontradas } = useMemo(() => {
     const idsMarcados = new Set();
     const mapSolicitacoes = new Map();
 
-    const normalizar = (txt) => String(txt || '').trim().replace(/\s+/g, ' ').toUpperCase();
-
     itens.forEach(linhaTabela => {
-      const nfTab = normalizar(linhaTabela.nfEntrada);
-      const sapTab = normalizar(linhaTabela.desenhoSAP);
-      const fornTab = normalizar(linhaTabela.fornecedor); // Texto Inteiro Exato
+      const nfTab = normalizarString(linhaTabela.nfEntrada);
+      const sapTab = normalizarString(linhaTabela.desenhoSAP);
+      const fornTab = normalizarString(linhaTabela.fornecedor);
 
       if (!nfTab || !fornTab) return;
 
       crossdockingsPendentes.forEach(cross => {
-        const nfCross = normalizar(cross.nfCrossdocking);
+        const nfCross = normalizarString(cross.nfCrossdocking);
         
         let fornCross = '';
         if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
-          fornCross = normalizar(cross.itens[0].fornecedor);
+          fornCross = normalizarString(cross.itens[0].fornecedor);
         }
         if (!fornCross && cross.observacoes) {
           const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) fornCross = normalizar(matchForn[1]);
+          if (matchForn) fornCross = normalizarString(matchForn[1]);
         }
 
-        // ✨ AQUI MORA A VERDADE: Só avança se a string inteira for rigorosamente igual!
+        // Se bater NF e Fornecedor
         if (nfTab === nfCross && fornTab === fornCross) {
           const obs = String(cross.observacoes || '');
           const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
@@ -383,8 +382,10 @@ export default function EntradaEstoque() {
           if (isParcial) {
             if (!sapTab) return;
             const itensCross = cross.itens || [];
+            
+            // Só pinta de azul se a linha bater com um SAP solicitado
             const bateuSap = itensCross.some(ic => {
-              const sapCross = normalizar(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP);
+              const sapCross = normalizarString(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP);
               return sapCross && sapCross === sapTab;
             });
 
@@ -393,6 +394,7 @@ export default function EntradaEstoque() {
               mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: fornCross, isParcial: true });
             }
           } else {
+            // Se for Total, aprova tudo o que partilhar a mesma NF e Fornecedor
             idsMarcados.add(linhaTabela.id);
             mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: fornCross, isParcial: false });
           }
@@ -438,7 +440,6 @@ export default function EntradaEstoque() {
         </div>
       </div>
 
-      {/* ✨ CARD DETALHADO DO CROSSDOCKING IDENTIFICADO */}
       {temCrossdockingAguardando && (
         <div style={{
           display: 'flex', flexDirection: 'column', gap: '14px',
