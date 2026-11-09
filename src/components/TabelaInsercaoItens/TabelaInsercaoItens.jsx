@@ -2,17 +2,17 @@
 // ARQUIVO: src/components/TabelaInsercaoItens/TabelaInsercaoItens.jsx
 // =================================================================
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight, AlertCircle, Info } from 'lucide-react';
+import { Package, Plus, Trash2, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import CarregarArquivo from '../CarregarArquivo/CarregarArquivo';
 import ExemploExcel from '../ExemploExcel/ExemploExcel';
 import ScrollDuplo from '../ScrollDuplo/ScrollDuplo';
-import { apiFetch } from '../../services/api';
 import { formatarDinheiroTempoReal } from '../../utils/formatadores';
+import './TabelaInsercaoItens.css';
 
 export default function TabelaInsercaoItens({
-  itens,
-  limiteLinhas = 20, 
+  itens = [],
+  limiteLinhas = 100, 
   wbsGlobal, 
   bloquearWBS = false, 
   linhasDestacadas = new Set(),
@@ -22,60 +22,18 @@ export default function TabelaInsercaoItens({
   onImportarExcel
 }) {
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [crossdockingsPendentes, setCrossdockingsPendentes] = useState([]);
-  
   const itensPorPagina = 10;
-  const alturaLinhaPx = 62;
   const totalPaginas = Math.max(1, Math.ceil(itens.length / itensPorPagina));
 
   useEffect(() => {
     if (paginaAtual > totalPaginas) setPaginaAtual(totalPaginas);
   }, [itens.length, totalPaginas, paginaAtual]);
 
-  useEffect(() => {
-    const buscarCrossdockings = async () => {
-      try {
-        const res = await apiFetch(`/solicitacoes/listar?tipo=Crossdocking&status=Pendente&limit=100`);
-        if (res.sucesso && res.dados) {
-          setCrossdockingsPendentes(res.dados);
-        }
-      } catch (e) {
-        console.error("Erro ao buscar crossdockings pendentes:", e);
-      }
-    };
-    buscarCrossdockings();
-  }, []);
-
   const indexUltimoItem = paginaAtual * itensPorPagina;
   const indexPrimeiroItem = indexUltimoItem - itensPorPagina;
   const itensDaPagina = itens.slice(indexPrimeiroItem, indexUltimoItem);
 
-  const linhasFantasmas = Math.max(0, itensPorPagina - itensDaPagina.length);
-  const limiteAtingido = itens.length >= limiteLinhas;
-  const larguraMinimaTabela = '2750px';
   const isWbsBloqueada = wbsGlobal !== undefined || bloquearWBS;
-
-  const verificarMatchCrossdocking = (itemLinha) => {
-    const nf = itemLinha.nfEntrada || itemLinha.nf_entrada || itemLinha.nf;
-    if (!nf || !itemLinha.fornecedor) return false;
-
-    const nfLinha = String(nf).trim().toUpperCase();
-    const fornLinha = String(itemLinha.fornecedor).trim().toUpperCase().split(/\s+/)[0];
-    const sapLinha = String(itemLinha.desenhoSAP || itemLinha.desenho_sap || '').trim().toUpperCase();
-
-    return crossdockingsPendentes.some(cross => {
-      const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
-      const fornCrossBruto = cross.itens?.[0]?.fornecedor || '';
-      const fornCross = String(fornCrossBruto).trim().toUpperCase().split(/\s+/)[0];
-      
-      if (nfLinha !== nfCross || fornLinha !== fornCross) return false;
-
-      const isParcial = cross.itens?.some(i => i.desenho_sap_manual && i.desenho_sap_manual !== '-');
-      if (!isParcial) return true; 
-
-      return cross.itens?.some(i => String(i.desenho_sap_manual || '').trim().toUpperCase() === sapLinha);
-    });
-  };
 
   const estaDestacada = (id) => {
     if (!linhasDestacadas) return false;
@@ -84,305 +42,200 @@ export default function TabelaInsercaoItens({
     return false;
   };
 
-  const temMatchTempoReal = itens.some(item => verificarMatchCrossdocking(item));
-  const totalDestacadas = linhasDestacadas instanceof Set ? linhasDestacadas.size : (Array.isArray(linhasDestacadas) ? linhasDestacadas.length : 0);
-  const mostrarBannerCross = totalDestacadas > 0 || temMatchTempoReal;
-
   return (
     <div className="form-cartao" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="form-header" style={{ padding: '20px 24px', margin: 0, borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        
-        <div className="form-header-esquerda" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="form-header-icone verde-quadrado" style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#dcfce7', color: '#16a34a', borderRadius: '6px' }}>
-            <Package size={16} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h2 style={{ fontSize: '1rem', margin: 0, color: '#1e293b' }}>Itens para Entrada</h2>
-            <span style={{ fontSize: '0.7rem', fontWeight: '600', backgroundColor: '#e0f2fe', color: '#0284c7', padding: '2px 8px', borderRadius: '999px', border: '1px solid #bae6fd', display: 'inline-flex', alignItems: 'center' }}>
-              Máx: {limiteLinhas}
-            </span>
+      <div className="form-header" style={{ padding: '20px 24px', margin: 0, borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="icone-destaque azul"><Package size={24} /></div>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b' }}>Itens da Solicitação</h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>Insira os materiais manualmente ou importe via Excel.</p>
           </div>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={onAdicionarLinha}
-            disabled={limiteAtingido}
-            title={limiteAtingido ? `Limite máximo de ${limiteLinhas} itens atingido.` : 'Adicionar linha em branco'}
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', 
-              backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', 
-              fontSize: '0.75rem', fontWeight: '600', color: '#475569', 
-              cursor: limiteAtingido ? 'not-allowed' : 'pointer',
-              opacity: limiteAtingido ? 0.5 : 1
-            }}
-          >
-            <Plus size={16} /> Nova Linha
-          </button>
-
-          <CarregarArquivo
-            variante="botao"
-            accept=".xlsx, .xls"
-            label="Importar Excel"
-            icone={<FileSpreadsheet size={16} color="#10b981" />}
-            onFileSelect={onImportarExcel}
-          />
-
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <ExemploExcel />
-
-          <span style={{ fontSize: '0.75rem', fontWeight: '500', color: limiteAtingido ? '#b91c1c' : '#64748b', backgroundColor: limiteAtingido ? '#fef2f2' : '#f8fafc', border: `1px solid ${limiteAtingido ? '#fecaca' : '#e2e8f0'}`, padding: '4px 10px', borderRadius: '999px' }}>
-            {itens.length} / {limiteLinhas} itens
-          </span>
+          <CarregarArquivo variante="botao" accept=".xlsx, .xls" label="Importar Excel" icone={<FileSpreadsheet size={16} />} onFileSelect={onImportarExcel} />
         </div>
       </div>
 
-      {mostrarBannerCross && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 24px',
-          backgroundColor: '#eff6ff', borderBottom: '1px solid #bfdbfe', color: '#1e40af', fontSize: '0.825rem'
-        }}>
-          <Info size={16} color="#2563eb" style={{ flexShrink: 0 }} />
-          <span>
-            <strong>Atenção Crossdocking:</strong> Apenas as linhas marcadas em <span style={{ backgroundColor: '#dbeafe', color: '#1d4ed8', fontWeight: '700', padding: '2px 6px', borderRadius: '4px' }}>azul</span> com a etiqueta <strong>CROSS</strong> serão deduzidas na saída de Crossdocking. As demais linhas entrarão normalmente no saldo disponível de estoque.
-          </span>
-        </div>
-      )}
-
-      <div style={{ position: 'relative' }}>
-        {itens.length === 0 && (
-          <div style={{ 
-            position: 'absolute', top: '80px', left: '50%', transform: 'translateX(-50%)', zIndex: 10,
-            backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderLeft: '4px solid #f59e0b', 
-            padding: '12px 20px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '10px', 
-            color: '#b45309', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-          }}>
-            <AlertCircle size={20} />
-            <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>
-              Atenção: A sua lista está vazia. Clique em "Nova Linha" ou importe uma planilha para começar.
-            </span>
-          </div>
-        )}
-
-        <ScrollDuplo larguraConteudo={larguraMinimaTabela}>
-          <table className="tabela-solicitacao-dados" style={{ minWidth: larguraMinimaTabela, width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
+      <ScrollDuplo>
+        <table className="tabela-insercao" style={{ width: '100%', minWidth: '2400px', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ width: '220px' }}>DESENHO SAP</th>
+              <th style={{ width: '380px' }}>DESCRIÇÃO DO MATERIAL</th>
+              <th style={{ width: '200px' }}>PART NUMBER (PN)</th>
+              <th style={{ width: '110px' }}>QTD</th>
+              <th style={{ width: '120px' }}>UNID</th>
+              <th style={{ width: '180px' }}>NF ENTRADA</th>
+              <th style={{ width: '220px' }}>FORNECEDOR</th>
+              <th style={{ width: '180px' }}>REFERÊNCIA</th>
+              <th style={{ width: '160px' }}>VALOR UNITÁRIO</th>
+              <th style={{ width: '220px' }}>WBS / CENTRO CUSTO</th>
+              <th style={{ width: '180px' }}>ALOCAÇÃO</th>
+              <th style={{ width: '60px', textAlign: 'center' }}>AÇÃO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {itensDaPagina.length === 0 ? (
               <tr>
-                <th style={{ width: '80px', textAlign: 'center', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>AÇÕES</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM SAP | DESENHO</th>
-                <th style={{ minWidth: '200px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DESCRIÇÃO</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FABRICANTE</th>
-                <th style={{ width: '120px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>QTDE ENTRADA</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>REFERÊNCIA</th>
-                <th style={{ width: '140px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>UNID. MEDIDA</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NUM DA NOTA FISCAL</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FORNECEDOR / REGISTRO</th>
-                <th style={{ 
-                  padding: '12px', backgroundColor: isWbsBloqueada ? '#f1f5f9' : '#fafafa', 
-                  borderBottom: '1px solid #e2e8f0', borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none',
-                  borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none', color: isWbsBloqueada ? '#64748b' : 'inherit'
-                }}>
-                  CENTRO DE CUSTO - WBS
-                </th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>NOME CENTRO DE CUSTO / PROJETO</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>EMISSÃO NF</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>RECEB. NF</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>Nº PEDIDO DE COMPRA / CPV</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>VLR. UNITÁRIO NOTA FISCAL</th>
-                <th style={{ width: '100px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>FILIAL</th>
-                <th style={{ width: '100px', padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>DEPÓSITO</th>
-                <th style={{ padding: '12px', backgroundColor: '#fafafa', borderBottom: '1px solid #e2e8f0' }}>ALOCAÇÃO</th>
+                <td colSpan="12" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                  Nenhum item adicionado. Clique no botão abaixo ou importe um arquivo Excel.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {itensDaPagina.map((item) => {
-                const isCrossdockingMatch = estaDestacada(item.id) || verificarMatchCrossdocking(item);
+            ) : (
+              itensDaPagina.map((item, indexOriginal) => {
+                const idx = indexPrimeiroItem + indexOriginal;
+                const isCrossMatch = estaDestacada(item.id);
 
                 return (
-                  <tr 
-                    key={item.id} 
-                    style={{ 
-                      height: `${alturaLinhaPx}px`, borderBottom: '1px solid #f1f5f9',
-                      backgroundColor: isCrossdockingMatch ? '#f0f7ff' : 'transparent',
-                      borderLeft: isCrossdockingMatch ? '4px solid #2563eb' : '4px solid transparent',
-                      transition: 'background-color 0.2s'
-                    }}
-                  >
-                    <td style={{ textAlign: 'center', padding: '4px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
-                        <button 
-                          onClick={() => onRemoverItem(item.id)} 
-                          className="btn-deletar-linha" 
-                          style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
-                          title="Remover linha"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                        {isCrossdockingMatch && (
-                          <span 
-                            title="Item reconhecido: será deduzido pelo Crossdocking" 
-                            style={{ 
-                              fontSize: '0.625rem', fontWeight: '700', color: '#1d4ed8', 
-                              backgroundColor: '#dbeafe', border: '1px solid #bfdbfe',
-                              borderRadius: '4px', padding: '1px 5px', lineHeight: '1.2'
-                            }}
-                          >
-                            CROSS
-                          </span>
-                        )}
+                  <tr key={item.id || idx} className={isCrossMatch ? 'linha-crossdocking' : ''}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input
+                          type="text"
+                          value={item.desenhoSAP || item.desenho_sap || ''}
+                          onChange={(e) => onAtualizarCampo(item.id, 'desenhoSAP', e.target.value)}
+                          placeholder="Ex: 10293847"
+                          style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
+                        />
+                        {isCrossMatch && <span className="badge-cross" title="Material vinculado a um Crossdocking">CROSS</span>}
                       </div>
                     </td>
-                    
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.desenhoSAP || ''} onChange={(e) => onAtualizarCampo(item.id, 'desenhoSAP', e.target.value)} placeholder="SAP / Desenho" />
-                    </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.vendorDescription || ''} onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)} placeholder="Descrição" />
-                    </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fabricante || ''} onChange={(e) => onAtualizarCampo(item.id, 'fabricante', e.target.value)} placeholder="Nome do Fabricante" />
-                    </td>
-
-                    <td style={{ padding: '8px', textAlign: 'center' }}>
-                      <input 
-                        type="number" min="1" step="1"
-                        style={{ 
-                          width: '75px', padding: '6px 8px', border: '1px solid #bfdbfe', 
-                          borderRadius: '6px', color: '#2563eb', fontWeight: '700', 
-                          textAlign: 'center', backgroundColor: isCrossdockingMatch ? '#ffffff' : '#eff6ff', outline: 'none',
-                          cursor: 'text'
-                        }} 
-                        value={item.qtdFornecida} 
-                        onKeyDown={(e) => { if (['.', ',', '-', 'e', 'E'].includes(e.key)) e.preventDefault(); }}
-                        onBlur={(e) => { if (!e.target.value || parseInt(e.target.value, 10) < 1) onAtualizarCampo(item.id, 'qtdFornecida', 1); }}
-                        onChange={(e) => {
-                          let val = e.target.value;
-                          if (val === '0') val = '1';
-                          onAtualizarCampo(item.id, 'qtdFornecida', val);
-                        }} 
-                        placeholder="1" 
+                    <td>
+                      <input
+                        type="text"
+                        value={item.vendorDescription || item.descricao || ''}
+                        onChange={(e) => onAtualizarCampo(item.id, 'vendorDescription', e.target.value)}
+                        placeholder="Descrição do material..."
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
                       />
                     </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.referencia || ''} onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)} placeholder="Referência" />
+                    <td>
+                      <input
+                        type="text"
+                        value={item.numPecaFabricante || item.part_number || ''}
+                        onChange={(e) => onAtualizarCampo(item.id, 'numPecaFabricante', e.target.value)}
+                        placeholder="PN..."
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
+                      />
                     </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <select className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', appearance: 'auto', padding: '4px' }} value={item.unidadeMedida || 'Unid'} onChange={(e) => onAtualizarCampo(item.id, 'unidadeMedida', e.target.value)}>
+                    <td>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.qtdFornecida !== undefined ? item.qtdFornecida : ''}
+                        onChange={(e) => onAtualizarCampo(item.id, 'qtdFornecida', e.target.value)}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none', textAlign: 'center' }}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={item.unidadeMedida || item.unidade_medida || 'Unid'}
+                        onChange={(e) => onAtualizarCampo(item.id, 'unidadeMedida', e.target.value)}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
+                      >
                         <option value="Unid">Unid</option>
                         <option value="Kg">Kg</option>
-                        <option value="Metro">Metro</option>
+                        <option value="Metros">Metros</option>
+                        <option value="Litros">Litros</option>
                         <option value="Caixa">Caixa</option>
-                        <option value="Litro">Litro</option>
-                        <option value="NR">NR</option>
                       </select>
                     </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-preto" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} value={item.nfEntrada || ''} onChange={(e) => onAtualizarCampo(item.id, 'nfEntrada', e.target.value)} placeholder="NF" />
-                    </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-cinza-escuro" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.fornecedor || ''} onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)} placeholder="Fornecedor" />
-                    </td>
-
-                    <td style={{ 
-                      padding: '8px', backgroundColor: isWbsBloqueada ? '#f1f5f9' : 'transparent',
-                      borderLeft: isWbsBloqueada ? '1px solid #e2e8f0' : 'none', borderRight: isWbsBloqueada ? '1px solid #e2e8f0' : 'none'
-                    }}>
-                      <input 
-                        style={{ 
-                          width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', 
-                          color: isWbsBloqueada ? '#94a3b8' : '#2563eb', fontFamily: 'monospace',
-                          fontWeight: isWbsBloqueada ? '500' : 'normal', cursor: isWbsBloqueada ? 'not-allowed' : 'text'
-                        }} 
-                        disabled={isWbsBloqueada}
-                        value={isWbsBloqueada ? (wbsGlobal || '-') : (item.wbsElement || '')} 
-                        onChange={(e) => !isWbsBloqueada && onAtualizarCampo(item.id, 'wbsElement', e.target.value)} 
-                        placeholder="-" 
+                    <td>
+                      <input
+                        type="text"
+                        value={item.nfEntrada || item.nf_entrada || ''}
+                        onChange={(e) => onAtualizarCampo(item.id, 'nfEntrada', e.target.value)}
+                        placeholder="Nº NF"
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
                       />
                     </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.nomeProjeto || ''} onChange={(e) => onAtualizarCampo(item.id, 'nomeProjeto', e.target.value)} placeholder="Nome Projeto" />
-                    </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input 
-                        type="date" className="input-editavel-tabela texto-cinza" 
-                        style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
-                        value={item.emissaoNF === '-' ? '' : (item.emissaoNF || '')} 
-                        onChange={(e) => onAtualizarCampo(item.id, 'emissaoNF', e.target.value)} 
-                        onClick={(e) => e.target.showPicker && e.target.showPicker()} 
+                    <td>
+                      <input
+                        type="text"
+                        value={item.fornecedor || ''}
+                        onChange={(e) => onAtualizarCampo(item.id, 'fornecedor', e.target.value)}
+                        placeholder="Ex: SIEMENS"
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
                       />
                     </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input 
-                        type="date" className="input-editavel-tabela texto-cinza" 
-                        style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569', cursor: 'pointer' }} 
-                        value={item.recebNF === '-' ? '' : (item.recebNF || '')} 
-                        onChange={(e) => onAtualizarCampo(item.id, 'recebNF', e.target.value)} 
-                        onClick={(e) => e.target.showPicker && e.target.showPicker()} 
+                    <td>
+                      <input
+                        type="text"
+                        value={item.referencia || ''}
+                        onChange={(e) => onAtualizarCampo(item.id, 'referencia', e.target.value)}
+                        placeholder="Referência..."
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
                       />
                     </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.docCompras || ''} onChange={(e) => onAtualizarCampo(item.id, 'docCompras', e.target.value)} placeholder="Doc Compras" />
-                    </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input 
-                        className="input-editavel-tabela texto-preto" 
-                        style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#1e293b' }} 
-                        value={item.poNetPrice || ''} 
+                    <td>
+                      <input
+                        type="text"
+                        value={item.poNetPrice || item.valor_unitario || ''}
                         onChange={(e) => {
-                          const valorFormatado = formatarDinheiroTempoReal(e.target.value);
-                          onAtualizarCampo(item.id, 'poNetPrice', valorFormatado);
-                        }} 
-                        placeholder="R$ 0,00" 
+                          const valFormatado = formatarDinheiroTempoReal ? formatarDinheiroTempoReal(e.target.value) : e.target.value;
+                          onAtualizarCampo(item.id, 'poNetPrice', valFormatado);
+                        }}
+                        placeholder="R$ 0,00"
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
                       />
                     </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.centro || ''} onChange={(e) => onAtualizarCampo(item.id, 'centro', e.target.value)} placeholder="Filial" />
+                    <td>
+                      <input
+                        type="text"
+                        value={isWbsBloqueada ? wbsGlobal : (item.wbsElement || item.wbs || '')}
+                        onChange={(e) => !isWbsBloqueada && onAtualizarCampo(item.id, 'wbsElement', e.target.value)}
+                        disabled={isWbsBloqueada}
+                        placeholder="WBS..."
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none', backgroundColor: isWbsBloqueada ? '#f1f5f9' : '#ffffff', color: isWbsBloqueada ? '#64748b' : '#334155' }}
+                      />
                     </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela texto-cinza" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#475569' }} value={item.deposito || ''} onChange={(e) => onAtualizarCampo(item.id, 'deposito', e.target.value)} placeholder="Depósito" />
+                    <td>
+                      <input
+                        type="text"
+                        value={item.alocacao || ''}
+                        onChange={(e) => onAtualizarCampo(item.id, 'alocacao', e.target.value)}
+                        placeholder="Ex: Prateleira A1"
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none' }}
+                      />
                     </td>
-
-                    <td style={{ padding: '8px' }}>
-                      <input className="input-editavel-tabela link-azul-fake" style={{ width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', color: '#2563eb', fontFamily: 'monospace' }} value={item.alocacao || ''} onChange={(e) => onAtualizarCampo(item.id, 'alocacao', e.target.value)} placeholder="Alocação" />
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        onClick={() => onRemoverItem(item.id)}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px' }}
+                        title="Remover linha"
+                        type="button"
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     </td>
                   </tr>
                 );
-              })}
-              
-              {linhasFantasmas > 0 && Array.from({ length: linhasFantasmas }).map((_, index) => (
-                <tr key={`fantasma-${index}`} style={{ height: `${alturaLinhaPx}px` }}>
-                  <td colSpan={18} style={{ backgroundColor: 'transparent', borderBottom: '1px solid #f1f5f9' }}></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </ScrollDuplo>
-      </div>
+              })
+            )}
+          </tbody>
+        </table>
+      </ScrollDuplo>
 
-      <div className="paginacao-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', backgroundColor: '#ffffff', borderTop: '1px solid #f1f5f9' }}>
-        <div className="paginacao-info" style={{ fontSize: '0.875rem', color: '#64748b' }}>
-          Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> &middot; Exibindo {itens.length === 0 ? 0 : indexPrimeiroItem + 1} a <strong>{Math.min(indexUltimoItem, itens.length)}</strong> de <strong>{itens.length}</strong> itens
-        </div>
-        <div className="paginacao-botoes" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <button onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))} disabled={paginaAtual === 1 || itens.length === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === 1 || itens.length === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === 1 || itens.length === 0) ? 0.6 : 1 }}>
-            <ChevronLeft size={16} /> Anterior
-          </button>
-          <button onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas || itens.length === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#334155', cursor: (paginaAtual === totalPaginas || itens.length === 0) ? 'not-allowed' : 'pointer', opacity: (paginaAtual === totalPaginas || itens.length === 0) ? 0.6 : 1 }}>
-            Próxima <ChevronRight size={16} />
-          </button>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', backgroundColor: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+        <button
+          type="button"
+          onClick={onAdicionarLinha}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#ffffff', border: '1px dashed #cbd5e1', borderRadius: '8px', color: '#3b82f6', fontWeight: '600', cursor: 'pointer' }}
+        >
+          <Plus size={18} /> Adicionar Linha Manualmente
+        </button>
+
+        {itens.length > itensPorPagina && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Página <strong>{paginaAtual}</strong> de {totalPaginas}</span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))} disabled={paginaAtual === 1} style={{ padding: '6px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer' }} type="button"><ChevronLeft size={16} /></button>
+              <button onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))} disabled={paginaAtual === totalPaginas} style={{ padding: '6px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer' }} type="button"><ChevronRight size={16} /></button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
