@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { Package, Truck, User, Paperclip, Send, FileSpreadsheet, X, Info } from 'lucide-react';
+import { Package, Truck, User, Paperclip, Send, FileSpreadsheet, X, Info, Eye, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
 import './EntradaEstoque.css';
@@ -45,11 +45,11 @@ export default function EntradaEstoque() {
     alocacao: ''
   });
 
-  // ✨ INICIA COM 1 LINHA VAZIA PRONTA PARA DIGITAR (NUNCA FICA BLOQUEADO VAZIO)
   const [itens, setItens] = useState(() => [gerarLinhaVazia()]);
   const [anexos, setAnexos] = useState([]);
   
   const [crossdockingsPendentes, setCrossdockingsPendentes] = useState([]);
+  const [solicitacaoAbertaId, setSolicitacaoAbertaId] = useState(null);
   const processador = useProcessadorExcel();
 
   useEffect(() => {
@@ -120,7 +120,7 @@ export default function EntradaEstoque() {
 
       if (!worksheetParaLer) {
         closeAlert();
-        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados em nenhuma das abas da planilha. Verifique o ficheiro.", "error");
+        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados nas abas da planilha.", "error");
         return;
       }
 
@@ -202,7 +202,6 @@ export default function EntradaEstoque() {
       closeAlert();
 
       setItens(prev => {
-        // Remove apenas linhas totalmente vazias antes de mesclar com o Excel
         const listaLimpa = prev.filter(i => (i.fabricante !== '' || i.desenhoSAP !== '' || i.vendorDescription !== '' || i.nfEntrada !== ''));
         const novaLista = [...listaLimpa, ...novosItensFormatados];
 
@@ -216,11 +215,10 @@ export default function EntradaEstoque() {
 
     } catch (error) {
       console.error(error);
-      showAlert("Erro de Leitura", "Falha ao ler o ficheiro Excel. Verifique se o documento está corrompido.", "error");
+      showAlert("Erro de Leitura", "Falha ao ler o ficheiro Excel.", "error");
     }
   };
 
-  // ✨ ADICIONAR LINHA MANUAL
   const adicionarLinhaEmBranco = () => {
     if (itens.length < LIMITE_LOGISTICA) {
       setItens(prev => [...prev, gerarLinhaVazia()]);
@@ -253,7 +251,6 @@ export default function EntradaEstoque() {
   const removerItem = (idParaRemover) => {
     setItens(prevItens => {
       const restantes = prevItens.filter(item => item.id !== idParaRemover);
-      // Se apagar todas, recria automaticamente 1 linha em branco para o usuário nunca ficar sem campo
       return restantes.length > 0 ? restantes : [gerarLinhaVazia()];
     });
   };
@@ -269,7 +266,6 @@ export default function EntradaEstoque() {
       return;
     }
 
-    // Filtra linhas que têm pelo menos algum dado preenchido
     const itensValidos = itens.filter(i => 
       (i.desenhoSAP && i.desenhoSAP.trim() !== '') || 
       (i.vendorDescription && i.vendorDescription.trim() !== '') || 
@@ -278,7 +274,7 @@ export default function EntradaEstoque() {
     );
     
     if (itensValidos.length === 0) {
-      showAlert("Lista Vazia", "Preencha ao menos uma linha da tabela (SAP, Descrição ou NF) para registrar a entrada.", "warning");
+      showAlert("Lista Vazia", "Preencha ao menos uma linha da tabela para registrar a entrada.", "warning");
       return;
     }
 
@@ -353,30 +349,33 @@ export default function EntradaEstoque() {
     }
   };
 
-  // Identificação precisa de Crossdocking (NF + Fornecedor + SAP se for parcial)
-  const { idsLinhasCrossdocking, nfsUnicasEncontradas } = useMemo(() => {
+  // ✨ COMPARAÇÃO EXATA DE FORNECEDOR (SEM SPLIT) E RETORNO DOS CROSSDOCKINGS RECONHECIDOS
+  const { idsLinhasCrossdocking, solicitacoesCrossEncontradas } = useMemo(() => {
     const idsMarcados = new Set();
-    const nfsEncontradas = new Set();
+    const mapSolicitacoes = new Map();
+
+    const normalizar = (txt) => String(txt || '').trim().replace(/\s+/g, ' ').toUpperCase();
 
     itens.forEach(linhaTabela => {
-      const nfTab = String(linhaTabela.nfEntrada || '').trim().toUpperCase();
-      const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
-      const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
+      const nfTab = normalizar(linhaTabela.nfEntrada);
+      const sapTab = normalizar(linhaTabela.desenhoSAP);
+      const fornTab = normalizar(linhaTabela.fornecedor);
 
       if (!nfTab || !fornTab) return;
 
       crossdockingsPendentes.forEach(cross => {
-        const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
+        const nfCross = normalizar(cross.nfCrossdocking);
         
         let fornCross = '';
         if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
-          fornCross = String(cross.itens[0].fornecedor).trim().toUpperCase().split(/\s+/)[0];
+          fornCross = normalizar(cross.itens[0].fornecedor);
         }
         if (!fornCross && cross.observacoes) {
           const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
+          if (matchForn) fornCross = normalizar(matchForn[1]);
         }
 
+        // ✨ COMPARAÇÃO EXATA DE FORNECEDOR E NF
         if (nfTab === nfCross && fornTab === fornCross) {
           const obs = String(cross.observacoes || '');
           const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
@@ -385,17 +384,17 @@ export default function EntradaEstoque() {
             if (!sapTab) return;
             const itensCross = cross.itens || [];
             const bateuSap = itensCross.some(ic => {
-              const sapCross = String(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP || '').trim().toUpperCase();
+              const sapCross = normalizar(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP);
               return sapCross && sapCross === sapTab;
             });
 
             if (bateuSap) {
               idsMarcados.add(linhaTabela.id);
-              nfsEncontradas.add(nfTab);
+              mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: fornCross, isParcial: true });
             }
           } else {
             idsMarcados.add(linhaTabela.id);
-            nfsEncontradas.add(nfTab);
+            mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: fornCross, isParcial: false });
           }
         }
       });
@@ -403,11 +402,11 @@ export default function EntradaEstoque() {
 
     return { 
       idsLinhasCrossdocking: idsMarcados, 
-      nfsUnicasEncontradas: Array.from(nfsEncontradas) 
+      solicitacoesCrossEncontradas: Array.from(mapSolicitacoes.values()) 
     };
   }, [itens, crossdockingsPendentes]);
 
-  const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
+  const temCrossdockingAguardando = solicitacoesCrossEncontradas.length > 0;
 
   return (
     <div className="estoque-wrapper">
@@ -439,35 +438,157 @@ export default function EntradaEstoque() {
         </div>
       </div>
 
+      {/* ✨ CARD DETALHADO DO CROSSDOCKING IDENTIFICADO COM VISUALIZAÇÃO DOS ITENS */}
       {temCrossdockingAguardando && (
         <div style={{
-          display: 'flex', flexDirection: 'column', gap: '12px',
+          display: 'flex', flexDirection: 'column', gap: '14px',
           backgroundColor: '#eff6ff', border: '1px solid #93c5fd',
-          padding: '16px 20px', borderRadius: '12px', marginBottom: '24px',
+          padding: '18px 22px', borderRadius: '12px', marginBottom: '24px',
           color: '#1e3a8a', animation: 'fadeIn 0.3s ease-in-out'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ backgroundColor: '#dbeafe', padding: '8px', borderRadius: '50%', color: '#2563eb' }}>
-              <Truck size={22} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ backgroundColor: '#dbeafe', padding: '10px', borderRadius: '50%', color: '#2563eb' }}>
+                <Truck size={24} />
+              </div>
+              <div>
+                <strong style={{ fontSize: '1.05rem', display: 'block', color: '#1e40af' }}>
+                  {solicitacoesCrossEncontradas.length} Solicitação(ões) de Crossdocking Reconhecida(s)
+                </strong>
+                <span style={{ fontSize: '0.825rem', color: '#475569' }}>
+                  Os materiais abaixo coincidiram rigorosamente com NF, Fornecedor e Desenho SAP.
+                </span>
+              </div>
             </div>
-            <div>
-              <strong style={{ fontSize: '1rem', display: 'block', color: '#1e40af' }}>
-                Crossdocking Identificado (NF: {nfsUnicasEncontradas.join(', ')})
-              </strong>
-              <span style={{ fontSize: '0.85rem', color: '#334155' }}>
-                Detectamos solicitações pendentes associadas a estes itens.
-              </span>
+
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              backgroundColor: '#dbeafe', color: '#1d4ed8',
+              padding: '6px 12px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: '700'
+            }}>
+              <Info size={14} />
+              Dedução Automática na Entrada
             </div>
+          </div>
+
+          {/* LISTA DE SOLICITAÇÕES RECONHECIDAS */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+            {solicitacoesCrossEncontradas.map(cross => {
+              const estaExpandida = solicitacaoAbertaId === cross.id;
+
+              return (
+                <div 
+                  key={cross.id}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '8px',
+                    padding: '14px 18px',
+                    boxShadow: '0 1px 3px rgba(37,99,235,0.06)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{
+                        backgroundColor: '#1e40af', color: '#ffffff',
+                        fontFamily: 'monospace', fontWeight: '700', fontSize: '0.85rem',
+                        padding: '3px 8px', borderRadius: '6px'
+                      }}>
+                        {cross.ps}
+                      </span>
+                      <span style={{
+                        fontSize: '0.75rem', fontWeight: '700',
+                        backgroundColor: cross.isParcial ? '#fef3c7' : '#dcfce7',
+                        color: cross.isParcial ? '#b45309' : '#15803d',
+                        padding: '2px 8px', borderRadius: '4px', border: `1px solid ${cross.isParcial ? '#fde68a' : '#bbf7d0'}`
+                      }}>
+                        {cross.isParcial ? 'Saída Parcial' : 'Saída Total'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSolicitacaoAbertaId(estaExpandida ? null : cross.id)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        background: 'none', border: '1px solid #cbd5e1', borderRadius: '6px',
+                        padding: '4px 10px', fontSize: '0.75rem', fontWeight: '600', color: '#2563eb',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Eye size={14} />
+                      {estaExpandida ? 'Ocultar Itens' : 'Ver Solicitação'}
+                      {estaExpandida ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  </div>
+
+                  {/* RESUMO RÁPIDO DO CABEÇALHO */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginTop: '10px', fontSize: '0.80rem', color: '#334155' }}>
+                    <div><strong>Solicitante:</strong> {cross.solicitante || cross.nome_solicitante || '-'}</div>
+                    <div><strong>Fornecedor:</strong> {cross.fornecedorIdentificado || '-'}</div>
+                    <div><strong>NF:</strong> {cross.nfCrossdocking || '-'}</div>
+                    <div><strong>Destino:</strong> {cross.destino || '-'}</div>
+                    <div><strong>WBS:</strong> {cross.wbs || cross.wbs_destino || '-'}</div>
+                  </div>
+
+                  {/* ITENS DETALHADOS SE EXPANDIR */}
+                  {estaExpandida && (
+                    <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #e2e8f0' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                        Itens Cadastrados no Pedido de Crossdocking:
+                      </span>
+
+                      {cross.itens && cross.itens.length > 0 ? (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: '#f8fafc', color: '#64748b' }}>
+                                <th style={{ padding: '6px 10px', borderBottom: '1px solid #e2e8f0' }}>SAP</th>
+                                <th style={{ padding: '6px 10px', borderBottom: '1px solid #e2e8f0' }}>Descrição</th>
+                                <th style={{ padding: '6px 10px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>Qtd Solicitada</th>
+                                <th style={{ padding: '6px 10px', borderBottom: '1px solid #e2e8f0' }}>Unid</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {cross.itens.map((it, idx) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '6px 10px', fontFamily: 'monospace', fontWeight: '700', color: '#2563eb' }}>
+                                    {it.desenho_sap_manual || it.desenho_sap || it.desenhoSAP || '-'}
+                                  </td>
+                                  <td style={{ padding: '6px 10px', color: '#334155' }}>
+                                    {it.descricao_manual || it.descricao || it.vendorDescription || '-'}
+                                  </td>
+                                  <td style={{ padding: '6px 10px', textAlign: 'center', fontWeight: '700', color: '#16a34a' }}>
+                                    {it.quantidade_solicitada || 1}
+                                  </td>
+                                  <td style={{ padding: '6px 10px', color: '#64748b' }}>
+                                    {it.unidade_medida_manual || it.unidadeMedida || 'Unid'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
+                          Saída Total: Todos os itens correspondentes a esta NF e Fornecedor serão transferidos.
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             backgroundColor: '#ffffff', border: '1px solid #bfdbfe',
-            padding: '10px 14px', borderRadius: '8px', fontSize: '0.825rem', color: '#1d4ed8'
+            padding: '8px 12px', borderRadius: '6px', fontSize: '0.80rem', color: '#1d4ed8', marginTop: '4px'
           }}>
             <Info size={16} style={{ flexShrink: 0 }} />
             <span>
-              <strong>Atenção:</strong> As linhas <span style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>destacadas em azul</span> com o selo <strong>CROSS</strong> correspondem aos materiais exatos que serão deduzidos pelo Crossdocking. As demais linhas entrarão normalmente no estoque.
+              <strong>Identificação Visual:</strong> As linhas marcadas com fundo azul e o selo <strong>CROSS</strong> na tabela abaixo são as que serão deduzidas na saída.
             </span>
           </div>
         </div>
