@@ -47,8 +47,14 @@ export const formatarDinheiroTempoReal = (valorOriginal) => {
   }).format(valorDecimal);
 };
 
-// ✨ Formata WBS: Força maiúsculas e permite apenas letras, números e hífens
+// Formata WBS: Força maiúsculas e permite apenas letras, números e hífens
 export const formatarWBS = (valor) => {
   if (!valor) return '';
   return String(valor).toUpperCase().replace(/[^A-Z0-9-]/g, '');
+};
+
+// ✨ NORMALIZAÇÃO ABSOLUTA: Remove espaços duplos e garante maiúsculas
+export const normalizarString = (txt) => {
+  if (!txt) return '';
+  return String(txt).trim().replace(/\s+/g, ' ').toUpperCase();
 };
