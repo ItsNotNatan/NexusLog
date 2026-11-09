@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { Package, Truck, User, Paperclip, Send, FileSpreadsheet, X, Info, ExternalLink, Calendar, MapPin, Tag } from 'lucide-react';
+import { Package, Truck, User, Paperclip, Send, FileSpreadsheet, X, Info } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
 import './EntradaEstoque.css';
@@ -246,7 +246,7 @@ export default function EntradaEstoque() {
   const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
   const removerItem = (idParaRemover) => setItens(itens.filter(item => item.id !== idParaRemover));
 
-  // Tripla Validação e captura das solicitações identificadas
+  // Validação Estrita de Matching (NF, Fornecedor e Desenho SAP)
   const { idsLinhasCrossdocking, nfsUnicasEncontradas, solicitacoesIdentificadas } = useMemo(() => {
     const idsMarcados = new Set();
     const nfsEncontradas = new Set();
@@ -255,24 +255,31 @@ export default function EntradaEstoque() {
     itens.forEach(linhaTabela => {
       const nfTab = String(linhaTabela.nfEntrada || '').trim().toUpperCase();
       const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
-      const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
+      const fornTabRaw = String(linhaTabela.fornecedor || '').trim().toUpperCase();
 
-      if (!nfTab || !fornTab) return;
+      if (!nfTab || !fornTabRaw) return;
 
       crossdockingsPendentes.forEach(cross => {
         const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
         
-        let fornCross = '';
+        let fornCrossRaw = '';
         if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
-          fornCross = String(cross.itens[0].fornecedor).trim().toUpperCase().split(/\s+/)[0];
+          fornCrossRaw = String(cross.itens[0].fornecedor).trim().toUpperCase();
         }
-        if (!fornCross && cross.observacoes) {
+        if (!fornCrossRaw && cross.observacoes) {
           const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
+          if (matchForn) fornCrossRaw = matchForn[1].trim().toUpperCase();
         }
 
-        // Validação 1 & 2: NF e Fornecedor estritamente iguais
-        if (nfTab === nfCross && fornTab === fornCross) {
+        // Validação estrita:
+        // 1. NF idêntica
+        // 2. O fornecedor cadastrado (já sanitizado como termo único) deve ser igual ao primeiro termo da linha
+        const primeiroNomeTab = fornTabRaw.split(/\s+/)[0];
+        const primeiroNomeCross = fornCrossRaw.split(/\s+/)[0];
+
+        const bateuFornecedor = (fornTabRaw === fornCrossRaw) || (primeiroNomeTab === fornCrossRaw) || (primeiroNomeTab === primeiroNomeCross && fornCrossRaw.length <= primeiroNomeCross.length);
+
+        if (nfTab === nfCross && bateuFornecedor) {
           const itensCross = cross.itens || [];
           const isParcial = itensCross.some(i => i.desenho_sap_manual && i.desenho_sap_manual !== '-');
 
@@ -289,7 +296,6 @@ export default function EntradaEstoque() {
               solicitacoesMap.set(cross.id, { ...cross, _modalidade: 'Parcial' });
             }
           } else {
-            // Total: toda linha vinculada
             idsMarcados.add(linhaTabela.id);
             nfsEncontradas.add(nfTab);
             solicitacoesMap.set(cross.id, { ...cross, _modalidade: 'Total' });
