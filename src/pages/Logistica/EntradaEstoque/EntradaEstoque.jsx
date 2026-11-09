@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { Package, Truck, User, Paperclip, Send, FileSpreadsheet, X, Info } from 'lucide-react';
+import { Package, Truck, User, Paperclip, Send, FileSpreadsheet, X, Info, ExternalLink, Calendar, MapPin, Tag } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
 import './EntradaEstoque.css';
@@ -47,25 +47,24 @@ export default function EntradaEstoque() {
 
   const [itens, setItens] = useState([]);
   const [anexos, setAnexos] = useState([]);
-  
   const [crossdockingsPendentes, setCrossdockingsPendentes] = useState([]);
   const processador = useProcessadorExcel();
 
-  useEffect(() => {
-    const buscarCrossdockingsPendentes = async () => {
-      try {
-        const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
-        const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
-        
-        if (resultado.sucesso && Array.isArray(resultado.dados)) {
-          const pendentes = resultado.dados.filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente');
-          setCrossdockingsPendentes(pendentes);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar as solicitações de Crossdocking:", error);
+  const buscarCrossdockingsPendentes = async () => {
+    try {
+      const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
+      const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
+      
+      if (resultado.sucesso && Array.isArray(resultado.dados)) {
+        const pendentes = resultado.dados.filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente');
+        setCrossdockingsPendentes(pendentes);
       }
-    };
+    } catch (error) {
+      console.error("Erro ao buscar solicitações de Crossdocking:", error);
+    }
+  };
 
+  useEffect(() => {
     if (estoqueAtual) {
       buscarCrossdockingsPendentes();
     }
@@ -73,7 +72,7 @@ export default function EntradaEstoque() {
 
   const handleImportarExcel = async (arquivo) => {
     try {
-      showLoading("Processando Excel", "A procurar a aba e as colunas corretas. Por favor, aguarde...");
+      showLoading("Processando Excel", "Localizando aba e colunas de entrada...");
       
       const workbook = new ExcelJS.Workbook();
       const buffer = await arquivo.arrayBuffer();
@@ -92,7 +91,6 @@ export default function EntradaEstoque() {
           if (rowNumber > 30) return; 
 
           const tempMap = {};
-          
           row.eachCell((cell, colNumber) => {
             let val = cell.value;
             if (val && typeof val === 'object' && val.richText) {
@@ -111,7 +109,7 @@ export default function EntradaEstoque() {
 
           if (temCabecalho) {
             headerRowIndex = rowNumber; 
-            mapColunas = tempMap;       
+            mapColunas = tempMap;        
             worksheetParaLer = worksheet;
           }
         });
@@ -119,7 +117,7 @@ export default function EntradaEstoque() {
 
       if (!worksheetParaLer) {
         closeAlert();
-        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados em nenhuma das abas da planilha. Verifique o ficheiro.", "error");
+        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados nas abas da planilha.", "error");
         return;
       }
 
@@ -156,7 +154,7 @@ export default function EntradaEstoque() {
         const desc = puxarDado(['DESCRIÇÃO', 'DESCRICAO', 'VENDOR']);
         const nomeFab = puxarDado(['FABRICANTE', 'MARCA', 'FABR']);
         const numPeca = puxarDado(['PEÇA', 'PART NUMBER', 'PN', 'REF. FABRICANTE']);
-        const qtd = parseInt(puxarDado(['QTDE ENTRADA', 'QTD', 'QUANTIDADE'])) || 1;
+        const qtd = parseInt(puxarDado(['QTDE ENTRADA', 'QTD', 'QUANTIDADE']), 10) || 1;
         const ref = puxarDado(['REFERÊNCIA', 'REFERENCIA']);
         const unid = puxarDado(['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid';
         const nf = puxarDado(['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NFE ENTRADA', 'NOTA FISCAL']);
@@ -176,24 +174,24 @@ export default function EntradaEstoque() {
         if (linhaValida) {
           novosItensFormatados.push({
             id: `excel-${Date.now()}-${rowNumber}`,
-            desenhoSAP: sap,                       
-            vendorDescription: desc,               
-            fabricante: nomeFab,                   
-            numPecaFabricante: numPeca,            
-            qtdFornecida: qtd,                
+            desenhoSAP: sap,                        
+            vendorDescription: desc,                
+            fabricante: nomeFab,                    
+            numPecaFabricante: numPeca,             
+            qtdFornecida: qtd,                 
             referencia: ref, 
-            unidadeMedida: unid,                 
-            nfEntrada: nf,                         
-            fornecedor: fornec,                    
-            wbsElement: wbs,                       
-            nomeProjeto: projeto,                  
-            emissaoNF: emissao,                    
-            recebNF: receb,                        
-            docCompras: docCompras,                
-            poNetPrice: preco,                     
-            centro: filialPlanilha,                
-            deposito: deposito,                    
-            alocacao: alocacao                     
+            unidadeMedida: unid,                  
+            nfEntrada: nf,                          
+            fornecedor: fornec,                     
+            wbsElement: wbs,                        
+            nomeProjeto: projeto,                   
+            emissaoNF: emissao,                     
+            recebNF: receb,                         
+            docCompras: docCompras,                 
+            poNetPrice: preco,                      
+            centro: filialPlanilha,                 
+            deposito: deposito,                     
+            alocacao: alocacao                      
           });
         }
       });
@@ -205,7 +203,7 @@ export default function EntradaEstoque() {
         const novaLista = [...listaLimpa, ...novosItensFormatados];
 
         if (novaLista.length > LIMITE_LOGISTICA) {
-          showAlert("Limite de Linhas Excedido", `A planilha contém mais itens do que o limite permitido. Foram importados os primeiros ${LIMITE_LOGISTICA} itens (de um total detetado de ${novaLista.length}).`, "warning");
+          showAlert("Limite Excedido", `Importados os primeiros ${LIMITE_LOGISTICA} itens permitidos.`, "warning");
           return novaLista.slice(0, LIMITE_LOGISTICA);
         }
 
@@ -214,7 +212,7 @@ export default function EntradaEstoque() {
 
     } catch (error) {
       console.error(error);
-      showAlert("Erro de Leitura", "Falha ao ler o ficheiro Excel. Verifique se o documento está corrompido.", "error");
+      showAlert("Erro de Leitura", "Falha ao processar o arquivo Excel.", "error");
     }
   };
 
@@ -246,14 +244,72 @@ export default function EntradaEstoque() {
 
   const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
   const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
-  
-  const removerItem = (idParaRemover) => {
-    setItens(itens.filter(item => item.id !== idParaRemover));
-  };
+  const removerItem = (idParaRemover) => setItens(itens.filter(item => item.id !== idParaRemover));
+
+  // Tripla Validação e captura das solicitações identificadas
+  const { idsLinhasCrossdocking, nfsUnicasEncontradas, solicitacoesIdentificadas } = useMemo(() => {
+    const idsMarcados = new Set();
+    const nfsEncontradas = new Set();
+    const solicitacoesMap = new Map();
+
+    itens.forEach(linhaTabela => {
+      const nfTab = String(linhaTabela.nfEntrada || '').trim().toUpperCase();
+      const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
+      const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
+
+      if (!nfTab || !fornTab) return;
+
+      crossdockingsPendentes.forEach(cross => {
+        const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
+        
+        let fornCross = '';
+        if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
+          fornCross = String(cross.itens[0].fornecedor).trim().toUpperCase().split(/\s+/)[0];
+        }
+        if (!fornCross && cross.observacoes) {
+          const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
+          if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
+        }
+
+        // Validação 1 & 2: NF e Fornecedor estritamente iguais
+        if (nfTab === nfCross && fornTab === fornCross) {
+          const itensCross = cross.itens || [];
+          const isParcial = itensCross.some(i => i.desenho_sap_manual && i.desenho_sap_manual !== '-');
+
+          if (isParcial) {
+            if (!sapTab) return;
+            const bateuSap = itensCross.some(ic => {
+              const sapCross = String(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP || '').trim().toUpperCase();
+              return sapCross && sapCross === sapTab;
+            });
+
+            if (bateuSap) {
+              idsMarcados.add(linhaTabela.id);
+              nfsEncontradas.add(nfTab);
+              solicitacoesMap.set(cross.id, { ...cross, _modalidade: 'Parcial' });
+            }
+          } else {
+            // Total: toda linha vinculada
+            idsMarcados.add(linhaTabela.id);
+            nfsEncontradas.add(nfTab);
+            solicitacoesMap.set(cross.id, { ...cross, _modalidade: 'Total' });
+          }
+        }
+      });
+    });
+
+    return { 
+      idsLinhasCrossdocking: idsMarcados, 
+      nfsUnicasEncontradas: Array.from(nfsEncontradas),
+      solicitacoesIdentificadas: Array.from(solicitacoesMap.values())
+    };
+  }, [itens, crossdockingsPendentes]);
+
+  const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
 
   const handleEnviar = async () => {
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
-      showAlert("Ação Bloqueada", "Por favor, selecione uma filial específica no topo da página antes de registar a entrada.", "warning");
+      showAlert("Ação Bloqueada", "Selecione uma filial física no topo da página antes de registrar a entrada.", "warning");
       return;
     }
 
@@ -263,28 +319,27 @@ export default function EntradaEstoque() {
     }
     
     if (itens.length === 0) {
-      showAlert("Lista Vazia", "Adicione pelo menos um item à tabela para registar a entrada.", "warning");
+      showAlert("Lista Vazia", "Adicione ao menos um item à tabela para registrar a entrada.", "warning");
       return;
     }
 
     if (itens.some(i => !i.qtdFornecida || i.qtdFornecida === '' || Number(i.qtdFornecida) < 1)) {
-      showAlert("Dados da Tabela", "Preencha o campo de Quantidade em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
+      showAlert("Dados da Tabela", "Preencha o campo de Quantidade em todas as linhas (mínimo 1).", "warning");
       return;
     }
 
     try {
-      showLoading("Registar Entrada", "A gravar dados no sistema...");
+      showLoading("Registrando Entrada", "Persistindo entrada e validando deduções...");
       const anexosProcessados = [];
       if (anexos.length > 0) {
         let enviados;
         try {
           enviados = await enviarArquivos(anexos);
         } catch (erroUpload) {
-          showAlert("Erro de Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+          showAlert("Erro de Anexo", erroUpload.message || "Falha ao enviar os arquivos.", "error");
           return;
         }
-
-        anexosProcessados.push(...enviados.map((anexo) => ({ ...anexo, origem: 'logistica' })));
+        anexosProcessados.push(...enviados.map(anexo => ({ ...anexo, origem: 'logistica' })));
       }
 
       const payload = {
@@ -324,85 +379,35 @@ export default function EntradaEstoque() {
 
       if (dados.sucesso || dados.ps_id || dados.ps) {
         closeAlert();
-        showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps_id || dados.ps}`, "success");
+        showAlert(
+          "Operação Concluída!", 
+          `Entrada registrada no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps_id || dados.ps}${temCrossdockingAguardando ? '\n\nOs itens identificados como Crossdocking foram deduzidos e vinculados com sucesso.' : ''}`, 
+          "success"
+        );
         setFormDados({ nome: '', observacoes: '' }); 
         setItens([]);
         setAnexos([]);
+        buscarCrossdockingsPendentes();
       } else {
         closeAlert();
         showAlert("Erro no Servidor", dados.erro, "error");
       }
     } catch (error) {
       closeAlert();
-      showAlert("Erro de Conexão", `Falha ao conectar com o servidor. Motivo: ${error.message}`, "error");
+      showAlert("Erro de Conexão", `Falha de comunicação: ${error.message}`, "error");
     }
   };
 
-  // ✨ MAPEAMENTO RIGOROSO DE LINHAS DESTACADAS (DIFERENCIA PARCIAL DE TOTAL)
-  const { idsLinhasCrossdocking, nfsUnicasEncontradas } = useMemo(() => {
-    const idsMarcados = new Set();
-    const nfsEncontradas = new Set();
-
-    itens.forEach(linhaTabela => {
-      const nfTab = String(linhaTabela.nfEntrada || '').trim().toUpperCase();
-      const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
-      const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
-
-      // A linha da tabela precisa ter pelo menos NF e Fornecedor
-      if (!nfTab || !fornTab) return;
-
-      crossdockingsPendentes.forEach(cross => {
-        const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
-        
-        // Extrai o primeiro nome do Fornecedor da observação ou dos itens
-        let fornCross = '';
-        if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
-          fornCross = String(cross.itens[0].fornecedor).trim().toUpperCase().split(/\s+/)[0];
-        }
-        if (!fornCross && cross.observacoes) {
-          const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
-        }
-
-        // Validação 1: NF e Fornecedor têm de ser estritamente iguais
-        if (nfTab === nfCross && fornTab === fornCross) {
-          // Identifica se é Parcial usando regex flexível ou presença de itens específicos
-          const obs = String(cross.observacoes || '');
-          const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
-
-          if (isParcial) {
-            // ✨ NO PARCIAL: Só destaca se o Desenho SAP estiver preenchido e bater com algum item pedido
-            if (!sapTab) return;
-            const itensCross = cross.itens || [];
-            const bateuSap = itensCross.some(ic => {
-              const sapCross = String(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP || '').trim().toUpperCase();
-              return sapCross && sapCross === sapTab;
-            });
-
-            if (bateuSap) {
-              idsMarcados.add(linhaTabela.id);
-              nfsEncontradas.add(nfTab);
-            }
-          } else {
-            // ✨ NO TOTAL: Toda e qualquer linha com essa NF e Fornecedor pertence à saída total
-            idsMarcados.add(linhaTabela.id);
-            nfsEncontradas.add(nfTab);
-          }
-        }
-      });
-    });
-
-    return { 
-      idsLinhasCrossdocking: idsMarcados, 
-      nfsUnicasEncontradas: Array.from(nfsEncontradas) 
-    };
-  }, [itens, crossdockingsPendentes]);
-
-  const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
-
   return (
     <div className="estoque-wrapper">
-      <ModalProcessamento estaProcessando={processador.estaProcessando} concluido={processador.concluido} estadoProgresso={processador.estadoProgresso} resultado={processador.resultado} erroFatal={processador.erroFatal} onClose={processador.resetarProcessador} />
+      <ModalProcessamento 
+        estaProcessando={processador.estaProcessando} 
+        concluido={processador.concluido} 
+        estadoProgresso={processador.estadoProgresso} 
+        resultado={processador.resultado} 
+        erroFatal={processador.erroFatal} 
+        onClose={processador.resetarProcessador} 
+      />
 
       <header className="estoque-cabecalho">
         <h1>Entrada de Estoque</h1>
@@ -412,7 +417,9 @@ export default function EntradaEstoque() {
       <div className="estoque-cartao form-cartao">
         <div className="form-header">
           <div className="form-header-esquerda">
-            <div className="icone-fundo-azul" style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', backgroundColor: '#eff6ff', color: '#2563eb' }}><User size={18} /></div>
+            <div className="icone-fundo-azul" style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', backgroundColor: '#eff6ff', color: '#2563eb' }}>
+              <User size={18} />
+            </div>
             <h2 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, color: '#0f172a' }}>Operador Responsável</h2>
           </div>
         </div>
@@ -420,33 +427,47 @@ export default function EntradaEstoque() {
         <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
           <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
             <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>NOME *</label>
-            <input type="text" className="input-campo" placeholder="Seu nome completo" value={formDados.nome} onChange={(e) => setFormDados({...formDados, nome: e.target.value})} style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none' }} />
+            <input 
+              type="text" 
+              className="input-campo" 
+              placeholder="Seu nome completo" 
+              value={formDados.nome} 
+              onChange={(e) => setFormDados({...formDados, nome: e.target.value})} 
+              style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none' }} 
+            />
           </div>
           
           <div className="input-grupo" style={{ display: 'flex', flexDirection: 'column' }}>
             <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>OBSERVAÇÕES</label>
-            <textarea className="input-campo" placeholder="Informações adicionais para a conferência..." value={formDados.observacoes} onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})} style={{ minHeight: '42px', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none', resize: 'vertical' }}></textarea>
+            <textarea 
+              className="input-campo" 
+              placeholder="Informações adicionais para a conferência..." 
+              value={formDados.observacoes} 
+              onChange={(e) => setFormDados({...formDados, observacoes: e.target.value})} 
+              style={{ minHeight: '42px', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', outline: 'none', resize: 'vertical' }}
+            />
           </div>
         </div>
       </div>
 
+      {/* BANNER E CARDS DAS SOLICITAÇÕES RECONHECIDAS */}
       {temCrossdockingAguardando && (
         <div style={{
-          display: 'flex', flexDirection: 'column', gap: '12px',
+          display: 'flex', flexDirection: 'column', gap: '16px',
           backgroundColor: '#eff6ff', border: '1px solid #93c5fd',
-          padding: '16px 20px', borderRadius: '12px', marginBottom: '24px',
+          padding: '20px', borderRadius: '12px', marginBottom: '24px',
           color: '#1e3a8a', animation: 'fadeIn 0.3s ease-in-out'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ backgroundColor: '#dbeafe', padding: '8px', borderRadius: '50%', color: '#2563eb' }}>
-              <Truck size={22} />
+            <div style={{ backgroundColor: '#dbeafe', padding: '10px', borderRadius: '50%', color: '#2563eb' }}>
+              <Truck size={24} />
             </div>
             <div>
-              <strong style={{ fontSize: '1rem', display: 'block', color: '#1e40af' }}>
-                Crossdocking Identificado (NF: {nfsUnicasEncontradas.join(', ')})
+              <strong style={{ fontSize: '1.05rem', display: 'block', color: '#1e40af' }}>
+                Crossdocking Identificado — NF: {nfsUnicasEncontradas.join(', ')}
               </strong>
-              <span style={{ fontSize: '0.85rem', color: '#334155' }}>
-                Detectamos solicitações pendentes associadas a estes itens.
+              <span style={{ fontSize: '0.875rem', color: '#334155' }}>
+                Identificamos {solicitacoesIdentificadas.length} solicitação(ões) pendente(s) aguardando o recebimento desta carga.
               </span>
             </div>
           </div>
@@ -454,12 +475,93 @@ export default function EntradaEstoque() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             backgroundColor: '#ffffff', border: '1px solid #bfdbfe',
-            padding: '10px 14px', borderRadius: '8px', fontSize: '0.825rem', color: '#1d4ed8'
+            padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', color: '#1d4ed8'
           }}>
-            <Info size={16} style={{ flexShrink: 0 }} />
+            <Info size={18} style={{ flexShrink: 0 }} />
             <span>
-              <strong>Atenção:</strong> Apenas as linhas <span style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>destacadas em azul</span> na tabela abaixo correspondem aos materiais exatos que serão deduzidos pelo Crossdocking. As demais linhas entrarão normalmente no estoque.
+              <strong>Regra de Abatimento:</strong> As linhas com destaque azul na tabela abaixo não irão para o saldo de prateleira; serão baixadas e vinculadas à solicitação no momento do salvamento.
             </span>
+          </div>
+
+          {/* Cards das Solicitações Encontradas */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: '#3b82f6', letterSpacing: '0.05em' }}>
+              Solicitações Vinculadas Prontas para Baixa Automática:
+            </span>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '14px' }}>
+              {solicitacoesIdentificadas.map(sol => (
+                <div 
+                  key={sol.id} 
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '14px 18px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: '800', color: '#0f172a', fontSize: '0.95rem', fontFamily: 'monospace' }}>
+                        {sol.ps}
+                      </span>
+                      {sol.pl && (
+                        <span style={{ fontSize: '0.75rem', backgroundColor: '#e2e8f0', color: '#334155', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                          {sol.pl}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      padding: '3px 8px',
+                      borderRadius: '999px',
+                      backgroundColor: sol._modalidade === 'Total' ? '#dcfce7' : '#fef9c3',
+                      color: sol._modalidade === 'Total' ? '#15803d' : '#a16207',
+                      border: `1px solid ${sol._modalidade === 'Total' ? '#bbf7d0' : '#fef08a'}`
+                    }}>
+                      Crossdocking {sol._modalidade}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.8rem', color: '#475569' }}>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.7rem' }}>SOLICITANTE</span>
+                      <strong style={{ color: '#1e293b' }}>{sol.solicitante || sol.nome_solicitante || 'Não informado'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.7rem' }}>WBS / DESTINO</span>
+                      <strong style={{ color: '#1e293b' }}>{sol.wbs || sol.wbs_destino || sol.destino || '—'}</strong>
+                    </div>
+                  </div>
+
+                  {sol.itens && sol.itens.length > 0 && (
+                    <div style={{ marginTop: '4px', borderTop: '1px dashed #e2e8f0', paddingTop: '8px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                        Itens Cadastrados no Pedido:
+                      </span>
+                      <div style={{ maxHeight: '90px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {sol.itens.map((it, idx) => (
+                          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', backgroundColor: '#f8fafc', padding: '4px 8px', borderRadius: '4px' }}>
+                            <span style={{ fontFamily: 'monospace', color: '#2563eb', fontWeight: '600' }}>
+                              {it.desenho_sap_manual && it.desenho_sap_manual !== '-' ? it.desenho_sap_manual : 'TODA A NOTA (TOTAL)'}
+                            </span>
+                            <span style={{ color: '#334155', fontWeight: '700' }}>
+                              Qtd: {it.quantidade_solicitada || 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
