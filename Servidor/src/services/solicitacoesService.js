@@ -36,7 +36,7 @@ const formatarDataBrasil = (isoString) => {
 
 const solicitacaoParaFront = (r) => ({
   ...r,
-  observacoes_logistica: db.txt(r.observacoes_logistica), // ✨ MAPEADO PARA O FRONTEND
+  observacoes_logistica: db.txt(r.observacoes_logistica),
   data_necessidade: db.dt(r.data_necessidade),
   data_entrega: db.dt(r.data_entrega),
   data_aprovacao_pl: db.dt(r.data_aprovacao_pl),
@@ -227,7 +227,7 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
 
       status: sol.status,
       observacoes: db.txt(sol.observacoes),
-      observacoes_logistica: sol.observacoes_logistica, // ✨ INJETADO
+      observacoes_logistica: sol.observacoes_logistica, 
       entregaUrgente: sol.entrega_urgente,
       
       anexos: resumido ? listaAnexos.map(a => ({ id: a.id })) : listaAnexos,
@@ -301,7 +301,7 @@ const obterSolicitacaoDetalhada = async (id) => {
     dataEntrega: sol.data_entrega ? formatarDataBrasil(sol.data_entrega) : sol.status === 'Concluído' ? 'Disponível' : null,
     status: sol.status,
     observacoes: db.txt(sol.observacoes),
-    observacoes_logistica: sol.observacoes_logistica, // ✨ INJETADO
+    observacoes_logistica: sol.observacoes_logistica, 
     entregaUrgente: sol.entrega_urgente,
     anexos: anexos,
     itens: itens,
@@ -446,16 +446,16 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
   const fornSolicitante = String(solicitante.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
 
   const itensDB = (itens || []).map((i) => ({
-    desenho_sap_manual: i.desenho_sap_manual || '-',
-    quantidade_solicitada: Math.max(1, i.quantidade_solicitada || 1),
-    unidade_medida_manual: i.unidade_medida_manual,
-    nf_entrada: String(i.nf_entrada || nfSolicitante).trim().toUpperCase(),
+    desenho_sap_manual: String(i.desenho_sap_manual || i.desenhoSAP || '-').trim().toUpperCase(),
+    quantidade_solicitada: Math.max(1, Number(i.quantidade_solicitada || i.qtdSelecionada || i.quantidade || 1)),
+    unidade_medida_manual: i.unidade_medida_manual || i.unidadeMedida || 'Unid',
+    nf_entrada: String(i.nf_entrada || i.nfEntrada || i.nf || nfSolicitante).trim().toUpperCase(),
     fornecedor: String(i.fornecedor || fornSolicitante).trim().toUpperCase().split(/\s+/)[0],
     fabricante: i.fabricante || null,
-    descricao_manual: limitarTexto(i.descricao_manual),
+    descricao_manual: limitarTexto(i.descricao_manual || i.materialDescription || i.descricao || 'Sem descrição'),
   }));
 
-  return salvarNoBanco(dados, itensDB, anexos, solicitante.nf);
+  return salvarNoBanco(dados, itensDB, anexos, nfSolicitante);
 };
 
 const criarNotaFiscal = async (solicitante, anexos) => {
@@ -665,11 +665,13 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
           if (idsCandidatos.length > 0) {
             const candidatos = await db.listarPorIds('solicitacoes', 'id', idsCandidatos);
-            const crossdockingsPendentes = candidatos
-              .filter((s) => s.tipo === 'Crossdocking' && s.status === 'Pendente')
+            
+            // Permite vincular Crossdockings Pendentes ou que já foram aprovados e aguardam material
+            const crossdockingsAlvo = candidatos
+              .filter((s) => s.tipo === 'Crossdocking' && (s.status === 'Pendente' || s.status === 'Em Separação' || s.status === 'Concluído'))
               .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
 
-            for (const cross of crossdockingsPendentes) {
+            for (const cross of crossdockingsAlvo) {
               if (cross.observacoes && cross.observacoes.includes('[NF VINCULADA]')) continue;
 
               const itensPedidosCross = await db.listar('solicitacoes_itens', {
@@ -678,7 +680,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
               if (itensPedidosCross.length === 0) continue;
 
-              // Extrai os dados normalizados salvos no momento da criação
+              // VALIDAÇÃO TRIPLA EXATA: NF e Fornecedor
               const nfCrossLimpa = String(itensPedidosCross[0].nf_entrada || '').trim().toUpperCase();
               const fornCross = String(itensPedidosCross[0].fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
 
@@ -695,13 +697,13 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               if (indicesItensValidos.length === 0) continue; 
 
               let vinculouAlgo = false;
-              // Parcialidade técnica: Existe Desenho SAP especificado no pedido?
               const isParcial = itensPedidosCross.some(p => p.desenho_sap_manual && p.desenho_sap_manual !== '-');
 
               if (!isParcial) {
-                // TOTAL
+                // CROSSDOCKING TOTAL
                 await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
-                await db.criarVarios('solicitacoes_itens', indicesItensValidos.map((idxOriginal) => {
+                
+                const novosItens = indicesItensValidos.map((idxOriginal) => {
                   const item = itensEntrada[idxOriginal];
                   return {
                     solicitacao_id: cross.id,
@@ -715,35 +717,63 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     nf_entrada: item.nf_entrada,
                     alocacao: 'CROSSDOCKING', 
                   };
-                }));
+                });
+                
+                await db.criarVarios('solicitacoes_itens', novosItens);
                 vinculouAlgo = true;
+
+                // Prevenção de Dupla Dedução: Se a PS de Cross já estava aprovada, deduz o Total agora
+                if (cross.status === 'Em Separação' || cross.status === 'Concluído') {
+                  for (const idxOriginal of indicesItensValidos) {
+                    const itemEst = estoqueCriado[idxOriginal];
+                    if (itemEst) {
+                        await db.atualizar('estoque', itemEst.id, { quantidade_disponivel: 0, status: 'Zerado' });
+                        itemEst.quantidade_disponivel = 0;
+                    }
+                  }
+                }
+
               } else {
-                // PARCIAL
+                // CROSSDOCKING PARCIAL
                 for (const pedido of itensPedidosCross) {
+                  // VALIDAÇÃO TRIPLA EXATA: Desenho SAP
                   const sapCross = String(pedido.desenho_sap_manual || '').trim().toUpperCase();
-                  const pnCross = String(pedido.part_number_manual || '').trim().toUpperCase();
 
                   const indexEncontrado = indicesItensValidos.find(idx => {
                     const e = estoqueCriado[idx];
                     if (!e) return false;
                     const sapE = String(e.desenho_sap || '').trim().toUpperCase();
-                    const pnE = String(e.part_number || '').trim().toUpperCase();
-                    return (sapE !== '-' && sapE === sapCross) || (pnE !== '-' && pnE === pnCross);
+                    return sapE !== '-' && sapE === sapCross;
                   });
 
                   if (indexEncontrado !== undefined) {
                     const itemEstoqueCriado = estoqueCriado[indexEncontrado];
                     await db.atualizar('solicitacoes_itens', pedido.id, {
                       estoque_id: itemEstoqueCriado.id,
-                      alocacao: 'CROSSDOCKING',
+                      alocacao: 'CROSSDOCKING PARCIAL',
                     });
                     vinculouAlgo = true;
+
+                    // Prevenção de Total no Parcial: Deduz apenas a quantidade solicitada
+                    if (cross.status === 'Em Separação' || cross.status === 'Concluído') {
+                       const qtdPedida = Number(pedido.quantidade_solicitada || 0);
+                       const qtdDisp = Number(itemEstoqueCriado.quantidade_disponivel || 0);
+                       const novoSaldo = Math.max(0, qtdDisp - qtdPedida);
+                       
+                       await db.atualizar('estoque', itemEstoqueCriado.id, {
+                          quantidade_disponivel: novoSaldo,
+                          status: novoSaldo <= 0 ? 'Zerado' : 'Disponível'
+                       });
+                       itemEstoqueCriado.quantidade_disponivel = novoSaldo;
+                    }
                   }
                 }
               }
 
               if (vinculouAlgo) {
-                await db.atualizar('solicitacoes', cross.id, { observacoes: (cross.observacoes || '') + '\n[NF VINCULADA]' });
+                if (!cross.observacoes || !cross.observacoes.includes('[NF VINCULADA]')) {
+                  await db.atualizar('solicitacoes', cross.id, { observacoes: (cross.observacoes || '') + '\n[NF VINCULADA]' });
+                }
               }
             }
           }
@@ -751,7 +781,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // ✨ CENÁRIO 2: APROVOU O CROSSDOCKING (Evitando dedução total no Parcial e Dupla Dedução)
+    // ✨ CENÁRIO 2: APROVOU O CROSSDOCKING (Evitando Dupla Dedução e Dedução Total no Parcial)
     else if (solicitacao.tipo === 'Crossdocking') {
       const itensCross = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
 
@@ -762,7 +792,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         if (!estoqueAtual) continue;
 
         const saldoAtual = Number(estoqueAtual.quantidade_disponivel || 0);
-        // Deduz ESTRITAMENTE a quantidade_solicitada preservada no pedido original
+        // Deduz ESTRITAMENTE a quantidade_solicitada no crossdocking
         const quantidadeRetirada = Number(item.quantidade_solicitada || 0); 
         
         if (quantidadeRetirada > 0) {
@@ -915,7 +945,6 @@ const salvarAnexosExtras = async (solicitacaoId, anexosArray) => {
   return true;
 };
 
-// ✨ FUNÇÃO PARA GRAVAR AS OBSERVAÇÕES INTERNAS
 const atualizarObservacoesLogistica = async (id, texto) => {
   return await db.atualizar('solicitacoes', id, { observacoes_logistica: texto || '' });
 };
