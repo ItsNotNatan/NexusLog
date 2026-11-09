@@ -13,7 +13,7 @@ import './TabelaInsercaoItens.css';
 
 export default function TabelaInsercaoItens({
   itens = [],
-  limiteLinhas = 100, 
+  limiteLinhas = 20, 
   wbsGlobal, 
   bloquearWBS = false, 
   linhasDestacadas = new Set(),
@@ -56,7 +56,7 @@ export default function TabelaInsercaoItens({
   const larguraMinimaTabela = '2750px';
   const isWbsBloqueada = wbsGlobal !== undefined || bloquearWBS;
 
-  // ✨ COMPARAÇÃO ESTRITA DE FORNECEDOR (Sem falso positivo)
+  // ✨ COMPARAÇÃO ESTRITA: Previne que "TESTE DO SISTEMA" case falsamente com "TESTE"
   const verificarMatchCrossdocking = (itemLinha) => {
     const nf = itemLinha.nfEntrada || itemLinha.nf_entrada || itemLinha.nf;
     if (!nf || !itemLinha.fornecedor) return false;
@@ -67,17 +67,22 @@ export default function TabelaInsercaoItens({
 
     return crossdockingsPendentes.some(cross => {
       const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
-      const fornCrossBruto = cross.itens?.[0]?.fornecedor || '';
-      const fornCrossEsperado = String(fornCrossBruto).trim().toUpperCase().split(/\s+/)[0];
+      const fornCrossBruto = String(cross.itens?.[0]?.fornecedor || '').trim().toUpperCase();
       
-      if (!fornCrossEsperado || nfLinha !== nfCross) return false;
+      if (!fornCrossBruto || nfLinha !== nfCross) return false;
 
-      // Validação: ou são idênticos, ou o digitado bate exatamente com o primeiro termo esperado
-      const bateuFornecedor = (fornLinha === fornCrossEsperado) || (fornLinha.split(/\s+/)[0] === fornCrossEsperado && fornCrossBruto.trim().toUpperCase() === fornLinha);
+      const primeiroFornLinha = fornLinha.split(/\s+/)[0];
+      const primeiroFornCross = fornCrossBruto.split(/\s+/)[0];
+
+      // Casamento exato ou compatibilidade sem truncamento indevido
+      const bateuFornecedor = (fornLinha === fornCrossBruto) || 
+                              (primeiroFornLinha === fornCrossBruto) || 
+                              (primeiroFornLinha === primeiroFornCross && fornCrossBruto.startsWith(fornLinha));
+
       if (!bateuFornecedor) return false;
 
       const isParcial = cross.itens?.some(i => i.desenho_sap_manual && i.desenho_sap_manual !== '-');
-      if (!isParcial) return true; // Total
+      if (!isParcial) return true; 
 
       return cross.itens?.some(i => String(i.desenho_sap_manual || '').trim().toUpperCase() === sapLinha);
     });
