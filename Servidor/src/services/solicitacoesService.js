@@ -324,8 +324,6 @@ const limparValor = (valorFront) => {
   return parseFloat(v) || 0;
 };
 
-// ===================== CRIAÇÃO DE PEDIDOS =====================
-
 const criarMaterial = async (solicitante, itens, anexos) => {
   const dados = {
     tipo: 'Material',
@@ -696,11 +694,12 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 fornCross = normalizar(itensPedidosCross[0].fornecedor);
               }
 
-              // Match exato de NF e Fornecedor
+              // ✨ VALIDAÇÃO EXATA: NF E FORNECEDOR COMPLETOS E IDÊNTICOS
               const indicesItensValidos = [];
               itensEntrada.forEach((item, idx) => {
                 const nfEnt = normalizar(item.nf_entrada);
                 const fornEnt = normalizar(item.fornecedor);
+                
                 if (nfEnt === nfCrossLimpa && fornEnt === fornCross) {
                   indicesItensValidos.push(idx);
                 }
@@ -708,11 +707,12 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
               if (indicesItensValidos.length === 0) continue;
 
+              let vinculouAlgo = false;
               const obs = String(cross.observacoes || '');
               const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (itensPedidosCross.length > 0 && !/sa[íi]da\s+total/i.test(obs));
 
               if (!isParcial) {
-                // Crossdocking Total
+                // ==================== CROSSDOCKING TOTAL ====================
                 await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
                 
                 const novosItens = indicesItensValidos.map((idxOriginal) => {
@@ -740,7 +740,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 
                 await db.criarVarios('solicitacoes_itens', novosItens);
 
-                // Se o crossdocking já tiver sido aprovado antes, baixa imediatamente
                 if (cross.status !== 'Pendente') {
                   for (const idxOriginal of indicesItensValidos) {
                     const itemEst = estoqueCriado[idxOriginal];
@@ -753,9 +752,10 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     observacoes: (cross.observacoes || '') + '\n[NF VINCULADA]' 
                   });
                 }
+                vinculouAlgo = true;
 
               } else {
-                // Crossdocking Parcial
+                // ==================== CROSSDOCKING PARCIAL ====================
                 for (const pedido of itensPedidosCross) {
                   const sapCross = normalizar(pedido.desenho_sap_manual);
                   if (!sapCross) continue;
@@ -797,6 +797,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                       });
                       itemEstoqueCriado.quantidade_disponivel = novoSaldo;
                     }
+                    vinculouAlgo = true;
                   }
                 }
 
@@ -813,13 +814,12 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     }
 
     // =========================================================================
-    // CENÁRIO 2: APROVAÇÃO DO CROSSDOCKING (VINCULA ITENS E REALIZA A BAIXA)
+    // CENÁRIO 2: APROVAÇÃO DO CROSSDOCKING (MATERIAL JÁ ESTAVA NO ESTOQUE)
     // =========================================================================
     else if (solicitacao.tipo === 'Crossdocking') {
       const jaFoiDeduzido = solicitacao.observacoes && solicitacao.observacoes.includes('[NF VINCULADA]');
       
       if (!jaFoiDeduzido) {
-        // 1. Identifica NF e Fornecedor
         const nfRecord = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
         let nfCross = normalizar(nfRecord ? nfRecord.numero_nf : '');
 
@@ -835,7 +835,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const obs = String(solicitacao.observacoes || '');
         const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (itensCross.length > 0 && !/sa[íi]da\s+total/i.test(obs));
 
-        // 2. Busca estoque físico disponível na mesma filial
         const candidatosEstoque = await db.listar('estoque', { 
           filter: db.f('filial_id = {:filial}', { filial: solicitacao.filial_origem_id }) 
         });
@@ -846,9 +845,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
           return bateuNF && bateuForn && Number(e.quantidade_disponivel || 0) > 0;
         });
 
-        // 3. Processamento Total vs Parcial
         if (!isParcial) {
-          // --- TOTAL ---
           if (estoqueValido.length > 0) {
             await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: id }));
 
@@ -886,17 +883,13 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
             });
           }
         } else {
-          // --- PARCIAL ---
           let deduziuAlgo = false;
 
           for (const itemPedido of itensCross) {
             const sapCross = normalizar(itemPedido.desenho_sap_manual);
-            const pnCross = normalizar(itemPedido.part_number_manual);
 
             const itemEstoque = estoqueValido.find(e => {
-              const sapE = normalizar(e.desenho_sap);
-              const pnE = normalizar(e.part_number);
-              return (sapCross && sapE === sapCross) || (pnCross && pnE === pnCross);
+              return sapCross && normalizar(e.desenho_sap) === sapCross;
             });
 
             if (itemEstoque) {
@@ -904,7 +897,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               const qtdDisp = Number(itemEstoque.quantidade_disponivel || 0);
               const novoSaldo = Math.max(0, qtdDisp - qtdPedida);
 
-              // Enriquece os dados do item com os campos do estoque para o PL ficar completo
               await db.atualizar('solicitacoes_itens', itemPedido.id, {
                 estoque_id: itemEstoque.id,
                 part_number_manual: itemEstoque.part_number || itemPedido.part_number_manual,
@@ -926,7 +918,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 status: novoSaldo <= 0 ? 'Zerado' : 'Disponível'
               });
 
-              itemEstoque.quantidade_disponivel = novoSaldo;
               deduziuAlgo = true;
             }
           }
@@ -1139,7 +1130,7 @@ const atualizarLocalizacao = async (id, dadosLocal) => {
 };
 
 const atualizarItensDaSolicitacao = async (solicitacaoId, itens) => {
-  await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: id }));
+  await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: solicitacaoId }));
   if (!itens || itens.length === 0) return true;
 
   const itensDB = itens.map((i) => ({
