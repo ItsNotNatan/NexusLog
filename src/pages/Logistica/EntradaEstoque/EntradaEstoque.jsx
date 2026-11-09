@@ -24,7 +24,7 @@ export default function EntradaEstoque() {
   });
 
   const gerarLinhaVazia = () => ({
-    id: `linha-vazia-${Date.now()}-${Math.random()}`, 
+    id: `linha-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
     desenhoSAP: '', 
     fabricante: '', 
     numPecaFabricante: '', 
@@ -40,31 +40,33 @@ export default function EntradaEstoque() {
     recebNF: '', 
     docCompras: '', 
     poNetPrice: '', 
-    centro: '', 
+    centro: estoqueAtual !== 'TODOS' ? estoqueAtual : '', 
     deposito: '', 
     alocacao: ''
   });
 
-  const [itens, setItens] = useState([]);
+  // ✨ INICIA COM 1 LINHA VAZIA PRONTA PARA DIGITAR (NUNCA FICA BLOQUEADO VAZIO)
+  const [itens, setItens] = useState(() => [gerarLinhaVazia()]);
   const [anexos, setAnexos] = useState([]);
+  
   const [crossdockingsPendentes, setCrossdockingsPendentes] = useState([]);
   const processador = useProcessadorExcel();
 
-  const buscarCrossdockingsPendentes = async () => {
-    try {
-      const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
-      const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
-      
-      if (resultado.sucesso && Array.isArray(resultado.dados)) {
-        const pendentes = resultado.dados.filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente');
-        setCrossdockingsPendentes(pendentes);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar solicitações de Crossdocking:", error);
-    }
-  };
-
   useEffect(() => {
+    const buscarCrossdockingsPendentes = async () => {
+      try {
+        const filialFiltro = estoqueAtual === 'TODOS' ? '' : estoqueAtual;
+        const resultado = await apiFetch(`/solicitacoes/listar?filial=${filialFiltro}&limit=1000`);
+        
+        if (resultado && resultado.sucesso && Array.isArray(resultado.dados)) {
+          const pendentes = resultado.dados.filter(sol => sol.tipo === 'Crossdocking' && sol.status === 'Pendente');
+          setCrossdockingsPendentes(pendentes);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar Crossdockings pendentes:", error);
+      }
+    };
+
     if (estoqueAtual) {
       buscarCrossdockingsPendentes();
     }
@@ -91,6 +93,7 @@ export default function EntradaEstoque() {
           if (rowNumber > 30) return; 
 
           const tempMap = {};
+          
           row.eachCell((cell, colNumber) => {
             let val = cell.value;
             if (val && typeof val === 'object' && val.richText) {
@@ -109,7 +112,7 @@ export default function EntradaEstoque() {
 
           if (temCabecalho) {
             headerRowIndex = rowNumber; 
-            mapColunas = tempMap;        
+            mapColunas = tempMap;       
             worksheetParaLer = worksheet;
           }
         });
@@ -117,7 +120,7 @@ export default function EntradaEstoque() {
 
       if (!worksheetParaLer) {
         closeAlert();
-        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados nas abas da planilha.", "error");
+        showAlert("Aba não encontrada", "Não foi possível encontrar a tabela de dados em nenhuma das abas da planilha. Verifique o ficheiro.", "error");
         return;
       }
 
@@ -154,7 +157,7 @@ export default function EntradaEstoque() {
         const desc = puxarDado(['DESCRIÇÃO', 'DESCRICAO', 'VENDOR']);
         const nomeFab = puxarDado(['FABRICANTE', 'MARCA', 'FABR']);
         const numPeca = puxarDado(['PEÇA', 'PART NUMBER', 'PN', 'REF. FABRICANTE']);
-        const qtd = parseInt(puxarDado(['QTDE ENTRADA', 'QTD', 'QUANTIDADE']), 10) || 1;
+        const qtd = parseInt(puxarDado(['QTDE ENTRADA', 'QTD', 'QUANTIDADE'])) || 1;
         const ref = puxarDado(['REFERÊNCIA', 'REFERENCIA']);
         const unid = puxarDado(['UNID. MEDIDA', 'UNIDADE DE MEDIDA', 'UNID']) || 'Unid';
         const nf = puxarDado(['NUM DA NOTA FISCAL', 'NF DE ENTRADA', 'NFE ENTRADA', 'NOTA FISCAL']);
@@ -165,7 +168,7 @@ export default function EntradaEstoque() {
         const receb = puxarDado(['RECEB. NF', 'RECEBIMENTO']);
         const docCompras = puxarDado(['PEDIDO DE COMPRA', 'CPV', 'COMPRAS']);
         const preco = puxarDado(['VLR. UNITÁRIO', 'VALOR UNITÁRIO', 'PO NET PRICE']);
-        const filialPlanilha = puxarDado(['FILIAL', 'CENTRO']);
+        const filialPlanilha = puxarDado(['FILIAL', 'CENTRO']) || (estoqueAtual !== 'TODOS' ? estoqueAtual : '');
         const deposito = puxarDado(['DEPÓSITO', 'DEPOSITO', 'LOCAL ESTOQUE']);
         const alocacao = puxarDado(['ALOCAÇÃO', 'ALOCACAO']);
 
@@ -174,24 +177,24 @@ export default function EntradaEstoque() {
         if (linhaValida) {
           novosItensFormatados.push({
             id: `excel-${Date.now()}-${rowNumber}`,
-            desenhoSAP: sap,                        
-            vendorDescription: desc,                
-            fabricante: nomeFab,                    
-            numPecaFabricante: numPeca,             
-            qtdFornecida: qtd,                 
+            desenhoSAP: sap,                       
+            vendorDescription: desc,               
+            fabricante: nomeFab,                   
+            numPecaFabricante: numPeca,            
+            qtdFornecida: qtd,                
             referencia: ref, 
-            unidadeMedida: unid,                  
-            nfEntrada: nf,                          
-            fornecedor: fornec,                     
-            wbsElement: wbs,                        
-            nomeProjeto: projeto,                   
-            emissaoNF: emissao,                     
-            recebNF: receb,                         
-            docCompras: docCompras,                 
-            poNetPrice: preco,                      
-            centro: filialPlanilha,                 
-            deposito: deposito,                     
-            alocacao: alocacao                      
+            unidadeMedida: unid,                 
+            nfEntrada: nf,                         
+            fornecedor: fornec,                    
+            wbsElement: wbs,                       
+            nomeProjeto: projeto,                  
+            emissaoNF: emissao,                    
+            recebNF: receb,                        
+            docCompras: docCompras,                
+            poNetPrice: preco,                     
+            centro: filialPlanilha,                
+            deposito: deposito,                    
+            alocacao: alocacao                     
           });
         }
       });
@@ -199,7 +202,8 @@ export default function EntradaEstoque() {
       closeAlert();
 
       setItens(prev => {
-        const listaLimpa = prev.filter(i => (i.fabricante !== '' || i.desenhoSAP !== '' || i.vendorDescription !== ''));
+        // Remove apenas linhas totalmente vazias antes de mesclar com o Excel
+        const listaLimpa = prev.filter(i => (i.fabricante !== '' || i.desenhoSAP !== '' || i.vendorDescription !== '' || i.nfEntrada !== ''));
         const novaLista = [...listaLimpa, ...novosItensFormatados];
 
         if (novaLista.length > LIMITE_LOGISTICA) {
@@ -207,7 +211,7 @@ export default function EntradaEstoque() {
           return novaLista.slice(0, LIMITE_LOGISTICA);
         }
 
-        return novaLista;
+        return novaLista.length > 0 ? novaLista : [gerarLinhaVazia()];
       });
 
     } catch (error) {
@@ -216,16 +220,17 @@ export default function EntradaEstoque() {
     }
   };
 
+  // ✨ ADICIONAR LINHA MANUAL
   const adicionarLinhaEmBranco = () => {
     if (itens.length < LIMITE_LOGISTICA) {
-      setItens([...itens, gerarLinhaVazia()]);
+      setItens(prev => [...prev, gerarLinhaVazia()]);
     } else {
       showAlert("Limite Atingido", `O limite máximo é de ${LIMITE_LOGISTICA} itens.`, "warning");
     }
   };
 
   const atualizarCampo = (id, campo, novoValor) => {
-    setItens(itens.map(item => {
+    setItens(prevItens => prevItens.map(item => {
       if (item.id === id) {
         let valorValidado = novoValor;
         if (campo === 'qtdFornecida') {
@@ -244,9 +249,111 @@ export default function EntradaEstoque() {
 
   const handleAnexar = (arquivo) => setAnexos([...anexos, arquivo]);
   const removerAnexo = (indexRemover) => setAnexos(anexos.filter((_, index) => index !== indexRemover));
-  const removerItem = (idParaRemover) => setItens(itens.filter(item => item.id !== idParaRemover));
+  
+  const removerItem = (idParaRemover) => {
+    setItens(prevItens => {
+      const restantes = prevItens.filter(item => item.id !== idParaRemover);
+      // Se apagar todas, recria automaticamente 1 linha em branco para o usuário nunca ficar sem campo
+      return restantes.length > 0 ? restantes : [gerarLinhaVazia()];
+    });
+  };
 
-  // ✨ MAPEAMENTO DE MATCHING RIGOROSO: Impede falsos positivos em nomes compostos
+  const handleEnviar = async () => {
+    if (!estoqueAtual || estoqueAtual === 'TODOS') {
+      showAlert("Ação Bloqueada", "Por favor, selecione uma filial específica no topo da página antes de registar a entrada.", "warning");
+      return;
+    }
+
+    if (!formDados.nome || formDados.nome.trim() === '') {
+      showAlert("Campos Obrigatórios", "Preencha o Nome do operador.", "warning");
+      return;
+    }
+
+    // Filtra linhas que têm pelo menos algum dado preenchido
+    const itensValidos = itens.filter(i => 
+      (i.desenhoSAP && i.desenhoSAP.trim() !== '') || 
+      (i.vendorDescription && i.vendorDescription.trim() !== '') || 
+      (i.fabricante && i.fabricante.trim() !== '') ||
+      (i.nfEntrada && i.nfEntrada.trim() !== '')
+    );
+    
+    if (itensValidos.length === 0) {
+      showAlert("Lista Vazia", "Preencha ao menos uma linha da tabela (SAP, Descrição ou NF) para registrar a entrada.", "warning");
+      return;
+    }
+
+    if (itensValidos.some(i => !i.qtdFornecida || i.qtdFornecida === '' || Number(i.qtdFornecida) < 1)) {
+      showAlert("Dados da Tabela", "Preencha a Quantidade corretamente em todas as linhas preenchidas (mínimo 1).", "warning");
+      return;
+    }
+
+    try {
+      showLoading("Registar Entrada", "A gravar dados no sistema...");
+      const anexosProcessados = [];
+      if (anexos.length > 0) {
+        let enviados;
+        try {
+          enviados = await enviarArquivos(anexos);
+        } catch (erroUpload) {
+          showAlert("Erro de Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
+          return;
+        }
+
+        anexosProcessados.push(...enviados.map((anexo) => ({ ...anexo, origem: 'logistica' })));
+      }
+
+      const payload = {
+        solicitante: { 
+          ...formDados, 
+          tipo: 'Entrada', 
+          filial_id: estoqueAtual 
+        },
+        itens: itensValidos.map(item => ({
+          desenho_sap: item.desenhoSAP || '-',
+          part_number: item.numPecaFabricante || '-',
+          fabricante: item.fabricante || null,
+          fornecedor: item.fornecedor || null,
+          referencia: item.referencia || null,
+          qtd: parseInt(item.qtdFornecida, 10) || 1,
+          unidade_medida: item.unidadeMedida || 'Unid',
+          nf_entrada: item.nfEntrada || null,
+          descricao: item.vendorDescription || 'Sem descrição',
+          materialDescription: item.vendorDescription || 'Sem descrição',
+          wbs_element: item.wbsElement || '-',
+          nome_projeto: item.nomeProjeto || null,
+          emissao_nf: item.emissaoNF || null,
+          receb_nf: item.recebNF || null,
+          documento_compras: item.docCompras || null,
+          valor_unitario: item.poNetPrice || null,
+          centro: item.centro || estoqueAtual,
+          deposito: item.deposito || null,
+          alocacao: item.alocacao || null
+        })),
+        anexos: anexosProcessados 
+      };
+
+      const dados = await apiFetch('/solicitacoes/entrada', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      if (dados && (dados.sucesso || dados.ps_id || dados.ps)) {
+        closeAlert();
+        showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps_id || dados.ps}`, "success");
+        setFormDados({ nome: '', observacoes: '' }); 
+        setItens([gerarLinhaVazia()]);
+        setAnexos([]);
+      } else {
+        closeAlert();
+        showAlert("Erro no Servidor", dados?.erro || "Falha ao gravar entrada.", "error");
+      }
+    } catch (error) {
+      closeAlert();
+      showAlert("Erro de Conexão", `Falha ao conectar com o servidor. Motivo: ${error.message}`, "error");
+    }
+  };
+
+  // Identificação precisa de Crossdocking (NF + Fornecedor + SAP se for parcial)
   const { idsLinhasCrossdocking, nfsUnicasEncontradas } = useMemo(() => {
     const idsMarcados = new Set();
     const nfsEncontradas = new Set();
@@ -254,32 +361,25 @@ export default function EntradaEstoque() {
     itens.forEach(linhaTabela => {
       const nfTab = String(linhaTabela.nfEntrada || '').trim().toUpperCase();
       const sapTab = String(linhaTabela.desenhoSAP || '').trim().toUpperCase();
-      const fornTabRaw = String(linhaTabela.fornecedor || '').trim().toUpperCase();
+      const fornTab = String(linhaTabela.fornecedor || '').trim().toUpperCase().split(/\s+/)[0];
 
-      if (!nfTab || !fornTabRaw) return;
+      if (!nfTab || !fornTab) return;
 
       crossdockingsPendentes.forEach(cross => {
         const nfCross = String(cross.nfCrossdocking || '').trim().toUpperCase();
         
-        let fornCrossRaw = '';
+        let fornCross = '';
         if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
-          fornCrossRaw = String(cross.itens[0].fornecedor).trim().toUpperCase();
+          fornCross = String(cross.itens[0].fornecedor).trim().toUpperCase().split(/\s+/)[0];
         }
-        if (!fornCrossRaw && cross.observacoes) {
+        if (!fornCross && cross.observacoes) {
           const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) fornCrossRaw = matchForn[1].trim().toUpperCase();
+          if (matchForn) fornCross = matchForn[1].trim().toUpperCase().split(/\s+/)[0];
         }
 
-        const fornCrossEsperado = fornCrossRaw.split(/\s+/)[0];
-        if (!fornCrossEsperado) return;
-
-        const primeiroFornLinha = fornTabRaw.split(/\s+/)[0];
-        const bateuFornecedor = (fornTabRaw === fornCrossEsperado) || 
-                                (primeiroFornLinha === fornCrossEsperado && fornCrossRaw.startsWith(fornTabRaw));
-
-        if (nfTab === nfCross && bateuFornecedor) {
+        if (nfTab === nfCross && fornTab === fornCross) {
           const obs = String(cross.observacoes || '');
-          const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && cross.itens.some(i => i.desenho_sap_manual && i.desenho_sap_manual !== '-'));
+          const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
 
           if (isParcial) {
             if (!sapTab) return;
@@ -308,95 +408,6 @@ export default function EntradaEstoque() {
   }, [itens, crossdockingsPendentes]);
 
   const temCrossdockingAguardando = nfsUnicasEncontradas.length > 0;
-
-  const handleEnviar = async () => {
-    if (!estoqueAtual || estoqueAtual === 'TODOS') {
-      showAlert("Ação Bloqueada", "Por favor, selecione uma filial específica no topo da página antes de registar a entrada.", "warning");
-      return;
-    }
-
-    if (!formDados.nome) {
-      showAlert("Campos Obrigatórios", "Preencha o Nome do operador.", "warning");
-      return;
-    }
-    
-    if (itens.length === 0) {
-      showAlert("Lista Vazia", "Adicione pelo menos um item à tabela para registar a entrada.", "warning");
-      return;
-    }
-
-    if (itens.some(i => !i.qtdFornecida || i.qtdFornecida === '' || Number(i.qtdFornecida) < 1)) {
-      showAlert("Dados da Tabela", "Preencha o campo de Quantidade em todas as linhas. A quantidade deve ser no mínimo 1.", "warning");
-      return;
-    }
-
-    try {
-      showLoading("Registar Entrada", "A gravar dados no sistema...");
-      const anexosProcessados = [];
-      if (anexos.length > 0) {
-        let enviados;
-        try {
-          enviados = await enviarArquivos(anexos);
-        } catch (erroUpload) {
-          showAlert("Erro de Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
-          return;
-        }
-
-        anexosProcessados.push(...enviados.map(anexo => ({ ...anexo, origem: 'logistica' })));
-      }
-
-      // Payload completo preservando 100% dos dados para o backend
-      const payload = {
-        solicitante: { 
-          ...formDados, 
-          tipo: 'Entrada', 
-          filial_id: estoqueAtual 
-        },
-        itens: itens.map(item => ({
-          desenho_sap: item.desenhoSAP || '-',
-          part_number: item.numPecaFabricante || '-',
-          fabricante: item.fabricante || null,
-          fornecedor: item.fornecedor || null,
-          referencia: item.referencia || null,
-          qtd: parseInt(item.qtdFornecida, 10) || 1,
-          unidade_medida: item.unidadeMedida || 'Unid',
-          nf_entrada: item.nfEntrada || null,
-          descricao: item.vendorDescription || 'Sem descrição',
-          materialDescription: item.vendorDescription || 'Sem descrição',
-          wbs_element: item.wbsElement || '-',
-          nome_projeto: item.nomeProjeto || null,
-          emissao_nf: item.emissaoNF || null,
-          receb_nf: item.recebNF || null,
-          documento_compras: item.docCompras || null,
-          valor_unitario: item.poNetPrice || null,
-          centro: item.centro || null,
-          deposito: item.deposito || null,
-          alocacao: item.alocacao || null
-        })),
-        anexos: anexosProcessados 
-      };
-
-      const dados = await apiFetch('/solicitacoes/entrada', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-
-      if (dados.sucesso || dados.ps_id || dados.ps) {
-        closeAlert();
-        showAlert("Operação Concluída!", `Entrada registrada automaticamente no galpão ${estoqueAtual}.\nNúmero de acompanhamento: ${dados.ps_id || dados.ps}`, "success");
-        setFormDados({ nome: '', observacoes: '' }); 
-        setItens([]);
-        setAnexos([]);
-        buscarCrossdockingsPendentes();
-      } else {
-        closeAlert();
-        showAlert("Erro no Servidor", dados.erro, "error");
-      }
-    } catch (error) {
-      closeAlert();
-      showAlert("Erro de Conexão", `Falha ao conectar com o servidor. Motivo: ${error.message}`, "error");
-    }
-  };
 
   return (
     <div className="estoque-wrapper">
@@ -456,12 +467,13 @@ export default function EntradaEstoque() {
           }}>
             <Info size={16} style={{ flexShrink: 0 }} />
             <span>
-              <strong>Atenção:</strong> Apenas as linhas <span style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>destacadas em azul</span> na tabela abaixo correspondem aos materiais exatos que serão deduzidos pelo Crossdocking. As demais linhas entrarão normalmente no estoque.
+              <strong>Atenção:</strong> As linhas <span style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>destacadas em azul</span> com o selo <strong>CROSS</strong> correspondem aos materiais exatos que serão deduzidos pelo Crossdocking. As demais linhas entrarão normalmente no estoque.
             </span>
           </div>
         </div>
       )}
 
+      {/* COMPONENTE DA TABELA */}
       <TabelaInsercaoItens 
         itens={itens}
         limiteLinhas={LIMITE_LOGISTICA} 
