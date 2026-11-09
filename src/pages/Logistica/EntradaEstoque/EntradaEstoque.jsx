@@ -349,7 +349,7 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ COMPARAÇÃO EXATA DE FORNECEDOR (SEM SPLIT) E RETORNO DOS CROSSDOCKINGS RECONHECIDOS
+  // ✨ COMPARAÇÃO EXATA DE FORNECEDOR (Sem remover palavras) E RETORNO DOS CROSSDOCKINGS RECONHECIDOS
   const { idsLinhasCrossdocking, solicitacoesCrossEncontradas } = useMemo(() => {
     const idsMarcados = new Set();
     const mapSolicitacoes = new Map();
@@ -359,7 +359,7 @@ export default function EntradaEstoque() {
     itens.forEach(linhaTabela => {
       const nfTab = normalizar(linhaTabela.nfEntrada);
       const sapTab = normalizar(linhaTabela.desenhoSAP);
-      const fornTab = normalizar(linhaTabela.fornecedor);
+      const fornTab = normalizar(linhaTabela.fornecedor); // Texto Inteiro Exato
 
       if (!nfTab || !fornTab) return;
 
@@ -375,7 +375,7 @@ export default function EntradaEstoque() {
           if (matchForn) fornCross = normalizar(matchForn[1]);
         }
 
-        // ✨ COMPARAÇÃO EXATA DE FORNECEDOR E NF
+        // ✨ AQUI MORA A VERDADE: Só avança se a string inteira for rigorosamente igual!
         if (nfTab === nfCross && fornTab === fornCross) {
           const obs = String(cross.observacoes || '');
           const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
@@ -438,7 +438,7 @@ export default function EntradaEstoque() {
         </div>
       </div>
 
-      {/* ✨ CARD DETALHADO DO CROSSDOCKING IDENTIFICADO COM VISUALIZAÇÃO DOS ITENS */}
+      {/* ✨ CARD DETALHADO DO CROSSDOCKING IDENTIFICADO */}
       {temCrossdockingAguardando && (
         <div style={{
           display: 'flex', flexDirection: 'column', gap: '14px',
@@ -471,7 +471,6 @@ export default function EntradaEstoque() {
             </div>
           </div>
 
-          {/* LISTA DE SOLICITAÇÕES RECONHECIDAS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
             {solicitacoesCrossEncontradas.map(cross => {
               const estaExpandida = solicitacaoAbertaId === cross.id;
@@ -522,7 +521,6 @@ export default function EntradaEstoque() {
                     </button>
                   </div>
 
-                  {/* RESUMO RÁPIDO DO CABEÇALHO */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginTop: '10px', fontSize: '0.80rem', color: '#334155' }}>
                     <div><strong>Solicitante:</strong> {cross.solicitante || cross.nome_solicitante || '-'}</div>
                     <div><strong>Fornecedor:</strong> {cross.fornecedorIdentificado || '-'}</div>
@@ -531,7 +529,6 @@ export default function EntradaEstoque() {
                     <div><strong>WBS:</strong> {cross.wbs || cross.wbs_destino || '-'}</div>
                   </div>
 
-                  {/* ITENS DETALHADOS SE EXPANDIR */}
                   {estaExpandida && (
                     <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #e2e8f0' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
@@ -594,7 +591,6 @@ export default function EntradaEstoque() {
         </div>
       )}
 
-      {/* COMPONENTE DA TABELA */}
       <TabelaInsercaoItens 
         itens={itens}
         limiteLinhas={LIMITE_LOGISTICA} 
