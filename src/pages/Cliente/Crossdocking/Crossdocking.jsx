@@ -10,7 +10,7 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
-import { formatarWBS } from '../../../utils/formatadores';
+import { formatarWBS, normalizarString } from '../../../utils/formatadores';
 
 import './Crossdocking.css';
 
@@ -18,7 +18,6 @@ export default function Crossdocking() {
   const { estoqueAtual } = useContext(AuthContext);
   const { showAlert } = useAlert();
 
-  // ✨ ESTADO DE SEGURANÇA: Trava contra múltiplos cliques (Race Condition)
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', fornecedor: '' });
@@ -59,11 +58,7 @@ export default function Crossdocking() {
   };
 
   const handleEnviar = async () => {
-    // ✨ BLOQUEIO DE SEGURANÇA 1: Impede envio múltiplo acidental
-    if (isSubmitting) {
-      console.warn("Bloqueado: Tentativa de duplo clique interceptada.");
-      return; 
-    }
+    if (isSubmitting) return; 
 
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
       showAlert("Atenção", "Por favor, selecione uma filial no topo da página antes de prosseguir.", "warning");
@@ -86,7 +81,6 @@ export default function Crossdocking() {
       }
     }
 
-    // ✨ FECHA A TRANCA: Todos os botões e inputs serão bloqueados a partir daqui
     setIsSubmitting(true);
 
     try {
@@ -95,24 +89,25 @@ export default function Crossdocking() {
         anexosProcessados = await enviarArquivos(anexos);
       } catch (erroUpload) {
         showAlert("Erro no Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
-        setIsSubmitting(false); // Solta a trava
+        setIsSubmitting(false);
         return;
       }
 
-      // ✨ EXTRAÇÃO INTELIGENTE: Pega apenas o primeiro nome e garante que está em maiúsculas
-      const fornecedorProcessado = formDados.fornecedor.trim().split(/\s+/)[0].toUpperCase();
+      // ✨ FIM DO ERRO DO FORNECEDOR CORTADO: Gravar o nome exatamente como o cliente digita
+      const fornecedorProcessado = normalizarString(formDados.fornecedor);
+      const nfProcessada = normalizarString(formDados.nf);
 
       const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
-        desenho_sap_manual: i.desenhoSAP,
+        desenho_sap_manual: normalizarString(i.desenhoSAP),
         quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
         unidade_medida_manual: 'Unid',
-        nf_entrada: formDados.nf,
+        nf_entrada: nfProcessada,
         fornecedor: fornecedorProcessado 
       }));
 
       const payload = {
         solicitante: {
-          nome: formDados.nome, wbs: formDados.wbs, nf: formDados.nf, destino: formDados.destino, 
+          nome: formDados.nome, wbs: formDados.wbs, nf: nfProcessada, destino: formDados.destino, 
           observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${fornecedorProcessado}] ${formDados.observacoes}`,
           tipo: 'Crossdocking', filial_origem: estoqueAtual 
         },
@@ -133,7 +128,6 @@ export default function Crossdocking() {
     } catch (error) {
       showAlert("Falha de Conexão", "Não foi possível ligar ao servidor. Verifica a tua internet.", "error");
     } finally {
-      // ✨ LIBERTA A TRANCA
       setIsSubmitting(false);
     }
   };
@@ -196,7 +190,7 @@ export default function Crossdocking() {
                 className="input-campo foco-ciano" 
                 placeholder="Ex: SIEMENS" 
                 value={formDados.fornecedor} 
-                onChange={(e) => setFormDados({...formDados, fornecedor: e.target.value.toUpperCase()})} 
+                onChange={(e) => setFormDados({...formDados, fornecedor: e.target.value})} 
                 disabled={isSubmitting}
               />
             </div>
@@ -301,7 +295,7 @@ export default function Crossdocking() {
         icone={<Send size={16} />} 
         cor="ciano" 
         onClick={handleEnviar} 
-        carregando={isSubmitting} // ✨ Botão recebe a trava
+        carregando={isSubmitting}
       />
     </div>
   );
