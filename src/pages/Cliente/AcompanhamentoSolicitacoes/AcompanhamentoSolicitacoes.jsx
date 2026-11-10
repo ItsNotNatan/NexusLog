@@ -781,11 +781,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <HeaderOrdenavel coluna="solicitante" label="SOLICITANTE / WBS" />
                 <HeaderOrdenavel coluna="pl" label="Nº DA PL" />
                 <HeaderOrdenavel coluna="destino" label="DE ➔ PARA" />
-                <HeaderOrdenavel coluna="dataCriacaoISO" label="DATA CRIAÇÃO" />
                 
-                {/* ✨ NOVA COLUNA: DATA NECESSIDADE */}
+                {/* ✨ ORDEM CORRIGIDA: DATA NECESSIDADE ENTRE "DE PARA" E "DATA CRIACAO" */}
                 <HeaderOrdenavel coluna="dataNecessidadeOriginal" label="DATA NECESSIDADE" />
-
+                <HeaderOrdenavel coluna="dataCriacaoISO" label="DATA CRIAÇÃO" />
                 <HeaderOrdenavel coluna="dataEntrega" label="DATA ENTREGA" />
                 <HeaderOrdenavel coluna="statusExibicao" label={`STATUS ${perfil === "logistica" ? "/ AÇÃO" : ""}`} />
               </tr>
@@ -808,11 +807,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                       <div className="skeleton-box" style={{ width: '90px', marginBottom: '8px', height: '20px' }}></div>
                       <div className="skeleton-box" style={{ width: '90px', height: '20px' }}></div>
                     </td>
-                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
                     
-                    {/* ✨ Skeleton da Nova Coluna */}
+                    {/* ✨ Skeleton da Nova Coluna Data Necessidade */}
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '70px', height: '14px' }}></div></td>
 
+                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '100px', height: '28px', borderRadius: '999px' }}></div></td>
                   </tr>
@@ -917,16 +916,16 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           </div>
                         </td>
 
-                        <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
-                        
-                        {/* ✨ CÉLULA DA NOVA COLUNA: DATA NECESSIDADE (APENAS PARA MATERIAL) */}
+                        {/* ✨ ORDEM CORRIGIDA: DATA NECESSIDADE ANTES DE DATA CRIAÇÃO */}
                         <td className="texto-data" style={{ color: corTextoForte, fontWeight: '500' }}>
                           {linha.tipo === 'Material' 
                             ? (linha.dataNecessidadeFormatada !== "—" ? linha.dataNecessidadeFormatada : <span style={{ color: '#94a3b8' }}>Não informada</span>)
                             : <span style={{ color: corTextoFraco }}>—</span>
                           }
                         </td>
-
+                        
+                        <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
+                        
                         <td>
                           {perfil === "logistica" && !isOperador && !isRecusadoOuCancelado && linha.status !== 'Pendente' ? (
                             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
