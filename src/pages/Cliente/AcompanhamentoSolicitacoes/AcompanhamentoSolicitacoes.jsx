@@ -780,10 +780,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <HeaderOrdenavel coluna="tipo" label="TIPO / ID (PS)" />
                 <HeaderOrdenavel coluna="solicitante" label="SOLICITANTE / WBS" />
                 <HeaderOrdenavel coluna="pl" label="Nº DA PL" />
-                <HeaderOrdenavel coluna="destino" label="DE ➔ PARA" />
                 
-                {/* ✨ ORDEM CORRIGIDA: DATA NECESSIDADE ENTRE "DE PARA" E "DATA CRIACAO" */}
+                {/* ✨ NOVA ORDEM: DATA NECESSIDADE ENTRE PL E DE ➔ PARA */}
                 <HeaderOrdenavel coluna="dataNecessidadeOriginal" label="DATA NECESSIDADE" />
+                
+                <HeaderOrdenavel coluna="destino" label="DE ➔ PARA" />
                 <HeaderOrdenavel coluna="dataCriacaoISO" label="DATA CRIAÇÃO" />
                 <HeaderOrdenavel coluna="dataEntrega" label="DATA ENTREGA" />
                 <HeaderOrdenavel coluna="statusExibicao" label={`STATUS ${perfil === "logistica" ? "/ AÇÃO" : ""}`} />
@@ -803,14 +804,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                       <div className="skeleton-box" style={{ width: '60px', height: '14px' }}></div>
                     </td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '70px', height: '20px' }}></div></td>
+                    
+                    {/* ✨ Skeleton da Nova Coluna Data Necessidade na nova posição */}
+                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '70px', height: '14px' }}></div></td>
+
                     <td style={{ padding: '16px' }}>
                       <div className="skeleton-box" style={{ width: '90px', marginBottom: '8px', height: '20px' }}></div>
                       <div className="skeleton-box" style={{ width: '90px', height: '20px' }}></div>
                     </td>
                     
-                    {/* ✨ Skeleton da Nova Coluna Data Necessidade */}
-                    <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '70px', height: '14px' }}></div></td>
-
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '100px', height: '28px', borderRadius: '999px' }}></div></td>
@@ -904,6 +906,14 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           )}
                         </td>
 
+                        {/* ✨ CÉLULA DA NOVA COLUNA: DATA NECESSIDADE MOVIDA AQUI */}
+                        <td className="texto-data" style={{ color: corTextoForte, fontWeight: '500' }}>
+                          {linha.tipo === 'Material' 
+                            ? (linha.dataNecessidadeFormatada !== "—" ? linha.dataNecessidadeFormatada : <span style={{ color: '#94a3b8' }}>Não informada</span>)
+                            : <span style={{ color: corTextoFraco }}>—</span>
+                          }
+                        </td>
+
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                             <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc', color: corTextoMedio, padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: `1px solid ${isRecusadoOuCancelado ? '#fca5a5' : '#e2e8f0'}`, whiteSpace: 'nowrap' }}>
@@ -914,14 +924,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               Para: {linha.destino}
                             </span>
                           </div>
-                        </td>
-
-                        {/* ✨ ORDEM CORRIGIDA: DATA NECESSIDADE ANTES DE DATA CRIAÇÃO */}
-                        <td className="texto-data" style={{ color: corTextoForte, fontWeight: '500' }}>
-                          {linha.tipo === 'Material' 
-                            ? (linha.dataNecessidadeFormatada !== "—" ? linha.dataNecessidadeFormatada : <span style={{ color: '#94a3b8' }}>Não informada</span>)
-                            : <span style={{ color: corTextoFraco }}>—</span>
-                          }
                         </td>
                         
                         <td className="texto-data" style={{ color: corTextoFraco }}>{linha.dataSolicitacao}</td>
