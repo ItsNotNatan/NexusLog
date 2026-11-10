@@ -30,11 +30,11 @@ import { io } from 'socket.io-client';
 
 import { formatarWBS } from '../../../utils/formatadores';
 import { AuthContext } from '../../../contexts/AuthContext';
-import { useAlert } from '../../../contexts/AlertContext'; // <-- Correção do Import (de AlertContext para useAlert)
+import { useAlert } from '../../../contexts/AlertContext'; 
 
 export default function MaterialEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
-  const { showAlert } = useAlert(); // <-- Utilizar o Hook correto
+  const { showAlert } = useAlert(); 
 
   // ✨ ESTADO DE SEGURANÇA 1: A trava contra os múltiplos cliques
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,13 +57,19 @@ export default function MaterialEstoque() {
     setDataMinima(new Date(hoje.getTime() - timezoneOffset).toISOString().split("T")[0]);
   }, []);
 
-  const prefixoWbsPrincipal = formDados.wbs.split('-')[0].trim().toUpperCase();
+  // ✨ VALIDAÇÃO HIERÁRQUICA DA WBS (CORRIGIDA)
+  const wbsPrincipalLimpa = String(formDados.wbs || '').trim().toUpperCase();
   
   const temWbsDivergente = itensSelecionados.some(item => {
-    const itemWbs = (item.wbs || item.wbs_element || '').trim().toUpperCase();
+    const itemWbs = String(item.wbs || item.wbs_element || '').trim().toUpperCase();
+    
+    // Se o item não tem WBS ou o cabeçalho ainda não foi preenchido, ignoramos
     if (itemWbs === '' || itemWbs === '-') return false;
-    const prefixoItemWbs = itemWbs.split('-')[0].trim().toUpperCase();
-    return prefixoWbsPrincipal !== '' && prefixoItemWbs !== prefixoWbsPrincipal;
+    if (wbsPrincipalLimpa === '') return false;
+
+    // A WBS do item deve COMEÇAR com a WBS principal do cabeçalho.
+    // Se não começar, é uma WBS divergente.
+    return !itemWbs.startsWith(wbsPrincipalLimpa);
   });
 
   useEffect(() => {
@@ -177,13 +183,11 @@ export default function MaterialEstoque() {
   };
 
   const handleEnviar = async () => {
-    // ✨ BLOQUEIO 1: Se já estivermos a enviar, descarta novos cliques
     if (isSubmitting) {
       console.warn("Bloqueado: Tentativa de duplo clique interceptada.");
       return; 
     }
 
-    // VALIDAÇÕES BÁSICAS
     if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.dataNecessidade) { showAlert("Campos Obrigatórios", "Preencha os campos (*).", "warning"); return; }
     if (itensSelecionados.length === 0) { showAlert("Lista Vazia", "Adicione um item.", "warning"); return; }
     if (itensSelecionados.some(i => !i.qtdSelecionada)) { showAlert("Incompleto", "Verifique as quantidades.", "warning"); return; }
@@ -193,8 +197,6 @@ export default function MaterialEstoque() {
       return;
     }
 
-    // ✨ BLOQUEIO 2: VERIFICAÇÃO RIGOROSA DO SALDO
-    // Garante que o utilizador não tentou injetar um valor inválido.
     const temItemComQuantidadeSuperiorAoSaldo = itensSelecionados.some(item => {
       const saldoLivre = item.qtdFornecida - (item.qtdReservada || 0);
       return item.qtdSelecionada > saldoLivre;
@@ -205,7 +207,6 @@ export default function MaterialEstoque() {
        return;
     }
 
-    // FECHA A TRANCA DE ENVIO! A PARTIR DAQUI O BOTÃO FICA BLOQUEADO!
     setIsSubmitting(true);
 
     const anexosProcessados = [];
@@ -217,7 +218,7 @@ export default function MaterialEstoque() {
           enviados = await enviarArquivos(anexos);
         } catch (erroUpload) {
           showAlert("Erro Anexo", erroUpload.message || "Falha ao anexar os ficheiros.", "error");
-          setIsSubmitting(false); // Solta a trava se falhar
+          setIsSubmitting(false);
           return;
         }
 
@@ -245,7 +246,6 @@ export default function MaterialEstoque() {
     } catch (error) { 
       showAlert("Erro Conexão", "Falha no servidor.", "error"); 
     } finally {
-      // ✨ LIBERTA A TRANCA: quer a operação falhe ou dê sucesso, o botão volta a ficar livre
       setIsSubmitting(false);
     }
   };
@@ -366,7 +366,6 @@ export default function MaterialEstoque() {
         />
       </div>
 
-      {/* ✨ O botão agora fica mais elegante: Cinzento durante a submissão e não reage a cliques duplicados */}
       <div className="form-acoes-final mt-4" style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button 
           className="btn-enviar-azul" 
@@ -375,7 +374,7 @@ export default function MaterialEstoque() {
           style={{ 
             display: 'flex', alignItems: 'center', gap: '8px', 
             padding: '12px 24px', borderRadius: '8px', fontWeight: 'bold', border: 'none',
-            backgroundColor: isSubmitting ? '#94a3b8' : '#2563eb', // Fica cinzento a submeter
+            backgroundColor: isSubmitting ? '#94a3b8' : '#2563eb',
             color: 'white',
             cursor: isSubmitting ? 'not-allowed' : 'pointer'
           }}
