@@ -223,6 +223,10 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
       destino: sol.destino || 'Não informado',
       dataSolicitacao: formatarDataBrasil(sol.created_at) || "-",
       dataCriacaoISO: sol.created_at,
+      
+      // ✨ CORREÇÃO AQUI: Passar a data_necessidade para o frontend
+      data_necessidade: sol.data_necessidade,
+      
       dataAprovacaoPL: dataAprovacaoValida,
       prazoFinalizacao: sol.prazo_finalizacao_pl,
       criacaoPl: formatarDataBrasil(dataAprovacaoValida),
@@ -300,6 +304,10 @@ const obterSolicitacaoDetalhada = async (id) => {
     destino: sol.destino || 'Não informado',
     dataSolicitacao: formatarDataBrasil(sol.created_at) || "-",
     dataCriacaoISO: sol.created_at,
+    
+    // ✨ PASSAR NO DETALHADO TAMBÉM
+    data_necessidade: sol.data_necessidade,
+    
     dataAprovacaoPL: dataAprovacaoValida,
     prazoFinalizacao: sol.prazo_finalizacao_pl,
     criacaoPl: formatarDataBrasil(dataAprovacaoValida),
