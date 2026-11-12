@@ -10,7 +10,6 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
-// IMPORTAÇÃO ATUALIZADA AQUI:
 import { formatarWBS, normalizarString, extrairEntidadePrincipal } from '../../../utils/formatadores';
 
 import './Crossdocking.css';
@@ -94,7 +93,6 @@ export default function Crossdocking() {
         return;
       }
 
-      // ✨ NOVA REGRA APLICADA: Extração apenas do Primeiro Nome do Fornecedor (O fallback de fabricante vai vazio pois não há esse campo aqui)
       const fornecedorProcessado = extrairEntidadePrincipal(formDados.fornecedor, '');
       const nfProcessada = normalizarString(formDados.nf);
 
