@@ -36,13 +36,19 @@ const formatarDataBrasil = (isoString) => {
 
 const normalizar = (txt) => String(txt || '').trim().replace(/\s+/g, ' ').toUpperCase();
 
-// NOVA REGRA APLICADA NO BACKEND TAMBÉM:
+// Função blindada contra N/A
 const extrairEntidadePrincipal = (fornecedor, fabricante) => {
+  const isInvalid = (val) => {
+    if (!val || typeof val !== 'string') return true;
+    const v = val.trim().toUpperCase();
+    return v === '' || /^[-_.]+$/.test(v) || v === 'N/A' || v === 'NA' || v === 'N.A' || v === 'ND' || v === 'N/D';
+  };
+
   let entidade = fornecedor;
-  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+  if (isInvalid(entidade)) {
     entidade = fabricante;
   }
-  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+  if (isInvalid(entidade)) {
     return '';
   }
   return entidade.trim().toUpperCase().split(/\s+/)[0];
@@ -452,7 +458,6 @@ const criarEntrada = async (solicitante, itens, anexos) => {
   return salvarNoBanco(dados, itensDB, anexos);
 };
 
-// NOVA REGRA APLICADA (Match Triplo Estrito na criação do Pedido)
 const criarCrossdocking = async (solicitante, itens, anexos) => {
   const dados = {
     tipo: 'Crossdocking',
@@ -586,8 +591,6 @@ const acharIdOriginalNoTexto = (observacoes) => {
   return porUuid ? porUuid[0] : null;
 };
 
-// ===================== PROCESSAMENTO DE STATUS E DEDUÇÃO =====================
-
 const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
   const solicitacao = await db.porId('solicitacoes', id);
   if (!solicitacao) throw new Error('Solicitação não encontrada.');
@@ -640,9 +643,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       await db.atualizar('solicitacoes', id, { pl: `PL #${numeroPLGerado}` });
     }
 
-    // =========================================================================
-    // CENÁRIO 1: APROVAÇÃO DA ENTRADA DE MATERIAL
-    // =========================================================================
     if (solicitacao.tipo === 'Entrada') {
       const itensEntrada = await db.listar('solicitacoes_itens', {
         filter: db.f('solicitacao_id = {:sid}', { sid: id }),
@@ -698,7 +698,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               const nfRec = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
               let nfCrossLimpa = normalizar(nfRec ? nfRec.numero_nf : '');
 
-              // NOVA REGRA APLICADA:
               let fornCross = '';
               const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]|\n]+)/i);
               if (matchForn) fornCross = extrairEntidadePrincipal(matchForn[1], '');
@@ -711,18 +710,19 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 nfCrossLimpa = normalizar(itensPedidosCross[0].nf_entrada);
               }
               if (!fornCross && itensPedidosCross.length > 0) {
-                // NOVA REGRA APLICADA:
                 fornCross = extrairEntidadePrincipal(itensPedidosCross[0].fornecedor, itensPedidosCross[0].fabricante);
               }
 
               const indicesItensValidos = [];
               itensEntrada.forEach((item, idx) => {
                 const nfEnt = normalizar(item.nf_entrada);
-                // NOVA REGRA APLICADA:
                 const fornEnt = extrairEntidadePrincipal(item.fornecedor, item.fabricante);
                 
-                // Match visual garantido
-                if (nfEnt === nfCrossLimpa && fornEnt === fornCross) {
+                // CORREÇÃO DA ARMADILHA: 
+                // Permite o cruzamento apenas pela NF se o crossdocking não indicou fornecedor
+                const bateuForn = fornCross ? fornEnt === fornCross : true;
+
+                if (nfEnt === nfCrossLimpa && bateuForn) {
                   indicesItensValidos.push(idx);
                 }
               });
@@ -734,7 +734,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (itensPedidosCross.length > 0 && !/sa[íi]da\s+total/i.test(obs));
 
               if (!isParcial) {
-                // ==================== CROSSDOCKING TOTAL ====================
                 await db.removerOnde('solicitacoes_itens', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
                 
                 const novosItens = indicesItensValidos.map((idxOriginal) => {
@@ -777,7 +776,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 vinculouAlgo = true;
 
               } else {
-                // ==================== CROSSDOCKING PARCIAL ====================
                 for (const pedido of itensPedidosCross) {
                   const sapCross = normalizar(pedido.desenho_sap_manual);
                   if (!sapCross) continue;
@@ -835,9 +833,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // =========================================================================
-    // CENÁRIO 2: APROVAÇÃO DO CROSSDOCKING (MATERIAL JÁ ESTAVA NO ESTOQUE)
-    // =========================================================================
     else if (solicitacao.tipo === 'Crossdocking') {
       const jaFoiDeduzido = solicitacao.observacoes && solicitacao.observacoes.includes('[NF VINCULADA]');
       
@@ -845,7 +840,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const nfRecord = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
         let nfCross = normalizar(nfRecord ? nfRecord.numero_nf : '');
 
-        // NOVA REGRA APLICADA:
         let fornCross = '';
         const matchForn = solicitacao.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
         if (matchForn) fornCross = extrairEntidadePrincipal(matchForn[1], '');
@@ -853,7 +847,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         let itensCross = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
 
         if (!nfCross && itensCross.length > 0) nfCross = normalizar(itensCross[0].nf_entrada);
-        // NOVA REGRA APLICADA:
+        
         if (!fornCross && itensCross.length > 0) fornCross = extrairEntidadePrincipal(itensCross[0].fornecedor, itensCross[0].fabricante);
 
         const obs = String(solicitacao.observacoes || '');
@@ -865,11 +859,8 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
         const estoqueValido = candidatosEstoque.filter(e => {
           const bateuNF = normalizar(e.nf_entrada) === nfCross;
-          
-          // NOVA REGRA APLICADA AO FILTRAR ESTOQUE EXISTENTE:
           const entidadeEstoque = extrairEntidadePrincipal(e.fornecedor, e.fabricante);
           const bateuForn = fornCross ? entidadeEstoque === fornCross : true;
-          
           return bateuNF && bateuForn && Number(e.quantidade_disponivel || 0) > 0;
         });
 
@@ -959,9 +950,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // =========================================================================
-    // CENÁRIO 3: SAÍDA DE MATERIAL OU TRANSFERÊNCIA WBS
-    // =========================================================================
     else if (solicitacao.tipo === 'Material' || solicitacao.tipo === 'Transferencia WBS') {
       const itensPedidos = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
 
@@ -1011,9 +999,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
       }
     }
 
-    // =========================================================================
-    // CENÁRIO 4: REINTEGRAÇÃO / CANCELAMENTO
-    // =========================================================================
     else if (solicitacao.tipo === 'Reintegracao' || solicitacao.tipo === 'Reintegração' || solicitacao.tipo === 'Cancelado') {
       let deveDevolverAoEstoque = true;
       let wbsDestinoTransferencia = null; 
