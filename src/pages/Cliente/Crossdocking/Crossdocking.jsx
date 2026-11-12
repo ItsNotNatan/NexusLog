@@ -10,7 +10,7 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
-import { formatarWBS, normalizarString, extrairEntidadePrincipal } from '../../../utils/formatadores';
+import { formatarWBS, normalizarString } from '../../../utils/formatadores';
 
 import './Crossdocking.css';
 
@@ -93,7 +93,8 @@ export default function Crossdocking() {
         return;
       }
 
-      const fornecedorProcessado = extrairEntidadePrincipal(formDados.fornecedor, '');
+      // ✨ FIM DO ERRO DO FORNECEDOR CORTADO: Gravar o nome exatamente como o cliente digita
+      const fornecedorProcessado = normalizarString(formDados.fornecedor);
       const nfProcessada = normalizarString(formDados.nf);
 
       const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
