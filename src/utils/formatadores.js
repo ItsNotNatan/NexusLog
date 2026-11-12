@@ -35,11 +35,9 @@ export const formatarDinheiro = (valor) => {
  */
 export const formatarDinheiroTempoReal = (valorOriginal) => {
   if (!valorOriginal) return '';
-  // Remove tudo o que não for número
   const apenasNumeros = valorOriginal.replace(/\D/g, '');
 
   if (apenasNumeros === '') return '';
-  // Divide por 100 para ter sempre 2 casas decimais
   const valorDecimal = parseInt(apenasNumeros, 10) / 100;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -53,8 +51,30 @@ export const formatarWBS = (valor) => {
   return String(valor).toUpperCase().replace(/[^A-Z0-9-]/g, '');
 };
 
-// ✨ NORMALIZAÇÃO ABSOLUTA: Remove espaços duplos e garante maiúsculas
+// NORMALIZAÇÃO ABSOLUTA: Remove espaços duplos e garante maiúsculas
 export const normalizarString = (txt) => {
   if (!txt) return '';
   return String(txt).trim().replace(/\s+/g, ' ').toUpperCase();
+};
+
+/**
+ * Extrai a entidade principal (Fornecedor ou Fabricante).
+ * Regra: Utiliza o fallback se fornecedor for inválido, e extrai apenas
+ * a primeira palavra (mantendo os hífens intactos, cortando no espaço).
+ */
+export const extrairEntidadePrincipal = (fornecedor, fabricante) => {
+  let entidade = fornecedor;
+
+  // Fallback Inteligente: Se fornecedor vier vazio, nulo, ou apenas traços
+  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+    entidade = fabricante;
+  }
+
+  // Se o fabricante também for inválido, retorna vazio
+  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+    return '';
+  }
+
+  // Limpa os espaços, passa para maiúsculas e extrai a primeira palavra cortando pelos espaços
+  return entidade.trim().toUpperCase().split(/\s+/)[0];
 };
