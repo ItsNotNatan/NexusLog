@@ -59,19 +59,26 @@ export const normalizarString = (txt) => {
 
 /**
  * Extrai a entidade principal (Fornecedor ou Fabricante).
- * Regra: Utiliza o fallback se fornecedor for inválido, e extrai apenas
- * a primeira palavra (mantendo os hífens intactos, cortando no espaço).
+ * Regra: Utiliza o fallback se fornecedor for inválido (incluindo N/A), 
+ * extrai apenas a primeira palavra.
  */
 export const extrairEntidadePrincipal = (fornecedor, fabricante) => {
+  const isInvalid = (val) => {
+    if (!val || typeof val !== 'string') return true;
+    const v = val.trim().toUpperCase();
+    // Apanha Vazio, traços, pontos, underscores e variações de N/A e N/D
+    return v === '' || /^[-_.]+$/.test(v) || v === 'N/A' || v === 'NA' || v === 'N.A' || v === 'ND' || v === 'N/D';
+  };
+
   let entidade = fornecedor;
 
-  // Fallback Inteligente: Se fornecedor vier vazio, nulo, ou apenas traços
-  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+  // Fallback Inteligente: Se fornecedor vier sujo/inválido
+  if (isInvalid(entidade)) {
     entidade = fabricante;
   }
 
   // Se o fabricante também for inválido, retorna vazio
-  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+  if (isInvalid(entidade)) {
     return '';
   }
 
