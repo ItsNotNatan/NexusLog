@@ -36,6 +36,18 @@ const formatarDataBrasil = (isoString) => {
 
 const normalizar = (txt) => String(txt || '').trim().replace(/\s+/g, ' ').toUpperCase();
 
+// NOVA REGRA APLICADA NO BACKEND TAMBÉM:
+const extrairEntidadePrincipal = (fornecedor, fabricante) => {
+  let entidade = fornecedor;
+  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+    entidade = fabricante;
+  }
+  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+    return '';
+  }
+  return entidade.trim().toUpperCase().split(/\s+/)[0];
+};
+
 const solicitacaoParaFront = (r) => ({
   ...r,
   observacoes_logistica: db.txt(r.observacoes_logistica),
@@ -224,7 +236,6 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
       dataSolicitacao: formatarDataBrasil(sol.created_at) || "-",
       dataCriacaoISO: sol.created_at,
       
-      // ✨ CORREÇÃO AQUI: Passar a data_necessidade para o frontend
       data_necessidade: sol.data_necessidade,
       
       dataAprovacaoPL: dataAprovacaoValida,
@@ -305,7 +316,6 @@ const obterSolicitacaoDetalhada = async (id) => {
     dataSolicitacao: formatarDataBrasil(sol.created_at) || "-",
     dataCriacaoISO: sol.created_at,
     
-    // ✨ PASSAR NO DETALHADO TAMBÉM
     data_necessidade: sol.data_necessidade,
     
     dataAprovacaoPL: dataAprovacaoValida,
@@ -442,6 +452,7 @@ const criarEntrada = async (solicitante, itens, anexos) => {
   return salvarNoBanco(dados, itensDB, anexos);
 };
 
+// NOVA REGRA APLICADA (Match Triplo Estrito na criação do Pedido)
 const criarCrossdocking = async (solicitante, itens, anexos) => {
   const dados = {
     tipo: 'Crossdocking',
@@ -454,14 +465,14 @@ const criarCrossdocking = async (solicitante, itens, anexos) => {
   };
 
   const nfSolicitante = normalizar(solicitante.nf);
-  const fornSolicitante = normalizar(solicitante.fornecedor);
+  const fornSolicitante = extrairEntidadePrincipal(solicitante.fornecedor, solicitante.fabricante);
 
   const itensDB = (itens || []).map((i) => ({
     desenho_sap_manual: normalizar(i.desenho_sap_manual || i.desenhoSAP || '-'),
     quantidade_solicitada: Math.max(1, Number(i.quantidade_solicitada || i.qtdSelecionada || i.quantidade || 1)),
     unidade_medida_manual: i.unidade_medida_manual || i.unidadeMedida || 'Unid',
     nf_entrada: normalizar(i.nf_entrada || i.nfEntrada || i.nf || nfSolicitante),
-    fornecedor: normalizar(i.fornecedor || fornSolicitante),
+    fornecedor: extrairEntidadePrincipal(i.fornecedor || fornSolicitante, i.fabricante || solicitante.fabricante),
     fabricante: i.fabricante || null,
     descricao_manual: limitarTexto(i.descricao_manual || i.materialDescription || i.descricao || 'Sem descrição'),
   }));
@@ -570,7 +581,7 @@ const acharIdOriginalNoTexto = (observacoes) => {
   if (porFormato) return porFormato[1];
 
   const porUuid = porFormato ? null : observacoes.match(
-    /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/
+    /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/
   );
   return porUuid ? porUuid[0] : null;
 };
@@ -687,9 +698,10 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               const nfRec = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
               let nfCrossLimpa = normalizar(nfRec ? nfRec.numero_nf : '');
 
+              // NOVA REGRA APLICADA:
               let fornCross = '';
               const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]|\n]+)/i);
-              if (matchForn) fornCross = normalizar(matchForn[1]);
+              if (matchForn) fornCross = extrairEntidadePrincipal(matchForn[1], '');
 
               const itensPedidosCross = await db.listar('solicitacoes_itens', {
                 filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
@@ -699,14 +711,17 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 nfCrossLimpa = normalizar(itensPedidosCross[0].nf_entrada);
               }
               if (!fornCross && itensPedidosCross.length > 0) {
-                fornCross = normalizar(itensPedidosCross[0].fornecedor);
+                // NOVA REGRA APLICADA:
+                fornCross = extrairEntidadePrincipal(itensPedidosCross[0].fornecedor, itensPedidosCross[0].fabricante);
               }
 
               const indicesItensValidos = [];
               itensEntrada.forEach((item, idx) => {
                 const nfEnt = normalizar(item.nf_entrada);
-                const fornEnt = normalizar(item.fornecedor);
+                // NOVA REGRA APLICADA:
+                const fornEnt = extrairEntidadePrincipal(item.fornecedor, item.fabricante);
                 
+                // Match visual garantido
                 if (nfEnt === nfCrossLimpa && fornEnt === fornCross) {
                   indicesItensValidos.push(idx);
                 }
@@ -741,7 +756,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     nome_projeto: item.nome_projeto,
                     centro: item.centro,
                     deposito: item.deposito,
-                    // ✨ PRESERVA A ALOCAÇÃO ORIGINAL
                     alocacao: item.alocacao || '-', 
                   };
                 });
@@ -791,7 +805,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                       nome_projeto: itemEnt.nome_projeto,
                       centro: itemEnt.centro,
                       deposito: itemEnt.deposito,
-                      // ✨ PRESERVA A ALOCAÇÃO ORIGINAL
                       alocacao: itemEnt.alocacao || pedido.alocacao || '-',
                     });
 
@@ -832,14 +845,16 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const nfRecord = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
         let nfCross = normalizar(nfRecord ? nfRecord.numero_nf : '');
 
+        // NOVA REGRA APLICADA:
         let fornCross = '';
         const matchForn = solicitacao.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
-        if (matchForn) fornCross = normalizar(matchForn[1]);
+        if (matchForn) fornCross = extrairEntidadePrincipal(matchForn[1], '');
 
         let itensCross = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
 
         if (!nfCross && itensCross.length > 0) nfCross = normalizar(itensCross[0].nf_entrada);
-        if (!fornCross && itensCross.length > 0) fornCross = normalizar(itensCross[0].fornecedor);
+        // NOVA REGRA APLICADA:
+        if (!fornCross && itensCross.length > 0) fornCross = extrairEntidadePrincipal(itensCross[0].fornecedor, itensCross[0].fabricante);
 
         const obs = String(solicitacao.observacoes || '');
         const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (itensCross.length > 0 && !/sa[íi]da\s+total/i.test(obs));
@@ -850,7 +865,11 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
         const estoqueValido = candidatosEstoque.filter(e => {
           const bateuNF = normalizar(e.nf_entrada) === nfCross;
-          const bateuForn = fornCross ? normalizar(e.fornecedor) === fornCross : true;
+          
+          // NOVA REGRA APLICADA AO FILTRAR ESTOQUE EXISTENTE:
+          const entidadeEstoque = extrairEntidadePrincipal(e.fornecedor, e.fabricante);
+          const bateuForn = fornCross ? entidadeEstoque === fornCross : true;
+          
           return bateuNF && bateuForn && Number(e.quantidade_disponivel || 0) > 0;
         });
 
@@ -875,7 +894,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               nome_projeto: e.nome_projeto,
               centro: e.centro,
               deposito: e.deposito,
-              // ✨ PRESERVA A ALOCAÇÃO ORIGINAL DO ESTOQUE
               alocacao: e.alocacao || '-',
             }));
 
@@ -920,7 +938,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 nome_projeto: itemEstoque.nome_projeto,
                 centro: itemEstoque.centro,
                 deposito: itemEstoque.deposito,
-                // ✨ PRESERVA A ALOCAÇÃO ORIGINAL DO ESTOQUE
                 alocacao: itemEstoque.alocacao || itemPedido.alocacao || '-'
               });
 
