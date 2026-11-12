@@ -10,7 +10,8 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
-import { formatarWBS, normalizarString } from '../../../utils/formatadores';
+// IMPORTAÇÃO ATUALIZADA AQUI:
+import { formatarWBS, normalizarString, extrairEntidadePrincipal } from '../../../utils/formatadores';
 
 import './Crossdocking.css';
 
@@ -93,8 +94,8 @@ export default function Crossdocking() {
         return;
       }
 
-      // ✨ FIM DO ERRO DO FORNECEDOR CORTADO: Gravar o nome exatamente como o cliente digita
-      const fornecedorProcessado = normalizarString(formDados.fornecedor);
+      // ✨ NOVA REGRA APLICADA: Extração apenas do Primeiro Nome do Fornecedor (O fallback de fabricante vai vazio pois não há esse campo aqui)
+      const fornecedorProcessado = extrairEntidadePrincipal(formDados.fornecedor, '');
       const nfProcessada = normalizarString(formDados.nf);
 
       const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
