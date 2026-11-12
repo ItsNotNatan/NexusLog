@@ -12,7 +12,8 @@ import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaI
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
-import { normalizarString } from '../../../utils/formatadores';
+// IMPORTAÇÃO ATUALIZADA AQUI:
+import { normalizarString, extrairEntidadePrincipal } from '../../../utils/formatadores';
 
 const LIMITE_LOGISTICA = 100;
 
@@ -358,7 +359,8 @@ export default function EntradaEstoque() {
     itens.forEach(linhaTabela => {
       const nfTab = normalizarString(linhaTabela.nfEntrada);
       const sapTab = normalizarString(linhaTabela.desenhoSAP);
-      const fornTab = normalizarString(linhaTabela.fornecedor);
+      // NOVA REGRA APLICADA:
+      const fornTab = extrairEntidadePrincipal(linhaTabela.fornecedor, linhaTabela.fabricante);
 
       if (!nfTab || !fornTab) return;
 
@@ -367,15 +369,19 @@ export default function EntradaEstoque() {
         
         let fornCross = '';
         if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
-          fornCross = normalizarString(cross.itens[0].fornecedor);
+          // NOVA REGRA APLICADA:
+          fornCross = extrairEntidadePrincipal(cross.itens[0].fornecedor, cross.itens[0].fabricante);
         }
         if (!fornCross && cross.observacoes) {
           const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) fornCross = normalizarString(matchForn[1]);
+          // NOVA REGRA APLICADA (Fallback vazio):
+          if (matchForn) fornCross = extrairEntidadePrincipal(matchForn[1], '');
         }
 
-        // Se bater NF e Fornecedor
-        if (nfTab === nfCross && fornTab === fornCross) {
+        // Se bater NF e Fornecedor extraído
+        const bateuForn = fornCross ? fornTab === fornCross : true;
+
+        if (nfTab === nfCross && bateuForn) {
           const obs = String(cross.observacoes || '');
           const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
 
