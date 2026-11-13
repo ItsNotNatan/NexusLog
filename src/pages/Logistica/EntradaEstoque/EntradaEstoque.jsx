@@ -12,7 +12,8 @@ import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaI
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
-import { normalizarString } from '../../../utils/formatadores';
+// ✨ IMPORTAÇÃO ATUALIZADA: Traz a nova função extrairEntidadePrincipal
+import { normalizarString, extrairEntidadePrincipal } from '../../../utils/formatadores';
 
 const LIMITE_LOGISTICA = 100;
 
@@ -350,7 +351,7 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ MATCH VISUAL REFORÇADO (O CORAÇÃO DA SOLUÇÃO DO PROBLEMA 1)
+  // ✨ MATCH VISUAL REFORÇADO (O CORAÇÃO DA SOLUÇÃO)
   const { idsLinhasCrossdocking, solicitacoesCrossEncontradas } = useMemo(() => {
     const idsMarcados = new Set();
     const mapSolicitacoes = new Map();
@@ -358,24 +359,26 @@ export default function EntradaEstoque() {
     itens.forEach(linhaTabela => {
       const nfTab = normalizarString(linhaTabela.nfEntrada);
       const sapTab = normalizarString(linhaTabela.desenhoSAP);
-      const fornTab = normalizarString(linhaTabela.fornecedor);
+      
+      // 🚀 NOVA REGRA: Extração com Fallback para Fabricante
+      const entidadeTab = extrairEntidadePrincipal(linhaTabela.fornecedor, linhaTabela.fabricante);
 
-      if (!nfTab || !fornTab) return;
+      if (!nfTab || !entidadeTab) return;
 
       crossdockingsPendentes.forEach(cross => {
         const nfCross = normalizarString(cross.nfCrossdocking);
         
-        let fornCross = '';
-        if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
-          fornCross = normalizarString(cross.itens[0].fornecedor);
+        let entidadeCross = '';
+        if (cross.itens && cross.itens.length > 0) {
+          entidadeCross = extrairEntidadePrincipal(cross.itens[0].fornecedor, cross.itens[0].fabricante);
         }
-        if (!fornCross && cross.observacoes) {
+        if (!entidadeCross && cross.observacoes) {
           const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) fornCross = normalizarString(matchForn[1]);
+          if (matchForn) entidadeCross = extrairEntidadePrincipal(matchForn[1], '');
         }
 
-        // Se bater NF e Fornecedor
-        if (nfTab === nfCross && fornTab === fornCross) {
+        // Se bater NF e Entidade (Primeiro nome)
+        if (nfTab === nfCross && entidadeTab === entidadeCross) {
           const obs = String(cross.observacoes || '');
           const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
 
@@ -391,12 +394,12 @@ export default function EntradaEstoque() {
 
             if (bateuSap) {
               idsMarcados.add(linhaTabela.id);
-              mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: fornCross, isParcial: true });
+              mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: entidadeCross, isParcial: true });
             }
           } else {
-            // Se for Total, aprova tudo o que partilhar a mesma NF e Fornecedor
+            // Se for Total, aprova tudo o que partilhar a mesma NF e Entidade
             idsMarcados.add(linhaTabela.id);
-            mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: fornCross, isParcial: false });
+            mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: entidadeCross, isParcial: false });
           }
         }
       });
