@@ -12,8 +12,9 @@ import TabelaInsercaoItens from '../../../components/TabelaInsercaoItens/TabelaI
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
-// ✨ IMPORTAÇÃO ATUALIZADA: Traz a nova função extrairEntidadePrincipal
-import { normalizarString, extrairEntidadePrincipal } from '../../../utils/formatadores';
+
+// 🚀 Trazemos as nossas funções utilitárias
+import { normalizarString, extrairPrimeiraPalavra, compararEntidade } from '../../../utils/formatadores';
 
 const LIMITE_LOGISTICA = 100;
 
@@ -351,7 +352,7 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ MATCH VISUAL REFORÇADO (O CORAÇÃO DA SOLUÇÃO)
+  // ✨ MATCH VISUAL REFORÇADO E LÓGICA DE CRUZAMENTO (OR: Fornecedor / Fabricante)
   const { idsLinhasCrossdocking, solicitacoesCrossEncontradas } = useMemo(() => {
     const idsMarcados = new Set();
     const mapSolicitacoes = new Map();
@@ -359,34 +360,35 @@ export default function EntradaEstoque() {
     itens.forEach(linhaTabela => {
       const nfTab = normalizarString(linhaTabela.nfEntrada);
       const sapTab = normalizarString(linhaTabela.desenhoSAP);
-      
-      // 🚀 NOVA REGRA: Extração com Fallback para Fabricante
-      const entidadeTab = extrairEntidadePrincipal(linhaTabela.fornecedor, linhaTabela.fabricante);
 
-      if (!nfTab || !entidadeTab) return;
+      if (!nfTab) return; // Se a linha de entrada não tem NF, pula logo
 
       crossdockingsPendentes.forEach(cross => {
         const nfCross = normalizarString(cross.nfCrossdocking);
         
-        let entidadeCross = '';
-        if (cross.itens && cross.itens.length > 0) {
-          entidadeCross = extrairEntidadePrincipal(cross.itens[0].fornecedor, cross.itens[0].fabricante);
+        let fornCross = '';
+        if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
+          fornCross = cross.itens[0].fornecedor;
         }
-        if (!entidadeCross && cross.observacoes) {
+        if (!fornCross && cross.observacoes) {
           const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) entidadeCross = extrairEntidadePrincipal(matchForn[1], '');
+          if (matchForn) fornCross = matchForn[1];
         }
 
-        // Se bater NF e Entidade (Primeiro nome)
-        if (nfTab === nfCross && entidadeTab === entidadeCross) {
+        // 🚀 VERIFICAÇÃO DUPLA: Bateu NF? E a entidade que o cliente pediu (fornCross)
+        // é a mesma que o Fornecedor OU Fabricante digitado na linha da tabela?
+        const bateuNF = nfTab === nfCross;
+        const bateuEntidade = compararEntidade(fornCross, linhaTabela.fornecedor, linhaTabela.fabricante);
+
+        if (bateuNF && bateuEntidade) {
           const obs = String(cross.observacoes || '');
           const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
 
           if (isParcial) {
-            if (!sapTab) return;
+            if (!sapTab) return; // Se a linha de entrada não tem SAP, não é aprovada na Parcial
             const itensCross = cross.itens || [];
             
-            // Só pinta de azul se a linha bater com um SAP solicitado
+            // Só pinta a linha se ela bater com o SAP específico que o cliente pediu
             const bateuSap = itensCross.some(ic => {
               const sapCross = normalizarString(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP);
               return sapCross && sapCross === sapTab;
@@ -394,12 +396,12 @@ export default function EntradaEstoque() {
 
             if (bateuSap) {
               idsMarcados.add(linhaTabela.id);
-              mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: entidadeCross, isParcial: true });
+              mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: extrairPrimeiraPalavra(fornCross), isParcial: true });
             }
           } else {
-            // Se for Total, aprova tudo o que partilhar a mesma NF e Entidade
+            // Se for Total, aprova tudo o que partilhar a mesma NF e Entidade (Não precisa de SAP)
             idsMarcados.add(linhaTabela.id);
-            mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: entidadeCross, isParcial: false });
+            mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: extrairPrimeiraPalavra(fornCross), isParcial: false });
           }
         }
       });
@@ -460,7 +462,7 @@ export default function EntradaEstoque() {
                   {solicitacoesCrossEncontradas.length} Solicitação(ões) de Crossdocking Reconhecida(s)
                 </strong>
                 <span style={{ fontSize: '0.825rem', color: '#475569' }}>
-                  Os materiais abaixo coincidiram rigorosamente com NF, Fornecedor e Desenho SAP.
+                  Os materiais abaixo coincidiram rigorosamente com a NF e a Entidade correspondente.
                 </span>
               </div>
             </div>
