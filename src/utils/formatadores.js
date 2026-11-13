@@ -58,23 +58,28 @@ export const normalizarString = (txt) => {
 };
 
 /**
- * Extrai a entidade principal (Fornecedor ou Fabricante).
- * Regra: Utiliza o fallback se fornecedor for inválido, e extrai apenas
- * a primeira palavra (mantendo os hífens intactos, cortando no espaço).
+ * Extrai apenas a primeira palavra de um texto, mantendo os hífens intactos.
  */
-export const extrairEntidadePrincipal = (fornecedor, fabricante) => {
-  let entidade = fornecedor;
-
-  // Fallback Inteligente: Se fornecedor vier vazio, nulo, ou apenas traços
-  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
-    entidade = fabricante;
-  }
-
-  // Se o fabricante também for inválido, retorna vazio
-  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+export const extrairPrimeiraPalavra = (texto) => {
+  if (!texto || typeof texto !== 'string' || texto.trim() === '' || /^[-]+$/.test(texto.trim())) {
     return '';
   }
-
   // Limpa os espaços, passa para maiúsculas e extrai a primeira palavra cortando pelos espaços
-  return entidade.trim().toUpperCase().split(/\s+/)[0];
+  return texto.trim().toUpperCase().split(/\s+/)[0];
+};
+
+/**
+ * Lógica do Match de Entidades: 
+ * Verifica se a primeira palavra da Entidade Procurada (o que o cliente pediu) 
+ * é IGUAL à primeira palavra do Fornecedor OU do Fabricante da linha de entrada.
+ */
+export const compararEntidade = (nomeProcurado, fornecedorLinha, fabricanteLinha) => {
+  const procurado = extrairPrimeiraPalavra(nomeProcurado);
+  if (!procurado) return false;
+  
+  const forn = extrairPrimeiraPalavra(fornecedorLinha);
+  const fab = extrairPrimeiraPalavra(fabricanteLinha);
+  
+  // Se bateu com o fornecedor OU bateu com o fabricante, o Match é válido.
+  return procurado === forn || procurado === fab;
 };
