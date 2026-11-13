@@ -10,7 +10,8 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
-import { formatarWBS, normalizarString } from '../../../utils/formatadores';
+// ✨ IMPORTAÇÃO ATUALIZADA: Nova função extrairEntidadePrincipal
+import { formatarWBS, normalizarString, extrairEntidadePrincipal } from '../../../utils/formatadores';
 
 import './Crossdocking.css';
 
@@ -93,8 +94,8 @@ export default function Crossdocking() {
         return;
       }
 
-      // ✨ FIM DO ERRO DO FORNECEDOR CORTADO: Gravar o nome exatamente como o cliente digita
-      const fornecedorProcessado = normalizarString(formDados.fornecedor);
+      // 🚀 NOVA REGRA: Gravar o nome extraído (apenas primeira palavra validada)
+      const entidadeProcessada = extrairEntidadePrincipal(formDados.fornecedor, '');
       const nfProcessada = normalizarString(formDados.nf);
 
       const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
@@ -102,13 +103,14 @@ export default function Crossdocking() {
         quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
         unidade_medida_manual: 'Unid',
         nf_entrada: nfProcessada,
-        fornecedor: fornecedorProcessado 
+        fornecedor: entidadeProcessada // Grava a entidade limpa
       }));
 
       const payload = {
         solicitante: {
           nome: formDados.nome, wbs: formDados.wbs, nf: nfProcessada, destino: formDados.destino, 
-          observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${fornecedorProcessado}] ${formDados.observacoes}`,
+          // A observação fica limpa com o nome da entidade principal
+          observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${entidadeProcessada}] ${formDados.observacoes}`,
           tipo: 'Crossdocking', filial_origem: estoqueAtual 
         },
         itens: listaItensFinais, anexos: anexosProcessados 
