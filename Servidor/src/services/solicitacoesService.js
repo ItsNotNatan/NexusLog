@@ -36,16 +36,22 @@ const formatarDataBrasil = (isoString) => {
 
 const normalizar = (txt) => String(txt || '').trim().replace(/\s+/g, ' ').toUpperCase();
 
-// ✨ Função espelho do frontend para garantir o match triplo no backend
-const extrairEntidadePrincipal = (fornecedor, fabricante) => {
-  let entidade = fornecedor;
-  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
-    entidade = fabricante;
-  }
-  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+// 🚀 FUNÇÕES DE MATCH NO SERVIDOR (Espelho do Frontend)
+const extrairPrimeiraPalavra = (texto) => {
+  if (!texto || typeof texto !== 'string' || texto.trim() === '' || /^[-]+$/.test(texto.trim())) {
     return '';
   }
-  return entidade.trim().toUpperCase().split(/\s+/)[0];
+  return texto.trim().toUpperCase().split(/\s+/)[0];
+};
+
+const compararEntidade = (nomeProcurado, fornecedorLinha, fabricanteLinha) => {
+  const procurado = extrairPrimeiraPalavra(nomeProcurado);
+  if (!procurado) return false;
+  
+  const forn = extrairPrimeiraPalavra(fornecedorLinha);
+  const fab = extrairPrimeiraPalavra(fabricanteLinha);
+  
+  return procurado === forn || procurado === fab;
 };
 
 const solicitacaoParaFront = (r) => ({
@@ -698,10 +704,9 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               const nfRec = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
               let nfCrossLimpa = normalizar(nfRec ? nfRec.numero_nf : '');
 
-              // 🚀 NOVA REGRA NO BACKEND: Aprovação de Entrada -> Extração inteligente
               let fornCross = '';
               const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]|\n]+)/i);
-              if (matchForn) fornCross = extrairEntidadePrincipal(matchForn[1], '');
+              if (matchForn) fornCross = matchForn[1];
 
               const itensPedidosCross = await db.listar('solicitacoes_itens', {
                 filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
@@ -711,15 +716,18 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 nfCrossLimpa = normalizar(itensPedidosCross[0].nf_entrada);
               }
               if (!fornCross && itensPedidosCross.length > 0) {
-                fornCross = extrairEntidadePrincipal(itensPedidosCross[0].fornecedor, itensPedidosCross[0].fabricante);
+                fornCross = itensPedidosCross[0].fornecedor;
               }
 
               const indicesItensValidos = [];
               itensEntrada.forEach((item, idx) => {
                 const nfEnt = normalizar(item.nf_entrada);
-                const fornEnt = extrairEntidadePrincipal(item.fornecedor, item.fabricante);
                 
-                if (nfEnt === nfCrossLimpa && fornEnt && fornEnt === fornCross) {
+                // 🚀 NOVA REGRA: Compara com a nossa função cruzada (fornecedor OU fabricante da entrada)
+                const bateuNF = nfEnt === nfCrossLimpa;
+                const bateuEntidade = compararEntidade(fornCross, item.fornecedor, item.fabricante);
+                
+                if (bateuNF && bateuEntidade) {
                   indicesItensValidos.push(idx);
                 }
               });
@@ -842,17 +850,16 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const nfRecord = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
         let nfCross = normalizar(nfRecord ? nfRecord.numero_nf : '');
 
-        // 🚀 NOVA REGRA NO BACKEND: Aprovação do Crossdocking -> Extração Inteligente
         let fornCross = '';
         const matchForn = solicitacao.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
-        if (matchForn) fornCross = extrairEntidadePrincipal(matchForn[1], '');
+        if (matchForn) fornCross = matchForn[1];
 
         let itensCross = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
 
         if (!nfCross && itensCross.length > 0) nfCross = normalizar(itensCross[0].nf_entrada);
         
         if (!fornCross && itensCross.length > 0) {
-          fornCross = extrairEntidadePrincipal(itensCross[0].fornecedor, itensCross[0].fabricante);
+          fornCross = itensCross[0].fornecedor;
         }
 
         const obs = String(solicitacao.observacoes || '');
@@ -865,11 +872,10 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const estoqueValido = candidatosEstoque.filter(e => {
           const bateuNF = normalizar(e.nf_entrada) === nfCross;
           
-          // 🚀 NOVA REGRA: Compara com o extrairEntidadePrincipal para ignorar hífens sujos e acionar fallback do Fabricante
-          const fornFisico = extrairEntidadePrincipal(e.fornecedor, e.fabricante);
-          const bateuForn = fornCross ? (fornFisico === fornCross) : true;
+          // 🚀 NOVA REGRA: Compara cruzado no estoque (Fornecedor OU Fabricante)
+          const bateuEntidade = fornCross ? compararEntidade(fornCross, e.fornecedor, e.fabricante) : true;
           
-          return bateuNF && bateuForn && Number(e.quantidade_disponivel || 0) > 0;
+          return bateuNF && bateuEntidade && Number(e.quantidade_disponivel || 0) > 0;
         });
 
         if (!isParcial) {
