@@ -10,8 +10,8 @@ import { AuthContext } from '../../../contexts/AuthContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
-// ✨ IMPORTAÇÃO ATUALIZADA: Nova função extrairEntidadePrincipal
-import { formatarWBS, normalizarString, extrairEntidadePrincipal } from '../../../utils/formatadores';
+// Importação da função de extração da primeira palavra
+import { formatarWBS, normalizarString, extrairPrimeiraPalavra } from '../../../utils/formatadores';
 
 import './Crossdocking.css';
 
@@ -94,8 +94,8 @@ export default function Crossdocking() {
         return;
       }
 
-      // 🚀 NOVA REGRA: Gravar o nome extraído (apenas primeira palavra validada)
-      const entidadeProcessada = extrairEntidadePrincipal(formDados.fornecedor, '');
+      // 🚀 NOVA REGRA: Salva na base de dados apenas a primeira palavra da Entidade requisitada
+      const entidadeProcessada = extrairPrimeiraPalavra(formDados.fornecedor);
       const nfProcessada = normalizarString(formDados.nf);
 
       const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
@@ -103,13 +103,12 @@ export default function Crossdocking() {
         quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
         unidade_medida_manual: 'Unid',
         nf_entrada: nfProcessada,
-        fornecedor: entidadeProcessada // Grava a entidade limpa
+        fornecedor: entidadeProcessada // Grava a primeira palavra limpa
       }));
 
       const payload = {
         solicitante: {
           nome: formDados.nome, wbs: formDados.wbs, nf: nfProcessada, destino: formDados.destino, 
-          // A observação fica limpa com o nome da entidade principal
           observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${entidadeProcessada}] ${formDados.observacoes}`,
           tipo: 'Crossdocking', filial_origem: estoqueAtual 
         },
