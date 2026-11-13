@@ -36,6 +36,18 @@ const formatarDataBrasil = (isoString) => {
 
 const normalizar = (txt) => String(txt || '').trim().replace(/\s+/g, ' ').toUpperCase();
 
+// ✨ Função espelho do frontend para garantir o match triplo no backend
+const extrairEntidadePrincipal = (fornecedor, fabricante) => {
+  let entidade = fornecedor;
+  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+    entidade = fabricante;
+  }
+  if (!entidade || typeof entidade !== 'string' || entidade.trim() === '' || /^[-]+$/.test(entidade.trim())) {
+    return '';
+  }
+  return entidade.trim().toUpperCase().split(/\s+/)[0];
+};
+
 const solicitacaoParaFront = (r) => ({
   ...r,
   observacoes_logistica: db.txt(r.observacoes_logistica),
@@ -686,9 +698,10 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               const nfRec = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: cross.id }));
               let nfCrossLimpa = normalizar(nfRec ? nfRec.numero_nf : '');
 
+              // 🚀 NOVA REGRA NO BACKEND: Aprovação de Entrada -> Extração inteligente
               let fornCross = '';
               const matchForn = cross.observacoes?.match(/Fornecedor:\s*([^\]|\n]+)/i);
-              if (matchForn) fornCross = normalizar(matchForn[1]);
+              if (matchForn) fornCross = extrairEntidadePrincipal(matchForn[1], '');
 
               const itensPedidosCross = await db.listar('solicitacoes_itens', {
                 filter: db.f('solicitacao_id = {:sid}', { sid: cross.id }),
@@ -698,15 +711,15 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 nfCrossLimpa = normalizar(itensPedidosCross[0].nf_entrada);
               }
               if (!fornCross && itensPedidosCross.length > 0) {
-                fornCross = normalizar(itensPedidosCross[0].fornecedor);
+                fornCross = extrairEntidadePrincipal(itensPedidosCross[0].fornecedor, itensPedidosCross[0].fabricante);
               }
 
               const indicesItensValidos = [];
               itensEntrada.forEach((item, idx) => {
                 const nfEnt = normalizar(item.nf_entrada);
-                const fornEnt = normalizar(item.fornecedor);
+                const fornEnt = extrairEntidadePrincipal(item.fornecedor, item.fabricante);
                 
-                if (nfEnt === nfCrossLimpa && fornEnt === fornCross) {
+                if (nfEnt === nfCrossLimpa && fornEnt && fornEnt === fornCross) {
                   indicesItensValidos.push(idx);
                 }
               });
@@ -740,7 +753,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                     nome_projeto: item.nome_projeto,
                     centro: item.centro,
                     deposito: item.deposito,
-                    // ✨ PRESERVA A ALOCAÇÃO ORIGINAL
                     alocacao: item.alocacao || '-', 
                   };
                 });
@@ -790,7 +802,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                       nome_projeto: itemEnt.nome_projeto,
                       centro: itemEnt.centro,
                       deposito: itemEnt.deposito,
-                      // ✨ PRESERVA A ALOCAÇÃO ORIGINAL
                       alocacao: itemEnt.alocacao || pedido.alocacao || '-',
                     });
 
@@ -798,7 +809,7 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                       const qtdPedida = Number(pedido.quantidade_solicitada || 0);
                       const qtdDisp = Number(itemEstoqueCriado.quantidade_disponivel || 0);
                       const novoSaldo = Math.max(0, qtdDisp - qtdPedida);
-                       
+                        
                       await db.atualizar('estoque', itemEstoqueCriado.id, {
                         quantidade_disponivel: novoSaldo,
                         status: novoSaldo <= 0 ? 'Zerado' : 'Disponível'
@@ -831,14 +842,18 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
         const nfRecord = await db.um('notas_fiscais', db.f('solicitacao_id = {:sid}', { sid: id }));
         let nfCross = normalizar(nfRecord ? nfRecord.numero_nf : '');
 
+        // 🚀 NOVA REGRA NO BACKEND: Aprovação do Crossdocking -> Extração Inteligente
         let fornCross = '';
         const matchForn = solicitacao.observacoes?.match(/Fornecedor:\s*([^\]]+)/i);
-        if (matchForn) fornCross = normalizar(matchForn[1]);
+        if (matchForn) fornCross = extrairEntidadePrincipal(matchForn[1], '');
 
         let itensCross = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
 
         if (!nfCross && itensCross.length > 0) nfCross = normalizar(itensCross[0].nf_entrada);
-        if (!fornCross && itensCross.length > 0) fornCross = normalizar(itensCross[0].fornecedor);
+        
+        if (!fornCross && itensCross.length > 0) {
+          fornCross = extrairEntidadePrincipal(itensCross[0].fornecedor, itensCross[0].fabricante);
+        }
 
         const obs = String(solicitacao.observacoes || '');
         const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (itensCross.length > 0 && !/sa[íi]da\s+total/i.test(obs));
@@ -849,7 +864,10 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
 
         const estoqueValido = candidatosEstoque.filter(e => {
           const bateuNF = normalizar(e.nf_entrada) === nfCross;
-          const bateuForn = fornCross ? normalizar(e.fornecedor) === fornCross : true;
+          
+          // 🚀 NOVA REGRA: Compara com o extrairEntidadePrincipal para ignorar hífens sujos e acionar fallback do Fabricante
+          const fornFisico = extrairEntidadePrincipal(e.fornecedor, e.fabricante);
+          const bateuForn = fornCross ? (fornFisico === fornCross) : true;
           
           return bateuNF && bateuForn && Number(e.quantidade_disponivel || 0) > 0;
         });
@@ -875,7 +893,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
               nome_projeto: e.nome_projeto,
               centro: e.centro,
               deposito: e.deposito,
-              // ✨ PRESERVA A ALOCAÇÃO ORIGINAL DO ESTOQUE
               alocacao: e.alocacao || '-',
             }));
 
@@ -920,7 +937,6 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
                 nome_projeto: itemEstoque.nome_projeto,
                 centro: itemEstoque.centro,
                 deposito: itemEstoque.deposito,
-                // ✨ PRESERVA A ALOCAÇÃO ORIGINAL DO ESTOQUE
                 alocacao: itemEstoque.alocacao || itemPedido.alocacao || '-'
               });
 
