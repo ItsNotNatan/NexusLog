@@ -556,6 +556,80 @@ const cancelarPL = async (solicitante, anexos) => {
   return salvarNoBanco(dados, itensDB, anexos);
 };
 
+// ===============================================
+// NOVAS FUNÇÕES PARA ROBÓTICA E GENERAL STOCK
+// ===============================================
+
+const criarRobotica = async (solicitante, itens, anexos) => {
+  const dados = {
+    tipo: 'Robótica',
+    nome_solicitante: solicitante.nome,
+    wbs_destino: solicitante.wbs,
+    destino: solicitante.destino,
+    data_necessidade: solicitante.dataNecessidade || null,
+    observacoes: solicitante.observacoes,
+    entrega_urgente: solicitante.entregaUrgente || false,
+    status: 'Pendente',
+    filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
+  };
+
+  const itensDB = itens.map((i) => ({
+    estoque_id: limparIdEstoque(i.estoque_id || i.id),
+    desenho_sap_manual: i.desenhoSAP || i.desenho_sap || null,
+    part_number_manual: i.numPecaFabricante || i.part_number || null,
+    fabricante: i.fabricante || null, 
+    descricao_manual: limitarTexto(i.materialDescription || i.descricao || 'Sem descrição'),
+    quantidade_solicitada: Math.max(1, Number(i.qtdSelecionada || i.quantidade || 1)),
+    unidade_medida_manual: i.unidadeMedida || i.unidade_medida || 'Unid',
+    fornecedor: i.fornecedor || null,
+    referencia: i.referencia || null,
+    wbs_element: i.wbs || i.wbs_element || null,
+    alocacao: i.alocacao || null,
+    nf_entrada: i.nf_entrada || i.nfEntrada || i.nf || null,
+    valor_unitario_manual: limparValor(i.valor_unitario || i.poNetPrice || i.val),
+    centro: i.centro || null,
+    deposito: i.deposito || null,
+    documento_compras: i.documento_compras || i.docCompras || null,
+  }));
+
+  return salvarNoBanco(dados, itensDB, anexos);
+};
+
+const criarGeneralStock = async (solicitante, itens, anexos) => {
+  const dados = {
+    tipo: 'General Stock',
+    nome_solicitante: solicitante.nome,
+    wbs_destino: solicitante.wbs,
+    destino: solicitante.destino,
+    data_necessidade: solicitante.dataNecessidade || null,
+    observacoes: solicitante.observacoes,
+    entrega_urgente: solicitante.entregaUrgente || false,
+    status: 'Pendente',
+    filial_origem_id: solicitante.filial_origem || solicitante.filial_id,
+  };
+
+  const itensDB = itens.map((i) => ({
+    estoque_id: limparIdEstoque(i.estoque_id || i.id),
+    desenho_sap_manual: i.desenhoSAP || i.desenho_sap || null,
+    part_number_manual: i.numPecaFabricante || i.part_number || null,
+    fabricante: i.fabricante || null, 
+    descricao_manual: limitarTexto(i.materialDescription || i.descricao || 'Sem descrição'),
+    quantidade_solicitada: Math.max(1, Number(i.qtdSelecionada || i.quantidade || 1)),
+    unidade_medida_manual: i.unidadeMedida || i.unidade_medida || 'Unid',
+    fornecedor: i.fornecedor || null,
+    referencia: i.referencia || null,
+    wbs_element: i.wbs || i.wbs_element || null,
+    alocacao: i.alocacao || null,
+    nf_entrada: i.nf_entrada || i.nfEntrada || i.nf || null,
+    valor_unitario_manual: limparValor(i.valor_unitario || i.poNetPrice || i.val),
+    centro: i.centro || null,
+    deposito: i.deposito || null,
+    documento_compras: i.documento_compras || i.docCompras || null,
+  }));
+
+  return salvarNoBanco(dados, itensDB, anexos);
+};
+
 const criarPackingList = async (solicitacaoId, status) =>
   db.emFila(async () => {
     const jaExiste = await db.um(
@@ -965,9 +1039,9 @@ const atualizarStatus = async (id, statusRecebido, motivoRecusa, numeroPL) => {
     }
 
     // =========================================================================
-    // CENÁRIO 3: SAÍDA DE MATERIAL OU TRANSFERÊNCIA WBS
+    // CENÁRIO 3: SAÍDA DE MATERIAL, TRANSFERÊNCIA WBS, ROBÓTICA OU GENERAL STOCK
     // =========================================================================
-    else if (solicitacao.tipo === 'Material' || solicitacao.tipo === 'Transferencia WBS') {
+    else if (solicitacao.tipo === 'Material' || solicitacao.tipo === 'Transferencia WBS' || solicitacao.tipo === 'Robótica' || solicitacao.tipo === 'General Stock') {
       const itensPedidos = await db.listar('solicitacoes_itens', { filter: db.f('solicitacao_id = {:sid}', { sid: id }) });
 
       for (const item of itensPedidos) {
@@ -1205,4 +1279,5 @@ module.exports = {
   listarSolicitacoes, obterSolicitacaoDetalhada, criarMaterial, criarTransferencia, criarEntrada, atualizarLocalizacao,
   criarCrossdocking, criarNotaFiscal, criarReintegracao, cancelarPL, atualizarStatus, atualizarObservacoesLogistica, deletarAnexo, reverterItemParaEstoque,
   buscarHistoricoItem, salvarAnexosExtras, atualizarItensDaSolicitacao, listarDemandasPorEstoque,
+  criarRobotica, criarGeneralStock
 };
