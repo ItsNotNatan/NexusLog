@@ -783,7 +783,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <HeaderOrdenavel coluna="solicitante" label="SOLICITANTE / WBS" />
                 <HeaderOrdenavel coluna="pl" label="Nº DA PL" />
                 
-                {/* ✨ DATA NECESSIDADE ENTRE PL E DE ➔ PARA */}
                 <HeaderOrdenavel coluna="dataNecessidadeOriginal" label="DATA NECESSIDADE" />
                 
                 <HeaderOrdenavel coluna="destino" label="DE ➔ PARA" />
