@@ -5,7 +5,7 @@
 const db = require('../db');
 
 // Tipos de solicitacao que "seguram" material enquanto estao pendentes.
-const TIPOS_QUE_RESERVAM = ['Material', 'Transferencia WBS', 'Transfer. WBS', 'Crossdocking'];
+const TIPOS_QUE_RESERVAM = ['Material', 'Transferencia WBS', 'Transfer. WBS', 'Crossdocking', 'Robótica', 'General Stock'];
 
 // Datas do estoque que precisam voltar como ISO (ou null) para o front.
 const paraFront = (r) => ({
