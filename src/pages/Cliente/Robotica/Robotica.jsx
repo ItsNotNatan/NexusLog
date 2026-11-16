@@ -59,7 +59,7 @@ export default function Robotica() {
         anexos: anexosSalvos
       };
 
-      // 3. ENVIO PARA O BACKEND (Padrão correto do apiFetch)
+      // 3. ENVIO PARA O BACKEND
       const resultado = await apiFetch('/solicitacoes/robotica', {
         method: 'POST',
         body: JSON.stringify(payload)
