@@ -109,6 +109,8 @@ const criarCrossdocking = (req, res) => criarResposta(res, service.criarCrossdoc
 const criarNotaFiscal = (req, res) => criarResposta(res, service.criarNotaFiscal(req.body.solicitante, req.body.anexos));
 const criarReintegracao = (req, res) => criarResposta(res, service.criarReintegracao(req.body.solicitante, req.body.itens, req.body.anexos));
 const cancelarPL = (req, res) => criarResposta(res, service.cancelarPL(req.body.solicitante, req.body.anexos));
+const criarRobotica = (req, res) => criarResposta(res, service.criarRobotica(req.body.solicitante, req.body.itens, req.body.anexos));
+const criarGeneralStock = (req, res) => criarResposta(res, service.criarGeneralStock(req.body.solicitante, req.body.itens, req.body.anexos));
 
 const atualizarStatus = async (req, res) => {
   const { id } = req.params;
@@ -136,7 +138,6 @@ const adicionarAnexosExtras = async (req, res) => {
   }
 };
 
-// ✨ NOVO CONTROLADOR (OBSERVAÇÕES LOGÍSTICA)
 const atualizarObservacoesLogistica = async (req, res) => {
   try {
     await service.atualizarObservacoesLogistica(req.params.id, req.body.observacoes_logistica);
@@ -272,10 +273,12 @@ module.exports = {
   criarReintegracao,
   cancelarPL,
   atualizarStatus,
-  atualizarObservacoesLogistica, // ✨ EXPORTADO
+  atualizarObservacoesLogistica,
   removerAnexo,
   reverterItem,
   adicionarAnexosExtras,
   atualizarItens,
-  listarDemandasPorEstoque
+  listarDemandasPorEstoque,
+  criarRobotica,
+  criarGeneralStock
 };
