@@ -43,8 +43,10 @@ const renderBadgeStatus = (status) => {
 const obterClasseBadgeTipo = (tipo) => {
   switch (tipo) {
     case "Transfer. WBS":
-    case "Transferencia WBS": return "badge-tipo-amarelo";
-    case "Nota Fiscal": return "badge-tipo-roxo";
+    case "Transferencia WBS":
+    case "General Stock": return "badge-tipo-amarelo";
+    case "Nota Fiscal":
+    case "Robótica": return "badge-tipo-roxo";
     case "Entrada": return "badge-tipo-verde";
     case "Crossdocking": return "badge-tipo-ciano";
     case "Reintegração":
@@ -192,7 +194,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
   } catch (erro) { }
 
   const isOperador = String(usuarioLogado.cargo || '').toLowerCase().trim().includes('operador');
-  const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração"];
+  const listaFiltros = ["Todos", "Material", "Transfer. WBS", "Nota Fiscal", "Entrada", "Crossdocking", "Reintegração", "Robótica", "General Stock"];
 
   const mapEstoque = useMemo(() => {
     const map = {};
@@ -781,7 +783,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                 <HeaderOrdenavel coluna="solicitante" label="SOLICITANTE / WBS" />
                 <HeaderOrdenavel coluna="pl" label="Nº DA PL" />
                 
-                {/* ✨ NOVA ORDEM: DATA NECESSIDADE ENTRE PL E DE ➔ PARA */}
+                {/* ✨ DATA NECESSIDADE ENTRE PL E DE ➔ PARA */}
                 <HeaderOrdenavel coluna="dataNecessidadeOriginal" label="DATA NECESSIDADE" />
                 
                 <HeaderOrdenavel coluna="destino" label="DE ➔ PARA" />
@@ -804,15 +806,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                       <div className="skeleton-box" style={{ width: '60px', height: '14px' }}></div>
                     </td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '70px', height: '20px' }}></div></td>
-                    
-                    {/* ✨ Skeleton da Nova Coluna Data Necessidade na nova posição */}
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '70px', height: '14px' }}></div></td>
-
                     <td style={{ padding: '16px' }}>
                       <div className="skeleton-box" style={{ width: '90px', marginBottom: '8px', height: '20px' }}></div>
                       <div className="skeleton-box" style={{ width: '90px', height: '20px' }}></div>
                     </td>
-                    
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '80px', height: '14px' }}></div></td>
                     <td style={{ padding: '16px' }}><div className="skeleton-box" style={{ width: '100px', height: '28px', borderRadius: '999px' }}></div></td>
@@ -906,7 +904,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                           )}
                         </td>
 
-                        {/* ✨ CÉLULA DA NOVA COLUNA: DATA NECESSIDADE MOVIDA AQUI */}
                         <td className="texto-data" style={{ color: corTextoForte, fontWeight: '500' }}>
                           {linha.tipo === 'Material' 
                             ? (linha.dataNecessidadeFormatada !== "—" ? linha.dataNecessidadeFormatada : <span style={{ color: '#94a3b8' }}>Não informada</span>)
@@ -1014,7 +1011,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                         <tr>
                           <td colSpan="9" className="td-expandida" style={{ padding: 0 }}>
                             
-                            {/* DESTAQUE DA NF PARA CROSSDOCKING */}
                             {linha.tipo === 'Crossdocking' && (
                               <div style={{ padding: '24px 32px 12px 32px', backgroundColor: '#f8fafc' }}>
                                 <div style={{
@@ -1052,7 +1048,6 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                             {perfil === "logistica" && !isOperador && linha.statusExibicao !== 'Reintegrado' && linha.statusExibicao !== 'Cancelado' && (
                               <div style={{ padding: "0 32px 24px 32px", backgroundColor: "#f8fafc", display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                 
-                                {/* ✨ CAMPO DE OBSERVAÇÃO FUNCIONAL */}
                                 <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "24px" }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                                     <MessageSquare size={18} color="#0f172a" />
