@@ -21,6 +21,8 @@ router.post('/crossdocking', ctrl.criarCrossdocking);
 router.post('/nota-fiscal', ctrl.criarNotaFiscal);
 router.post('/reintegracao', ctrl.criarReintegracao);
 router.post('/cancelamento', ctrl.cancelarPL);
+router.post('/robotica', ctrl.criarRobotica);
+router.post('/general-stock', ctrl.criarGeneralStock);
 
 // ==========================================================
 // 🔴 ROTAS PROTEGIDAS (SÓ A LOGÍSTICA PODE USAR)
@@ -30,7 +32,7 @@ router.post('/:id/anexos', verificarToken, ctrl.adicionarAnexosExtras);
 router.patch('/:id/itens', verificarToken, ctrl.atualizarItens);
 router.patch('/:id/status', verificarToken, ctrl.atualizarStatus);
 router.patch('/:id/local', verificarToken, ctrl.atualizarLocalizacao);
-router.patch('/:id/observacoes-logistica', verificarToken, ctrl.atualizarObservacoesLogistica); // ✨ NOVA ROTA
+router.patch('/:id/observacoes-logistica', verificarToken, ctrl.atualizarObservacoesLogistica);
 router.delete('/anexo/:anexoId', verificarToken, ctrl.removerAnexo);
 
 router.get('/demandas/estoque/:estoqueId', ctrl.listarDemandasPorEstoque);
