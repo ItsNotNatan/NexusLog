@@ -85,6 +85,9 @@ export default function FiltroExportacaoModal({ aberto, onClose, filtros, setFil
                 <option value="Todos">Todos os Tipos</option>
                 <option value="Material">Material</option>
                 <option value="Entrada">Entrada</option>
+                {/* ✨ ADICIONADOS AQUI */}
+                <option value="Robótica">Robótica</option>
+                <option value="General Stock">General Stock</option>
               </select>
             </div>
           </div>
