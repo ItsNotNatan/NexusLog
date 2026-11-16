@@ -42,6 +42,11 @@ export default function TabelaDemandas({ dados = [] }) {
       case 'Cancelado': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1' }}><XCircle size={14}/> Estorno / Cancelado</span>;
       case 'Nota Fiscal': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #bfdbfe' }}><FileText size={14}/> Nota Fiscal</span>;
       case 'Edição Manual': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fffbeb', color: '#d97706', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde68a' }}><Edit size={14}/> Edição de Item</span>;
+      
+      // ✨ ADICIONADOS AQUI:
+      case 'Robótica': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#e0e7ff', color: '#4338ca', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #c7d2fe' }}><ArrowUpRight size={14}/> Robótica</span>;
+      case 'General Stock': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fefce8', color: '#a16207', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde047' }}><ArrowUpRight size={14}/> General Stock</span>;
+      
       default: return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#64748b', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600' }}>{tipo || 'Operação Padrão'}</span>;
     }
   };
@@ -375,64 +380,12 @@ export default function TabelaDemandas({ dados = [] }) {
                           </td>
                           <td style={{ padding: '8px', color: corTextoPadrao }}>
                             {hist.descricao_manual || '-'}
-                            
-                            {/* TAG TRANSFERÊNCIA */}
-                            {isTransferencia && (
-                              <div style={{ marginTop: '6px' }}>
-                                <span style={{
-                                  fontSize: '0.65rem',
-                                  backgroundColor: '#fef08a',
-                                  color: '#854d0e',
-                                  border: '1px solid #eab308',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  fontWeight: 'bold',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.05em'
-                                }}>
-                                  ★ Transferência WBS
-                                </span>
-                              </div>
+                            {isCrossdockingParcial && (
+                              <span style={{ marginLeft: '8px', fontSize: '0.7rem', backgroundColor: '#fef08a', color: '#854d0e', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>PARCIAL</span>
                             )}
-
-                            {/* ✨ TAG CROSSDOCKING COM VALIDAÇÃO DE "PARCIAL" OU "TOTAL" */}
-                            {isCrossdocking && (
-                              <div style={{ marginTop: '6px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                <span style={{
-                                  fontSize: '0.65rem',
-                                  backgroundColor: '#f3e8ff',
-                                  color: '#7e22ce',
-                                  border: '1px solid #d8b4fe',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  fontWeight: 'bold',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.05em'
-                                }}>
-                                  📦 Saída Crossdocking
-                                </span>
-                                
-                                {isCrossdockingParcial && (
-                                  <span style={{
-                                    fontSize: '0.65rem',
-                                    backgroundColor: '#fffbeb',
-                                    color: '#d97706',
-                                    border: '1px solid #fde68a',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    fontWeight: 'bold',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em'
-                                  }}>
-                                    Parcial
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
                           </td>
-                          <td style={{ padding: '8px', textAlign: 'center', color: isCrossdocking ? '#9333ea' : (isTransferencia ? '#a16207' : '#0056b3'), fontWeight: 'bold' }}>
-                            {hist.quantidade_solicitada || hist.qtd || 1} <span style={{ fontSize: '12px', fontWeight: 'normal' }}>{hist.unidade_medida_manual || 'Un'}</span>
+                          <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#0056b3' }}>
+                            {hist.quantidade_solicitada || 1}
                           </td>
                         </tr>
                       );
@@ -441,10 +394,20 @@ export default function TabelaDemandas({ dados = [] }) {
                 </table>
               </div>
             ) : (
-              <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
-                Nenhum item encontrado para esta solicitação.
-              </p>
+              <p style={{ color: '#999', textAlign: 'center', padding: '20px' }}>Nenhum item detalhado encontrado.</p>
             )}
+
+            <div style={{ marginTop: '20px', textAlign: 'right' }}>
+              <button
+                onClick={fecharModal}
+                style={{
+                  backgroundColor: '#f1f1f1', border: '1px solid #ccc',
+                  padding: '8px 16px', borderRadius: '4px', cursor: 'pointer'
+                }}
+              >
+                Fechar
+              </button>
+            </div>
 
           </div>
         </div>
