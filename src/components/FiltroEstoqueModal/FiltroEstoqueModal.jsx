@@ -1,135 +1,111 @@
-// FiltroEstoqueModal.jsx
-import React, { useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import Select from 'react-select';
-import './FiltroEstoqueModal.css';
+// =================================================================
+// ARQUIVO: src/components/FiltroExportacaoModal/FiltroExportacaoModal.jsx
+// =================================================================
+import React from 'react';
+import { X, Filter, Trash2 } from 'lucide-react';
 
-const XCircle = ({ size = 16 }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
-);
-const X = ({ size = 20 }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-);
-
-// ✨ CONFIGURAÇÃO CENTRALIZADA: Adiciona ou remove campos do filtro aqui
-const CAMPOS_FILTRO = [
-  { chave: 'filial', label: 'Filial' },
-  { chave: 'desenho_sap', label: 'Desenho SAP' },
-  { chave: 'part_number', label: 'Part Number' },
-  { chave: 'descricao', label: 'Descrição' },
-  { chave: 'fornecedor', label: 'Fornecedor' },
-  { chave: 'nf_entrada', label: 'NF Entrada' },
-  { chave: 'quantidade_nf', label: 'Qtd. NF' },
-  { chave: 'quantidade_disponivel', label: 'Saldo' },
-  { chave: 'unidade_medida', label: 'Unidade de Medida (Un)' },
-  { chave: 'valor_unitario', label: 'Valor Unitário' },
-  { chave: 'alocacao', label: 'Alocação' },
-  { chave: 'wbs', label: 'WBS' },
-  { chave: 'situacao', label: 'Situação' }
-];
-
-export default function FiltroEstoqueModal({ 
-  aberto, 
-  onClose, 
-  dadosEstoque, 
-  filtros, 
-  setFiltros,
-  onLimpar
-}) {
-  
-  // 🧠 Extrai opções de forma inteligente para TODAS as colunas configuradas
-  const opcoesMapeadas = useMemo(() => {
-    const mapaOpcoes = {};
-    
-    CAMPOS_FILTRO.forEach(({ chave }) => {
-      // Cria um Set (valores únicos) extraindo o valor do campo
-      // Removemos null, undefined, vazios e traços inúteis
-      const valoresUnicos = new Set(
-        dadosEstoque
-          .map(item => item[chave])
-          .filter(v => v !== null && v !== undefined && v !== '' && v !== '—' && v !== 'SEM-PN')
-      );
-      
-      // Formata no padrão {value, label} exigido pelo react-select
-      mapaOpcoes[chave] = Array.from(valoresUnicos).sort().map(val => ({
-        value: val,
-        label: String(val)
-      }));
-    });
-
-    return mapaOpcoes;
-  }, [dadosEstoque]);
-
-  const temFiltroAtivo = Object.values(filtros).some(valor => valor !== null);
-
-  const selectStyles = {
-    control: (base, state) => ({
-      ...base,
-      borderColor: state.isFocused ? '#3b82f6' : '#cbd5e1',
-      boxShadow: state.isFocused ? '0 0 0 1px #3b82f6' : 'none',
-      borderRadius: '8px',
-      padding: '0px',
-      minHeight: '36px',
-      fontSize: '0.875rem',
-      '&:hover': { borderColor: '#94a3b8' }
-    }),
-    option: (base, state) => ({
-      ...base,
-      fontSize: '0.875rem',
-      backgroundColor: state.isSelected ? '#2563eb' : state.isFocused ? '#eff6ff' : 'white',
-      color: state.isSelected ? 'white' : '#334155',
-    })
-  };
-
+export default function FiltroExportacaoModal({ aberto, onClose, filtros, setFiltros, onLimpar, opcoesStatus }) {
   if (!aberto) return null;
 
-  return createPortal(
-    <div className="filtro-modal__overlay">
-      <div className="filtro-modal__content">
+  const handleChange = (campo, valor) => {
+    setFiltros(prev => ({ ...prev, [campo]: valor }));
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(2px)' }}>
+      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '450px', maxWidth: '95%', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', maxHeight: '90vh', overflowY: 'auto' }}>
         
-        <div className="filtro-modal__header">
-          <div>
-            <span className="filtro-modal__subtitle">Refine a sua listagem com precisão</span>
-            <h2 className="filtro-modal__title">Filtros Avançados de Estoque</h2>
-          </div>
-          <button onClick={onClose} className="filtro-modal__close-btn">
-            <X size={24} />
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <Filter size={20} color="#2563eb" /> Filtros Avançados
+          </h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
         </div>
 
-        {/* ✨ GERAÇÃO AUTOMÁTICA DOS CAMPOS COM BASE NO ARRAY */}
-        <div className="filtro-modal__body">
-          {CAMPOS_FILTRO.map((campo) => (
-            <div className="filtro-block" key={campo.chave}>
-              <label className="filtro-block__label">{campo.label}</label>
-              <Select 
-                options={opcoesMapeadas[campo.chave] || []}
-                value={filtros[campo.chave] || null}
-                onChange={(opt) => setFiltros({ ...filtros, [campo.chave]: opt })}
-                placeholder={`Qualquer ${campo.label.toLowerCase()}...`}
-                isClearable
-                styles={selectStyles}
-                noOptionsMessage={() => "Sem dados"}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Solicitante</label>
+              <input type="text" value={filtros.solicitante || ''} onChange={(e) => handleChange('solicitante', e.target.value)} placeholder="Ex: Patrick..." style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>WBS</label>
+              <input type="text" value={filtros.wbs || ''} onChange={(e) => handleChange('wbs', e.target.value)} placeholder="Ex: BRBC..." style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Nº da PL</label>
+            <input type="text" value={filtros.pl || ''} onChange={(e) => handleChange('pl', e.target.value)} placeholder="Ex: 356" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Período Rápido</label>
+              <select 
+                value={filtros.periodo} 
+                onChange={(e) => {
+                  handleChange('periodo', e.target.value);
+                  handleChange('mesEspecifico', ''); 
+                }} 
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', outline: 'none' }}
+              >
+                <option value="Todo Período">Todo Período</option>
+                <option value="Este Mês">Este Mês</option>
+                <option value="Semana Passada">Semana Passada</option>
+                <option value="Hoje">Hoje</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Mês Específico</label>
+              <input 
+                type="month" 
+                value={filtros.mesEspecifico || ''} 
+                onChange={(e) => {
+                  handleChange('mesEspecifico', e.target.value);
+                  handleChange('periodo', 'Todo Período'); 
+                }} 
+                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#ffffff', color: '#334155', boxSizing: 'border-box' }} 
               />
             </div>
-          ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Status</label>
+              <select value={filtros.status} onChange={(e) => handleChange('status', e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', outline: 'none' }}>
+                {opcoesStatus.map(st => <option key={st} value={st}>{st}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Tipo</label>
+              <select value={filtros.tipo} onChange={(e) => handleChange('tipo', e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', outline: 'none' }}>
+                <option value="Todos">Todos os Tipos</option>
+                <option value="Material">Material</option>
+                <option value="Entrada">Entrada</option>
+                <option value="Robótica">Robótica</option>
+                <option value="General Stock">General Stock</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>SLA (Target)</label>
+            <select value={filtros.target} onChange={(e) => handleChange('target', e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', outline: 'none' }}>
+              <option value="Todos">Mostrar Todos</option>
+              <option value="Dentro">Dentro do Target</option>
+              <option value="Fora">Fora do Target</option>
+            </select>
+          </div>
         </div>
 
-        <div className="filtro-modal__footer">
-          <div>
-            {temFiltroAtivo && (
-              <button onClick={onLimpar} className="filtro-modal__btn-clear">
-                <XCircle size={16} /> Limpar Filtros
-              </button>
-            )}
-          </div>
-          <button onClick={onClose} className="filtro-modal__btn-submit">
-            Aplicar e Fechar
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '28px', paddingTop: '20px', borderTop: '1px solid #f1f5f9' }}>
+          <button onClick={onLimpar} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: '#ef4444', fontWeight: '600', cursor: 'pointer' }}><Trash2 size={16} /> Limpar</button>
+          <button onClick={onClose} style={{ backgroundColor: '#2563eb', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Aplicar Filtros</button>
         </div>
 
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }
