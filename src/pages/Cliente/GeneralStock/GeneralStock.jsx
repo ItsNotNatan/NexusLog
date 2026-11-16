@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/GeneralStock/GeneralStock.jsx
-// DESCRIÇÃO: Formulário de General Stock (Frontend apenas - sem ligação ao Backend)
+// DESCRIÇÃO: Formulário de General Stock (Conectado à API)
 // =================================================================
 import React, { useState, useContext } from 'react';
 import { User, FileText, Paperclip, Send, MapPin, Archive } from 'lucide-react'; 
@@ -9,6 +9,7 @@ import { formatarWBS } from '../../../utils/formatadores';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { useAlert } from '../../../contexts/AlertContext';
 import { AuthContext } from '../../../contexts/AuthContext';
+import { apiFetch } from '../../../services/api'; // ✨ IMPORTADO A API
 
 export default function GeneralStock() {
   const { showAlert } = useAlert();
@@ -18,7 +19,7 @@ export default function GeneralStock() {
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', descricao: '', observacoes: '' });
   const [anexos, setAnexos] = useState([]);
 
-  const handleEnviar = () => {
+  const handleEnviar = async () => {
     if (isSubmitting) return;
 
     if (!estoqueAtual || estoqueAtual === 'TODOS') {
@@ -33,23 +34,65 @@ export default function GeneralStock() {
 
     setIsSubmitting(true);
 
-    // ✨ SIMULAÇÃO DE ENVIO (APENAS FRONTEND)
-    setTimeout(() => {
-      showAlert("Teste Concluído!", "Interface de General Stock a funcionar. Nenhum dado foi enviado ao servidor.", "success");
-      setFormDados({ nome: '', wbs: '', destino: '', descricao: '', observacoes: '' });
-      setAnexos([]);
+    try {
+      // 1. UPLOAD DE ANEXOS (SE HOUVER)
+      let anexosSalvos = [];
+      if (anexos.length > 0) {
+        const formData = new FormData();
+        anexos.forEach((file) => formData.append('arquivos', file));
+        
+        // true no final indica que é FormData (multipart)
+        const uploadRes = await apiFetch('/arquivos/upload', 'POST', formData, true);
+        if (uploadRes.sucesso) {
+          anexosSalvos = uploadRes.dados;
+        } else {
+          throw new Error('Falha ao enviar os anexos.');
+        }
+      }
+
+      // 2. CONSTRUÇÃO DO PAYLOAD
+      const payload = {
+        solicitante: {
+          nome: formDados.nome,
+          wbs: formDados.wbs,
+          destino: formDados.destino,
+          observacoes: formDados.observacoes,
+          filial_origem: estoqueAtual
+        },
+        itens: [
+          {
+            descricao: formDados.descricao,
+            quantidade: 1
+          }
+        ],
+        anexos: anexosSalvos
+      };
+
+      // 3. ENVIO PARA O BACKEND
+      const resultado = await apiFetch('/solicitacoes/general-stock', 'POST', payload);
+
+      if (resultado.sucesso) {
+        showAlert("Sucesso!", `Solicitação General Stock enviada! (PS: ${resultado.ps})`, "success");
+        setFormDados({ nome: '', wbs: '', destino: '', descricao: '', observacoes: '' });
+        setAnexos([]);
+      } else {
+        throw new Error(resultado.erro || 'Falha ao processar solicitação.');
+      }
+    } catch (erro) {
+      console.error("Erro ao enviar solicitação:", erro);
+      showAlert("Erro", erro.message || "Não foi possível enviar a solicitação. Tente novamente.", "error");
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
+    }
   };
 
   return (
     <div className="nf-container">
-      {/* Cabeçalho Visual Específico de General Stock */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
         <Archive size={32} color="#64748b" />
         <div>
           <h2 style={{ margin: 0, color: '#334155', fontSize: '1.25rem' }}>General Stock</h2>
-          <p style={{ margin: 0, color: '#475569', fontSize: '0.875rem' }}>Solicitações de estoque geral (Modo Visual)</p>
+          <p style={{ margin: 0, color: '#475569', fontSize: '0.875rem' }}>Solicitações de estoque geral</p>
         </div>
       </div>
 
@@ -122,9 +165,9 @@ export default function GeneralStock() {
       </div>
 
       <BotaoAcaoGlobal 
-        texto={isSubmitting ? "A simular envio..." : "Enviar Solicitação (General Stock)"} 
+        texto={isSubmitting ? "A enviar..." : "Enviar Solicitação (General Stock)"} 
         icone={<Send size={16} />} 
-        cor="cinza" // Corrigido para refletir o tema
+        cor="azul" 
         onClick={handleEnviar} 
         carregando={isSubmitting}
       />
