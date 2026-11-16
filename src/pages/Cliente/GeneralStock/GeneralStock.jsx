@@ -9,7 +9,7 @@ import { formatarWBS } from '../../../utils/formatadores';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { useAlert } from '../../../contexts/AlertContext';
 import { AuthContext } from '../../../contexts/AuthContext';
-import { apiFetch } from '../../../services/api'; // ✨ IMPORTADO A API
+import { apiFetch, enviarArquivos } from '../../../services/api';
 
 export default function GeneralStock() {
   const { showAlert } = useAlert();
@@ -38,16 +38,7 @@ export default function GeneralStock() {
       // 1. UPLOAD DE ANEXOS (SE HOUVER)
       let anexosSalvos = [];
       if (anexos.length > 0) {
-        const formData = new FormData();
-        anexos.forEach((file) => formData.append('arquivos', file));
-        
-        // true no final indica que é FormData (multipart)
-        const uploadRes = await apiFetch('/arquivos/upload', 'POST', formData, true);
-        if (uploadRes.sucesso) {
-          anexosSalvos = uploadRes.dados;
-        } else {
-          throw new Error('Falha ao enviar os anexos.');
-        }
+        anexosSalvos = await enviarArquivos(anexos);
       }
 
       // 2. CONSTRUÇÃO DO PAYLOAD
@@ -68,8 +59,11 @@ export default function GeneralStock() {
         anexos: anexosSalvos
       };
 
-      // 3. ENVIO PARA O BACKEND
-      const resultado = await apiFetch('/solicitacoes/general-stock', 'POST', payload);
+      // 3. ENVIO PARA O BACKEND (Padrão correto do apiFetch)
+      const resultado = await apiFetch('/solicitacoes/general-stock', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
 
       if (resultado.sucesso) {
         showAlert("Sucesso!", `Solicitação General Stock enviada! (PS: ${resultado.ps})`, "success");
