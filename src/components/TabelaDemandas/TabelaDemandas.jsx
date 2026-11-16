@@ -43,9 +43,9 @@ export default function TabelaDemandas({ dados = [] }) {
       case 'Nota Fiscal': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #bfdbfe' }}><FileText size={14}/> Nota Fiscal</span>;
       case 'Edição Manual': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fffbeb', color: '#d97706', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde68a' }}><Edit size={14}/> Edição de Item</span>;
       
-      // ✨ ADICIONADOS AQUI:
-      case 'Robótica': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#e0e7ff', color: '#4338ca', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #c7d2fe' }}><ArrowUpRight size={14}/> Robótica</span>;
-      case 'General Stock': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#fefce8', color: '#a16207', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fde047' }}><ArrowUpRight size={14}/> General Stock</span>;
+      // ✨ CORES APLICADAS AQUI:
+      case 'Robótica': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f0fdfa', color: '#0f766e', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #ccfbf1' }}><ArrowUpRight size={14}/> Robótica</span>;
+      case 'General Stock': return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ffedd5', color: '#7c2d12', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fed7aa' }}><ArrowUpRight size={14}/> General Stock</span>;
       
       default: return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#64748b', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600' }}>{tipo || 'Operação Padrão'}</span>;
     }
@@ -340,7 +340,7 @@ export default function TabelaDemandas({ dados = [] }) {
                   </thead>
                   <tbody>
                     {historicoItem.map((hist, idx) => {
-                      // ✨ LÓGICA DE CORES PARA OS DESTAQUES
+                      // LÓGICA DE CORES PARA OS DESTAQUES
                       const isTransferencia =
                         tipoSolicitacao === 'Transferencia WBS' ||
                         tipoSolicitacao === 'Transfer. WBS' ||
@@ -348,11 +348,8 @@ export default function TabelaDemandas({ dados = [] }) {
                         hist.isTransferencia;
 
                       const isCrossdocking = tipoSolicitacao === 'Crossdocking';
-                      
-                      // ✨ LÓGICA PARA VERIFICAR SE O CROSSDOCKING FOI PARCIAL
                       const isCrossdockingParcial = isCrossdocking && hist.alocacao && hist.alocacao.toUpperCase().includes('PARCIAL');
 
-                      // Variáveis dinâmicas para o visual da linha
                       let corFundoLinha = 'transparent';
                       let corBordaLinha = '#eee';
                       let corTextoPadrao = 'inherit';
@@ -361,12 +358,12 @@ export default function TabelaDemandas({ dados = [] }) {
                       if (isTransferencia) {
                         corFundoLinha = '#fefce8';
                         corBordaLinha = '#fde047';
-                        corTextoPadrao = '#854d0e'; // Marrom/Laranja Escuro
+                        corTextoPadrao = '#854d0e'; 
                         corTextoSap = '#a16207';
                       } else if (isCrossdocking) {
                         corFundoLinha = '#faf5ff';
                         corBordaLinha = '#e9d5ff';
-                        corTextoPadrao = '#6b21a8'; // Roxo Escuro
+                        corTextoPadrao = '#6b21a8'; 
                         corTextoSap = '#7e22ce';
                       }
 
