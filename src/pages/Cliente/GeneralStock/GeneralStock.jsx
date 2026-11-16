@@ -59,7 +59,7 @@ export default function GeneralStock() {
         anexos: anexosSalvos
       };
 
-      // 3. ENVIO PARA O BACKEND (Padrão correto do apiFetch)
+      // 3. ENVIO PARA O BACKEND
       const resultado = await apiFetch('/solicitacoes/general-stock', {
         method: 'POST',
         body: JSON.stringify(payload)
