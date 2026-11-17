@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/Robotica/Robotica.jsx
-// DESCRIÇÃO: Formulário de Robótica (Conectado à API)
+// DESCRIÇÃO: Formulário de Robótica (Linhas e Anexo obrigatórios)
 // =================================================================
 import React, { useState, useContext } from 'react';
 import { User, FileText, Paperclip, Send, MapPin, Cpu } from 'lucide-react'; 
@@ -16,7 +16,6 @@ export default function Robotica() {
   const { estoqueAtual } = useContext(AuthContext); 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // ✨ Trocado 'observacoes' por 'linhas'
   const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', descricao: '', linhas: '' });
   const [anexos, setAnexos] = useState([]);
 
@@ -28,26 +27,34 @@ export default function Robotica() {
       return;
     }
     
-    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.descricao) {
-      showAlert("Campos Obrigatórios", "Por favor, preencha os campos obrigatórios (*).", "warning");
+    // Validação dos campos obrigatórios (incluindo Linhas)
+    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.descricao || !formDados.linhas) {
+      showAlert("Campos Obrigatórios", "Por favor, preencha todos os campos obrigatórios (*), incluindo o número de linhas.", "warning");
+      return;
+    }
+
+    if (Number(formDados.linhas) <= 0) {
+      showAlert("Quantidade Inválida", "O número de linhas deve ser um número inteiro maior que zero.", "warning");
+      return;
+    }
+
+    // Validação de Anexo obrigatório
+    if (!anexos || anexos.length === 0) {
+      showAlert("Anexo Obrigatório", "Por favor, adicione pelo menos um documento de suporte antes de enviar a solicitação.", "warning");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      let anexosSalvos = [];
-      if (anexos.length > 0) {
-        anexosSalvos = await enviarArquivos(anexos);
-      }
+      const anexosSalvos = await enviarArquivos(anexos);
 
       const payload = {
         solicitante: {
           nome: formDados.nome,
           wbs: formDados.wbs,
           destino: formDados.destino,
-          // ✨ Enviamos o valor das linhas para o campo observacoes do BD
-          observacoes: formDados.linhas ? String(formDados.linhas) : '',
+          observacoes: String(formDados.linhas),
           filial_origem: estoqueAtual
         },
         itens: [
@@ -137,9 +144,8 @@ export default function Robotica() {
               <textarea className="input-campo flex-1" style={{ outlineColor: '#ec4899', minHeight: '120px' }} placeholder="Descreva o motivo..." value={formDados.descricao} onChange={(e) => setFormDados({ ...formDados, descricao: e.target.value })} disabled={isSubmitting}></textarea>
             </div>
             
-            {/* ✨ CAMPO LINHAS COM REGEX PARA ACEITAR APENAS NÚMEROS INTEIROS POSITIVOS */}
             <div className="input-grupo mt-4">
-              <label>LINHAS</label>
+              <label>LINHAS *</label>
               <input 
                 type="text" 
                 inputMode="numeric"
@@ -154,7 +160,6 @@ export default function Robotica() {
                 disabled={isSubmitting} 
               />
             </div>
-
           </div>
         </div>
       </div>
@@ -164,8 +169,8 @@ export default function Robotica() {
           <div className="form-header-esquerda">
             <div className="form-header-icone cinza redondo"><Paperclip size={18} /></div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <h2 style={{ fontSize: '1rem', marginBottom: '2px' }}>Anexos</h2>
-              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Documentos ou arquivos de suporte</span>
+              <h2 style={{ fontSize: '1rem', marginBottom: '2px' }}>Anexos *</h2>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Documentos ou arquivos de suporte (Obrigatório)</span>
             </div>
           </div>
         </div>
