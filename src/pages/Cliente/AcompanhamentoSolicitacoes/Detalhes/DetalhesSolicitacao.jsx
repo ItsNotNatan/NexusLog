@@ -422,14 +422,31 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
     const bgBadge = isRecusadoOuCancelado ? '#fef2f2' : (isRobotica ? '#f0fdfa' : '#ffedd5');
     const borderBadge = isRecusadoOuCancelado ? '#fecaca' : (isRobotica ? '#ccfbf1' : '#fed7aa');
 
+    const obsLimpa = item.observacoes && item.observacoes !== 'null'
+      ? String(item.observacoes).split('[RECUSADO]:')[0].trim()
+      : '';
+    const motivoRecusaMatch = item.observacoes
+      ? String(item.observacoes).match(/\[RECUSADO\]:\s*(.*)/i)
+      : null;
+    const motivoRecusaTexto = motivoRecusaMatch ? motivoRecusaMatch[1].trim() : null;
+    const linhasExibicao = item.linhas || obsLimpa || 'Não informada';
+
     return (
-      <div className="area-expandida-cliente" style={{ padding: '24px' }}>
+      <div className="area-expandida-cliente">
         {isRecusadoOuCancelado && (
-          <div style={{ padding: '12px 16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ padding: '12px 16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertCircle size={18} />
-            <strong>Atenção:</strong> A solicitação de {item.tipo} foi <strong>{item.statusExibicao}</strong>.
+            <span>
+              <strong>Atenção:</strong> A solicitação de {item.tipo} foi <strong>{item.statusExibicao}</strong>.
+              {motivoRecusaTexto && <> Motivo: <strong>{motivoRecusaTexto}</strong></>}
+            </span>
           </div>
         )}
+
+        <div className="expandida-cabecalho" style={{ marginBottom: '24px' }}>
+          <span>WBS Principal: <strong style={{ color: corTema }}>{item.wbs}</strong></span>
+          <span>Linhas: <strong style={{ color: corTema }}>{linhasExibicao}</strong></span>
+        </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '32px', fontSize: '0.875rem', marginBottom: '16px', backgroundColor: '#ffffff', padding: '16px 20px', borderRadius: '8px', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}` }}>
           <div style={{ flex: 1, minWidth: '250px' }}>
@@ -443,7 +460,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
 
           <div style={{ minWidth: '150px' }}>
             <span style={{ color: isRecusadoOuCancelado ? '#991b1b' : '#1e293b', fontWeight: '700', display: 'block', marginBottom: '6px', textTransform: 'uppercase', fontSize: '0.75rem' }}>
-              Quantidade de Linhas:
+              Linhas:
             </span>
             <span style={{
               display: 'inline-block',
@@ -456,7 +473,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
               fontSize: '0.9rem',
               fontFamily: 'monospace'
             }}>
-              {item.observacoes && item.observacoes !== 'null' ? item.observacoes : 'Não informada'}
+              {linhasExibicao}
             </span>
           </div>
         </div>
