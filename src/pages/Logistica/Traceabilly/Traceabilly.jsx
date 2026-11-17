@@ -1,11 +1,19 @@
+// =================================================================
+// ARQUIVO: src/pages/Logistica/Traceabilly/Traceabilly.jsx
+// DESCRIÇÃO: Histórico de Movimentações com Cruzamento de Dados e Exportação Excel
+// =================================================================
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Loader2, Archive, Calendar, User, Box, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText, X, ChevronLeft, ChevronRight, Filter, RotateCcw, Activity } from 'lucide-react';
+import { Search, Loader2, Archive, Calendar, User, Box, ArrowUpRight, ArrowRightLeft, ArrowDownLeft, XCircle, FileText, X, ChevronLeft, ChevronRight, Filter, RotateCcw, Activity, Download } from 'lucide-react';
 import { AuthContext } from '../../../contexts/AuthContext';
 import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch } from '../../../services/api';
 import PaginacaoTabela from "../../../components/PaginacaoTabela/PaginacaoTabela";
 import FiltroTraceabillyModal from "../../../components/FiltroTraceabillyModal/FiltroTraceabillyModal";
 import './Traceabilly.css';
+
+// ✨ IMPORTAÇÕES PARA EXPORTAR O EXCEL FORMATADO
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 export default function Traceabilly({ perfil }) {
   const { estoqueAtual, usuario } = useContext(AuthContext);
@@ -21,7 +29,6 @@ export default function Traceabilly({ perfil }) {
   const [itemReverter, setItemReverter] = useState(null);
   const [qtdReverter, setQtdReverter] = useState(1);
 
-  // ✨ ESTADOS DO NOVO MODAL DE CICLO DE VIDA (DUPLO CLIQUE)
   const [modalCicloVida, setModalCicloVida] = useState(false);
   const [detalhesCicloVida, setDetalhesCicloVida] = useState(null);
   const [movimentosCicloVida, setMovimentosCicloVida] = useState([]);
@@ -92,6 +99,9 @@ export default function Traceabilly({ perfil }) {
         const resSol = await apiFetch(`/solicitacoes/listar${urlSol}`);
         
         if (resEstoque.sucesso && resSol.sucesso) {
+          // ✨ NOVO: Mapa de Estoque Completo para Puxar Referências e NFs perdidas
+          const mapEstoque = new Map(resEstoque.dados.map(e => [e.id, e]));
+          
           const itensZerados = resEstoque.dados.filter(e => e.status === 'Zerado' || e.quantidade_disponivel <= 0);
           const setIdsZerados = new Set(itensZerados.map(e => e.id));
 
@@ -104,17 +114,27 @@ export default function Traceabilly({ perfil }) {
             if (sol.itens && sol.itens.length > 0) {
               sol.itens.forEach(it => {
                 if (it.estoque_id && setIdsZerados.has(it.estoque_id)) {
+                  
+                  // ✨ BUSCA A RAIZ FÍSICA PARA COMPLETAR DADOS
+                  const itemFisico = mapEstoque.get(it.estoque_id) || {};
+                  
                   const isEntrada = sol.tipo === 'Entrada' || sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração';
-                  const notaFiscalFinal = it.nf_entrada || it.nfEntrada || it.nf || sol.nfCrossdocking || sol.nf_entrada || '-';
+                  
+                  // ✨ GARANTE A NOTA FISCAL (Cruza com o físico se o da solicitação não existir)
+                  const notaFiscalFinal = it.nf_entrada || it.nfEntrada || it.nf || itemFisico.nf_entrada || sol.nfCrossdocking || '-';
+                  
+                  // ✨ GARANTE A REFERÊNCIA
+                  const refFinal = it.referencia || itemFisico.referencia || '-';
 
                   itemsList.push({
                     idUnico: `${sol.id}-${it.id}`,
                     idItem: it.id, 
-                    estoqueId: it.estoque_id, // ✨ NOVO: Guarda o ID físico para cruzar o ciclo de vida
+                    estoqueId: it.estoque_id, 
                     tipoOriginal: sol.tipo, 
-                    desenhoSAP: it.desenho_sap_manual || '-',
-                    partNumber: it.part_number_manual || '-',
-                    descricao: it.descricao_manual || 'Sem descrição',
+                    desenhoSAP: it.desenho_sap_manual || itemFisico.desenho_sap || '-',
+                    partNumber: it.part_number_manual || itemFisico.part_number || '-',
+                    descricao: it.descricao_manual || itemFisico.descricao || 'Sem descrição',
+                    referencia: refFinal, // ✨ Guardado no estado!
                     nfEntrada: notaFiscalFinal,
                     bsSaida: sol.pl || '-', 
                     solicitacao: sol.ps || '-',
@@ -123,7 +143,7 @@ export default function Traceabilly({ perfil }) {
                     
                     isEntrada,
                     qtdMovimentada: Number(it.quantidade_solicitada || 0),
-                    unidadeMedida: it.unidade_medida_manual || 'Un',
+                    unidadeMedida: it.unidade_medida_manual || itemFisico.unidade_medida || 'Un',
                     
                     wbs: sol.wbs || '-',
                     dataSaida: formatarData(sol.dataFinalizacaoISO || sol.dataCriacaoISO),
@@ -151,11 +171,9 @@ export default function Traceabilly({ perfil }) {
     }
   }, [estoqueAtual, showAlert, recarregar]);
 
-  // ✨ FUNÇÃO PARA ABRIR O CICLO DE VIDA (DUPLO CLIQUE)
   const handleDoubleClickRow = (item) => {
     if (!item.estoqueId) return;
     
-    // Filtra todas as movimentações deste ID de estoque específico, ordenadas da mais antiga para a mais recente
     const historicoCompleto = itensArquivados
       .filter(i => i.estoqueId === item.estoqueId)
       .sort((a, b) => a.dataSort - b.dataSort);
@@ -165,6 +183,7 @@ export default function Traceabilly({ perfil }) {
       partNumber: item.partNumber,
       desenhoSAP: item.desenhoSAP,
       descricao: item.descricao,
+      referencia: item.referencia, // ✨ Exibe a Referência no Header do Modal
       nfEntrada: item.nfEntrada
     });
     setModalCicloVida(true);
@@ -217,7 +236,8 @@ export default function Traceabilly({ perfil }) {
   const historicoFiltrado = itensArquivados.filter(item => {
     if (termoPesquisa) {
       const termo = termoPesquisa.toLowerCase();
-      const textoBuscavel = `${item.partNumber} ${item.nfEntrada} ${item.bsSaida} ${item.wbs} ${item.solicitante} ${item.solicitacao} ${item.desenhoSAP}`.toLowerCase();
+      // ✨ Adicionada a Referência na Pesquisa Global
+      const textoBuscavel = `${item.partNumber} ${item.nfEntrada} ${item.bsSaida} ${item.wbs} ${item.solicitante} ${item.solicitacao} ${item.desenhoSAP} ${item.referencia}`.toLowerCase();
       if (!textoBuscavel.includes(termo)) return false;
     }
 
@@ -243,6 +263,77 @@ export default function Traceabilly({ perfil }) {
   const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, totalRegistrosFiltrados);
   const dadosPaginados = historicoFiltrado.slice(indexPrimeiroItem, indexUltimoItem);
 
+  // ✨ NOVA FUNÇÃO DE EXPORTAÇÃO PARA EXCEL
+  const exportarParaExcel = async () => {
+    if (historicoFiltrado.length === 0) {
+      showAlert("Vazio", "Não existem dados filtrados para exportar.", "warning");
+      return;
+    }
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Histórico Traceabilly');
+
+      // Colunas formatadas
+      worksheet.columns = [
+        { header: 'DESENHO SAP', key: 'sap', width: 20 },
+        { header: 'PART NUMBER', key: 'pn', width: 25 },
+        { header: 'DESCRIÇÃO', key: 'desc', width: 45 },
+        { header: 'REFERÊNCIA', key: 'ref', width: 25 },
+        { header: 'NF ENTRADA', key: 'nf', width: 25 },
+        { header: 'BS / SOLICITAÇÃO', key: 'bs', width: 25 },
+        { header: 'SOLICITANTE', key: 'solicitante', width: 25 },
+        { header: 'FLUXO', key: 'fluxo', width: 20 },
+        { header: 'QTD', key: 'qtd', width: 15 },
+        { header: 'UNIDADE', key: 'unid', width: 15 },
+        { header: 'WBS / DESTINO', key: 'wbs', width: 25 },
+        { header: 'ALOCAÇÃO', key: 'aloc', width: 25 },
+        { header: 'DATA DA OPERAÇÃO', key: 'data', width: 20 },
+      ];
+
+      // Aplica estilo ao Cabeçalho
+      const linhaCabecalho = worksheet.getRow(1);
+      linhaCabecalho.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } }; // Azul NexusLog
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      });
+      linhaCabecalho.height = 25;
+
+      // Insere as linhas baseadas no array filtrado visualmente
+      historicoFiltrado.forEach(item => {
+        const bsCompleto = item.bsSaida !== '-' ? item.bsSaida : item.solicitacao;
+        const operacaoSinal = item.isEntrada ? '+' : '-';
+        
+        worksheet.addRow({
+          sap: item.desenhoSAP,
+          pn: item.partNumber,
+          desc: item.descricao,
+          ref: item.referencia,
+          nf: item.nfEntrada,
+          bs: bsCompleto,
+          solicitante: item.solicitante,
+          fluxo: item.tipoOriginal,
+          qtd: `${operacaoSinal}${item.qtdMovimentada}`,
+          unid: item.unidadeMedida,
+          wbs: item.wbs,
+          aloc: item.alocacao,
+          data: item.dataSaida
+        });
+      });
+
+      // Gera e Baixa
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Relatorio_Historico_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      
+    } catch (error) {
+      console.error("Erro na exportação Excel:", error);
+      showAlert("Erro na Exportação", "Houve um problema ao gerar o documento Excel.", "error");
+    }
+  };
+
   return (
     <div className="traceabilly-wrapper">
       <div className="traceabilly-card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -254,16 +345,34 @@ export default function Traceabilly({ perfil }) {
             <span className="badge-contador">{totalRegistrosFiltrados}</span>
           </div>
           <div className="header-direita" style={{ display: 'flex', gap: '12px', height: '42px', alignItems: 'stretch' }}>
+            
+            {/* ✨ BOTÃO DE EXPORTAÇÃO EXCEL AQUI! */}
+            <button 
+              onClick={exportarParaExcel}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px', borderRadius: '8px', 
+                border: '1px solid #a7f3d0', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '0.875rem', 
+                fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', height: '100%'
+              }}
+              title="Baixar lista filtrada em formato XLSX"
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#d1fae5'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ecfdf5'}
+            >
+              <Download size={18} />
+              Exportar
+            </button>
+
             <div style={{ position: 'relative', height: '100%', width: '350px' }}>
               <Search size={16} className="icone-pesquisa" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
                 type="text" 
-                placeholder="Buscar por PN, NF, BS, WBS, Solicitante..." 
+                placeholder="Buscar por PN, NF, Referência, BS, WBS..." 
                 value={termoPesquisa}
                 onChange={(e) => setTermoPesquisa(e.target.value)}
-                style={{ height: '100%', width: '100%', boxSizing: 'border-box', paddingLeft: '36px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                style={{ height: '100%', width: '100%', boxSizing: 'border-box', paddingLeft: '36px', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#3b82f6' }}
               />
             </div>
+            
             <button 
               onClick={() => setModalFiltroAberto(true)}
               style={{ 
@@ -271,6 +380,8 @@ export default function Traceabilly({ perfil }) {
                 border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontSize: '0.875rem', 
                 fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s', height: '100%'
               }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
             >
               <Filter size={18} color="#475569" />
               Filtros
@@ -298,7 +409,8 @@ export default function Traceabilly({ perfil }) {
                 <tr>
                   <th>DESENHO SAP</th>
                   <th>PART NUMBER</th>
-                  <th>DESCRIÇÃO</th>
+                  {/* ✨ REFERÊNCIA AGRUPADA COM DESCRIÇÃO NO HEADER */}
+                  <th>DESCRIÇÃO / REFERÊNCIA</th>
                   <th>NF ENTRADA</th>
                   <th>BS / SOLICITAÇÃO</th>
                   <th>SOLICITANTE</th>
@@ -321,7 +433,17 @@ export default function Traceabilly({ perfil }) {
                   >
                     <td className="texto-azul">{item.desenhoSAP}</td>
                     <td className="texto-negrito">{item.partNumber}</td>
-                    <td className="texto-truncado" title={item.descricao}>{item.descricao}</td>
+                    
+                    {/* ✨ DESCRIÇÃO E REFERÊNCIA JUNTAS PARA POUPAR ESPAÇO NA TELA */}
+                    <td className="texto-truncado" title={`${item.descricao} | Ref: ${item.referencia}`}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span>{item.descricao}</span>
+                        {item.referencia !== '-' && (
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Ref: <strong>{item.referencia}</strong></span>
+                        )}
+                      </div>
+                    </td>
+
                     <td>{item.nfEntrada !== '-' ? <span className="badge-nf">{item.nfEntrada}</span> : '-'}</td>
                     <td>
                       <div className="flex-centro" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
@@ -402,7 +524,7 @@ export default function Traceabilly({ perfil }) {
               <button onClick={() => setModalCicloVida(false)} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', color: '#64748b', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={20} /></button>
             </div>
 
-            <div style={{ padding: '16px 24px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+            <div style={{ padding: '16px 24px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <div>
                 <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Part Number</span>
                 <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{detalhesCicloVida.partNumber}</strong>
@@ -412,10 +534,14 @@ export default function Traceabilly({ perfil }) {
                 <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{detalhesCicloVida.desenhoSAP}</strong>
               </div>
               <div>
+                <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Referência</span>
+                <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{detalhesCicloVida.referencia}</strong>
+              </div>
+              <div>
                 <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>NF Principal</span>
                 <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{detalhesCicloVida.nfEntrada}</strong>
               </div>
-              <div style={{ gridColumn: 'span 3' }}>
+              <div style={{ gridColumn: 'span 4' }}>
                 <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Descrição</span>
                 <span style={{ color: '#334155', fontSize: '0.9rem' }}>{detalhesCicloVida.descricao}</span>
               </div>
