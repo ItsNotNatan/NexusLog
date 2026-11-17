@@ -15,6 +15,14 @@ import './Traceabilly.css';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
+// ✨ FUNÇÃO "LIMPA-NEVE" (Destrói traços e "null", forçando a busca do valor correto)
+const obterValorSeguroTexto = (valItem, valEstoque) => {
+  const validar = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== '—' && String(v).trim() !== 'null';
+  if (validar(valItem)) return valItem;
+  if (validar(valEstoque)) return valEstoque;
+  return '-';
+};
+
 export default function Traceabilly({ perfil }) {
   const { estoqueAtual, usuario } = useContext(AuthContext);
   const { showAlert } = useAlert();
@@ -38,6 +46,7 @@ export default function Traceabilly({ perfil }) {
 
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
+    // ✨ ATENÇÃO: Se quiseres filtrar por Fornecedor no futuro, terás de mudar a chave aqui e no FiltroTraceabillyModal
     tipoOriginal: '', desenhoSAP: '', partNumber: '', nfEntrada: '', bsSaida: '', solicitante: '', wbs: '', alocacao: ''
   });
 
@@ -82,6 +91,10 @@ export default function Traceabilly({ perfil }) {
         return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}><XCircle size={14}/> Estorno / Cancelado</span>;
       case 'Nota Fiscal': 
         return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #bfdbfe', whiteSpace: 'nowrap' }}><FileText size={14}/> Nota Fiscal</span>;
+      case 'Robótica': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f0fdfa', color: '#0f766e', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #ccfbf1', whiteSpace: 'nowrap' }}><ArrowUpRight size={14}/> Robótica</span>;
+      case 'General Stock': 
+        return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ffedd5', color: '#7c2d12', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid #fed7aa', whiteSpace: 'nowrap' }}><ArrowUpRight size={14}/> General Stock</span>;
       default: 
         return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', color: '#64748b', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', whiteSpace: 'nowrap' }}>{tipo || 'Operação Padrão'}</span>;
     }
@@ -99,7 +112,7 @@ export default function Traceabilly({ perfil }) {
         const resSol = await apiFetch(`/solicitacoes/listar${urlSol}`);
         
         if (resEstoque.sucesso && resSol.sucesso) {
-          // ✨ NOVO: Mapa de Estoque Completo para Puxar Referências e NFs perdidas
+          // ✨ NOVO: Mapa de Estoque Completo para Puxar Referências, Fornecedor e NFs perdidas
           const mapEstoque = new Map(resEstoque.dados.map(e => [e.id, e]));
           
           const itensZerados = resEstoque.dados.filter(e => e.status === 'Zerado' || e.quantidade_disponivel <= 0);
@@ -120,30 +133,44 @@ export default function Traceabilly({ perfil }) {
                   
                   const isEntrada = sol.tipo === 'Entrada' || sol.tipo === 'Reintegracao' || sol.tipo === 'Reintegração';
                   
-                  // ✨ GARANTE A NOTA FISCAL (Cruza com o físico se o da solicitação não existir)
-                  const notaFiscalFinal = it.nf_entrada || it.nfEntrada || it.nf || itemFisico.nf_entrada || sol.nfCrossdocking || '-';
+                  // ✨ GARANTE A NOTA FISCAL, REFERÊNCIA, FORNECEDOR E PART NUMBER (Cruza com o físico se não existir)
+                  const notaFiscalFinal = obterValorSeguroTexto(it.nf_entrada || it.nfEntrada || it.nf, itemFisico.nf_entrada) === '-' && sol.nfCrossdocking ? sol.nfCrossdocking : obterValorSeguroTexto(it.nf_entrada || it.nfEntrada || it.nf, itemFisico.nf_entrada);
+                  const refFinal = obterValorSeguroTexto(it.referencia, itemFisico.referencia);
+                  const fornecedorFinal = obterValorSeguroTexto(it.fornecedor, itemFisico.fornecedor); // ✨ EXTRAÍDO FORNECEDOR
                   
-                  // ✨ GARANTE A REFERÊNCIA
-                  const refFinal = it.referencia || itemFisico.referencia || '-';
+                  const sapFinal = obterValorSeguroTexto(it.desenho_sap_manual || it.desenho_sap, itemFisico.desenho_sap);
+                  const pnFinal = obterValorSeguroTexto(it.part_number_manual || it.part_number, itemFisico.part_number);
+                  
+                  let descFinal = obterValorSeguroTexto(it.descricao_manual || it.descricao, itemFisico.descricao);
+                  if (descFinal === '-') descFinal = 'Sem descrição';
+
+                  const unidFinal = obterValorSeguroTexto(it.unidade_medida_manual, itemFisico.unidade_medida) === '-' 
+                    ? 'Un' 
+                    : obterValorSeguroTexto(it.unidade_medida_manual, itemFisico.unidade_medida);
+
+                  const alocFinal = obterValorSeguroTexto(it.alocacao, itemFisico.alocacao) !== '-' 
+                    ? obterValorSeguroTexto(it.alocacao, itemFisico.alocacao) 
+                    : (sol.tipo || '-');
 
                   itemsList.push({
                     idUnico: `${sol.id}-${it.id}`,
                     idItem: it.id, 
                     estoqueId: it.estoque_id, 
                     tipoOriginal: sol.tipo, 
-                    desenhoSAP: it.desenho_sap_manual || itemFisico.desenho_sap || '-',
-                    partNumber: it.part_number_manual || itemFisico.part_number || '-',
-                    descricao: it.descricao_manual || itemFisico.descricao || 'Sem descrição',
-                    referencia: refFinal, // ✨ Guardado no estado!
+                    desenhoSAP: sapFinal,
+                    partNumber: pnFinal,
+                    fornecedor: fornecedorFinal, // ✨ GUARDADO NO ESTADO
+                    descricao: descFinal,
+                    referencia: refFinal, 
                     nfEntrada: notaFiscalFinal,
                     bsSaida: sol.pl || '-', 
                     solicitacao: sol.ps || '-',
                     solicitante: sol.solicitante || '-',
-                    alocacao: it.alocacao || sol.tipo || '-',
+                    alocacao: alocFinal,
                     
                     isEntrada,
                     qtdMovimentada: Number(it.quantidade_solicitada || 0),
-                    unidadeMedida: it.unidade_medida_manual || itemFisico.unidade_medida || 'Un',
+                    unidadeMedida: unidFinal,
                     
                     wbs: sol.wbs || '-',
                     dataSaida: formatarData(sol.dataFinalizacaoISO || sol.dataCriacaoISO),
@@ -180,10 +207,10 @@ export default function Traceabilly({ perfil }) {
       
     setMovimentosCicloVida(historicoCompleto);
     setDetalhesCicloVida({
-      partNumber: item.partNumber,
+      fornecedor: item.fornecedor, // ✨ Exibe o Fornecedor no Header do Modal (Substituindo PN)
       desenhoSAP: item.desenhoSAP,
       descricao: item.descricao,
-      referencia: item.referencia, // ✨ Exibe a Referência no Header do Modal
+      referencia: item.referencia, 
       nfEntrada: item.nfEntrada
     });
     setModalCicloVida(true);
@@ -236,8 +263,8 @@ export default function Traceabilly({ perfil }) {
   const historicoFiltrado = itensArquivados.filter(item => {
     if (termoPesquisa) {
       const termo = termoPesquisa.toLowerCase();
-      // ✨ Adicionada a Referência na Pesquisa Global
-      const textoBuscavel = `${item.partNumber} ${item.nfEntrada} ${item.bsSaida} ${item.wbs} ${item.solicitante} ${item.solicitacao} ${item.desenhoSAP} ${item.referencia}`.toLowerCase();
+      // ✨ Adicionado Fornecedor na Pesquisa Global
+      const textoBuscavel = `${item.fornecedor} ${item.partNumber} ${item.nfEntrada} ${item.bsSaida} ${item.wbs} ${item.solicitante} ${item.solicitacao} ${item.desenhoSAP} ${item.referencia}`.toLowerCase();
       if (!textoBuscavel.includes(termo)) return false;
     }
 
@@ -263,7 +290,7 @@ export default function Traceabilly({ perfil }) {
   const indexUltimoItem = Math.min(paginaAtual * itensPorPagina, totalRegistrosFiltrados);
   const dadosPaginados = historicoFiltrado.slice(indexPrimeiroItem, indexUltimoItem);
 
-  // ✨ NOVA FUNÇÃO DE EXPORTAÇÃO PARA EXCEL
+  // ✨ NOVA FUNÇÃO DE EXPORTAÇÃO PARA EXCEL (CABEÇALHO FORNECEDOR)
   const exportarParaExcel = async () => {
     if (historicoFiltrado.length === 0) {
       showAlert("Vazio", "Não existem dados filtrados para exportar.", "warning");
@@ -277,7 +304,7 @@ export default function Traceabilly({ perfil }) {
       // Colunas formatadas
       worksheet.columns = [
         { header: 'DESENHO SAP', key: 'sap', width: 20 },
-        { header: 'PART NUMBER', key: 'pn', width: 25 },
+        { header: 'FORNECEDOR', key: 'fornecedor', width: 25 }, // ✨ TROCADO PARA FORNECEDOR
         { header: 'DESCRIÇÃO', key: 'desc', width: 45 },
         { header: 'REFERÊNCIA', key: 'ref', width: 25 },
         { header: 'NF ENTRADA', key: 'nf', width: 25 },
@@ -308,7 +335,7 @@ export default function Traceabilly({ perfil }) {
         
         worksheet.addRow({
           sap: item.desenhoSAP,
-          pn: item.partNumber,
+          fornecedor: item.fornecedor, // ✨ INSERINDO FORNECEDOR
           desc: item.descricao,
           ref: item.referencia,
           nf: item.nfEntrada,
@@ -346,7 +373,6 @@ export default function Traceabilly({ perfil }) {
           </div>
           <div className="header-direita" style={{ display: 'flex', gap: '12px', height: '42px', alignItems: 'stretch' }}>
             
-            {/* ✨ BOTÃO DE EXPORTAÇÃO EXCEL AQUI! */}
             <button 
               onClick={exportarParaExcel}
               style={{
@@ -366,7 +392,7 @@ export default function Traceabilly({ perfil }) {
               <Search size={16} className="icone-pesquisa" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
                 type="text" 
-                placeholder="Buscar por PN, NF, Referência, BS, WBS..." 
+                placeholder="Buscar por Fornecedor, NF, Referência, BS, WBS..." 
                 value={termoPesquisa}
                 onChange={(e) => setTermoPesquisa(e.target.value)}
                 style={{ height: '100%', width: '100%', boxSizing: 'border-box', paddingLeft: '36px', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#3b82f6' }}
@@ -408,8 +434,8 @@ export default function Traceabilly({ perfil }) {
               <thead>
                 <tr>
                   <th>DESENHO SAP</th>
-                  <th>PART NUMBER</th>
-                  {/* ✨ REFERÊNCIA AGRUPADA COM DESCRIÇÃO NO HEADER */}
+                  {/* ✨ TROCADO PARA FORNECEDOR */}
+                  <th>FORNECEDOR</th>
                   <th>DESCRIÇÃO / REFERÊNCIA</th>
                   <th>NF ENTRADA</th>
                   <th>BS / SOLICITAÇÃO</th>
@@ -432,9 +458,9 @@ export default function Traceabilly({ perfil }) {
                     onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <td className="texto-azul">{item.desenhoSAP}</td>
-                    <td className="texto-negrito">{item.partNumber}</td>
+                    {/* ✨ EXIBE O FORNECEDOR */}
+                    <td className="texto-negrito">{item.fornecedor}</td>
                     
-                    {/* ✨ DESCRIÇÃO E REFERÊNCIA JUNTAS PARA POUPAR ESPAÇO NA TELA */}
                     <td className="texto-truncado" title={`${item.descricao} | Ref: ${item.referencia}`}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span>{item.descricao}</span>
@@ -508,7 +534,6 @@ export default function Traceabilly({ perfil }) {
         />
       </div>
 
-      {/* ✨ MODAL DE CICLO DE VIDA DO MATERIAL */}
       {modalCicloVida && detalhesCicloVida && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1050, backdropFilter: 'blur(3px)' }}>
           <div style={{ background: '#fff', borderRadius: '12px', width: '900px', maxWidth: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
@@ -526,8 +551,8 @@ export default function Traceabilly({ perfil }) {
 
             <div style={{ padding: '16px 24px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <div>
-                <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Part Number</span>
-                <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{detalhesCicloVida.partNumber}</strong>
+                <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Fornecedor</span>
+                <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{detalhesCicloVida.fornecedor}</strong>
               </div>
               <div>
                 <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Desenho SAP</span>
@@ -552,7 +577,6 @@ export default function Traceabilly({ perfil }) {
                 {movimentosCicloVida.map((mov, index) => (
                   <div key={mov.idUnico} style={{ position: 'relative', marginBottom: index === movimentosCicloVida.length - 1 ? '0' : '24px' }}>
                     
-                    {/* Ponto na linha do tempo */}
                     <div style={{ position: 'absolute', left: '-21px', top: '4px', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: mov.isEntrada ? '#10b981' : '#ef4444', border: '2px solid #fff', boxShadow: '0 0 0 1px #e2e8f0' }}></div>
                     
                     <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
@@ -611,7 +635,7 @@ export default function Traceabilly({ perfil }) {
             </div>
             <div style={{ marginBottom: '20px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <p style={{ margin: '0 0 4px 0', fontSize: '0.875rem', color: '#475569' }}>Vai devolver itens retirados pela solicitação <strong>{itemReverter.solicitacao}</strong>.</p>
-              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>{itemReverter.partNumber} — {itemReverter.descricao}</p>
+              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#1e293b' }}>{itemReverter.fornecedor} — {itemReverter.descricao}</p>
             </div>
             <div style={{ marginBottom: '24px' }}>
               <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '8px' }}>QUANTIDADE A DEVOLVER (MÁX: {itemReverter.qtdMovimentada})</label>
