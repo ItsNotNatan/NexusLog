@@ -40,7 +40,6 @@ export default function FiltroExportacaoModal({ aberto, onClose, filtros, setFil
             <input type="text" value={filtros.pl || ''} onChange={(e) => handleChange('pl', e.target.value)} placeholder="Ex: 356" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} />
           </div>
 
-          {/* ✨ NOVO: Dropdown lado a lado com Mês Específico */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Período Rápido</label>
@@ -48,7 +47,7 @@ export default function FiltroExportacaoModal({ aberto, onClose, filtros, setFil
                 value={filtros.periodo} 
                 onChange={(e) => {
                   handleChange('periodo', e.target.value);
-                  handleChange('mesEspecifico', ''); // Desativa o mês específico ao usar atalho
+                  handleChange('mesEspecifico', ''); 
                 }} 
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', outline: 'none' }}
               >
@@ -65,7 +64,7 @@ export default function FiltroExportacaoModal({ aberto, onClose, filtros, setFil
                 value={filtros.mesEspecifico || ''} 
                 onChange={(e) => {
                   handleChange('mesEspecifico', e.target.value);
-                  handleChange('periodo', 'Todo Período'); // Desativa o atalho
+                  handleChange('periodo', 'Todo Período'); 
                 }} 
                 style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#ffffff', color: '#334155', boxSizing: 'border-box' }} 
               />
@@ -85,7 +84,11 @@ export default function FiltroExportacaoModal({ aberto, onClose, filtros, setFil
                 <option value="Todos">Todos os Tipos</option>
                 <option value="Material">Material</option>
                 <option value="Entrada">Entrada</option>
-                {/* ✨ ADICIONADOS AQUI */}
+                <option value="Transferencia WBS">Transferência WBS</option>
+                <option value="Crossdocking">Crossdocking</option>
+                <option value="Reintegracao">Reintegração</option>
+                <option value="Nota Fiscal">Nota Fiscal</option>
+                {/* ✨ OS NOVOS TIPOS AQUI PARA FILTRAGEM */}
                 <option value="Robótica">Robótica</option>
                 <option value="General Stock">General Stock</option>
               </select>
