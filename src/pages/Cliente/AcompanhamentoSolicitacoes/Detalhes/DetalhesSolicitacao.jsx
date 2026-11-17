@@ -1,6 +1,6 @@
 // =================================================================
 // ARQUIVO: src/pages/Cliente/AcompanhamentoSolicitacoes/Detalhes/DetalhesSolicitacao.jsx
-// DESCRIÇÃO: Detalhamento expandido das solicitações (Sem Valor Estimado na NF e com Obs da Logística read-only)
+// DESCRIÇÃO: Detalhamento expandido das solicitações (Com suporte para Robótica e General Stock)
 // =================================================================
 import React from 'react';
 import { PackageX, Box, ArrowRightLeft, FileText, PackagePlus, Truck, RefreshCcw, XCircle, AlertCircle } from 'lucide-react';
@@ -33,7 +33,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
     </div>
   );
 
-  // ✨ NOVO: FUNÇÃO PARA RENDERIZAR O CAMPO DE OBSERVAÇÕES DA LOGÍSTICA (APENAS LEITURA)
+  // ✨ FUNÇÃO PARA RENDERIZAR O CAMPO DE OBSERVAÇÕES DA LOGÍSTICA (APENAS LEITURA)
   const RenderizarObsLogistica = () => (
     <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px dashed #e2e8f0', paddingTop: '16px' }}>
       <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569', textTransform: 'uppercase' }}>
@@ -41,24 +41,20 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
       </label>
       
       <textarea 
-        // Mostra o texto da base de dados ou uma mensagem padrão se estiver vazio
         value={item.observacoes_logistica || 'Nenhuma observação registada pela logística até ao momento.'}
-        // Bloqueia a digitação (o React ignora as teclas pressionadas)
         readOnly 
-        // Desativa o campo visualmente e funcionalmente para o navegador
         disabled 
-        // Aplica o estilo visual de bloqueio
         style={{
           width: '100%',
           minHeight: '100px',
           padding: '12px',
           borderRadius: '8px',
           border: '1px solid #cbd5e1',
-          backgroundColor: '#f1f5f9', // Fundo cinza para dar a sensação de inativo
-          color: '#64748b',           // Texto ligeiramente mais claro
+          backgroundColor: '#f1f5f9',
+          color: '#64748b',
           fontSize: '0.875rem',
-          cursor: 'not-allowed',      // O cursor do rato muda para um sinal de proibido
-          resize: 'none',             // Impede que o utilizador estique a caixa de texto
+          cursor: 'not-allowed',
+          resize: 'none',
           outline: 'none',
           boxSizing: 'border-box'
         }}
@@ -176,7 +172,6 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </table>
         </div>
 
-        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
         <RenderizarObsLogistica />
         <RenderizarAnexos tituloLogistica={item.tipo === 'Entrada' ? "Documentos de Recebimento Final" : "Documentos de Liberação (Logística)"} />
       </div>
@@ -269,7 +264,6 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </table>
         </div>
 
-        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
         <RenderizarObsLogistica />
         <RenderizarAnexos />
       </div>
@@ -277,7 +271,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
   }
 
   // ========================================================
-  // 4. VISUAL: NOTA FISCAL (🚀 Atualizado: Removido o Valor Estimado)
+  // 4. VISUAL: NOTA FISCAL
   // ========================================================
   if (item.tipo === 'Nota Fiscal') {
     return (
@@ -289,7 +283,6 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </div>
         )}
         
-        {/* ✨ Aqui deixamos apenas a "Descrição / Motivo", ocupando 100% da largura de forma limpa */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '32px', fontSize: '0.875rem', marginBottom: '16px' }}>
           <div style={{ flex: 1 }}>
             <span style={{ color: isRecusadoOuCancelado ? '#991b1b' : '#1e293b', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Descrição / Motivo:</span>
@@ -299,7 +292,6 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </div>
         </div>
 
-        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
         <RenderizarObsLogistica />
         <RenderizarAnexos tituloCliente="Notas Fiscais e Espelhos (Solicitante)" />
       </div>
@@ -356,7 +348,6 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </table>
         </div>
 
-        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
         <RenderizarObsLogistica />
         <RenderizarAnexos 
           tituloCliente="Nota Fiscal Original (Solicitante)" 
@@ -390,9 +381,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
             <thead>
               <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP</th>
-                
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>FABRICANTE</th>
-                
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESCRIÇÃO DO MATERIAL</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>QTD. DEVOLVIDA</th>
               </tr>
@@ -418,9 +407,62 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
           </table>
         </div>
 
-        {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
         <RenderizarObsLogistica />
         <RenderizarAnexos tituloLogistica={isCancelamento ? "Documento de Cancelamento" : "Documento Final de Reintegração"} />
+      </div>
+    );
+  }
+
+  // ========================================================
+  // 7. VISUAL: ROBÓTICA E GENERAL STOCK
+  // ========================================================
+  if (item.tipo === 'Robótica' || item.tipo === 'General Stock') {
+    const isRobotica = item.tipo === 'Robótica';
+    const corTema = isRecusadoOuCancelado ? '#dc2626' : (isRobotica ? '#0f766e' : '#7c2d12');
+    const bgBadge = isRecusadoOuCancelado ? '#fef2f2' : (isRobotica ? '#f0fdfa' : '#ffedd5');
+    const borderBadge = isRecusadoOuCancelado ? '#fecaca' : (isRobotica ? '#ccfbf1' : '#fed7aa');
+
+    return (
+      <div className="area-expandida-cliente" style={{ padding: '24px' }}>
+        {isRecusadoOuCancelado && (
+          <div style={{ padding: '12px 16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={18} />
+            <strong>Atenção:</strong> A solicitação de {item.tipo} foi <strong>{item.statusExibicao}</strong>.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '32px', fontSize: '0.875rem', marginBottom: '16px', backgroundColor: '#ffffff', padding: '16px 20px', borderRadius: '8px', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}` }}>
+          <div style={{ flex: 1, minWidth: '250px' }}>
+            <span style={{ color: isRecusadoOuCancelado ? '#991b1b' : '#1e293b', fontWeight: '700', display: 'block', marginBottom: '6px', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+              Descrição / Motivo:
+            </span>
+            <span style={{ color: isRecusadoOuCancelado ? '#dc2626' : '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+              {itensReais[0]?.descricao_manual || 'Nenhuma descrição informada.'}
+            </span>
+          </div>
+
+          <div style={{ minWidth: '150px' }}>
+            <span style={{ color: isRecusadoOuCancelado ? '#991b1b' : '#1e293b', fontWeight: '700', display: 'block', marginBottom: '6px', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+              Quantidade de Linhas:
+            </span>
+            <span style={{
+              display: 'inline-block',
+              backgroundColor: bgBadge,
+              color: corTema,
+              border: `1px solid ${borderBadge}`,
+              padding: '4px 14px',
+              borderRadius: '6px',
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              fontFamily: 'monospace'
+            }}>
+              {item.observacoes && item.observacoes !== 'null' ? item.observacoes : 'Não informada'}
+            </span>
+          </div>
+        </div>
+
+        <RenderizarObsLogistica />
+        <RenderizarAnexos />
       </div>
     );
   }
@@ -432,7 +474,6 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
     <div className="area-expandida-cliente" style={{ textAlign: 'center', color: '#64748b' }}>
       <p>O painel detalhado para o tipo <strong>{item.tipo}</strong> será construído em breve.</p>
       
-      {/* ✨ AQUI: CHAMA A NOVA FUNÇÃO DAS OBSERVAÇÕES E OS ANEXOS EM SEGUIDA */}
       <RenderizarObsLogistica />
       <RenderizarAnexos />
     </div>
