@@ -259,7 +259,8 @@ export default function ExportarDados() {
       return;
     }
 
-    const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;DATA_ENTREGA;LEAD_TIME_DIAS;TARGET;ITENS;VALOR_TOTAL\n";
+    // ✨ SUBSTITUÍDO "ITENS" POR "LINHAS" AQUI NO CSV
+    const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;DATA_ENTREGA;LEAD_TIME_DIAS;TARGET;LINHAS;VALOR_TOTAL\n";
     const linhas = listaFiltrada.map(row => {
       const leadTimeExport = row.leadTime !== null ? row.leadTime.toFixed(2) : '';
       const targetExport = row.dentroTarget === true ? 'Dentro' : (row.dentroTarget === false ? 'Fora' : '');
@@ -365,7 +366,8 @@ export default function ExportarDados() {
                       <th>DATA ENTREGA</th>
                       <th>LEAD TIME</th>
                       <th>TARGET</th>
-                      <th style={{ textAlign: 'center' }}>ITENS</th>
+                      {/* ✨ SUBSTITUÍDO "ITENS" POR "LINHAS" AQUI NA TABELA */}
+                      <th style={{ textAlign: 'center' }}>LINHAS</th>
                       <th>VALOR TOTAL</th>
                     </tr>
                   </thead>
