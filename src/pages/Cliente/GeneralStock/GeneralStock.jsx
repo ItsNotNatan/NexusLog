@@ -16,7 +16,8 @@ export default function GeneralStock() {
   const { estoqueAtual } = useContext(AuthContext); 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', descricao: '', observacoes: '' });
+  // ✨ Trocado 'observacoes' por 'linhas'
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', descricao: '', linhas: '' });
   const [anexos, setAnexos] = useState([]);
 
   const handleEnviar = async () => {
@@ -35,19 +36,18 @@ export default function GeneralStock() {
     setIsSubmitting(true);
 
     try {
-      // 1. UPLOAD DE ANEXOS (SE HOUVER)
       let anexosSalvos = [];
       if (anexos.length > 0) {
         anexosSalvos = await enviarArquivos(anexos);
       }
 
-      // 2. CONSTRUÇÃO DO PAYLOAD
       const payload = {
         solicitante: {
           nome: formDados.nome,
           wbs: formDados.wbs,
           destino: formDados.destino,
-          observacoes: formDados.observacoes,
+          // ✨ Enviamos o valor das linhas para o campo observacoes do BD
+          observacoes: formDados.linhas ? String(formDados.linhas) : '',
           filial_origem: estoqueAtual
         },
         itens: [
@@ -59,7 +59,6 @@ export default function GeneralStock() {
         anexos: anexosSalvos
       };
 
-      // 3. ENVIO PARA O BACKEND
       const resultado = await apiFetch('/solicitacoes/general-stock', {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -67,7 +66,7 @@ export default function GeneralStock() {
 
       if (resultado.sucesso) {
         showAlert("Sucesso!", `Solicitação General Stock enviada! (PS: ${resultado.ps})`, "success");
-        setFormDados({ nome: '', wbs: '', destino: '', descricao: '', observacoes: '' });
+        setFormDados({ nome: '', wbs: '', destino: '', descricao: '', linhas: '' });
         setAnexos([]);
       } else {
         throw new Error(resultado.erro || 'Falha ao processar solicitação.');
@@ -137,10 +136,25 @@ export default function GeneralStock() {
               <label>DESCRIÇÃO / MOTIVO *</label>
               <textarea className="input-campo flex-1" style={{ outlineColor: '#64748b', minHeight: '120px' }} placeholder="Descreva o motivo..." value={formDados.descricao} onChange={(e) => setFormDados({ ...formDados, descricao: e.target.value })} disabled={isSubmitting}></textarea>
             </div>
+
+            {/* ✨ CAMPO LINHAS COM REGEX PARA ACEITAR APENAS NÚMEROS INTEIROS POSITIVOS */}
             <div className="input-grupo mt-4">
-              <label>OBSERVAÇÕES</label>
-              <input type="text" className="input-campo" style={{ outlineColor: '#64748b' }} placeholder="Info adicional..." value={formDados.observacoes} onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })} disabled={isSubmitting} />
+              <label>LINHAS</label>
+              <input 
+                type="text" 
+                inputMode="numeric"
+                className="input-campo" 
+                style={{ outlineColor: '#64748b' }} 
+                placeholder="Apenas números inteiros..." 
+                value={formDados.linhas} 
+                onChange={(e) => {
+                  const apenasNumeros = e.target.value.replace(/\D/g, '');
+                  setFormDados({ ...formDados, linhas: apenasNumeros });
+                }} 
+                disabled={isSubmitting} 
+              />
             </div>
+
           </div>
         </div>
       </div>
