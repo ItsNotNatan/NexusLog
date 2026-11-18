@@ -28,7 +28,7 @@ export default function ExportarDados() {
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
     periodo: 'Todo Período',
-    mesEspecifico: '', // ✨ NOVO: Campo para o mês específico (Formato: YYYY-MM)
+    mesEspecifico: '', 
     status: 'Todos os Status',
     tipo: 'Todos',
     target: 'Todos',
@@ -95,7 +95,7 @@ export default function ExportarDados() {
       try {
         setCarregando(true);
         const filtroFilial = estoqueAtual && estoqueAtual !== 'TODOS' ? `&filial=${estoqueAtual}` : '';
-        const resultado = await apiFetch(`/solicitacoes/listar?limit=1000${filtroFilial}`);
+        const resultado = await apiFetch(`/solicitacoes/listar?limit=2000${filtroFilial}`); // Aumentado para 2000
 
         if (resultado.sucesso) {
           const dadosFormatados = resultado.dados.map((item) => {
@@ -132,6 +132,17 @@ export default function ExportarDados() {
 
             let plApresentacao = item.pl || '-';
 
+            // ✨ LIMPA-NEVE: Extrai o valor real das linhas ignorando avisos como [RECUSADO] ou [NF VINCULADA]
+            const isRoboticaOuGeneral = item.tipo === 'Robótica' || item.tipo === 'General Stock';
+            let linhasInformadas = item.itens ? item.itens.length : 0;
+            
+            if (isRoboticaOuGeneral && item.observacoes && item.observacoes !== 'null') {
+              const obsLimpa = String(item.observacoes).split(/\[RECUSADO\]:|\[NF VINCULADA\]/)[0].trim();
+              if (obsLimpa !== '' && !isNaN(Number(obsLimpa))) {
+                linhasInformadas = Number(obsLimpa);
+              }
+            }
+
             return {
               id: item.ps || `PS:${item.id.replace(/\D/g, '') || item.id}`,
               solicitante: item.solicitante || 'Não informado',
@@ -144,7 +155,7 @@ export default function ExportarDados() {
               dataEntregaFormatada: dataEntregaFisica ? formatarDataHora(dataEntregaFisica) : '-',
               leadTime: leadTimeDias,
               dentroTarget: dentroTarget,
-              itensCount: item.itens ? item.itens.length : 0,
+              itensCount: linhasInformadas, // ✨ O número limpo vai diretamente para a interface!
               valorTotal: valorTotal
             };
           });
@@ -187,7 +198,6 @@ export default function ExportarDados() {
     if (filtrosAvancados.pl) batePl = item.pl.toLowerCase().includes(filtrosAvancados.pl.toLowerCase());
 
     let bateData = true;
-    // ✨ Lógica para aplicar o mês específico prioritariamente ao período rápido
     if (filtrosAvancados.mesEspecifico && item.criacaoPsRaw) {
       const dataItem = new Date(item.criacaoPsRaw);
       const [anoFiltro, mesFiltro] = filtrosAvancados.mesEspecifico.split('-');
@@ -259,7 +269,6 @@ export default function ExportarDados() {
       return;
     }
 
-    // ✨ SUBSTITUÍDO "ITENS" POR "LINHAS" AQUI NO CSV
     const cabecalho = "PS_ID;SOLICITANTE;WBS;TIPO;STATUS_PS;PL;CRIACAO_PS;DATA_ENTREGA;LEAD_TIME_DIAS;TARGET;LINHAS;VALOR_TOTAL\n";
     const linhas = listaFiltrada.map(row => {
       const leadTimeExport = row.leadTime !== null ? row.leadTime.toFixed(2) : '';
@@ -366,7 +375,6 @@ export default function ExportarDados() {
                       <th>DATA ENTREGA</th>
                       <th>LEAD TIME</th>
                       <th>TARGET</th>
-                      {/* ✨ SUBSTITUÍDO "ITENS" POR "LINHAS" AQUI NA TABELA */}
                       <th style={{ textAlign: 'center' }}>LINHAS</th>
                       <th>VALOR TOTAL</th>
                     </tr>
