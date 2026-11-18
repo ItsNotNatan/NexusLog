@@ -244,6 +244,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
         const necessidadeCrua = obterDataNecessidade(item);
 
+        // ✨ INTEGRAÇÃO DAS "LINHAS" PARA ROBÓTICA E GENERAL STOCK
+        const isRoboticaOuGeneral = item.tipo === 'Robótica' || item.tipo === 'General Stock';
+        let detalhesQuantidade = item.itens?.length || 0;
+        
+        if (isRoboticaOuGeneral && item.observacoes && item.observacoes !== 'null') {
+          const obsLimpa = String(item.observacoes).split('[RECUSADO]:')[0].trim();
+          if (!isNaN(Number(obsLimpa))) {
+            detalhesQuantidade = Number(obsLimpa);
+          }
+        }
+
         return {
           ...item,
           idOriginal: item.idOriginal || item.id,
@@ -267,7 +278,11 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           textoBuscavel: textoBuscavel,
           itensRaw: item.itens || [],
           anexos: item.anexos || [],
-          detalhesCompletos: false 
+          detalhesCompletos: false,
+          
+          // ✨ EXPORTANDO O VALOR DE LINHAS PARA A TABELA VISUAL
+          qtdMovimentada: detalhesQuantidade,
+          unidadeMedida: isRoboticaOuGeneral ? 'linhas' : 'itens'
         };
       });
 
@@ -292,7 +307,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
     const buscarDadosIniciais = async () => {
       try {
         setCarregando(true);
-        const urlSolicitacoes = `/solicitacoes/listar?limit=1000&filial=${estoqueAtual}&resumido=true`;
+        const urlSolicitacoes = `/solicitacoes/listar?limit=2000&filial=${estoqueAtual}&resumido=true`;
 
         const [resultadoSol, resultadoEst] = await Promise.all([
           apiFetch(urlSolicitacoes),
@@ -322,7 +337,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (payload && payload.filialOrigem && payload.filialOrigem !== estoqueAtual && estoqueAtual !== 'TODOS') return; 
 
       try {
-        const resultadoSol = await apiFetch(`/solicitacoes/listar?limit=1000&filial=${estoqueAtual}&resumido=true`);
+        const resultadoSol = await apiFetch(`/solicitacoes/listar?limit=2000&filial=${estoqueAtual}&resumido=true`);
         if (resultadoSol.sucesso) processarESetarSolicitacoes(resultadoSol.dados);
       } catch (e) {
         console.warn("Falha na atualização silenciosa dupla via socket.", e);
@@ -863,6 +878,13 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
                               {linha.tipo}
                             </span>
                             <span style={{ fontSize: "0.875rem", fontWeight: "700", color: corTextoForte, marginTop: "4px", display: "block", fontFamily: "monospace" }}>{linha.id}</span>
+                            
+                            {/* ✨ EXIBE A QUANTIDADE DE LINHAS PARA ROBÓTICA E GENERAL STOCK NA TABELA VISUAL */}
+                            {(linha.tipo === 'Robótica' || linha.tipo === 'General Stock') && linha.qtdMovimentada > 0 && (
+                              <span style={{ fontSize: "0.75rem", fontWeight: "600", color: corTextoMedio, marginTop: "2px", display: "block" }}>
+                                Linhas: {linha.qtdMovimentada}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td>
