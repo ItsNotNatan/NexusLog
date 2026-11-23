@@ -3,7 +3,7 @@
 // DESCRIÇÃO: Ecrã de Saída Crossdocking com Proteção Anti-Duplo Clique
 // =================================================================
 import React, { useState, useEffect, useContext } from 'react';
-import { Package, User, Send, Plus, Trash2, AlertTriangle, FileText, MapPin, Truck } from 'lucide-react';
+import { Package, User, Send, Plus, Trash2, AlertTriangle, FileText, MapPin } from 'lucide-react';
 import BotaoAcaoGlobal from '../../../components/BotaoAcaoGlobal/BotaoAcaoGlobal';
 import GerenciadorAnexos from '../../../components/GerenciadorAnexos/GerenciadorAnexos';
 import { AuthContext } from '../../../contexts/AuthContext';
@@ -21,13 +21,13 @@ export default function Crossdocking() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', documentoCompras: '', fornecedor: '' });
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', documentoCompras: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
   const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
   const [anexos, setAnexos] = useState([]);
 
   useEffect(() => {
-    setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', documentoCompras: '', fornecedor: '' });
+    setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', documentoCompras: '' });
     setTipoSaida(null);
     setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]);
     setAnexos([]);
@@ -94,8 +94,6 @@ export default function Crossdocking() {
         return;
       }
 
-      // O fornecedor fica apenas como informação complementar, sem participar do cruzamento.
-      const fornecedorInformado = normalizarString(formDados.fornecedor);
       const nfProcessada = normalizarString(formDados.nf);
       const pedidoCompraProcessado = normalizarString(formDados.documentoCompras);
 
@@ -104,14 +102,13 @@ export default function Crossdocking() {
         quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
         unidade_medida_manual: 'Unid',
         nf_entrada: nfProcessada,
-        documento_compras: pedidoCompraProcessado,
-        fornecedor: fornecedorInformado // Mantido apenas como informação da solicitação
+        documento_compras: pedidoCompraProcessado
       }));
 
       const payload = {
         solicitante: {
           nome: formDados.nome, wbs: formDados.wbs, nf: nfProcessada, documento_compras: pedidoCompraProcessado, destino: formDados.destino, 
-          observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${fornecedorInformado}] ${formDados.observacoes}`,
+          observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'}] ${formDados.observacoes}`,
           tipo: 'Crossdocking', filial_origem: estoqueAtual 
         },
         itens: listaItensFinais, anexos: anexosProcessados 
@@ -121,7 +118,7 @@ export default function Crossdocking() {
 
       if (dados.sucesso || dados.ps) {
         showAlert("Sucesso!", `Solicitação de Crossdocking enviada com sucesso. ID: ${dados.ps}`, "success");
-        setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', documentoCompras: '', fornecedor: '' });
+        setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', documentoCompras: '' });
         setTipoSaida(null); 
         setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
         setAnexos([]); 
@@ -194,17 +191,6 @@ export default function Crossdocking() {
                 placeholder="Ex: 4500123456"
                 value={formDados.documentoCompras}
                 onChange={(e) => setFormDados({ ...formDados, documentoCompras: e.target.value })}
-                disabled={isSubmitting}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Truck size={14} color="#0891b2" /> FORNECEDOR / EMISSOR DA NF (OPCIONAL)</label>
-              <input 
-                type="text" 
-                className="input-campo foco-ciano" 
-                placeholder="Ex: SIEMENS" 
-                value={formDados.fornecedor} 
-                onChange={(e) => setFormDados({...formDados, fornecedor: e.target.value})} 
                 disabled={isSubmitting}
               />
             </div>
