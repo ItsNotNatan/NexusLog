@@ -11,7 +11,7 @@ import { apiFetch, enviarArquivos } from '../../../services/api';
 import { useAlert } from '../../../contexts/AlertContext';
 
 // Importação da função de extração da primeira palavra
-import { formatarWBS, normalizarString, extrairPrimeiraPalavra } from '../../../utils/formatadores';
+import { formatarWBS, normalizarString } from '../../../utils/formatadores';
 
 import './Crossdocking.css';
 
@@ -21,13 +21,13 @@ export default function Crossdocking() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', fornecedor: '' });
+  const [formDados, setFormDados] = useState({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', documentoCompras: '', fornecedor: '' });
   const [tipoSaida, setTipoSaida] = useState(null);
   const [itensParciais, setItensParciais] = useState([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
   const [anexos, setAnexos] = useState([]);
 
   useEffect(() => {
-    setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', fornecedor: '' });
+    setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', documentoCompras: '', fornecedor: '' });
     setTipoSaida(null);
     setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]);
     setAnexos([]);
@@ -66,8 +66,8 @@ export default function Crossdocking() {
       return;
     }
     
-    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.nf || !formDados.fornecedor || !tipoSaida) {
-      showAlert("Campos Obrigatórios", "Por favor, preencha todos os campos obrigatórios (Nome, WBS, Destino, Fornecedor, Número da NF) e selecione o Tipo de Saída.", "warning");
+    if (!formDados.nome || !formDados.wbs || !formDados.destino || !formDados.nf || !formDados.documentoCompras || !tipoSaida) {
+      showAlert("Campos Obrigatórios", "Preencha Nome, WBS, Destino, Número da NF e Número do Pedido de Compra, e selecione o Tipo de Saída.", "warning");
       return;
     }
     if (anexos.length === 0) {
@@ -94,22 +94,24 @@ export default function Crossdocking() {
         return;
       }
 
-      // 🚀 NOVA REGRA: Salva na base de dados apenas a primeira palavra da Entidade requisitada
-      const entidadeProcessada = extrairPrimeiraPalavra(formDados.fornecedor);
+      // O fornecedor fica apenas como informação complementar, sem participar do cruzamento.
+      const fornecedorInformado = normalizarString(formDados.fornecedor);
       const nfProcessada = normalizarString(formDados.nf);
+      const pedidoCompraProcessado = normalizarString(formDados.documentoCompras);
 
       const listaItensFinais = tipoSaida === 'total' ? [] : itensParciais.map(i => ({
         desenho_sap_manual: normalizarString(i.desenhoSAP),
         quantidade_solicitada: parseInt(i.quantidade, 10) || 1,
         unidade_medida_manual: 'Unid',
         nf_entrada: nfProcessada,
-        fornecedor: entidadeProcessada // Grava a primeira palavra limpa
+        documento_compras: pedidoCompraProcessado,
+        fornecedor: fornecedorInformado // Mantido apenas como informação da solicitação
       }));
 
       const payload = {
         solicitante: {
-          nome: formDados.nome, wbs: formDados.wbs, nf: nfProcessada, destino: formDados.destino, 
-          observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${entidadeProcessada}] ${formDados.observacoes}`,
+          nome: formDados.nome, wbs: formDados.wbs, nf: nfProcessada, documento_compras: pedidoCompraProcessado, destino: formDados.destino, 
+          observacoes: `[Saída ${tipoSaida === 'total' ? 'Total' : 'Parcial'} | Fornecedor: ${fornecedorInformado}] ${formDados.observacoes}`,
           tipo: 'Crossdocking', filial_origem: estoqueAtual 
         },
         itens: listaItensFinais, anexos: anexosProcessados 
@@ -119,7 +121,7 @@ export default function Crossdocking() {
 
       if (dados.sucesso || dados.ps) {
         showAlert("Sucesso!", `Solicitação de Crossdocking enviada com sucesso. ID: ${dados.ps}`, "success");
-        setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', fornecedor: '' });
+        setFormDados({ nome: '', wbs: '', destino: '', observacoes: '', nf: '', documentoCompras: '', fornecedor: '' });
         setTipoSaida(null); 
         setItensParciais([{ id: Date.now(), desenhoSAP: '', quantidade: 1 }]); 
         setAnexos([]); 
@@ -139,7 +141,7 @@ export default function Crossdocking() {
         <Package size={24} />
         <div>
           <strong>Crossdocking</strong>
-          <p>Saída Total processa toda a NF. Saída Parcial permite informar múltiplos itens (Desenho SAP + Qtd) para serem descontados automaticamente na entrada.</p>
+          <p>Saída Total considera a Nota Fiscal e o Pedido de Compra. Saída Parcial considera também o Desenho SAP de cada item para realizar o cruzamento na entrada.</p>
         </div>
       </div>
 
@@ -179,13 +181,24 @@ export default function Crossdocking() {
             <input type="text" className="input-campo foco-ciano" placeholder="Local de destino do material..." value={formDados.destino} onChange={(e) => setFormDados({...formDados, destino: e.target.value})} disabled={isSubmitting} />
           </div>
           
-          <div className="input-grupo" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+          <div className="input-grupo" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', padding: '16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} color="#0891b2" /> NÚMERO DA NOTA FISCAL *</label>
               <input type="text" className="input-campo foco-ciano" placeholder="Ex: 123456" value={formDados.nf} onChange={(e) => setFormDados({...formDados, nf: e.target.value})} disabled={isSubmitting} />
             </div>
             <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Truck size={14} color="#0891b2" /> FORNECEDOR / EMISSOR DA NF *</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} color="#0891b2" /> NÚMERO DO PEDIDO DE COMPRA *</label>
+              <input
+                type="text"
+                className="input-campo foco-ciano"
+                placeholder="Ex: 4500123456"
+                value={formDados.documentoCompras}
+                onChange={(e) => setFormDados({ ...formDados, documentoCompras: e.target.value })}
+                disabled={isSubmitting}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Truck size={14} color="#0891b2" /> FORNECEDOR / EMISSOR DA NF (OPCIONAL)</label>
               <input 
                 type="text" 
                 className="input-campo foco-ciano" 
@@ -224,7 +237,7 @@ export default function Crossdocking() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                 <span style={{ fontSize: '0.85rem', color: '#d97706', display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '75%' }}>
                   <AlertTriangle size={16} /> 
-                  Os itens abaixo serão descontados automaticamente pela combinação de NF e Desenho SAP durante a Entrada.
+                  Os itens abaixo serão descontados automaticamente quando Desenho SAP, Nota Fiscal e Pedido de Compra corresponderem à Entrada.
                 </span>
                 <button disabled={isSubmitting} onClick={adicionarItemParcial} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', color: isSubmitting ? '#cbd5e1' : '#2563eb', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}><Plus size={14} /> Adicionar Item</button>
               </div>
