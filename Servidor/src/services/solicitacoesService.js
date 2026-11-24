@@ -237,6 +237,7 @@ const listarSolicitacoes = async (page = 1, limit = 10, busca = '', tipo = '', f
       ps: sol.ps,
       tipo: sol.tipo,
       nfCrossdocking: nfCross,
+      documento_compras: sol.documento_compras || '',
       solicitante: sol.nome_solicitante || 'Não informado',
       wbs: wbsExibicao,
       pl: plFinal,
@@ -315,6 +316,7 @@ const obterSolicitacaoDetalhada = async (id) => {
     ps: sol.ps,
     tipo: sol.tipo,
     nfCrossdocking: nfCross,
+      documento_compras: sol.documento_compras || '',
     solicitante: sol.nome_solicitante || 'Não informado',
     wbs: wbsExibicao,
     wbs_origem: sol.wbs_origem,
@@ -323,7 +325,6 @@ const obterSolicitacaoDetalhada = async (id) => {
     filial: sol.filial_origem_id || '-',
     destino: sol.destino || 'Não informado',
     dataSolicitacao: formatarDataBrasil(sol.created_at) || "-",
-
     dataCriacaoISO: sol.created_at,
 
     data_necessidade: sol.data_necessidade,
