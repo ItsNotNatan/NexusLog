@@ -14,9 +14,16 @@ import { useAlert } from '../../../contexts/AlertContext';
 import { apiFetch, enviarArquivos } from '../../../services/api';
 
 // 🚀 Trazemos as nossas funções utilitárias
-import { normalizarString, extrairPrimeiraPalavra, compararEntidade } from '../../../utils/formatadores';
+import { normalizarString } from '../../../utils/formatadores';
 
 const LIMITE_LOGISTICA = 100;
+
+// Normaliza identificadores e impede que valores vazios/placeholder gerem falso reconhecimento.
+const normalizarIdentificador = (valor) => {
+  const normalizado = normalizarString(valor);
+  const invalidos = ['', '-', '—', '--', 'SEM-NF', 'SEM-PN', 'SEM-PEDIDO', 'N/A', 'NA'];
+  return invalidos.includes(normalizado) ? '' : normalizado;
+};
 
 export default function EntradaEstoque() {
   const { estoqueAtual } = useContext(AuthContext);
@@ -352,64 +359,72 @@ export default function EntradaEstoque() {
     }
   };
 
-  // ✨ MATCH VISUAL REFORÇADO E LÓGICA DE CRUZAMENTO (OR: Fornecedor / Fabricante)
+  // Reconhecimento visual de Crossdocking:
+  // Total = NF + Pedido de Compra.
+  // Parcial = NF + Pedido de Compra + Desenho SAP.
   const { idsLinhasCrossdocking, solicitacoesCrossEncontradas } = useMemo(() => {
     const idsMarcados = new Set();
     const mapSolicitacoes = new Map();
 
-    itens.forEach(linhaTabela => {
-      const nfTab = normalizarString(linhaTabela.nfEntrada);
-      const sapTab = normalizarString(linhaTabela.desenhoSAP);
+    itens.forEach((linhaTabela) => {
+      const nfEntrada = normalizarIdentificador(linhaTabela.nfEntrada);
+      const pedidoEntrada = normalizarIdentificador(linhaTabela.docCompras);
+      const sapEntrada = normalizarIdentificador(linhaTabela.desenhoSAP);
 
-      if (!nfTab) return; // Se a linha de entrada não tem NF, pula logo
+      // NF e Pedido são obrigatórios nos dois tipos de saída.
+      if (!nfEntrada || !pedidoEntrada) return;
 
-      crossdockingsPendentes.forEach(cross => {
-        const nfCross = normalizarString(cross.nfCrossdocking);
-        
-        let fornCross = '';
-        if (cross.itens && cross.itens.length > 0 && cross.itens[0].fornecedor) {
-          fornCross = cross.itens[0].fornecedor;
+      crossdockingsPendentes.forEach((cross) => {
+        const itensCross = Array.isArray(cross.itens) ? cross.itens : [];
+        const primeiroItemComNF = itensCross.find((item) => item.nf_entrada);
+        const primeiroItemComPedido = itensCross.find((item) => item.documento_compras);
+
+        const nfCross = normalizarIdentificador(
+          cross.nfCrossdocking || primeiroItemComNF?.nf_entrada
+        );
+        const pedidoCross = normalizarIdentificador(
+          cross.documento_compras || primeiroItemComPedido?.documento_compras
+        );
+
+        // Evita reconhecimento quando qualquer um dos identificadores estiver ausente.
+        if (!nfCross || !pedidoCross) return;
+
+        const bateuNFEPedido =
+          nfEntrada === nfCross &&
+          pedidoEntrada === pedidoCross;
+
+        if (!bateuNFEPedido) return;
+
+        const observacoes = String(cross.observacoes || '');
+        const mencionaParcial = /sa[íi]da\s+parcial/i.test(observacoes);
+        const mencionaTotal = /sa[íi]da\s+total/i.test(observacoes);
+        const isParcial = mencionaParcial || (!mencionaTotal && itensCross.length > 0);
+
+        if (isParcial) {
+          // Na saída parcial, além de NF e Pedido, o Desenho SAP também deve coincidir.
+          if (!sapEntrada) return;
+
+          const bateuSAP = itensCross.some((item) => {
+            const sapCross = normalizarIdentificador(
+              item.desenho_sap_manual || item.desenho_sap || item.desenhoSAP
+            );
+            return sapCross && sapCross === sapEntrada;
+          });
+
+          if (!bateuSAP) return;
         }
-        if (!fornCross && cross.observacoes) {
-          const matchForn = cross.observacoes.match(/Fornecedor:\s*([^\]|\n]+)/i);
-          if (matchForn) fornCross = matchForn[1];
-        }
 
-        // 🚀 VERIFICAÇÃO DUPLA: Bateu NF? E a entidade que o cliente pediu (fornCross)
-        // é a mesma que o Fornecedor OU Fabricante digitado na linha da tabela?
-        const bateuNF = nfTab === nfCross;
-        const bateuEntidade = compararEntidade(fornCross, linhaTabela.fornecedor, linhaTabela.fabricante);
-
-        if (bateuNF && bateuEntidade) {
-          const obs = String(cross.observacoes || '');
-          const isParcial = /sa[íi]da\s+parcial/i.test(obs) || (cross.itens && cross.itens.length > 0 && !/sa[íi]da\s+total/i.test(obs));
-
-          if (isParcial) {
-            if (!sapTab) return; // Se a linha de entrada não tem SAP, não é aprovada na Parcial
-            const itensCross = cross.itens || [];
-            
-            // Só pinta a linha se ela bater com o SAP específico que o cliente pediu
-            const bateuSap = itensCross.some(ic => {
-              const sapCross = normalizarString(ic.desenho_sap_manual || ic.desenho_sap || ic.desenhoSAP);
-              return sapCross && sapCross === sapTab;
-            });
-
-            if (bateuSap) {
-              idsMarcados.add(linhaTabela.id);
-              mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: extrairPrimeiraPalavra(fornCross), isParcial: true });
-            }
-          } else {
-            // Se for Total, aprova tudo o que partilhar a mesma NF e Entidade (Não precisa de SAP)
-            idsMarcados.add(linhaTabela.id);
-            mapSolicitacoes.set(cross.id, { ...cross, fornecedorIdentificado: extrairPrimeiraPalavra(fornCross), isParcial: false });
-          }
-        }
+        idsMarcados.add(linhaTabela.id);
+        mapSolicitacoes.set(cross.id, {
+          ...cross,
+          isParcial
+        });
       });
     });
 
-    return { 
-      idsLinhasCrossdocking: idsMarcados, 
-      solicitacoesCrossEncontradas: Array.from(mapSolicitacoes.values()) 
+    return {
+      idsLinhasCrossdocking: idsMarcados,
+      solicitacoesCrossEncontradas: Array.from(mapSolicitacoes.values())
     };
   }, [itens, crossdockingsPendentes]);
 
@@ -462,7 +477,7 @@ export default function EntradaEstoque() {
                   {solicitacoesCrossEncontradas.length} Solicitação(ões) de Crossdocking Reconhecida(s)
                 </strong>
                 <span style={{ fontSize: '0.825rem', color: '#475569' }}>
-                  Os materiais abaixo coincidiram rigorosamente com a NF e a Entidade correspondente.
+                  Os materiais abaixo coincidiram com os critérios da solicitação: NF + Pedido de Compra e, na saída parcial, também Desenho SAP.
                 </span>
               </div>
             </div>
@@ -529,8 +544,8 @@ export default function EntradaEstoque() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginTop: '10px', fontSize: '0.80rem', color: '#334155' }}>
                     <div><strong>Solicitante:</strong> {cross.solicitante || cross.nome_solicitante || '-'}</div>
-                    <div><strong>Fornecedor:</strong> {cross.fornecedorIdentificado || '-'}</div>
                     <div><strong>NF:</strong> {cross.nfCrossdocking || '-'}</div>
+                    <div><strong>Pedido de Compra:</strong> {cross.documento_compras || '-'}</div>
                     <div><strong>Destino:</strong> {cross.destino || '-'}</div>
                     <div><strong>WBS:</strong> {cross.wbs || cross.wbs_destino || '-'}</div>
                   </div>
@@ -574,7 +589,7 @@ export default function EntradaEstoque() {
                         </div>
                       ) : (
                         <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
-                          Saída Total: Todos os itens correspondentes a esta NF e Fornecedor serão transferidos.
+                          Saída Total: Todos os itens correspondentes a esta NF e Pedido de Compra serão reconhecidos.
                         </span>
                       )}
                     </div>
