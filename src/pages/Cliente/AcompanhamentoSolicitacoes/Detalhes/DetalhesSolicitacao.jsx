@@ -322,10 +322,11 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
         </div>
 
         <div style={{ overflowX: 'auto', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, borderRadius: '8px', backgroundColor: '#ffffff', paddingTop: '12px', width: '100%', maxWidth: '78vw' }}>
-          <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse' }}>
+          <table className="tabela-sub-itens" style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#f8fafc' }}>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>DESENHO SAP / REFERÊNCIA</th>
+                <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b' }}>Nº PEDIDO DE COMPRA / CPV</th>
                 <th style={{ padding: '12px 16px', borderBottom: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e2e8f0'}`, fontSize: '0.75rem', color: isRecusadoOuCancelado ? '#dc2626' : '#64748b', textAlign: 'center' }}>VOLUME SOLICITADO</th>
               </tr>
             </thead>
@@ -334,6 +335,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                 itensReais.map((it, idx) => (
                   <tr key={idx} style={{ borderBottom: isRecusadoOuCancelado ? '1px solid #fee2e2' : '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 16px', fontWeight: '700', color: isRecusadoOuCancelado ? '#b91c1c' : '#1e293b', fontFamily: 'monospace' }}>{it.desenho_sap_manual || '-'}</td>
+                    <td style={{ padding: '12px 16px', color: isRecusadoOuCancelado ? '#ef4444' : '#475569', fontFamily: 'monospace', fontSize: '0.8rem' }}>{it.documento_compras || item.documento_compras || '-'}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <span style={{ display: 'inline-block', backgroundColor: isRecusadoOuCancelado ? '#fef2f2' : '#faf5ff', color: isRecusadoOuCancelado ? '#dc2626' : '#9333ea', padding: '4px 12px', borderRadius: '6px', fontWeight: '700', fontSize: '0.85rem', border: `1px solid ${isRecusadoOuCancelado ? '#fecaca' : '#e9d5ff'}` }}>
                         {it.quantidade_solicitada} <span style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>{it.unidade_medida_manual}</span>
@@ -342,7 +344,7 @@ export default function DetalhesSolicitacao({ item, perfil, onDeleteAnexo }) {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="2" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '24px' }}>Saída Total (Sem itens especificados). Veja os anexos.</td></tr>
+                <tr><td colSpan="3" style={{ textAlign: 'center', color: isRecusadoOuCancelado ? '#ef4444' : '#94a3b8', padding: '24px' }}>Saída Total (Sem itens especificados). Veja os anexos.</td></tr>
               )}
             </tbody>
           </table>
