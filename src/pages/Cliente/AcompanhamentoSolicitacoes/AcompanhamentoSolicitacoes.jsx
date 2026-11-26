@@ -154,6 +154,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [dadosTabela, setDadosTabela] = useState([]);
   const [estoque, setEstoque] = useState([]);
+  // Total real informado pelo backend (sem depender do limite de registros carregados).
+  const [totalSolicitacoesBackend, setTotalSolicitacoesBackend] = useState(0);
   const [filtroAtivo, setFiltroAtivo] = useState("Todos");
   const [carregando, setCarregando] = useState(true);
   const [carregandoDetalhes, setCarregandoDetalhes] = useState(null); 
@@ -363,6 +365,15 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
         if (resultadoEst.sucesso) setEstoque(resultadoEst.dados);
 
         if (resultadoSol.sucesso) {
+          // No Painel da Logística, usa a contagem completa retornada pelo backend.
+          // O campo totalItems do PocketBase não é limitado ao número de linhas desta resposta.
+          if (perfil === 'logistica' && resultadoSol.total !== undefined && resultadoSol.total !== null) {
+            const totalRecebido = Number(resultadoSol.total);
+            if (Number.isFinite(totalRecebido)) {
+              setTotalSolicitacoesBackend(totalRecebido);
+            }
+          }
+
           processarESetarSolicitacoes(resultadoSol.dados);
         } else {
           showAlert("Erro Operacional", resultadoSol.erro || 'Falha ao buscar dados.', "error");
@@ -384,7 +395,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
       try {
         const resultadoSol = await buscarSolicitacoesAcompanhamento();
-        if (resultadoSol.sucesso) processarESetarSolicitacoes(resultadoSol.dados);
+        if (resultadoSol.sucesso) {
+          // Mantém o contador correto também após atualizações via Socket.IO.
+          if (perfil === 'logistica' && resultadoSol.total !== undefined && resultadoSol.total !== null) {
+            const totalRecebido = Number(resultadoSol.total);
+            if (Number.isFinite(totalRecebido)) {
+              setTotalSolicitacoesBackend(totalRecebido);
+            }
+          }
+
+          processarESetarSolicitacoes(resultadoSol.dados);
+        }
       } catch (e) {
         console.warn("Falha na atualização silenciosa dupla via socket.", e);
       }
@@ -512,14 +533,17 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const kpis = useMemo(() => {
     return {
-      total: dadosOrdenados.length,
+      // Na Logística, mostra todas as solicitações da filial, mesmo que a
+      // consulta de registros tenha retornado somente os primeiros 1.000.
+      // No perfil Cliente, preserva o cálculo anterior.
+      total: perfil === 'logistica' ? totalSolicitacoesBackend : dadosOrdenados.length,
       pendentes: dadosOrdenados.filter((item) => item.status === "Pendente").length,
       andamento: dadosOrdenados.filter((item) => item.status === "Em Separação" || item.status === "Em Andamento").length,
       concluidos: dadosOrdenados.filter((item) => item.status === "Concluído" || item.statusExibicao === "Reintegrado").length,
       recusados: dadosOrdenados.filter((item) => item.status === "Recusado").length,
       cancelados: dadosOrdenados.filter((item) => item.status === "Cancelado" || item.statusExibicao === "Cancelado").length,
     };
-  }, [dadosOrdenados]);
+  }, [dadosOrdenados, perfil, totalSolicitacoesBackend]);
 
   const { dadosPaginados, totalPaginas, totalRegistrosFiltrados, indexPrimeiroItem, indexUltimoItem } = useMemo(() => {
     const totalRegistros = dadosOrdenados.length;
