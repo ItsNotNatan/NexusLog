@@ -165,7 +165,8 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [ordenacao, setOrdenacao] = useState({ coluna: 'dataCriacaoISO', direcao: 'desc' });
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [itensPorPagina, setItensPorPagina] = useState(10);
+  // O Acompanhamento do cliente abre com até 2.000 registros; o Painel da Logística mantém 10.
+  const [itensPorPagina, setItensPorPagina] = useState(perfil === 'cliente' ? 2000 : 10);
 
   const [termoPesquisaInput, setTermoPesquisaInput] = useState("");
   const [termoPesquisaFiltro, setTermoPesquisaFiltro] = useState("");
@@ -304,13 +305,58 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       });
     };
 
+    // PocketBase 0.22 limita cada página da API a 500 registros.
+    // Buscamos até quatro páginas e juntamos os resultados para disponibilizar
+    // até 2.000 solicitações somente nesta tela.
+    const buscarSolicitacoesAcompanhamento = async () => {
+      // A rota do Painel da Logística mantém a consulta e o comportamento atuais.
+      if (perfil !== 'cliente') {
+        return apiFetch(`/solicitacoes/listar?limit=2000&filial=${estoqueAtual}&resumido=true`);
+      }
+
+      const limitePorConsulta = 500;
+      const limiteTotal = 2000;
+      const urlBase = `/solicitacoes/listar?limit=${limitePorConsulta}&filial=${encodeURIComponent(estoqueAtual)}&resumido=true`;
+
+      const primeiraResposta = await apiFetch(`${urlBase}&page=1`);
+      if (!primeiraResposta?.sucesso) return primeiraResposta;
+
+      const primeiraPagina = Array.isArray(primeiraResposta.dados) ? primeiraResposta.dados : [];
+      const totalDisponivel = Number(primeiraResposta.total) || primeiraPagina.length;
+      const paginasNecessarias = Math.min(
+        limiteTotal / limitePorConsulta,
+        Math.ceil(totalDisponivel / limitePorConsulta)
+      );
+
+      if (paginasNecessarias <= 1) {
+        return { ...primeiraResposta, dados: primeiraPagina };
+      }
+
+      const respostasRestantes = await Promise.all(
+        Array.from({ length: paginasNecessarias - 1 }, (_, indice) =>
+          apiFetch(`${urlBase}&page=${indice + 2}`)
+        )
+      );
+
+      const respostaComFalha = respostasRestantes.find((resposta) => !resposta?.sucesso);
+      if (respostaComFalha) return respostaComFalha;
+
+      const dadosCombinados = [
+        ...primeiraPagina,
+        ...respostasRestantes.flatMap((resposta) =>
+          Array.isArray(resposta.dados) ? resposta.dados : []
+        ),
+      ].slice(0, limiteTotal);
+
+      return { ...primeiraResposta, dados: dadosCombinados };
+    };
+
     const buscarDadosIniciais = async () => {
       try {
         setCarregando(true);
-        const urlSolicitacoes = `/solicitacoes/listar?limit=2000&filial=${estoqueAtual}&resumido=true`;
 
         const [resultadoSol, resultadoEst] = await Promise.all([
-          apiFetch(urlSolicitacoes),
+          buscarSolicitacoesAcompanhamento(),
           apiFetch(`/estoque/listar?filial=${estoqueAtual}`)
         ]);
 
@@ -337,7 +383,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       if (payload && payload.filialOrigem && payload.filialOrigem !== estoqueAtual && estoqueAtual !== 'TODOS') return; 
 
       try {
-        const resultadoSol = await apiFetch(`/solicitacoes/listar?limit=2000&filial=${estoqueAtual}&resumido=true`);
+        const resultadoSol = await buscarSolicitacoesAcompanhamento();
         if (resultadoSol.sucesso) processarESetarSolicitacoes(resultadoSol.dados);
       } catch (e) {
         console.warn("Falha na atualização silenciosa dupla via socket.", e);
@@ -1123,6 +1169,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           indexUltimoItem={indexUltimoItem}
           dadosPaginadosLength={dadosPaginados.length}
           itensPorPagina={itensPorPagina}
+          opcoesItensPorPagina={perfil === 'cliente' ? [10, 25, 50, 100, 2000] : undefined}
           setItensPorPagina={setItensPorPagina}
           setPaginaAtual={setPaginaAtual}
           carregando={carregando}

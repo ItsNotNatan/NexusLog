@@ -13,6 +13,7 @@ export default function PaginacaoTabela({
   indexUltimoItem,
   dadosPaginadosLength,
   itensPorPagina,
+  opcoesItensPorPagina = [10, 25, 50, 100],
   setItensPorPagina,
   setPaginaAtual,
   carregando
@@ -41,10 +42,11 @@ export default function PaginacaoTabela({
               cursor: carregando ? 'not-allowed' : 'pointer', outline: 'none'
             }}
           >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
+            {opcoesItensPorPagina.map((quantidade) => (
+              <option key={quantidade} value={quantidade}>
+                {quantidade.toLocaleString('pt-BR')}
+              </option>
+            ))}
           </select>
         </div>
       </div>
