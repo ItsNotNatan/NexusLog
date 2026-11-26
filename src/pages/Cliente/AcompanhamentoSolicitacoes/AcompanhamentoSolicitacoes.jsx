@@ -305,9 +305,9 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       });
     };
 
-    // PocketBase 0.22 limita cada página da API a 500 registros.
-    // Buscamos até quatro páginas e juntamos os resultados para disponibilizar
-    // até 2.000 solicitações somente nesta tela.
+    // Cada consulta busca 500 registros para manter compatibilidade com os
+    // limites de paginação do PocketBase. No perfil Cliente, juntamos até
+    // quatro páginas para disponibilizar até 2.000 solicitações nesta tela.
     const buscarSolicitacoesAcompanhamento = async () => {
       // A rota do Painel da Logística mantém a consulta e o comportamento atuais.
       if (perfil !== 'cliente') {
