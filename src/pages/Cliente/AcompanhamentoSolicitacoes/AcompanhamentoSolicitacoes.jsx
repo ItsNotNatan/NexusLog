@@ -167,7 +167,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
 
   const [ordenacao, setOrdenacao] = useState({ coluna: 'dataCriacaoISO', direcao: 'desc' });
   const [paginaAtual, setPaginaAtual] = useState(1);
-  // O Acompanhamento do cliente abre com até 2.000 registros; o Painel da Logística mantém 10.
+  // O Cliente inicia com 2.000; a Logística mantém 10 como padrão, mas ambos podem selecionar até 2.000.
   const [itensPorPagina, setItensPorPagina] = useState(perfil === 'cliente' ? 2000 : 10);
 
   const [termoPesquisaInput, setTermoPesquisaInput] = useState("");
@@ -307,15 +307,10 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
       });
     };
 
-    // Cada consulta busca 500 registros para manter compatibilidade com os
-    // limites de paginação do PocketBase. No perfil Cliente, juntamos até
-    // quatro páginas para disponibilizar até 2.000 solicitações nesta tela.
+    // Cada consulta busca 500 registros para respeitar o limite do PocketBase.
+    // Nesta tela, tanto Cliente quanto Logística podem carregar até 2.000
+    // solicitações, permitindo selecionar esse valor em "Itens por página".
     const buscarSolicitacoesAcompanhamento = async () => {
-      // A rota do Painel da Logística mantém a consulta e o comportamento atuais.
-      if (perfil !== 'cliente') {
-        return apiFetch(`/solicitacoes/listar?limit=2000&filial=${estoqueAtual}&resumido=true`);
-      }
-
       const limitePorConsulta = 500;
       const limiteTotal = 2000;
       const urlBase = `/solicitacoes/listar?limit=${limitePorConsulta}&filial=${encodeURIComponent(estoqueAtual)}&resumido=true`;
@@ -1193,7 +1188,7 @@ export default function AcompanhamentoSolicitacoes({ perfil = "cliente" }) {
           indexUltimoItem={indexUltimoItem}
           dadosPaginadosLength={dadosPaginados.length}
           itensPorPagina={itensPorPagina}
-          opcoesItensPorPagina={perfil === 'cliente' ? [10, 25, 50, 100, 2000] : undefined}
+          opcoesItensPorPagina={[10, 25, 50, 100, 200, 500, 1000, 2000]}
           setItensPorPagina={setItensPorPagina}
           setPaginaAtual={setPaginaAtual}
           carregando={carregando}
